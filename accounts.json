@@ -1,0 +1,26 @@
+[
+  {
+    "id": "AS-0001",
+    "name": "anil",
+    "mobile": "9755503929",
+    "village": "siladehi",
+    "pinHash": "3a8e0a134a12cf1b189cb33215c399f1a7a975046b3a035f47ad6ca0a6f14f4a",
+    "createdAt": "2026-08-03T07:47:49.155Z",
+    "history": [
+      {
+        "entryId": "AS-0001-E1",
+        "amount": 100,
+        "tier": "₹50 – ₹500 वाले ग्राहकों के लिए",
+        "discount": 10,
+        "timestamp": "2026-08-03T07:48:08.503Z"
+      },
+      {
+        "entryId": "AS-0001-E2",
+        "amount": 500,
+        "tier": "₹50 – ₹500 वाले ग्राहकों के लिए",
+        "discount": 8,
+        "timestamp": "2026-08-03T07:51:54.251Z"
+      }
+    ]
+  }
+]
