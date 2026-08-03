@@ -19,7 +19,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-const PORT = 4000;
+const PORT = process.env.PORT || 4000;
 const DATA_FILE = path.join(__dirname, 'accounts.json');
 const CSV_FILE = path.join(__dirname, 'customers.csv');
 const HTML_FILE = path.join(__dirname, 'aditya-studio-discount-wheel.html');
