@@ -1,0 +1,7 @@
+node_modules/
+.env
+
+# Real customer data — kabhi bhi public repo me nahi honi chahiye
+accounts.json
+customers.csv
+codes.json
