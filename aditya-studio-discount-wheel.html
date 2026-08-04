@@ -104,13 +104,44 @@
   #wheelSection{display:none;}
   .tier-badge{display:inline-block; padding:6px 16px; border:1px solid var(--gold-dim); border-radius:999px; font-size:12px; color:var(--gold-light); letter-spacing:0.5px; margin-bottom:8px; font-family:'Poppins',sans-serif;}
   .cust-id{font-size:12px; color:var(--muted); margin-bottom:22px;}
-  .wheel-stage{position:relative; width:min(320px, 82vw); aspect-ratio:1/1; margin:10px auto 26px;}
+  .wheel-stage{position:relative; width:min(320px, 82vw); aspect-ratio:1/1; margin:10px auto 44px;}
   .pointer{position:absolute; top:-14px; left:50%; transform:translateX(-50%); width:0; height:0; border-left:14px solid transparent; border-right:14px solid transparent; border-top:24px solid var(--gold-light); filter:drop-shadow(0 3px 4px rgba(0,0,0,0.5)); z-index:3;}
-  .wheel-outer{width:100%; height:100%; border-radius:50%; padding:10px; background:conic-gradient(from 0deg, var(--gold-light), var(--gold), var(--gold-dim), var(--gold), var(--gold-light)); box-shadow:0 18px 40px rgba(0,0,0,0.55), 0 0 0 1px rgba(212,175,55,0.4);}
-  .wheel{width:100%; height:100%; border-radius:50%; position:relative; background:#12100c; transition:transform 4.2s cubic-bezier(0.15, 0.85, 0.15, 1); box-shadow:inset 0 0 24px rgba(0,0,0,0.6); overflow:hidden;}
-  .wheel .seg-label{position:absolute; top:50%; left:50%; width:50%; transform-origin:0% 50%; font-family:'Poppins',sans-serif; font-weight:600; font-size:15px; text-align:right; padding-right:16px; letter-spacing:0.3px;}
-  .hub{position:absolute; top:50%; left:50%; width:54px; height:54px; transform:translate(-50%,-50%); border-radius:50%; background:radial-gradient(circle at 35% 30%, var(--gold-light), var(--gold) 55%, var(--gold-dim)); box-shadow:0 3px 10px rgba(0,0,0,0.5), inset 0 0 0 2px rgba(0,0,0,0.25); z-index:2; display:flex; align-items:center; justify-content:center; font-size:18px;}
-  .spin-btn{width:min(320px, 82vw); margin:0 auto; display:block;}
+  .wheel-outer{width:100%; height:100%; border-radius:50%; padding:12px; position:relative; background:conic-gradient(from 0deg, var(--gold-light), var(--gold) 15%, var(--gold-dim) 30%, var(--gold) 50%, var(--gold-light) 65%, var(--gold) 80%, var(--gold-dim) 92%, var(--gold-light)); box-shadow:0 22px 45px rgba(0,0,0,0.6), 0 0 0 1px rgba(212,175,55,0.5), inset 0 0 12px rgba(0,0,0,0.4);}
+  .wheel-outer::before{content:""; position:absolute; inset:0; border-radius:50%; background:repeating-conic-gradient(rgba(255,255,255,0.55) 0deg 1.4deg, transparent 1.4deg 14deg); mix-blend-mode:overlay; pointer-events:none;}
+  .wheel{width:100%; height:100%; border-radius:50%; position:relative; background:var(--gold-dim); transition:transform 4.4s cubic-bezier(0.12, 0.85, 0.1, 1); box-shadow:inset 0 0 3px rgba(0,0,0,0.6), 0 0 0 3px rgba(0,0,0,0.5); overflow:hidden;}
+  .wheel .seg-label{position:absolute; top:50%; left:50%; width:50%; transform-origin:0% 50%; font-family:'Poppins',sans-serif; font-weight:700; font-size:16px; text-align:right; padding-right:18px; letter-spacing:0.3px; color:#FBF3DD; text-shadow:0 1px 2px rgba(0,0,0,0.6), 0 0 8px rgba(0,0,0,0.3);}
+  .hub{position:absolute; top:50%; left:50%; width:60px; height:60px; transform:translate(-50%,-50%); border-radius:50%; background:radial-gradient(circle at 35% 30%, var(--gold-light), var(--gold) 55%, var(--gold-dim)); box-shadow:0 4px 12px rgba(0,0,0,0.55), inset 0 0 0 2px rgba(0,0,0,0.3), 0 0 0 4px rgba(0,0,0,0.5); z-index:2; display:flex; align-items:center; justify-content:center; font-size:22px;}
+
+  .spin-btn-wrap{display:flex; flex-direction:column; align-items:center; margin-top:6px;}
+  .spin-btn{
+    position:relative;
+    width:200px; height:64px;
+    border:none; border-radius:999px;
+    background:linear-gradient(180deg, var(--gold-light) 0%, var(--gold) 55%, var(--gold-dim) 100%);
+    color:#241804;
+    font-family:'Poppins',sans-serif; font-weight:700; font-size:16px; letter-spacing:1px;
+    cursor:pointer;
+    box-shadow:
+      inset 0 2px 0 rgba(255,255,255,0.55),
+      inset 0 -10px 14px rgba(0,0,0,0.18),
+      0 8px 0 var(--gold-dim),
+      0 18px 28px rgba(0,0,0,0.55);
+    transition:transform .12s ease, box-shadow .12s ease, opacity .2s;
+  }
+  .spin-btn:hover{transform:translateY(-2px);}
+  .spin-btn:active{
+    transform:translateY(5px);
+    box-shadow:
+      inset 0 2px 0 rgba(255,255,255,0.5),
+      inset 0 -6px 10px rgba(0,0,0,0.2),
+      0 3px 0 var(--gold-dim),
+      0 8px 16px rgba(0,0,0,0.5);
+  }
+  .spin-btn:disabled{opacity:0.45; cursor:not-allowed; transform:none;}
+  .spin-btn-shadow{
+    width:150px; height:16px; margin-top:10px;
+    background:radial-gradient(ellipse at center, rgba(0,0,0,0.55), transparent 70%);
+  }
 
   .modal-bg{display:none; position:fixed; inset:0; background:rgba(6,4,2,0.78); backdrop-filter:blur(3px); z-index:50; align-items:center; justify-content:center; padding:20px;}
   .modal{background:linear-gradient(180deg, #1B140F, #120D09); border:1px solid rgba(212,175,55,0.4); border-radius:18px; max-width:360px; width:100%; padding:36px 26px; text-align:center; box-shadow:0 25px 60px rgba(0,0,0,0.6);}
@@ -224,12 +255,15 @@
       <div class="pointer"></div>
       <div class="wheel-outer">
         <div class="wheel" id="wheel">
-          <div class="hub">🎁</div>
+          <div class="hub">📸</div>
         </div>
       </div>
     </div>
 
-    <button class="btn spin-btn" id="spinBtn">व्हील स्पिन करें 🎡</button>
+    <div class="spin-btn-wrap">
+      <button class="spin-btn" id="spinBtn">SPIN 🎡</button>
+      <div class="spin-btn-shadow"></div>
+    </div>
   </div>
 
   <footer>Aditya Studio — डिस्काउंट व्हील डेमो</footer>
@@ -419,23 +453,31 @@ function tierFor(amount){
   return TIERS.find(t => amount >= t.min && amount <= t.max) || TIERS[TIERS.length - 1];
 }
 
+const JEWEL_COLORS = ['#8E1B2E', '#1B3B6F', '#1F5C3F', '#5B2A86', '#A9711F', '#7A1F2B', '#154C63', '#4A1942'];
+
 function buildWheel(tier){
-  wheelEl.innerHTML = '<div class="hub">🎁</div>';
+  wheelEl.innerHTML = '<div class="hub">📸</div>';
   const n = tier.values.length;
   const segAngle = 360 / n;
+  const seam = 1.4; // thin gold line width in degrees between segments
   const stops = [];
   for(let i=0;i<n;i++){
-    const c1 = (i % 2 === 0) ? 'var(--maroon)' : '#241A10';
-    const c2 = (i % 2 === 0) ? 'var(--maroon-light)' : '#2E2113';
+    const color = JEWEL_COLORS[i % JEWEL_COLORS.length];
     const from = i*segAngle, to = (i+1)*segAngle;
-    stops.push(c1 + ' ' + from + 'deg ' + ((from+to)/2) + 'deg', c2 + ' ' + ((from+to)/2) + 'deg ' + to + 'deg');
+    stops.push(
+      'var(--gold) ' + from + 'deg',
+      'var(--gold) ' + (from+seam) + 'deg',
+      color + ' ' + (from+seam) + 'deg',
+      color + ' ' + (to-seam) + 'deg',
+      'var(--gold) ' + (to-seam) + 'deg',
+      'var(--gold) ' + to + 'deg'
+    );
   }
   wheelEl.style.background = 'conic-gradient(' + stops.join(',') + ')';
   for(let i=0;i<n;i++){
     const label = document.createElement('div');
     label.className = 'seg-label';
     label.textContent = tier.values[i] + '%';
-    label.style.color = (i % 2 === 0) ? 'var(--gold-light)' : 'var(--gold)';
     const angle = i*segAngle + segAngle/2;
     label.style.transform = 'rotate(' + angle + 'deg)';
     wheelEl.appendChild(label);
@@ -477,7 +519,7 @@ amountForm.addEventListener('submit', async (e)=>{
   dashboardCard.style.display = 'none';
   wheelSection.style.display = 'block';
   spinBtn.disabled = false;
-  spinBtn.textContent = 'व्हील स्पिन करें 🎡';
+  spinBtn.textContent = 'SPIN 🎡';
   wheelSection.scrollIntoView({behavior:'smooth', block:'start'});
 });
 
