@@ -420,7 +420,7 @@ const authCard = document.getElementById('authCard');
 /* ---------- Landing teaser wheel ---------- */
 const LW_PRIZES = [
   { val: "5%",   sub: "DISCOUNT",    icon: "🛍️" },
-  { val: "25%",  sub: "DISCOUNT",    icon: "🛍️" },
+  { val: "Sign Up", sub: "अभी जुड़ें",  icon: "📝" },
   { val: "90%",  sub: "DISCOUNT",    icon: "🔥" },
   { val: "₹100", sub: "COUPON CODE", icon: "🎫" },
   { val: "₹50",  sub: "COUPON CODE", icon: "🎫" },
@@ -429,7 +429,8 @@ const LW_PRIZES = [
   { val: "100%", sub: "DISCOUNT",    icon: "🏆" },
   { val: "10%",  sub: "DISCOUNT",    icon: "✨" }
 ];
-const LW_COLORS = ['#7B2CBF', '#1B9C3A', '#C47A1A', '#D4A017', '#E8B923', '#F0C93A', '#E8B923', '#C41E3A', '#1E5AA8'];
+const LW_SIGNUP_INDEX = LW_PRIZES.findIndex(p => p.val === "Sign Up");
+const LW_COLORS = ['#7B2CBF', '#C41E3A', '#1B9C3A', '#D4A017', '#E8B923', '#F0C93A', '#E8B923', '#1E5AA8', '#C47A1A'];
 const lwWheel = document.getElementById('lwWheel');
 const lwSegmentsEl = document.getElementById('lwSegments');
 const lwSpinBtn = document.getElementById('lwSpinBtn');
@@ -457,7 +458,7 @@ lwSpinBtn.addEventListener('click', ()=>{
   if(lwSpinning) return;
   lwSpinning = true;
   lwSpinBtn.disabled = true;
-  const idx = Math.floor(Math.random()*LW_PRIZES.length);
+  const idx = LW_SIGNUP_INDEX; // wheel hamesha "Sign Up" pe rukta hai
   const mid = LW_OFFSET + idx*LW_SEG + LW_SEG/2;
   const needed = ((-mid % 360)+360)%360;
   const cur = ((lwRotation % 360)+360)%360;
@@ -470,6 +471,7 @@ lwSpinBtn.addEventListener('click', ()=>{
     lwSpinning = false;
     lwSpinBtn.disabled = false;
     authCard.style.display = 'block';
+    tabRegister.click();
     authCard.scrollIntoView({behavior:'smooth', block:'start'});
   }, 5700);
 });
