@@ -44,14 +44,28 @@ const PORT = process.env.PORT || 4000;
 const PIN_SALT = process.env.PIN_SALT || 'aditya-studio-local-salt';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || null; // null = admin panel band (locked) rahega jab tak set na ho
 
-const DATA_FILE = path.join(__dirname, 'accounts.json');
-const CSV_FILE = path.join(__dirname, 'customers.csv');
+// DATA_DIR env set karo Render Persistent Disk pe (e.g. /var/data)
+const DATA_DIR = process.env.DATA_DIR || __dirname;
+try { if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
+const DATA_FILE = path.join(DATA_DIR, 'accounts.json');
+const CSV_FILE = path.join(DATA_DIR, 'customers.csv');
 const HTML_FILE = path.join(__dirname, 'aditya-studio-discount-wheel.html');
 
 function loadAccounts() {
   if (!fs.existsSync(DATA_FILE)) return [];
-  try { return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')); }
-  catch (e) { console.error('accounts.json padhne me error:', e.message); return []; }
+  try {
+    const raw = fs.readFileSync(DATA_FILE, 'utf8');
+    const data = JSON.parse(raw);
+    // ensure pin always string
+    return (Array.isArray(data) ? data : []).map(a => ({
+      ...a,
+      mobile: String(a.mobile || ''),
+      pin: String(a.pin || '')
+    }));
+  } catch (e) {
+    console.error('accounts.json padhne me error:', e.message);
+    return [];
+  }
 }
 
 function hashPin(pin, mobile) {
@@ -81,11 +95,15 @@ function writeCSV(accounts) {
 }
 
 function saveAccounts(accounts) {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(accounts, null, 2), 'utf8');
-  writeCSV(accounts);
+  // normalize pins to string before save
+  accounts.forEach(a => { a.pin = String(a.pin || ''); a.mobile = String(a.mobile || ''); });
+  const tmp = DATA_FILE + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(accounts, null, 2), 'utf8');
+  fs.renameSync(tmp, DATA_FILE); // atomic-ish replace
+  try { writeCSV(accounts); } catch (e) { console.error('CSV write error:', e.message); }
 }
 
-const CODES_FILE = path.join(__dirname, 'codes.json');
+const CODES_FILE = path.join(DATA_DIR, 'codes.json');
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no O/0, I/1 confusion
 
 function loadCodes() {
@@ -194,9 +212,9 @@ const server = http.createServer(async (req, res) => {
       accounts.push({
         id,
         name: (body.name || '').toString().trim(),
-        mobile,
+        mobile: String(mobile),
         village: (body.village || '').toString().trim(),
-        pin,
+        pin: String(pin),
         createdAt: new Date().toISOString(),
         visitCount: 1,
         lastVisitAt: new Date().toISOString(),
@@ -219,15 +237,41 @@ const server = http.createServer(async (req, res) => {
       const mobile = (body.mobile || '').toString().trim();
       const pin = (body.pin || '').toString().trim();
       const accounts = loadAccounts();
-      const acc = accounts.find(a => a.mobile === mobile);
-      if (!acc || acc.pin !== pin) {
+      const acc = accounts.find(a => String(a.mobile) === String(mobile));
+      if (!acc || String(acc.pin) !== String(pin)) {
         return sendJSON(res, 401, { ok: false, error: 'invalid-credentials' });
       }
       acc.visitCount = (acc.visitCount || 0) + 1;
       acc.lastVisitAt = new Date().toISOString();
       saveAccounts(accounts);
       console.log('Login hua:', acc.id, mobile);
-      sendJSON(res, 200, { ok: true, id: acc.id, name: acc.name, village: acc.village, history: publicHistory(acc) });
+      sendJSON(res, 200, { ok: true, id: acc.id, name: acc.name, village: acc.village, mobile: acc.mobile, history: publicHistory(acc) });
+    } catch (e) {
+      sendJSON(res, 400, { ok: false, error: 'bad-request' });
+    }
+    return;
+  }
+
+
+  if (req.method === 'POST' && req.url === '/api/restore-session') {
+    try {
+      const body = await readBody(req);
+      const mobile = String((body.mobile || '')).trim();
+      const pin = String((body.pin || '')).trim();
+      const accounts = loadAccounts();
+      const acc = accounts.find(a => String(a.mobile) === mobile);
+      if (!acc || String(acc.pin) !== pin) {
+        return sendJSON(res, 401, { ok: false, error: 'invalid-credentials' });
+      }
+      // visit count mat badhao — silent restore
+      sendJSON(res, 200, {
+        ok: true,
+        id: acc.id,
+        name: acc.name,
+        village: acc.village,
+        mobile: acc.mobile,
+        history: publicHistory(acc)
+      });
     } catch (e) {
       sendJSON(res, 400, { ok: false, error: 'bad-request' });
     }
@@ -316,8 +360,63 @@ const server = http.createServer(async (req, res) => {
   }
 
   // Admin-only from here on
-  if (req.url === '/api/customers' || req.url === '/admin' || req.url === '/admin/generate-code' || req.url === '/admin/reset-pin') {
+  if (req.url === '/api/customers' || req.url === '/admin' || req.url.startsWith('/admin/')) {
     if (!isAdminAuthed(req)) return requireAdminAuth(req, res);
+  }
+
+
+  // ---- BACKUP: PC me download ----
+  if (req.method === 'GET' && req.url === '/admin/backup') {
+    const payload = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      accounts: loadAccounts(),
+      codes: loadCodes()
+    };
+    const body = JSON.stringify(payload, null, 2);
+    const fname = 'aditya-studio-backup-' + new Date().toISOString().slice(0,10) + '.json';
+    res.writeHead(200, {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Content-Disposition': 'attachment; filename="' + fname + '"'
+    });
+    res.end(body);
+    console.log('Backup download:', fname, 'accounts=', payload.accounts.length, 'codes=', payload.codes.length);
+    return;
+  }
+
+  // ---- RESTORE: PC se upload ----
+  if (req.method === 'POST' && req.url === '/admin/restore') {
+    try {
+      const chunks = [];
+      for await (const c of req) chunks.push(c);
+      const raw = Buffer.concat(chunks).toString('utf8');
+      // multipart or raw JSON both support
+      let jsonStr = raw;
+      const ct = (req.headers['content-type'] || '');
+      if (ct.includes('multipart/form-data')) {
+        // very simple extract of file content between boundaries
+        const m = raw.match(/\{[\s\S]*"accounts"[\s\S]*\}/);
+        if (!m) {
+          res.writeHead(302, { Location: '/admin?restore=fail' });
+          return res.end();
+        }
+        jsonStr = m[0];
+      }
+      const data = JSON.parse(jsonStr);
+      if (!data || !Array.isArray(data.accounts)) {
+        res.writeHead(302, { Location: '/admin?restore=fail' });
+        return res.end();
+      }
+      saveAccounts(data.accounts);
+      if (Array.isArray(data.codes)) saveCodes(data.codes);
+      console.log('Restore OK — accounts:', data.accounts.length, 'codes:', (data.codes || []).length);
+      res.writeHead(302, { Location: '/admin?restore=ok' });
+      return res.end();
+    } catch (e) {
+      console.error('Restore error:', e.message);
+      res.writeHead(302, { Location: '/admin?restore=fail' });
+      return res.end();
+    }
   }
 
   if (req.method === 'POST' && req.url === '/admin/generate-code') {
@@ -429,7 +528,32 @@ const server = http.createServer(async (req, res) => {
         .wa-link{background:linear-gradient(180deg,#3ee06b,#25D366 60%,#128C4A);}
       </style></head><body>
       <h1>Aditya Studio — Admin</h1>
-      <div class="sub">CSV file: customers.csv (server ke folder me) | <a href="/">customer page</a></div>
+      <div class="sub">CSV file: customers.csv | <a href="/">customer page</a></div>
+
+      <h2>💾 Data Backup (PC me save karo)</h2>
+      <div class="codes-block">
+        <p class="sub" style="margin-bottom:12px;">
+          Render free pe data kabhi-kabhi mit sakta hai. Isliye <b>hafte me 1–2 baar</b> backup download karke apne PC me rakh lo.
+          Agar data wipe ho jaye to yahi file upload karke restore kar sakte ho.
+        </p>
+        <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:center;">
+          <a class="gen-btn" href="/admin/backup">⬇️ Backup Download (JSON)</a>
+          <form method="POST" action="/admin/restore" enctype="multipart/form-data" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+            <input type="file" name="backup" accept=".json,application/json" required
+              style="color:#F4EAD6; font-size:13px; max-width:220px;">
+            <button class="gen-btn" type="submit" style="background:linear-gradient(180deg,#8fd19e,#3E7A4C);">⬆️ Restore Upload</button>
+          </form>
+        </div>
+        <div id="restoreMsg" class="muted" style="margin-top:10px;"></div>
+        <script>
+          (function(){
+            var q = new URLSearchParams(location.search).get('restore');
+            var el = document.getElementById('restoreMsg');
+            if(q === 'ok'){ el.style.color = '#8fd19e'; el.textContent = '✅ Restore successful — accounts & codes wapas aa gaye.'; }
+            if(q === 'fail'){ el.style.color = '#e08a8a'; el.textContent = '❌ Restore fail — sahi backup JSON file choose karo.'; }
+          })();
+        </script>
+      </div>
 
       <h2>⚠️ PIN Reset Requests ${pendingResets.length ? '(' + pendingResets.length + ')' : ''}</h2>
       <div>
@@ -461,5 +585,7 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log('Aditya Studio server chalu ho gaya, port:', PORT);
+  console.log('Data folder:', DATA_DIR);
+  console.log('Accounts file:', DATA_FILE);
   console.log('Admin panel:', ADMIN_PASSWORD ? '/admin (password protected)' : '/admin (LOCKED — ADMIN_PASSWORD env var set nahi hai)');
 });
