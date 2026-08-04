@@ -188,7 +188,7 @@ const server = http.createServer(async (req, res) => {
         name: (body.name || '').toString().trim(),
         mobile,
         village: (body.village || '').toString().trim(),
-        pinHash: hashPin(pin, mobile),
+        pin,
         createdAt: new Date().toISOString(),
         visitCount: 1,
         lastVisitAt: new Date().toISOString(),
@@ -212,7 +212,7 @@ const server = http.createServer(async (req, res) => {
       const pin = (body.pin || '').toString().trim();
       const accounts = loadAccounts();
       const acc = accounts.find(a => a.mobile === mobile);
-      if (!acc || acc.pinHash !== hashPin(pin, mobile)) {
+      if (!acc || acc.pin !== pin) {
         return sendJSON(res, 401, { ok: false, error: 'invalid-credentials' });
       }
       acc.visitCount = (acc.visitCount || 0) + 1;
@@ -330,11 +330,14 @@ const server = http.createServer(async (req, res) => {
       const accounts = loadAccounts();
       const acc = accounts.find(a => a.mobile === mobile);
       if (acc && /^\d{4}$/.test(newPin)) {
-        acc.pinHash = hashPin(newPin, mobile);
+        acc.pin = newPin;
         acc.pinResetRequested = false;
         acc.pinResetRequestedAt = null;
         saveAccounts(accounts);
         console.log('Admin ne PIN reset kiya:', acc.id, mobile);
+        const msg = 'Hi ' + acc.name + ', aapka Aditya Studio ka naya PIN hai: ' + newPin + '. Isse login karke discount wheel spin kar sakte hain.';
+        res.writeHead(302, { Location: 'https://wa.me/91' + mobile + '?text=' + encodeURIComponent(msg) });
+        return res.end();
       }
       res.writeHead(302, { Location: '/admin' });
       return res.end();
@@ -364,7 +367,7 @@ const server = http.createServer(async (req, res) => {
       return `
         <div class="acc-block">
           <h3>${acc.id} — ${acc.name} <span class="muted">(${acc.mobile}, ${acc.village})</span></h3>
-          <div class="muted" style="margin-bottom:8px;">👁️ Visits: ${acc.visitCount || 1}  |  Last visit: ${acc.lastVisitAt ? new Date(acc.lastVisitAt).toLocaleString('en-IN') : '—'}  |  Joined: ${new Date(acc.createdAt).toLocaleDateString('en-IN')}</div>
+          <div class="muted" style="margin-bottom:8px;">🔑 PIN: <span style="color:#F3DE9A; font-family:monospace; letter-spacing:2px;">${acc.pin || '—'}</span> &nbsp;|&nbsp; 👁️ Visits: ${acc.visitCount || 1} &nbsp;|&nbsp; Last visit: ${acc.lastVisitAt ? new Date(acc.lastVisitAt).toLocaleString('en-IN') : '—'} &nbsp;|&nbsp; Joined: ${new Date(acc.createdAt).toLocaleDateString('en-IN')}</div>
           <table>
             <thead><tr><th>Entry</th><th>Amount</th><th>Tier</th><th>Discount</th><th>Time</th></tr></thead>
             <tbody>${rows || '<tr><td colspan="5">कोई काम एंट्री नहीं</td></tr>'}</tbody>
@@ -372,19 +375,21 @@ const server = http.createServer(async (req, res) => {
         </div>`;
     }).join('');
     const pendingResets = accounts.filter(a => a.pinResetRequested);
-    const resetRows = pendingResets.map(acc => `
-      <tr>
-        <td>${acc.id} — ${acc.name}</td>
-        <td>${acc.mobile}</td>
-        <td>${acc.pinResetRequestedAt ? new Date(acc.pinResetRequestedAt).toLocaleString('en-IN') : '—'}</td>
-        <td>
+    const resetCards = pendingResets.map(acc => {
+      const existingMsg = encodeURIComponent('Hi ' + acc.name + ', aapka Aditya Studio PIN hai: ' + (acc.pin || '') + '. Isse login karke discount wheel spin kar sakte hain.');
+      return `
+      <div class="msg-card">
+        <div class="msg-text">🔔 <b>${acc.name}</b> (${acc.mobile}) ने PIN भूलने की request भेजी है — ${acc.pinResetRequestedAt ? new Date(acc.pinResetRequestedAt).toLocaleString('en-IN') : ''}</div>
+        <div class="msg-actions">
+          <a class="gen-btn wa-link" href="https://wa.me/91${acc.mobile}?text=${existingMsg}" target="_blank" rel="noopener">💬 मौजूदा PIN भेजें</a>
           <form method="POST" action="/admin/reset-pin" style="display:flex; gap:6px;">
             <input type="hidden" name="mobile" value="${acc.mobile}">
-            <input type="text" name="newPin" placeholder="नया 4-अंक PIN" maxlength="4" style="width:110px; background:#0C0906; border:1px solid rgba(212,175,55,0.3); border-radius:6px; padding:6px 8px; color:#F4EAD6;">
-            <button class="gen-btn" type="submit" style="padding:6px 14px; font-size:12px;">Set PIN</button>
+            <input type="text" name="newPin" placeholder="नया PIN" maxlength="4" style="width:90px; background:#0C0906; border:1px solid rgba(212,175,55,0.3); border-radius:6px; padding:6px 8px; color:#F4EAD6;">
+            <button class="gen-btn" type="submit" style="padding:6px 14px; font-size:12px;">नया PIN सेट करें → WhatsApp</button>
           </form>
-        </td>
-      </tr>`).join('');
+        </div>
+      </div>`;
+    }).join('');
     const codes = loadCodes().slice().reverse();
     const codeRows = codes.map(c => `
       <tr>
@@ -409,17 +414,18 @@ const server = http.createServer(async (req, res) => {
         a{color:#D4AF37;}
         .acc-block{border:1px solid rgba(212,175,55,0.15); border-radius:10px; padding:12px 16px; margin-bottom:14px;}
         .codes-block{border:1px solid rgba(212,175,55,0.15); border-radius:10px; padding:16px; margin-bottom:20px;}
-        .gen-btn{background:linear-gradient(180deg,#F3DE9A,#D4AF37 60%,#8C6E2F); color:#241804; border:none; padding:10px 20px; border-radius:8px; font-weight:700; cursor:pointer; font-size:14px;}
+        .gen-btn{background:linear-gradient(180deg,#F3DE9A,#D4AF37 60%,#8C6E2F); color:#241804; border:none; padding:10px 20px; border-radius:8px; font-weight:700; cursor:pointer; font-size:14px; text-decoration:none; display:inline-block;}
+        .msg-card{background:#1B140F; border:1px solid rgba(224,138,138,0.35); border-radius:10px; padding:14px 16px; margin-bottom:12px;}
+        .msg-text{font-size:13.5px; margin-bottom:10px;}
+        .msg-actions{display:flex; gap:10px; flex-wrap:wrap; align-items:center;}
+        .wa-link{background:linear-gradient(180deg,#3ee06b,#25D366 60%,#128C4A);}
       </style></head><body>
       <h1>Aditya Studio — Admin</h1>
       <div class="sub">CSV file: customers.csv (server ke folder me) | <a href="/">customer page</a></div>
 
       <h2>⚠️ PIN Reset Requests ${pendingResets.length ? '(' + pendingResets.length + ')' : ''}</h2>
-      <div class="codes-block">
-        <table>
-          <thead><tr><th>Customer</th><th>Mobile</th><th>Requested At</th><th>Action</th></tr></thead>
-          <tbody>${resetRows || '<tr><td colspan="4">कोई pending request नहीं है</td></tr>'}</tbody>
-        </table>
+      <div>
+        ${resetCards || '<div class="muted">कोई pending request नहीं है</div>'}
       </div>
 
       <h2>Spin Codes</h2>
