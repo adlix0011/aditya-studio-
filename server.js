@@ -1,17 +1,30 @@
 /*
-  Aditya Studio — Local Data Server (Accounts + Discount History)
+  Aditya Studio — Data Server (Local + Render/Production ready)
   -----------------------------------------------------------------
-  Chalane ka tarika:
-    1) Terminal isi folder me kholo
-    2) node server.js
-    3) Browser me kholo: http://localhost:4000       (customer page)
-                          http://localhost:4000/admin (sab accounts + history)
+  LOCAL chalane ka tarika:
+    node server.js
+    -> http://localhost:4000        (customer page)
+    -> http://localhost:4000/admin  (admin — password maangega)
+
+  RENDER pe deploy karte waqt:
+    - PORT apne aap Render se milta hai (process.env.PORT)
+    - Environment Variables me ye set karo (Render dashboard -> Environment):
+        ADMIN_PASSWORD = <apna admin password>
+        PIN_SALT       = <koi bhi random lambi string>
+    - .env file sirf LOCAL testing ke liye hai, usko kabhi GitHub pe push mat karo
+      (isiliye .gitignore me daala gaya hai)
 
   Data kaha save hota hai:
-    - accounts.json  -> har customer ka account (PIN hashed hota hai, plain text nahi)
+    - accounts.json  -> har customer ka account (PIN hashed, plain text kabhi nahi)
     - customers.csv  -> Excel me kholne layak, har spin/work-entry ki ek row
 
-  Har naye customer ko unique ID milta hai: AS-0001, AS-0002, ...
+  ⚠️ IMPORTANT (Render free tier): iska filesystem "ephemeral" hota hai — matlab
+  jab bhi service restart/redeploy hoti hai (free tier sleep ke baad bhi), ye
+  accounts.json file DELETE ho jaati hai aur sara data khatam ho jaata hai.
+  Real customer data permanently save karna hai to:
+    (a) Render ka paid "Persistent Disk" add karo, YA
+    (b) Isko ek real database (Postgres/MongoDB) me shift karo.
+  Abhi ke liye ye JSON-file wala tarika sirf demo/testing ke liye theek hai.
 */
 
 const http = require('http');
@@ -20,6 +33,9 @@ const path = require('path');
 const crypto = require('crypto');
 
 const PORT = process.env.PORT || 4000;
+const PIN_SALT = process.env.PIN_SALT || 'aditya-studio-local-salt';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || null; // null = admin panel band (locked) rahega jab tak set na ho
+
 const DATA_FILE = path.join(__dirname, 'accounts.json');
 const CSV_FILE = path.join(__dirname, 'customers.csv');
 const HTML_FILE = path.join(__dirname, 'aditya-studio-discount-wheel.html');
@@ -31,8 +47,7 @@ function loadAccounts() {
 }
 
 function hashPin(pin, mobile) {
-  // Basic local protection — plain PIN kabhi file me save nahi hota
-  return crypto.createHash('sha256').update(mobile + ':' + pin).digest('hex');
+  return crypto.createHash('sha256').update(PIN_SALT + ':' + mobile + ':' + pin).digest('hex');
 }
 
 function csvEscape(v) {
@@ -60,6 +75,26 @@ function saveAccounts(accounts) {
   writeCSV(accounts);
 }
 
+const CODES_FILE = path.join(__dirname, 'codes.json');
+const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no O/0, I/1 confusion
+
+function loadCodes() {
+  if (!fs.existsSync(CODES_FILE)) return [];
+  try { return JSON.parse(fs.readFileSync(CODES_FILE, 'utf8')); }
+  catch (e) { console.error('codes.json padhne me error:', e.message); return []; }
+}
+
+function saveCodes(codes) {
+  fs.writeFileSync(CODES_FILE, JSON.stringify(codes, null, 2), 'utf8');
+}
+
+function generateCode() {
+  let code = '';
+  for (let i = 0; i < 6; i++) code += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+  return code;
+}
+
+
 function nextCustomerId(accounts) {
   return 'AS-' + String(accounts.length + 1).padStart(4, '0');
 }
@@ -82,6 +117,24 @@ function readBody(req) {
   });
 }
 
+// Simple HTTP Basic Auth check for admin routes
+function isAdminAuthed(req) {
+  if (!ADMIN_PASSWORD) return false; // password set hi nahi hai -> admin panel band
+  const header = req.headers['authorization'] || '';
+  if (!header.startsWith('Basic ')) return false;
+  const decoded = Buffer.from(header.slice(6), 'base64').toString('utf8'); // "user:pass"
+  const pass = decoded.split(':').slice(1).join(':');
+  return pass === ADMIN_PASSWORD;
+}
+
+function requireAdminAuth(req, res) {
+  res.writeHead(401, {
+    'Content-Type': 'text/plain; charset=utf-8',
+    'WWW-Authenticate': 'Basic realm="Aditya Studio Admin"'
+  });
+  res.end('Admin password chahiye.');
+}
+
 const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
@@ -101,7 +154,6 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Register a new customer account
   if (req.method === 'POST' && req.url === '/api/register') {
     try {
       const body = await readBody(req);
@@ -133,7 +185,6 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Login with mobile + PIN
   if (req.method === 'POST' && req.url === '/api/login') {
     try {
       const body = await readBody(req);
@@ -152,7 +203,6 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Add a new work-amount entry for a logged-in customer -> returns entryId
   if (req.method === 'POST' && req.url === '/api/work-entry') {
     try {
       const body = await readBody(req);
@@ -176,7 +226,6 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Attach spin discount result to an entry
   if (req.method === 'POST' && req.url === '/api/spin-result') {
     try {
       const body = await readBody(req);
@@ -196,14 +245,48 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Raw JSON of all accounts (PIN hash excluded)
+  if (req.method === 'POST' && req.url === '/api/redeem-code') {
+    try {
+      const body = await readBody(req);
+      const mobile = (body.mobile || '').toString().trim();
+      const code = (body.code || '').toString().trim().toUpperCase();
+      const codes = loadCodes();
+      const found = codes.find(c => c.code === code);
+      if (!found) return sendJSON(res, 404, { ok: false, error: 'invalid' });
+      if (found.used) return sendJSON(res, 409, { ok: false, error: 'used' });
+      found.used = true;
+      found.usedBy = mobile;
+      found.usedAt = new Date().toISOString();
+      saveCodes(codes);
+      console.log('Code redeem hua:', code, 'by', mobile);
+      sendJSON(res, 200, { ok: true });
+    } catch (e) {
+      sendJSON(res, 400, { ok: false, error: 'bad-request' });
+    }
+    return;
+  }
+
+  // Admin-only from here on
+  if (req.url === '/api/customers' || req.url === '/admin' || req.url === '/admin/generate-code') {
+    if (!isAdminAuthed(req)) return requireAdminAuth(req, res);
+  }
+
+  if (req.method === 'POST' && req.url === '/admin/generate-code') {
+    const codes = loadCodes();
+    const newCode = generateCode();
+    codes.push({ code: newCode, used: false, usedBy: null, createdAt: new Date().toISOString(), usedAt: null });
+    saveCodes(codes);
+    console.log('Naya spin code bana:', newCode);
+    res.writeHead(302, { Location: '/admin' });
+    return res.end();
+  }
+
   if (req.method === 'GET' && req.url === '/api/customers') {
     const accounts = loadAccounts().map(a => ({ id: a.id, name: a.name, mobile: a.mobile, village: a.village, history: a.history }));
     sendJSON(res, 200, accounts);
     return;
   }
 
-  // Admin table view
   if (req.method === 'GET' && req.url === '/admin') {
     const accounts = loadAccounts().slice().reverse();
     const blocks = accounts.map(acc => {
@@ -224,11 +307,20 @@ const server = http.createServer(async (req, res) => {
           </table>
         </div>`;
     }).join('');
+    const codes = loadCodes().slice().reverse();
+    const codeRows = codes.map(c => `
+      <tr>
+        <td style="font-family:monospace; font-size:15px; letter-spacing:2px;">${c.code}</td>
+        <td>${c.used ? '<span style="color:#e08a8a;">Used</span>' : '<span style="color:#8fd19e;">Unused</span>'}</td>
+        <td>${c.usedBy || '—'}</td>
+        <td>${new Date(c.createdAt).toLocaleString('en-IN')}</td>
+      </tr>`).join('');
     const html = `<!DOCTYPE html><html lang="hi"><head><meta charset="UTF-8">
       <title>Aditya Studio — Admin</title>
       <style>
         body{font-family:sans-serif; background:#0F0C09; color:#F4EAD6; padding:24px;}
         h1{color:#D4AF37; font-size:22px;}
+        h2{color:#D4AF37; font-size:17px; margin:30px 0 8px;}
         h3{color:#F3DE9A; font-size:15px; margin:22px 0 8px;}
         .muted{color:#B7A480; font-weight:normal; font-size:12px;}
         .sub{color:#B7A480; font-size:13px; margin-bottom:16px;}
@@ -238,9 +330,24 @@ const server = http.createServer(async (req, res) => {
         tr:hover{background:#1B140F;}
         a{color:#D4AF37;}
         .acc-block{border:1px solid rgba(212,175,55,0.15); border-radius:10px; padding:12px 16px; margin-bottom:14px;}
+        .codes-block{border:1px solid rgba(212,175,55,0.15); border-radius:10px; padding:16px; margin-bottom:20px;}
+        .gen-btn{background:linear-gradient(180deg,#F3DE9A,#D4AF37 60%,#8C6E2F); color:#241804; border:none; padding:10px 20px; border-radius:8px; font-weight:700; cursor:pointer; font-size:14px;}
       </style></head><body>
-      <h1>Aditya Studio — Accounts (${accounts.length})</h1>
-      <div class="sub">CSV file: customers.csv (isi folder me) | <a href="/">customer page</a></div>
+      <h1>Aditya Studio — Admin</h1>
+      <div class="sub">CSV file: customers.csv (server ke folder me) | <a href="/">customer page</a></div>
+
+      <h2>Spin Codes</h2>
+      <div class="codes-block">
+        <form method="POST" action="/admin/generate-code">
+          <button class="gen-btn" type="submit">+ नया स्पिन कोड बनाएं</button>
+        </form>
+        <table style="margin-top:16px;">
+          <thead><tr><th>Code</th><th>Status</th><th>Used By (Mobile)</th><th>Created</th></tr></thead>
+          <tbody>${codeRows || '<tr><td colspan="4">अभी कोई कोड नहीं बना</td></tr>'}</tbody>
+        </table>
+      </div>
+
+      <h2>Accounts (${accounts.length})</h2>
       ${blocks || '<p>Abhi koi account nahi hai</p>'}
       </body></html>`;
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
@@ -252,8 +359,7 @@ const server = http.createServer(async (req, res) => {
   res.end('Not found');
 });
 
-server.listen(PORT, () => {
-  console.log('Aditya Studio server chalu ho gaya: http://localhost:' + PORT);
-  console.log('Admin panel:                       http://localhost:' + PORT + '/admin');
-  console.log('Band karne ke liye Ctrl+C dabayein.');
+server.listen(PORT, '0.0.0.0', () => {
+  console.log('Aditya Studio server chalu ho gaya, port:', PORT);
+  console.log('Admin panel:', ADMIN_PASSWORD ? '/admin (password protected)' : '/admin (LOCKED — ADMIN_PASSWORD env var set nahi hai)');
 });
