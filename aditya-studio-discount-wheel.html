@@ -56,6 +56,20 @@
   .divider{width:120px; height:1px; margin:26px auto 0; background:linear-gradient(90deg, transparent, var(--gold), transparent);}
   .divider::after{content:"◆"; display:block; color:var(--gold); font-size:10px; margin-top:-6px; background:var(--bg); width:16px; margin-left:auto; margin-right:auto;}
 
+  .deco-float{position:fixed; z-index:0; font-size:1.6rem; opacity:0.55; pointer-events:none; animation:floaty 3.5s ease-in-out infinite;}
+  .deco-float.d2{animation-duration:4.2s; animation-delay:.4s; font-size:1.3rem;}
+  .deco-float.d3{animation-duration:5s; animation-delay:.8s; font-size:1.8rem;}
+  @keyframes floaty{0%,100%{transform:translateY(0) rotate(0deg);} 50%{transform:translateY(-14px) rotate(8deg);}}
+
+  .skip-wrap{margin-top:30px;}
+  .skip-btn{
+    background:transparent; border:1px solid rgba(212,175,55,0.5); color:var(--gold-light);
+    font-family:'Poppins',sans-serif; font-size:13px; letter-spacing:1px; padding:10px 26px;
+    border-radius:999px; cursor:pointer; transition:background .2s, transform .15s;
+  }
+  .skip-btn:hover{background:rgba(212,175,55,0.12); transform:translateY(-2px);}
+  .skip-btn span{display:inline-block; margin-left:4px;}
+
   .card{
     background:linear-gradient(180deg, var(--bg-alt), #150F0B);
     border:1px solid rgba(212,175,55,0.25); border-radius:18px; padding:32px 26px; margin-top:36px;
@@ -102,6 +116,7 @@
   .history-empty{padding:18px 14px; text-align:center; color:var(--muted); font-size:13px;}
 
   #wheelSection{display:none;}
+  #codeCard{display:none;}
   .tier-badge{display:inline-block; padding:6px 16px; border:1px solid var(--gold-dim); border-radius:999px; font-size:12px; color:var(--gold-light); letter-spacing:0.5px; margin-bottom:8px; font-family:'Poppins',sans-serif;}
   .cust-id{font-size:12px; color:var(--muted); margin-bottom:22px;}
   .wheel-stage{position:relative; width:min(320px, 82vw); aspect-ratio:1/1; margin:10px auto 44px;}
@@ -148,12 +163,22 @@
   .modal .big{font-family:'Cormorant Garamond', serif; font-size:52px; font-weight:700; color:var(--gold-light); margin:14px 0 6px;}
   .modal h3{font-family:'Hind',sans-serif; font-size:18px; color:var(--cream); margin-bottom:4px;}
   .modal p{color:var(--muted); font-size:13px; margin-top:14px; line-height:1.6;}
-  .modal .close-btn{margin-top:22px; background:transparent; border:1px solid var(--gold-dim); color:var(--gold-light); padding:11px; border-radius:10px; width:100%; cursor:pointer; font-family:'Poppins',sans-serif; font-size:14px;}
+  .modal .close-btn{background:transparent; border:1px solid var(--gold-dim); color:var(--gold-light); padding:11px; border-radius:10px; width:100%; cursor:pointer; font-family:'Poppins',sans-serif; font-size:14px;}
+  .btn-row{display:flex; flex-direction:column; gap:10px; margin-top:22px;}
+  .claim-btn{background:linear-gradient(180deg, var(--gold-light), var(--gold) 60%, var(--gold-dim)); color:#241804; border:none; padding:12px; border-radius:10px; width:100%; cursor:pointer; font-family:'Poppins',sans-serif; font-weight:700; font-size:14px;}
+  #confetti{position:fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:99;}
 
   footer{text-align:center; color:#544934; font-size:11px; margin-top:50px; letter-spacing:0.5px;}
 </style>
 </head>
 <body>
+
+<div class="deco-float" style="top:10%; left:6%;">🪙</div>
+<div class="deco-float d2" style="top:18%; right:8%;">💎</div>
+<div class="deco-float d3" style="bottom:20%; left:10%;">🪙</div>
+<div class="deco-float d2" style="bottom:28%; right:6%;">💎</div>
+<div class="deco-float d3" style="top:50%; left:4%;">📸</div>
+<div class="deco-float" style="top:60%; right:5%;">✨</div>
 
 <div class="wrap">
 
@@ -162,9 +187,12 @@
     <div class="title3d">Aditya Studio</div>
     <div class="tagline">आपके भरोसे का स्टूडियो</div>
     <div class="divider"></div>
+    <div class="skip-wrap">
+      <button class="skip-btn" id="skipBtn">Skip <span>→</span></button>
+    </div>
   </div>
 
-  <div class="card" id="authCard">
+  <div class="card" id="authCard" style="display:none;">
     <h2>अपना अकाउंट खोलें</h2>
     <div class="sub">पहली बार आए हैं तो नया अकाउंट बनाएं, वरना अपने मोबाइल नंबर व PIN से लॉगिन करें</div>
 
@@ -241,8 +269,22 @@
         <input type="number" id="workAmount" placeholder="जैसे: 350" min="1">
         <div class="err">₹50 से ₹1,00,000 के बीच राशि डालें</div>
       </div>
-      <button type="submit" class="btn">डिस्काउंट व्हील देखें →</button>
+      <button type="submit" class="btn">आगे बढ़ें →</button>
     </form>
+  </div>
+
+  <div class="card" id="codeCard" style="text-align:center;">
+    <h2>स्पिन कोड डालें</h2>
+    <div class="sub">स्टूडियो से मिला हुआ 6-अंकों का स्पिन कोड यहाँ डालें</div>
+    <div class="auth-error" id="codeError"></div>
+    <form id="codeForm" novalidate>
+      <div class="field" id="cf-code">
+        <input type="text" id="spinCode" placeholder="जैसे: A3F9K2" maxlength="6" style="text-align:center; letter-spacing:4px; text-transform:uppercase; font-weight:700;">
+        <div class="err">6 अंकों का सही कोड डालें</div>
+      </div>
+      <button type="submit" class="btn">कोड वेरिफ़ाई करें →</button>
+    </form>
+    <div class="note">* यह कोड स्टूडियो पर आपको दिया जाएगा — एक कोड से एक ही बार स्पिन कर सकते हैं</div>
   </div>
 
   <div class="card" id="wheelSection" style="text-align:center;">
@@ -276,9 +318,15 @@
     <h3 id="resultLine">बधाई हो, आपको डिस्काउंट मिला!</h3>
     <p id="resultId" style="color:var(--gold-light); font-weight:600;"></p>
     <p>आपकी जानकारी सेव कर ली गई है। बाकी जानकारी के लिए स्टूडियो जल्द ही आपसे संपर्क करेगा।</p>
-    <button class="close-btn" id="closeModal">अकाउंट पर वापस जाएं</button>
+    <div class="btn-row">
+      <button class="claim-btn" id="claimBtn">🎟️ कूपन डाउनलोड करें</button>
+      <button class="close-btn" id="closeModal">अकाउंट पर वापस जाएं</button>
+    </div>
   </div>
 </div>
+
+<canvas id="confetti"></canvas>
+<canvas id="couponCanvas" width="700" height="400" style="display:none;"></canvas>
 
 <script>
 const TIERS = [
@@ -291,6 +339,12 @@ const TIERS = [
 const API_BASE = '';
 
 const authCard = document.getElementById('authCard');
+const skipBtn = document.getElementById('skipBtn');
+
+skipBtn.addEventListener('click', ()=>{
+  authCard.style.display = 'block';
+  authCard.scrollIntoView({behavior:'smooth', block:'start'});
+});
 const dashboardCard = document.getElementById('dashboardCard');
 const wheelSection = document.getElementById('wheelSection');
 const tabRegister = document.getElementById('tabRegister');
@@ -302,6 +356,9 @@ const dashGreeting = document.getElementById('dashGreeting');
 const dashId = document.getElementById('dashId');
 const historyBox = document.getElementById('historyBox');
 const amountForm = document.getElementById('amountForm');
+const codeCard = document.getElementById('codeCard');
+const codeForm = document.getElementById('codeForm');
+const codeError = document.getElementById('codeError');
 const wheelEl = document.getElementById('wheel');
 const tierBadge = document.getElementById('tierBadge');
 const custIdBadge = document.getElementById('custIdBadge');
@@ -316,6 +373,7 @@ const logoutBtn = document.getElementById('logoutBtn');
 let currentAccount = null;
 let currentTier = null;
 let currentEntryId = null;
+let currentDiscountPct = null;
 let hasSpun = false;
 
 function showFieldError(id, invalid){
@@ -442,6 +500,7 @@ function renderHistory(){
 logoutBtn.addEventListener('click', ()=>{
   currentAccount = null;
   dashboardCard.style.display = 'none';
+  codeCard.style.display = 'none';
   wheelSection.style.display = 'none';
   authCard.style.display = 'block';
   registerForm.reset(); loginForm.reset();
@@ -509,14 +568,55 @@ amountForm.addEventListener('submit', async (e)=>{
     currentEntryId = null;
     console.warn('Server se connect nahi ho paaya.', err);
   }
-  btn.disabled = false; btn.textContent = 'डिस्काउंट व्हील देखें →';
+  btn.disabled = false; btn.textContent = 'आगे बढ़ें →';
+
+  dashboardCard.style.display = 'none';
+  codeCard.style.display = 'block';
+  codeForm.reset();
+  setCodeError('');
+  codeCard.scrollIntoView({behavior:'smooth', block:'start'});
+});
+
+function setCodeError(msg){
+  codeError.textContent = msg || '';
+  codeError.style.display = msg ? 'block' : 'none';
+}
+
+codeForm.addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  setCodeError('');
+  const code = document.getElementById('spinCode').value.trim().toUpperCase();
+  const codeOk = /^[A-Z0-9]{6}$/.test(code);
+  showFieldError('cf-code', !codeOk);
+  if(!codeOk) return;
+
+  const btn = codeForm.querySelector('button');
+  btn.disabled = true; btn.textContent = 'जांच हो रही है...';
+  try{
+    const res = await fetch(API_BASE + '/api/redeem-code', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ mobile: currentAccount.mobile, code })
+    });
+    const out = await res.json();
+    btn.disabled = false; btn.textContent = 'कोड वेरिफ़ाई करें →';
+    if(!out.ok){
+      setCodeError(out.error === 'used'
+        ? 'यह कोड पहले इस्तेमाल हो चुका है'
+        : 'गलत कोड है — दोबारा जांच लें');
+      return;
+    }
+  }catch(err){
+    btn.disabled = false; btn.textContent = 'कोड वेरिफ़ाई करें →';
+    setCodeError('सर्वर से जुड़ नहीं पाया। server.js चल रहा है यह जांच लें।');
+    return;
+  }
 
   tierBadge.textContent = currentTier.label;
   custIdBadge.textContent = 'कस्टमर ID: ' + currentAccount.id;
   wheelGreeting.textContent = 'बधाई हो, ' + currentAccount.name + '!';
   buildWheel(currentTier);
 
-  dashboardCard.style.display = 'none';
+  codeCard.style.display = 'none';
   wheelSection.style.display = 'block';
   spinBtn.disabled = false;
   spinBtn.textContent = 'SPIN 🎡';
@@ -539,10 +639,12 @@ spinBtn.addEventListener('click', ()=>{
 
   setTimeout(async ()=>{
     const pct = currentTier.values[idx];
+    currentDiscountPct = pct;
     resultPct.textContent = pct + '%';
     resultLine.textContent = 'बधाई हो, ' + currentAccount.name + '! आपको ' + pct + '% डिस्काउंट मिला';
     resultId.textContent = 'कस्टमर ID: ' + currentAccount.id;
     modalBg.style.display = 'flex';
+    startConfetti();
     try{
       await fetch(API_BASE + '/api/spin-result', {
         method:'POST', headers:{'Content-Type':'application/json'},
@@ -571,6 +673,142 @@ document.getElementById('heroTitle').addEventListener('mousemove', (e)=>{
 document.getElementById('heroTitle').addEventListener('mouseleave', ()=>{
   heroTitle.style.transform = 'rotateX(8deg)';
 });
+
+/* ---------- Confetti ---------- */
+const confettiCanvas = document.getElementById('confetti');
+const confettiCtx = confettiCanvas.getContext('2d');
+let confettiParticles = [];
+let confettiAnimId = null;
+
+function resizeConfetti(){
+  confettiCanvas.width = window.innerWidth;
+  confettiCanvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resizeConfetti);
+resizeConfetti();
+
+function createConfetti(){
+  confettiParticles = [];
+  const colors = ['#D4AF37', '#F3DE9A', '#8E1B2E', '#1B3B6F', '#1F5C3F', '#FFFFFF'];
+  for(let i=0; i<140; i++){
+    confettiParticles.push({
+      x: Math.random() * confettiCanvas.width,
+      y: Math.random() * confettiCanvas.height - confettiCanvas.height,
+      w: Math.random()*8 + 4,
+      h: Math.random()*5 + 3,
+      color: colors[Math.floor(Math.random()*colors.length)],
+      speed: Math.random()*3 + 2,
+      angle: Math.random()*360,
+      rotSpeed: Math.random()*10 - 5,
+      opacity: 1
+    });
+  }
+}
+
+function drawConfetti(){
+  confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+  let active = false;
+  confettiParticles.forEach(p=>{
+    if(p.opacity <= 0) return;
+    active = true;
+    confettiCtx.save();
+    confettiCtx.translate(p.x, p.y);
+    confettiCtx.rotate((p.angle * Math.PI)/180);
+    confettiCtx.globalAlpha = p.opacity;
+    confettiCtx.fillStyle = p.color;
+    confettiCtx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
+    confettiCtx.restore();
+    p.y += p.speed;
+    p.angle += p.rotSpeed;
+    p.x += Math.sin(p.y*0.01)*1.5;
+    if(p.y > confettiCanvas.height + 20) p.opacity -= 0.02;
+  });
+  if(active) confettiAnimId = requestAnimationFrame(drawConfetti);
+}
+
+function startConfetti(){
+  createConfetti();
+  if(confettiAnimId) cancelAnimationFrame(confettiAnimId);
+  drawConfetti();
+}
+
+/* ---------- Coupon PNG download ---------- */
+function roundRect(ctx, x, y, w, h, r){
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.arcTo(x+w, y, x+w, y+h, r);
+  ctx.arcTo(x+w, y+h, x, y+h, r);
+  ctx.arcTo(x, y+h, x, y, r);
+  ctx.arcTo(x, y, x+w, y, r);
+  ctx.closePath();
+}
+
+document.getElementById('claimBtn').addEventListener('click', ()=>{
+  if(currentDiscountPct == null || !currentAccount) return;
+  const c = document.getElementById('couponCanvas');
+  const cx = c.getContext('2d');
+  const W = 700, H = 400;
+
+  const grad = cx.createLinearGradient(0, 0, W, H);
+  grad.addColorStop(0, '#1B140F');
+  grad.addColorStop(0.5, '#241A10');
+  grad.addColorStop(1, '#0F0C09');
+  cx.fillStyle = grad;
+  cx.fillRect(0, 0, W, H);
+
+  cx.strokeStyle = '#D4AF37';
+  cx.lineWidth = 6;
+  cx.strokeRect(12, 12, W-24, H-24);
+  cx.strokeStyle = 'rgba(212,175,55,0.4)';
+  cx.lineWidth = 2;
+  cx.strokeRect(22, 22, W-44, H-44);
+
+  cx.fillStyle = '#D4AF37';
+  cx.font = 'bold 30px Poppins, Arial, sans-serif';
+  cx.textAlign = 'center';
+  cx.fillText('Aditya Studio', W/2, 70);
+
+  cx.fillStyle = 'rgba(212,175,55,0.15)';
+  roundRect(cx, 80, 110, W-160, 70, 12);
+  cx.fill();
+  cx.fillStyle = '#F4EAD6';
+  cx.font = 'bold 26px Poppins, Arial, sans-serif';
+  cx.fillText(currentDiscountPct + '% DISCOUNT COUPON', W/2, 155);
+
+  const codeGrad = cx.createLinearGradient(150, 210, 550, 210);
+  codeGrad.addColorStop(0, '#F3DE9A');
+  codeGrad.addColorStop(1, '#D4AF37');
+  cx.fillStyle = codeGrad;
+  roundRect(cx, 150, 210, 400, 60, 12);
+  cx.fill();
+  cx.fillStyle = '#241804';
+  cx.font = 'bold 30px Poppins, Arial, sans-serif';
+  cx.fillText(currentAccount.id, W/2, 250);
+
+  cx.fillStyle = 'rgba(244,234,214,0.75)';
+  cx.font = '15px Poppins, Arial, sans-serif';
+  cx.fillText(currentAccount.name + '  •  ' + currentAccount.mobile, W/2, 305);
+
+  cx.fillStyle = 'rgba(212,175,55,0.7)';
+  cx.font = '12px Poppins, Arial, sans-serif';
+  cx.fillText('Show this coupon at Aditya Studio  •  Valid for 30 days', W/2, 345);
+
+  c.toBlob((blob)=>{
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'AdityaStudio_Coupon_' + currentAccount.id + '.png';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    const btn = document.getElementById('claimBtn');
+    const original = btn.textContent;
+    btn.textContent = '✓ डाउनलोड हो गया';
+    setTimeout(()=>{ btn.textContent = original; }, 2200);
+  }, 'image/png');
+});
 </script>
+
 </body>
 </html>
