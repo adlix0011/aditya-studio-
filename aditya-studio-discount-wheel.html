@@ -400,7 +400,7 @@
       </div>
       <div class="field" id="rf-mobile">
         <label>मोबाइल नंबर (Mobile No.)</label>
-        <input type="tel" id="rMobile" placeholder="10 अंकों का मोबाइल नंबर" maxlength="10">
+        <input type="tel" id="rMobile" placeholder="10 अंकों का मोबाइल नंबर" maxlength="10" autocomplete="username">
         <div class="err">सही 10 अंकों का मोबाइल नंबर डालें</div>
       </div>
       <div class="field" id="rf-village">
@@ -411,12 +411,12 @@
       <div class="two-col">
         <div class="field" id="rf-pin">
           <label>4-अंकों का PIN बनाएं</label>
-          <input type="password" inputmode="numeric" id="rPin" placeholder="जैसे: 1234" maxlength="4">
+          <input type="password" inputmode="numeric" id="rPin" placeholder="जैसे: 1234" maxlength="4" autocomplete="new-password" inputmode="numeric">
           <div class="err">4 अंकों का PIN डालें</div>
         </div>
         <div class="field" id="rf-pin2">
           <label>PIN दोबारा डालें</label>
-          <input type="password" inputmode="numeric" id="rPin2" placeholder="फिर से PIN" maxlength="4">
+          <input type="password" inputmode="numeric" id="rPin2" placeholder="फिर से PIN" maxlength="4" autocomplete="new-password" inputmode="numeric">
           <div class="err">PIN मेल नहीं खा रहा</div>
         </div>
       </div>
@@ -426,12 +426,12 @@
     <form id="loginForm" class="auth-form" novalidate>
       <div class="field" id="lf-mobile">
         <label>मोबाइल नंबर (Mobile No.)</label>
-        <input type="tel" id="lMobile" placeholder="10 अंकों का मोबाइल नंबर" maxlength="10">
+        <input type="tel" id="lMobile" placeholder="10 अंकों का मोबाइल नंबर" maxlength="10" autocomplete="username">
         <div class="err">सही 10 अंकों का मोबाइल नंबर डालें</div>
       </div>
       <div class="field" id="lf-pin">
         <label>PIN</label>
-        <input type="password" inputmode="numeric" id="lPin" placeholder="4 अंकों का PIN" maxlength="4">
+        <input type="password" inputmode="numeric" id="lPin" placeholder="4 अंकों का PIN" maxlength="4" autocomplete="current-password" inputmode="numeric">
         <div class="err">PIN डालें</div>
       </div>
       <button type="submit" class="btn">लॉगिन करें →</button>
@@ -748,6 +748,78 @@ const logoutBtn = document.getElementById('logoutBtn');
 
 let currentAccount = null;
 let currentTier = null;
+
+/* ===== Persistent login (localStorage) ===== */
+const SESSION_KEY = 'aditya_studio_session_v1';
+
+function saveSession(acc, pin) {
+  try {
+    localStorage.setItem(SESSION_KEY, JSON.stringify({
+      id: acc.id,
+      name: acc.name,
+      mobile: acc.mobile,
+      village: acc.village || '',
+      pin: String(pin),
+      savedAt: Date.now()
+    }));
+  } catch (e) { console.warn('localStorage save fail', e); }
+}
+
+function loadSession() {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    if (!s || !s.mobile || !s.pin) return null;
+    return s;
+  } catch (e) { return null; }
+}
+
+function clearSession() {
+  try { localStorage.removeItem(SESSION_KEY); } catch (e) {}
+}
+
+async function tryRestoreSession() {
+  const s = loadSession();
+  if (!s) return false;
+  try {
+    const res = await fetch(API_BASE + '/api/restore-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mobile: s.mobile, pin: s.pin })
+    });
+    const out = await res.json();
+    if (!out.ok) {
+      // PIN change ho gaya ho ya account delete — session clear
+      clearSession();
+      return false;
+    }
+    currentAccount = {
+      id: out.id,
+      name: out.name,
+      mobile: out.mobile || s.mobile,
+      village: out.village,
+      history: out.history || [],
+      _pin: s.pin
+    };
+    enterDashboard();
+    return true;
+  } catch (e) {
+    // offline / server down — local session se soft restore (read-only feel)
+    currentAccount = {
+      id: s.id,
+      name: s.name,
+      mobile: s.mobile,
+      village: s.village,
+      history: [],
+      _pin: s.pin
+    };
+    enterDashboard();
+    return true;
+  }
+}
+
+
 let currentEntryId = null;
 let currentDiscountPct = null;
 let hasSpun = false;
@@ -806,7 +878,8 @@ registerForm.addEventListener('submit', async (e)=>{
         : 'कुछ गलत हो गया, दोबारा कोशिश करें');
       return;
     }
-    currentAccount = { id: out.id, name, mobile, village, history: [] };
+    currentAccount = { id: out.id, name, mobile, village, history: [], _pin: pin };
+    saveSession(currentAccount, pin);
     enterDashboard();
   }catch(err){
     btn.disabled = false; btn.textContent = 'अकाउंट बनाएं →';
@@ -839,7 +912,8 @@ loginForm.addEventListener('submit', async (e)=>{
       setAuthError('मोबाइल नंबर या PIN गलत है');
       return;
     }
-    currentAccount = { id: out.id, name: out.name, mobile, village: out.village, history: out.history || [] };
+    currentAccount = { id: out.id, name: out.name, mobile, village: out.village, history: out.history || [], _pin: pin };
+    saveSession(currentAccount, pin);
     enterDashboard();
   }catch(err){
     btn.disabled = false; btn.textContent = 'लॉगिन करें →';
@@ -922,6 +996,7 @@ function renderHistory(){
 
 logoutBtn.addEventListener('click', ()=>{
   currentAccount = null;
+  clearSession();
   dashboardCard.style.display = 'none';
   codeCard.style.display = 'none';
   wheelSection.style.display = 'none';
@@ -1338,6 +1413,8 @@ document.getElementById('claimBtn').addEventListener('click', ()=>{
     setTimeout(()=>{ btn.textContent = original; }, 2200);
   }, 'image/png');
 });
+
+tryRestoreSession();
 
 const footYearEl = document.getElementById('footYear');
 if(footYearEl) footYearEl.textContent = new Date().getFullYear();
