@@ -56,14 +56,16 @@ function csvEscape(v) {
 }
 
 function writeCSV(accounts) {
-  const header = ['Customer ID', 'Name', 'Mobile', 'Village', 'Entry ID', 'Amount', 'Tier', 'Discount(%)', 'Timestamp'];
+  const header = ['Customer ID', 'Name', 'Mobile', 'Village', 'Visits', 'Last Visit', 'Entry ID', 'Amount', 'Tier', 'Discount(%)', 'Timestamp'];
   const rows = [];
   accounts.forEach(acc => {
+    const visits = acc.visitCount || 1;
+    const lastVisit = acc.lastVisitAt || acc.createdAt;
     if (!acc.history || acc.history.length === 0) {
-      rows.push([acc.id, acc.name, acc.mobile, acc.village, '', '', '', '', acc.createdAt].map(csvEscape).join(','));
+      rows.push([acc.id, acc.name, acc.mobile, acc.village, visits, lastVisit, '', '', '', '', acc.createdAt].map(csvEscape).join(','));
     } else {
       acc.history.forEach(h => {
-        rows.push([acc.id, acc.name, acc.mobile, acc.village, h.entryId, h.amount, h.tier, h.discount ?? '', h.timestamp].map(csvEscape).join(','));
+        rows.push([acc.id, acc.name, acc.mobile, acc.village, visits, lastVisit, h.entryId, h.amount, h.tier, h.discount ?? '', h.timestamp].map(csvEscape).join(','));
       });
     }
   });
@@ -113,6 +115,20 @@ function readBody(req) {
     let body = '';
     req.on('data', c => { body += c; });
     req.on('end', () => { try { resolve(body ? JSON.parse(body) : {}); } catch (e) { reject(e); } });
+    req.on('error', reject);
+  });
+}
+
+function readFormBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', c => { body += c; });
+    req.on('end', () => {
+      const params = new URLSearchParams(body);
+      const obj = {};
+      for (const [k, v] of params) obj[k] = v;
+      resolve(obj);
+    });
     req.on('error', reject);
   });
 }
@@ -174,6 +190,10 @@ const server = http.createServer(async (req, res) => {
         village: (body.village || '').toString().trim(),
         pinHash: hashPin(pin, mobile),
         createdAt: new Date().toISOString(),
+        visitCount: 1,
+        lastVisitAt: new Date().toISOString(),
+        pinResetRequested: false,
+        pinResetRequestedAt: null,
         history: []
       });
       saveAccounts(accounts);
@@ -195,6 +215,9 @@ const server = http.createServer(async (req, res) => {
       if (!acc || acc.pinHash !== hashPin(pin, mobile)) {
         return sendJSON(res, 401, { ok: false, error: 'invalid-credentials' });
       }
+      acc.visitCount = (acc.visitCount || 0) + 1;
+      acc.lastVisitAt = new Date().toISOString();
+      saveAccounts(accounts);
       console.log('Login hua:', acc.id, mobile);
       sendJSON(res, 200, { ok: true, id: acc.id, name: acc.name, village: acc.village, history: publicHistory(acc) });
     } catch (e) {
@@ -266,8 +289,26 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === 'POST' && req.url === '/api/request-pin-reset') {
+    try {
+      const body = await readBody(req);
+      const mobile = (body.mobile || '').toString().trim();
+      const accounts = loadAccounts();
+      const acc = accounts.find(a => a.mobile === mobile);
+      if (!acc) return sendJSON(res, 404, { ok: false, error: 'no-account' });
+      acc.pinResetRequested = true;
+      acc.pinResetRequestedAt = new Date().toISOString();
+      saveAccounts(accounts);
+      console.log('PIN reset request:', acc.id, mobile);
+      sendJSON(res, 200, { ok: true });
+    } catch (e) {
+      sendJSON(res, 400, { ok: false, error: 'bad-request' });
+    }
+    return;
+  }
+
   // Admin-only from here on
-  if (req.url === '/api/customers' || req.url === '/admin' || req.url === '/admin/generate-code') {
+  if (req.url === '/api/customers' || req.url === '/admin' || req.url === '/admin/generate-code' || req.url === '/admin/reset-pin') {
     if (!isAdminAuthed(req)) return requireAdminAuth(req, res);
   }
 
@@ -279,6 +320,28 @@ const server = http.createServer(async (req, res) => {
     console.log('Naya spin code bana:', newCode);
     res.writeHead(302, { Location: '/admin' });
     return res.end();
+  }
+
+  if (req.method === 'POST' && req.url === '/admin/reset-pin') {
+    try {
+      const body = await readFormBody(req);
+      const mobile = (body.mobile || '').toString().trim();
+      const newPin = (body.newPin || '').toString().trim();
+      const accounts = loadAccounts();
+      const acc = accounts.find(a => a.mobile === mobile);
+      if (acc && /^\d{4}$/.test(newPin)) {
+        acc.pinHash = hashPin(newPin, mobile);
+        acc.pinResetRequested = false;
+        acc.pinResetRequestedAt = null;
+        saveAccounts(accounts);
+        console.log('Admin ne PIN reset kiya:', acc.id, mobile);
+      }
+      res.writeHead(302, { Location: '/admin' });
+      return res.end();
+    } catch (e) {
+      res.writeHead(302, { Location: '/admin' });
+      return res.end();
+    }
   }
 
   if (req.method === 'GET' && req.url === '/api/customers') {
@@ -301,12 +364,27 @@ const server = http.createServer(async (req, res) => {
       return `
         <div class="acc-block">
           <h3>${acc.id} — ${acc.name} <span class="muted">(${acc.mobile}, ${acc.village})</span></h3>
+          <div class="muted" style="margin-bottom:8px;">👁️ Visits: ${acc.visitCount || 1}  |  Last visit: ${acc.lastVisitAt ? new Date(acc.lastVisitAt).toLocaleString('en-IN') : '—'}  |  Joined: ${new Date(acc.createdAt).toLocaleDateString('en-IN')}</div>
           <table>
             <thead><tr><th>Entry</th><th>Amount</th><th>Tier</th><th>Discount</th><th>Time</th></tr></thead>
             <tbody>${rows || '<tr><td colspan="5">कोई काम एंट्री नहीं</td></tr>'}</tbody>
           </table>
         </div>`;
     }).join('');
+    const pendingResets = accounts.filter(a => a.pinResetRequested);
+    const resetRows = pendingResets.map(acc => `
+      <tr>
+        <td>${acc.id} — ${acc.name}</td>
+        <td>${acc.mobile}</td>
+        <td>${acc.pinResetRequestedAt ? new Date(acc.pinResetRequestedAt).toLocaleString('en-IN') : '—'}</td>
+        <td>
+          <form method="POST" action="/admin/reset-pin" style="display:flex; gap:6px;">
+            <input type="hidden" name="mobile" value="${acc.mobile}">
+            <input type="text" name="newPin" placeholder="नया 4-अंक PIN" maxlength="4" style="width:110px; background:#0C0906; border:1px solid rgba(212,175,55,0.3); border-radius:6px; padding:6px 8px; color:#F4EAD6;">
+            <button class="gen-btn" type="submit" style="padding:6px 14px; font-size:12px;">Set PIN</button>
+          </form>
+        </td>
+      </tr>`).join('');
     const codes = loadCodes().slice().reverse();
     const codeRows = codes.map(c => `
       <tr>
@@ -335,6 +413,14 @@ const server = http.createServer(async (req, res) => {
       </style></head><body>
       <h1>Aditya Studio — Admin</h1>
       <div class="sub">CSV file: customers.csv (server ke folder me) | <a href="/">customer page</a></div>
+
+      <h2>⚠️ PIN Reset Requests ${pendingResets.length ? '(' + pendingResets.length + ')' : ''}</h2>
+      <div class="codes-block">
+        <table>
+          <thead><tr><th>Customer</th><th>Mobile</th><th>Requested At</th><th>Action</th></tr></thead>
+          <tbody>${resetRows || '<tr><td colspan="4">कोई pending request नहीं है</td></tr>'}</tbody>
+        </table>
+      </div>
 
       <h2>Spin Codes</h2>
       <div class="codes-block">
