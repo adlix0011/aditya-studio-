@@ -61,14 +61,39 @@
   .deco-float.d3{animation-duration:5s; animation-delay:.8s; font-size:1.8rem;}
   @keyframes floaty{0%,100%{transform:translateY(0) rotate(0deg);} 50%{transform:translateY(-14px) rotate(8deg);}}
 
-  .skip-wrap{margin-top:30px;}
-  .skip-btn{
-    background:transparent; border:1px solid rgba(212,175,55,0.5); color:var(--gold-light);
-    font-family:'Poppins',sans-serif; font-size:13px; letter-spacing:1px; padding:10px 26px;
-    border-radius:999px; cursor:pointer; transition:background .2s, transform .15s;
+  .filmstrip{position:fixed; left:0; right:0; height:14px; z-index:5; background:repeating-linear-gradient(90deg, #000 0px, #000 10px, transparent 10px, transparent 14px), #0a0806; opacity:0.9;}
+  .filmstrip.top{top:0;}
+  .filmstrip.bottom{bottom:0;}
+
+  .landing-wheel-wrap{margin-top:34px; display:flex; flex-direction:column; align-items:center;}
+  .lw-stage{position:relative; width:min(300px, 78vw); aspect-ratio:1/1;}
+  .lw-outer{position:absolute; inset:0; border-radius:50%; background:linear-gradient(145deg, var(--gold-light), var(--gold-dim), var(--gold-light)); padding:10px; box-shadow:0 0 34px rgba(212,175,55,0.45), inset 0 0 18px rgba(0,0,0,0.35);}
+  .lw-rim{position:absolute; inset:3px; border-radius:50%; background:#150F0B; overflow:hidden;}
+  .lw-rim::before{content:""; position:absolute; inset:0; border-radius:50%; background:repeating-conic-gradient(from 0deg, var(--gold-light) 0deg 7deg, transparent 7deg 18deg); animation:lwBlink .9s linear infinite; opacity:0.85;}
+  @keyframes lwBlink{0%,100%{opacity:0.85;} 50%{opacity:0.3;}}
+  .lw-wheel{position:absolute; inset:15px; border-radius:50%; overflow:hidden; transition:transform 5.5s cubic-bezier(0.15,0.85,0.2,1); box-shadow:inset 0 0 22px rgba(0,0,0,0.5);}
+  .lw-segments{width:100%; height:100%; border-radius:50%; position:relative;}
+  .lw-label{position:absolute; left:50%; top:50%; width:48%; height:52px; margin-top:-26px; transform-origin:0 50%; display:flex; align-items:center; justify-content:flex-end; padding-right:8px; pointer-events:none; text-align:center;}
+  .lw-label-inner{display:flex; flex-direction:column; align-items:center; line-height:1.05;}
+  .lw-label.flip .lw-label-inner{transform:rotate(180deg);}
+  .lw-val{font-family:'Poppins',sans-serif; font-weight:800; font-size:0.82rem; color:#FFF8E4; text-shadow:0 1px 2px rgba(0,0,0,0.5);}
+  .lw-sub{font-family:'Poppins',sans-serif; font-weight:700; font-size:0.42rem; letter-spacing:0.4px; opacity:0.9; color:#FFF8E4;}
+  .lw-ico{font-size:0.8rem; margin-top:1px;}
+  .lw-pointer{position:absolute; top:-13px; left:50%; transform:translateX(-50%); width:0; height:0; border-left:13px solid transparent; border-right:13px solid transparent; border-top:26px solid var(--gold-light); z-index:5; filter:drop-shadow(0 3px 4px rgba(0,0,0,0.5));}
+  .lw-hub{position:absolute; top:50%; left:50%; width:64px; height:64px; transform:translate(-50%,-50%); border-radius:50%; background:#150F0B; border:3px solid var(--gold-light); box-shadow:0 0 14px rgba(212,175,55,0.5), inset 0 0 10px rgba(0,0,0,0.5); z-index:10; display:flex; align-items:center; justify-content:center; font-size:1.6rem;}
+
+  .lw-spin-wrap{margin-top:24px; display:flex; flex-direction:column; align-items:center;}
+  .lw-spin-btn{
+    background:linear-gradient(180deg, #c44aff 0%, #8b1fc7 55%, #6a0dad 100%);
+    color:#fff; font-family:'Poppins',sans-serif; font-size:1.05rem; font-weight:800;
+    padding:13px 44px; border:none; border-radius:50px; cursor:pointer;
+    box-shadow:0 6px 0 #4a0a7a, 0 10px 20px rgba(139,31,199,0.5), inset 0 2px 0 rgba(255,255,255,0.3);
+    text-transform:uppercase; letter-spacing:2px; transition:all .15s ease;
   }
-  .skip-btn:hover{background:rgba(212,175,55,0.12); transform:translateY(-2px);}
-  .skip-btn span{display:inline-block; margin-left:4px;}
+  .lw-spin-btn:hover{transform:translateY(-2px); box-shadow:0 8px 0 #4a0a7a, 0 13px 24px rgba(139,31,199,0.6), inset 0 2px 0 rgba(255,255,255,0.3);}
+  .lw-spin-btn:active{transform:translateY(4px); box-shadow:0 2px 0 #4a0a7a, 0 5px 12px rgba(139,31,199,0.4), inset 0 2px 0 rgba(255,255,255,0.3);}
+  .lw-spin-btn:disabled{opacity:0.55; cursor:not-allowed; transform:none;}
+  .lw-hint{margin-top:12px; font-size:12px; color:var(--muted); text-align:center; max-width:260px;}
 
   .card{
     background:linear-gradient(180deg, var(--bg-alt), #150F0B);
@@ -173,6 +198,9 @@
 </head>
 <body>
 
+<div class="filmstrip top"></div>
+<div class="filmstrip bottom"></div>
+
 <div class="deco-float" style="top:10%; left:6%;">🪙</div>
 <div class="deco-float d2" style="top:18%; right:8%;">💎</div>
 <div class="deco-float d3" style="bottom:20%; left:10%;">🪙</div>
@@ -187,8 +215,21 @@
     <div class="title3d">Aditya Studio</div>
     <div class="tagline">आपके भरोसे का स्टूडियो</div>
     <div class="divider"></div>
-    <div class="skip-wrap">
-      <button class="skip-btn" id="skipBtn">Skip <span>→</span></button>
+    <div class="landing-wheel-wrap">
+      <div class="lw-stage">
+        <div class="lw-pointer"></div>
+        <div class="lw-outer">
+          <div class="lw-rim"></div>
+          <div class="lw-wheel" id="lwWheel">
+            <div class="lw-segments" id="lwSegments"></div>
+          </div>
+        </div>
+        <div class="lw-hub">📷</div>
+      </div>
+      <div class="lw-spin-wrap">
+        <button class="lw-spin-btn" id="lwSpinBtn">SPIN</button>
+        <div class="lw-hint">डिस्काउंट पाने के लिए स्पिन करें — पहले अपना अकाउंट बना लें</div>
+      </div>
     </div>
   </div>
 
@@ -339,11 +380,62 @@ const TIERS = [
 const API_BASE = '';
 
 const authCard = document.getElementById('authCard');
-const skipBtn = document.getElementById('skipBtn');
 
-skipBtn.addEventListener('click', ()=>{
-  authCard.style.display = 'block';
-  authCard.scrollIntoView({behavior:'smooth', block:'start'});
+/* ---------- Landing teaser wheel ---------- */
+const LW_PRIZES = [
+  { val: "5%",   sub: "DISCOUNT",    icon: "🛍️" },
+  { val: "25%",  sub: "DISCOUNT",    icon: "🛍️" },
+  { val: "90%",  sub: "DISCOUNT",    icon: "🔥" },
+  { val: "₹100", sub: "COUPON CODE", icon: "🎫" },
+  { val: "₹50",  sub: "COUPON CODE", icon: "🎫" },
+  { val: "₹40",  sub: "COUPON CODE", icon: "🎫" },
+  { val: "₹20",  sub: "COUPON CODE", icon: "🎫" },
+  { val: "100%", sub: "DISCOUNT",    icon: "🏆" },
+  { val: "10%",  sub: "DISCOUNT",    icon: "✨" }
+];
+const LW_COLORS = ['#7B2CBF', '#1B9C3A', '#C47A1A', '#D4A017', '#E8B923', '#F0C93A', '#E8B923', '#C41E3A', '#1E5AA8'];
+const lwWheel = document.getElementById('lwWheel');
+const lwSegmentsEl = document.getElementById('lwSegments');
+const lwSpinBtn = document.getElementById('lwSpinBtn');
+const LW_SEG = 360 / LW_PRIZES.length;
+const LW_OFFSET = -20;
+let lwSpinning = false;
+let lwRotation = 0;
+
+function buildLandingWheel(){
+  const stops = LW_PRIZES.map((p,i)=> LW_COLORS[i] + ' ' + (LW_OFFSET+i*LW_SEG) + 'deg ' + (LW_OFFSET+(i+1)*LW_SEG) + 'deg');
+  lwSegmentsEl.style.background = 'conic-gradient(' + stops.join(',') + ')';
+  LW_PRIZES.forEach((p,i)=>{
+    const mid = LW_OFFSET + i*LW_SEG + LW_SEG/2;
+    const a = ((mid % 360) + 360) % 360;
+    const label = document.createElement('div');
+    label.className = 'lw-label' + (a > 90 && a < 270 ? ' flip' : '');
+    label.style.transform = 'rotate(' + mid + 'deg)';
+    label.innerHTML = '<div class="lw-label-inner"><div class="lw-val">' + p.val + '</div><div class="lw-sub">' + p.sub + '</div><div class="lw-ico">' + p.icon + '</div></div>';
+    lwSegmentsEl.appendChild(label);
+  });
+}
+buildLandingWheel();
+
+lwSpinBtn.addEventListener('click', ()=>{
+  if(lwSpinning) return;
+  lwSpinning = true;
+  lwSpinBtn.disabled = true;
+  const idx = Math.floor(Math.random()*LW_PRIZES.length);
+  const mid = LW_OFFSET + idx*LW_SEG + LW_SEG/2;
+  const needed = ((-mid % 360)+360)%360;
+  const cur = ((lwRotation % 360)+360)%360;
+  let delta = needed - cur;
+  if(delta <= 0) delta += 360;
+  delta += (5 + Math.floor(Math.random()*3))*360;
+  lwRotation += delta;
+  lwWheel.style.transform = 'rotate(' + lwRotation + 'deg)';
+  setTimeout(()=>{
+    lwSpinning = false;
+    lwSpinBtn.disabled = false;
+    authCard.style.display = 'block';
+    authCard.scrollIntoView({behavior:'smooth', block:'start'});
+  }, 5700);
 });
 const dashboardCard = document.getElementById('dashboardCard');
 const wheelSection = document.getElementById('wheelSection');
