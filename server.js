@@ -27,6 +27,14 @@
   Abhi ke liye ye JSON-file wala tarika sirf demo/testing ke liye theek hai.
 */
 
+/*
+  FLOW (customer page):
+    1) Landing: logo + 3D title + wheel + SPIN only
+    2) Spin ~5s → then Sign Up / Login card
+    3) Forgot PIN → /api/request-pin-reset → green success on page
+  Admin: /admin (ADMIN_PASSWORD required)
+*/
+
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
