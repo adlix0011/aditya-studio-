@@ -44,12 +44,29 @@ const PORT = process.env.PORT || 4000;
 const PIN_SALT = process.env.PIN_SALT || 'aditya-studio-local-salt';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || null; // null = admin panel band (locked) rahega jab tak set na ho
 
-// DATA_DIR env set karo Render Persistent Disk pe (e.g. /var/data)
-const DATA_DIR = process.env.DATA_DIR || __dirname;
-try { if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
+// DATA_DIR: sirf tab use karo jab Render pe Persistent Disk mount ho.
+// Bina disk ke /var/data likhne se write fail hota hai — auto fallback __dirname.
+function resolveDataDir() {
+  const preferred = process.env.DATA_DIR || __dirname;
+  const candidates = [preferred, __dirname, '/tmp'];
+  for (const dir of candidates) {
+    try {
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      const testFile = path.join(dir, '.write-test');
+      fs.writeFileSync(testFile, 'ok');
+      fs.unlinkSync(testFile);
+      return dir;
+    } catch (e) {
+      console.warn('Data dir not writable:', dir, e.message);
+    }
+  }
+  return __dirname;
+}
+const DATA_DIR = resolveDataDir();
 const DATA_FILE = path.join(DATA_DIR, 'accounts.json');
 const CSV_FILE = path.join(DATA_DIR, 'customers.csv');
 const HTML_FILE = path.join(__dirname, 'aditya-studio-discount-wheel.html');
+console.log('[boot] Using data dir:', DATA_DIR);
 
 function loadAccounts() {
   if (!fs.existsSync(DATA_FILE)) return [];
@@ -95,11 +112,17 @@ function writeCSV(accounts) {
 }
 
 function saveAccounts(accounts) {
-  // normalize pins to string before save
   accounts.forEach(a => { a.pin = String(a.pin || ''); a.mobile = String(a.mobile || ''); });
-  const tmp = DATA_FILE + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify(accounts, null, 2), 'utf8');
-  fs.renameSync(tmp, DATA_FILE); // atomic-ish replace
+  const json = JSON.stringify(accounts, null, 2);
+  try {
+    const tmp = DATA_FILE + '.tmp';
+    fs.writeFileSync(tmp, json, 'utf8');
+    fs.renameSync(tmp, DATA_FILE);
+  } catch (e) {
+    // fallback direct write
+    console.error('atomic save fail, trying direct:', e.message);
+    fs.writeFileSync(DATA_FILE, json, 'utf8');
+  }
   try { writeCSV(accounts); } catch (e) { console.error('CSV write error:', e.message); }
 }
 
@@ -226,7 +249,8 @@ const server = http.createServer(async (req, res) => {
       console.log('Naya account bana:', id, mobile);
       sendJSON(res, 200, { ok: true, id });
     } catch (e) {
-      sendJSON(res, 400, { ok: false, error: 'bad-request' });
+      console.error('Register error:', e.message);
+      sendJSON(res, 500, { ok: false, error: 'save-failed', detail: e.message });
     }
     return;
   }
@@ -238,8 +262,11 @@ const server = http.createServer(async (req, res) => {
       const pin = (body.pin || '').toString().trim();
       const accounts = loadAccounts();
       const acc = accounts.find(a => String(a.mobile) === String(mobile));
-      if (!acc || String(acc.pin) !== String(pin)) {
-        return sendJSON(res, 401, { ok: false, error: 'invalid-credentials' });
+      if (!acc) {
+        return sendJSON(res, 401, { ok: false, error: 'not-found' });
+      }
+      if (String(acc.pin) !== String(pin)) {
+        return sendJSON(res, 401, { ok: false, error: 'wrong-pin' });
       }
       acc.visitCount = (acc.visitCount || 0) + 1;
       acc.lastVisitAt = new Date().toISOString();
@@ -260,8 +287,11 @@ const server = http.createServer(async (req, res) => {
       const pin = String((body.pin || '')).trim();
       const accounts = loadAccounts();
       const acc = accounts.find(a => String(a.mobile) === mobile);
-      if (!acc || String(acc.pin) !== pin) {
-        return sendJSON(res, 401, { ok: false, error: 'invalid-credentials' });
+      if (!acc) {
+        return sendJSON(res, 401, { ok: false, error: 'not-found' });
+      }
+      if (String(acc.pin) !== String(pin)) {
+        return sendJSON(res, 401, { ok: false, error: 'wrong-pin' });
       }
       // visit count mat badhao — silent restore
       sendJSON(res, 200, {
