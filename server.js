@@ -131,7 +131,11 @@ function defaultSettings() {
       reel: 'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=400&q=80',
       event: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=400&q=80',
       other: 'https://images.unsplash.com/photo-1478144592103-25e218a04891?w=400&q=80'
-    }
+    },
+    offerImages: [
+      { url: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80', title: '🎡 स्पिन ऑफ़र चल रहा है!', sub: 'कोड डालो → व्हील → डिस्काउंट' },
+      { url: 'https://images.unsplash.com/photo-1519741497674-611481863552?w=800&q=80', title: '📸 Book Your Day', sub: 'Wedding · Birthday · Event' }
+    ]
   };
 }
 function loadSettings() {
@@ -435,8 +439,19 @@ const server = http.createServer(async (req, res) => {
       const entry = (acc.history || []).find(h => h.entryId === body.entryId);
       if (entry) {
         entry.discount = body.discount;
-        entry.prize = body.prize || entry.prize;
+        entry.prize = body.prize || entry.prize || (body.discount != null ? body.discount + '%' : '');
         saveAccounts(accounts);
+        // link prize to spin code history
+        if (entry.code) {
+          const codes = loadCodes();
+          const crow = codes.find(c => String(c.code).toUpperCase() === String(entry.code).toUpperCase());
+          if (crow) {
+            crow.prize = entry.prize;
+            crow.discount = entry.discount;
+            crow.prizeAt = new Date().toISOString();
+            saveCodes(codes);
+          }
+        }
       }
       return sendJSON(res, 200, { ok: true });
     } catch (e) {
@@ -597,6 +612,30 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+
+  if (req.method === 'POST' && urlPath === '/admin/save-offer-images') {
+    try {
+      const body = await readFormBody(req);
+      const cur = loadSettings();
+      const urls = String(body.urls || '').split('\n').map(u => u.trim()).filter(Boolean);
+      const titles = String(body.titles || '').split('\n').map(t => t.trim());
+      const subs = String(body.subs || '').split('\n').map(t => t.trim());
+      if (urls.length) {
+        cur.offerImages = urls.map((url, i) => ({
+          url,
+          title: titles[i] || ('✨ Offer ' + (i + 1)),
+          sub: subs[i] || ''
+        }));
+        saveSettings(cur);
+      }
+      res.writeHead(302, { Location: '/admin?offers=ok' });
+      return res.end();
+    } catch (e) {
+      res.writeHead(302, { Location: '/admin?offers=fail' });
+      return res.end();
+    }
+  }
+
   if (req.method === 'POST' && urlPath === '/admin/save-book-images') {
     try {
       const body = await readFormBody(req);
@@ -667,8 +706,14 @@ const server = http.createServer(async (req, res) => {
     }).join('') || '<div class="muted">No PIN resets</div>';
 
     const codeRows = codes.map(c =>
-      '<tr><td class="mono">' + esc(c.code) + '</td><td>₹' + esc(c.amount != null ? c.amount : '—') + '</td><td>' + (c.used ? '<span class="bad">Used</span>' : '<span class="ok">Unused</span>') + '</td><td>' + esc(c.usedBy || '—') + '</td><td>' + esc(fmtDate(c.createdAt)) + '</td></tr>'
-    ).join('') || '<tr><td colspan="5">No codes</td></tr>';
+      '<tr><td class="mono">' + esc(c.code) + '</td>'
+      + '<td>₹' + esc(c.amount != null ? c.amount : '—') + '</td>'
+      + '<td>' + (c.used ? '<span class="bad">Used</span>' : '<span class="ok">Unused</span>') + '</td>'
+      + '<td>' + esc(c.usedBy || '—') + '</td>'
+      + '<td>' + esc(c.prize || (c.discount != null ? c.discount + '%' : (c.used ? 'Spin pending/unknown' : '—'))) + '</td>'
+      + '<td>' + esc(fmtDate(c.createdAt)) + '</td>'
+      + '<td>' + esc(c.usedAt ? fmtDate(c.usedAt) : '—') + '</td></tr>'
+    ).join('') || '<tr><td colspan="7">No codes yet</td></tr>';
 
     function lastPrize(acc) {
       const h = (acc.history || []).slice().reverse();
@@ -768,14 +813,28 @@ ${resetCards}
 </form>
 </div>
 
-<h2>🎫 Spin Codes</h2>
+<h2>🎬 Home Offer photos (animated)</h2>
+<div class="codes-block">
+<p class="sub">Har line ek photo URL. Titles/subs optional (same order). Save ke baad home offer carousel me animation chalega.</p>
+<form method="POST" action="/admin/save-offer-images" style="display:grid;gap:8px;max-width:560px">
+<label class="muted">Image URLs (one per line)
+<textarea name="urls" rows="4" style="width:100%;background:#0C0906;border:1px solid rgba(212,175,55,0.3);border-radius:8px;color:#F4EAD6;padding:8px">${esc((settings.offerImages||[]).map(o=>o.url||o).join('\n'))}</textarea></label>
+<label class="muted">Titles (one per line)
+<textarea name="titles" rows="3" style="width:100%;background:#0C0906;border:1px solid rgba(212,175,55,0.3);border-radius:8px;color:#F4EAD6;padding:8px">${esc((settings.offerImages||[]).map(o=>o.title||'').join('\n'))}</textarea></label>
+<label class="muted">Subtitles (one per line)
+<textarea name="subs" rows="3" style="width:100%;background:#0C0906;border:1px solid rgba(212,175,55,0.3);border-radius:8px;color:#F4EAD6;padding:8px">${esc((settings.offerImages||[]).map(o=>o.sub||'').join('\n'))}</textarea></label>
+<button class="gen-btn" type="submit">💾 Save offer photos</button>
+</form>
+</div>
+
+<h2>🎫 Spin Codes History</h2>
 <div class="codes-block">
 <form method="POST" action="/admin/generate-code" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
 <input class="inp" name="amount" type="number" min="1" placeholder="Amount ₹" required style="width:120px">
 <input class="inp" name="note" placeholder="Note" style="width:140px">
 <button class="gen-btn" type="submit">+ Naya spin code</button>
 </form>
-<table><thead><tr><th>Code</th><th>Amount</th><th>Status</th><th>Used By</th><th>Created</th></tr></thead>
+<table><thead><tr><th>Code</th><th>Amount</th><th>Status</th><th>Used By</th><th>Coupon/Prize</th><th>Created</th><th>Used At</th></tr></thead>
 <tbody>${codeRows}</tbody></table>
 </div>
 
