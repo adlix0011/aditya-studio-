@@ -752,17 +752,17 @@
       </div>
 
       <div id="spinVerifyBox" class="spin-verify-box" style="display:none;">
-        <div class="spin-verify-title">📱 मोबाइल Verify ज़रूरी</div>
-        <div class="spin-verify-msg">स्पिन से पहले अपना नंबर WhatsApp OTP से verify करें। Admin आपको OTP भेजेगा।</div>
-        <button type="button" class="btn" id="requestSpinOtpBtn" style="margin-bottom:10px;">OTP Request भेजें (Admin को)</button>
-        <div id="spinOtpWait" style="display:none;">
-          <div class="otp-hint" style="margin-bottom:8px;">✅ Request चली गई। Admin WhatsApp पर OTP भेजेगा — मिलने पर नीचे डालें। जब चाहें verify कर सकते हैं।</div>
-          <div class="field" id="sv-otp">
-            <label>WhatsApp वाला OTP</label>
-            <input type="tel" inputmode="numeric" id="spinOtpInput" placeholder="OTP डालें" maxlength="6">
-          </div>
-          <button type="button" class="btn" id="verifySpinOtpBtn">OTP Verify करें</button>
+        <div class="spin-verify-title">📱 मोबाइल Verify</div>
+        <div class="spin-verify-msg" id="spinVerifyMsg">
+          WhatsApp पर जो OTP भेजा गया है, वही डालकर अपना नंबर verify करें।<br>
+          <span style="color:var(--muted);font-size:0.8rem;">Admin को request अपने आप चली जाएगी।</span>
         </div>
+        <div class="field" id="sv-otp">
+          <label>WhatsApp वाला OTP</label>
+          <input type="tel" inputmode="numeric" id="spinOtpInput" placeholder="OTP यहाँ डालें" maxlength="6" autocomplete="one-time-code">
+        </div>
+        <button type="button" class="btn" id="verifySpinOtpBtn">OTP डालकर Verify करें</button>
+        <button type="button" class="btn-secondary" id="requestSpinOtpBtn" style="margin-top:8px;">Request दोबारा भेजें</button>
         <div class="auth-error" id="spinVerifyError" style="display:none;margin-top:8px;"></div>
       </div>
       <button class="fw-spin-btn" id="freeSpinBtn">SPIN</button>
@@ -1310,11 +1310,48 @@ async function isMobileVerified(){
   }catch(e){}
   return false;
 }
+async function autoRequestSpinOtp(){
+  if(!currentAccount || !currentAccount.mobile) return;
+  setSpinVerifyError('');
+  try{
+    const res = await fetch(API_BASE + '/api/request-spin-otp', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ mobile: currentAccount.mobile })
+    });
+    if(!res.ok){
+      setSpinVerifyError('Server error ('+res.status+'). Naya server.js deploy karein.');
+      return;
+    }
+    const out = await res.json();
+    if(out.alreadyVerified){
+      currentAccount.mobileVerified = true;
+      showSpinVerifyUI(false);
+      return;
+    }
+    if(!out.ok){
+      setSpinVerifyError(out.error === 'not-found' ? 'अकाउंट नहीं मिला — दोबारा login करें' : 'Request fail');
+      return;
+    }
+    const msg = document.getElementById('spinVerifyMsg');
+    if(msg){
+      msg.innerHTML = 'WhatsApp पर जो OTP भेजा गया है / भेजा जाएगा, वही डालकर अपना नंबर verify करें।<br><span style="color:#8fd19e;font-size:0.85rem;">✅ Admin को request चली गई — OTP WhatsApp पर आएगा।</span>';
+    }
+  }catch(e){
+    console.error(e);
+    setSpinVerifyError('सर्वर से जुड़ नहीं पाया। Confirm karein: naya server.js deploy hua hai (request-spin-otp API).');
+  }
+}
+
 function showSpinVerifyUI(show){
   const box = document.getElementById('spinVerifyBox');
   if(!box) return;
   box.style.display = show ? 'block' : 'none';
   if(freeSpinBtn) freeSpinBtn.style.display = show ? 'none' : 'inline-block';
+  if(show){
+    const inp = document.getElementById('spinOtpInput');
+    if(inp){ inp.value = ''; setTimeout(()=>inp.focus(), 200); }
+    autoRequestSpinOtp();
+  }
 }
 function setSpinVerifyError(msg){
   const el = document.getElementById('spinVerifyError');
@@ -1326,33 +1363,11 @@ const requestSpinOtpBtn = document.getElementById('requestSpinOtpBtn');
 const verifySpinOtpBtn = document.getElementById('verifySpinOtpBtn');
 if(requestSpinOtpBtn){
   requestSpinOtpBtn.addEventListener('click', async ()=>{
-    setSpinVerifyError('');
-    if(!currentAccount){ setSpinVerifyError('पहले लॉगिन करें'); return; }
     requestSpinOtpBtn.disabled = true;
-    requestSpinOtpBtn.textContent = 'Request जा रही है...';
-    try{
-      const res = await fetch(API_BASE + '/api/request-spin-otp', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ mobile: currentAccount.mobile })
-      });
-      const out = await res.json();
-      requestSpinOtpBtn.disabled = false;
-      requestSpinOtpBtn.textContent = 'OTP Request भेजें (Admin को)';
-      if(!out.ok){
-        setSpinVerifyError(out.error === 'not-found' ? 'अकाउंट नहीं मिला' : 'Request fail');
-        return;
-      }
-      if(out.alreadyVerified){
-        currentAccount.mobileVerified = true;
-        showSpinVerifyUI(false);
-        return;
-      }
-      document.getElementById('spinOtpWait').style.display = 'block';
-    }catch(e){
-      requestSpinOtpBtn.disabled = false;
-      requestSpinOtpBtn.textContent = 'OTP Request भेजें (Admin को)';
-      setSpinVerifyError('सर्वर से जुड़ नहीं पाया');
-    }
+    requestSpinOtpBtn.textContent = 'भेज रहे हैं...';
+    await autoRequestSpinOtp();
+    requestSpinOtpBtn.disabled = false;
+    requestSpinOtpBtn.textContent = 'Request दोबारा भेजें';
   });
 }
 if(verifySpinOtpBtn){
@@ -1393,7 +1408,6 @@ if(freeSpinBtn){
     const verified = await isMobileVerified();
     if(!verified){
       showSpinVerifyUI(true);
-      setSpinVerifyError('पहले मोबाइल verify करें');
       return;
     }
     freeHasSpun = true;
