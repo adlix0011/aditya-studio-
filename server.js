@@ -243,6 +243,7 @@ const server = http.createServer(async (req, res) => {
         lastVisitAt: new Date().toISOString(),
         pinResetRequested: false,
         pinResetRequestedAt: null,
+        freeSpinUsed: false,
         history: []
       });
       saveAccounts(accounts);
@@ -492,118 +493,106 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === 'GET' && req.url === '/admin') {
     const accounts = loadAccounts().slice().reverse();
-    const blocks = accounts.map(acc => {
-      const rows = (acc.history || []).slice().reverse().map(h => `
-        <tr>
-          <td>${h.entryId}</td>
-          <td>₹${h.amount}</td>
-          <td>${h.tier}</td>
-          <td>${h.discount != null ? h.discount + '%' : '— स्पिन बाकी —'}</td>
-          <td>${new Date(h.timestamp).toLocaleString('en-IN')}</td>
-        </tr>`).join('');
-      return `
-        <div class="acc-block">
-          <h3>${acc.id} — ${acc.name} <span class="muted">(${acc.mobile}, ${acc.village})</span></h3>
-          <div class="muted" style="margin-bottom:8px;">🔑 PIN: <span style="color:#F3DE9A; font-family:monospace; letter-spacing:2px;">${acc.pin || '—'}</span> &nbsp;|&nbsp; 👁️ Visits: ${acc.visitCount || 1} &nbsp;|&nbsp; Last visit: ${acc.lastVisitAt ? new Date(acc.lastVisitAt).toLocaleString('en-IN') : '—'} &nbsp;|&nbsp; Joined: ${new Date(acc.createdAt).toLocaleDateString('en-IN')}</div>
-          <table>
-            <thead><tr><th>Entry</th><th>Amount</th><th>Tier</th><th>Discount</th><th>Time</th></tr></thead>
-            <tbody>${rows || '<tr><td colspan="5">कोई काम एंट्री नहीं</td></tr>'}</tbody>
-          </table>
-        </div>`;
-    }).join('');
     const pendingResets = accounts.filter(a => a.pinResetRequested);
+    const codes = loadCodes().slice().reverse();
+
+    function esc(t) {
+      return String(t == null ? '' : t)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
     const resetCards = pendingResets.map(acc => {
       const existingMsg = encodeURIComponent('Hi ' + acc.name + ', aapka Aditya Studio PIN hai: ' + (acc.pin || '') + '. Isse login karke discount wheel spin kar sakte hain.');
-      return `
-      <div class="msg-card">
-        <div class="msg-text">🔔 <b>${acc.name}</b> (${acc.mobile}) ने PIN भूलने की request भेजी है — ${acc.pinResetRequestedAt ? new Date(acc.pinResetRequestedAt).toLocaleString('en-IN') : ''}</div>
-        <div class="msg-actions">
-          <a class="gen-btn wa-link" href="https://wa.me/91${acc.mobile}?text=${existingMsg}" target="_blank" rel="noopener">💬 मौजूदा PIN भेजें</a>
-          <form method="POST" action="/admin/reset-pin" style="display:flex; gap:6px;">
-            <input type="hidden" name="mobile" value="${acc.mobile}">
-            <input type="text" name="newPin" placeholder="नया PIN" maxlength="4" style="width:90px; background:#0C0906; border:1px solid rgba(212,175,55,0.3); border-radius:6px; padding:6px 8px; color:#F4EAD6;">
-            <button class="gen-btn" type="submit" style="padding:6px 14px; font-size:12px;">नया PIN सेट करें → WhatsApp</button>
-          </form>
-        </div>
-      </div>`;
-    }).join('');
-    const codes = loadCodes().slice().reverse();
-    const codeRows = codes.map(c => `
-      <tr>
-        <td style="font-family:monospace; font-size:15px; letter-spacing:2px;">${c.code}</td>
-        <td>${c.used ? '<span style="color:#e08a8a;">Used</span>' : '<span style="color:#8fd19e;">Unused</span>'}</td>
-        <td>${c.usedBy || '—'}</td>
-        <td>${new Date(c.createdAt).toLocaleString('en-IN')}</td>
-      </tr>`).join('');
-    const html = `<!DOCTYPE html><html lang="hi"><head><meta charset="UTF-8">
-      <title>Aditya Studio — Admin</title>
-      <style>
-        body{font-family:sans-serif; background:#0F0C09; color:#F4EAD6; padding:24px;}
-        h1{color:#D4AF37; font-size:22px;}
-        h2{color:#D4AF37; font-size:17px; margin:30px 0 8px;}
-        h3{color:#F3DE9A; font-size:15px; margin:22px 0 8px;}
-        .muted{color:#B7A480; font-weight:normal; font-size:12px;}
-        .sub{color:#B7A480; font-size:13px; margin-bottom:16px;}
-        table{width:100%; border-collapse:collapse;}
-        th,td{padding:8px 10px; border-bottom:1px solid #2a2018; text-align:left; font-size:13px;}
-        th{color:#D4AF37; text-transform:uppercase; font-size:11px; letter-spacing:0.5px;}
-        tr:hover{background:#1B140F;}
-        a{color:#D4AF37;}
-        .acc-block{border:1px solid rgba(212,175,55,0.15); border-radius:10px; padding:12px 16px; margin-bottom:14px;}
-        .codes-block{border:1px solid rgba(212,175,55,0.15); border-radius:10px; padding:16px; margin-bottom:20px;}
-        .gen-btn{background:linear-gradient(180deg,#F3DE9A,#D4AF37 60%,#8C6E2F); color:#241804; border:none; padding:10px 20px; border-radius:8px; font-weight:700; cursor:pointer; font-size:14px; text-decoration:none; display:inline-block;}
-        .msg-card{background:#1B140F; border:1px solid rgba(224,138,138,0.35); border-radius:10px; padding:14px 16px; margin-bottom:12px;}
-        .msg-text{font-size:13.5px; margin-bottom:10px;}
-        .msg-actions{display:flex; gap:10px; flex-wrap:wrap; align-items:center;}
-        .wa-link{background:linear-gradient(180deg,#3ee06b,#25D366 60%,#128C4A);}
-      </style></head><body>
-      <h1>Aditya Studio — Admin</h1>
-      <div class="sub">CSV file: customers.csv | <a href="/">customer page</a></div>
+      return '<div class="msg-card">'
+        + '<div class="msg-text">🔔 <b>' + esc(acc.name) + '</b> (' + esc(acc.mobile) + ') ne PIN bhoolne ki request bheji — '
+        + (acc.pinResetRequestedAt ? new Date(acc.pinResetRequestedAt).toLocaleString('en-IN') : '') + '</div>'
+        + '<div class="msg-actions">'
+        + '<a class="gen-btn wa-link" href="https://wa.me/91' + esc(acc.mobile) + '?text=' + existingMsg + '" target="_blank" rel="noopener">💬 maujooda PIN bhejo</a>'
+        + '<form method="POST" action="/admin/reset-pin" style="display:flex;gap:6px;">'
+        + '<input type="hidden" name="mobile" value="' + esc(acc.mobile) + '">'
+        + '<input type="text" name="newPin" placeholder="Naya PIN" maxlength="4" style="width:90px;background:#0C0906;border:1px solid rgba(212,175,55,0.3);border-radius:6px;padding:6px 8px;color:#F4EAD6;">'
+        + '<button class="gen-btn" type="submit" style="padding:6px 14px;font-size:12px;">Naya PIN → WhatsApp</button>'
+        + '</form></div></div>';
+    }).join('') || '<div class="muted">Koi pending request nahi</div>';
 
-      <h2>💾 Data Backup (PC me save karo)</h2>
-      <div class="codes-block">
-        <p class="sub" style="margin-bottom:12px;">
-          Render free pe data kabhi-kabhi mit sakta hai. Isliye <b>hafte me 1–2 baar</b> backup download karke apne PC me rakh lo.
-          Agar data wipe ho jaye to yahi file upload karke restore kar sakte ho.
-        </p>
-        <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:center;">
-          <a class="gen-btn" href="/admin/backup">⬇️ Backup Download (JSON)</a>
-          <form method="POST" action="/admin/restore" enctype="multipart/form-data" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-            <input type="file" name="backup" accept=".json,application/json" required
-              style="color:#F4EAD6; font-size:13px; max-width:220px;">
-            <button class="gen-btn" type="submit" style="background:linear-gradient(180deg,#8fd19e,#3E7A4C);">⬆️ Restore Upload</button>
-          </form>
-        </div>
-        <div id="restoreMsg" class="muted" style="margin-top:10px;"></div>
-        <script>
-          (function(){
-            var q = new URLSearchParams(location.search).get('restore');
-            var el = document.getElementById('restoreMsg');
-            if(q === 'ok'){ el.style.color = '#8fd19e'; el.textContent = '✅ Restore successful — accounts & codes wapas aa gaye.'; }
-            if(q === 'fail'){ el.style.color = '#e08a8a'; el.textContent = '❌ Restore fail — sahi backup JSON file choose karo.'; }
-          })();
-        </script>
-      </div>
+    const codeRows = codes.map(c =>
+      '<tr><td style="font-family:monospace;letter-spacing:2px;">' + esc(c.code) + '</td>'
+      + '<td>' + (c.used ? '<span style="color:#e08a8a;">Used</span>' : '<span style="color:#8fd19e;">Unused</span>') + '</td>'
+      + '<td>' + esc(c.usedBy || '—') + '</td>'
+      + '<td>' + esc(new Date(c.createdAt).toLocaleString('en-IN')) + '</td></tr>'
+    ).join('') || '<tr><td colspan="4">Abhi koi code nahi</td></tr>';
 
-      <h2>⚠️ PIN Reset Requests ${pendingResets.length ? '(' + pendingResets.length + ')' : ''}</h2>
-      <div>
-        ${resetCards || '<div class="muted">कोई pending request नहीं है</div>'}
-      </div>
+    const blocks = accounts.map(acc => {
+      const rows = (acc.history || []).slice().reverse().map(h =>
+        '<tr><td>' + esc(h.entryId) + '</td><td>₹' + esc(h.amount) + '</td><td>' + esc(h.tier || '') + '</td>'
+        + '<td>' + (h.discount != null ? esc(h.discount) + '%' : '— spin baaki —') + '</td>'
+        + '<td>' + esc(new Date(h.timestamp).toLocaleString('en-IN')) + '</td></tr>'
+      ).join('') || '<tr><td colspan="5">Koi entry nahi</td></tr>';
+      return '<div class="acc-block">'
+        + '<h3>' + esc(acc.id) + ' — ' + esc(acc.name)
+        + ' <span class="muted">(' + esc(acc.mobile) + ', ' + esc(acc.village) + ')</span></h3>'
+        + '<div class="muted" style="margin-bottom:8px;">🔑 PIN: <span style="color:#F3DE9A;font-family:monospace;letter-spacing:2px;">'
+        + esc(acc.pin || '—') + '</span> | 👁️ Visits: ' + esc(acc.visitCount || 1)
+        + ' | Last: ' + (acc.lastVisitAt ? esc(new Date(acc.lastVisitAt).toLocaleString('en-IN')) : '—')
+        + ' | Joined: ' + esc(new Date(acc.createdAt).toLocaleDateString('en-IN')) + '</div>'
+        + '<table><thead><tr><th>Entry</th><th>Amount</th><th>Tier</th><th>Discount</th><th>Time</th></tr></thead>'
+        + '<tbody>' + rows + '</tbody></table></div>';
+    }).join('') || '<p>Abhi koi account nahi hai</p>';
 
-      <h2>Spin Codes</h2>
-      <div class="codes-block">
-        <form method="POST" action="/admin/generate-code">
-          <button class="gen-btn" type="submit">+ नया स्पिन कोड बनाएं</button>
-        </form>
-        <table style="margin-top:16px;">
-          <thead><tr><th>Code</th><th>Status</th><th>Used By (Mobile)</th><th>Created</th></tr></thead>
-          <tbody>${codeRows || '<tr><td colspan="4">अभी कोई कोड नहीं बना</td></tr>'}</tbody>
-        </table>
-      </div>
+    const html = `<!DOCTYPE html>
+<html lang="hi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Aditya Studio — Admin</title>
+<style>
+body{font-family:sans-serif;background:#0F0C09;color:#F4EAD6;padding:24px;margin:0}
+h1{color:#D4AF37;font-size:22px}h2{color:#D4AF37;font-size:17px;margin:28px 0 10px}
+h3{color:#F3DE9A;font-size:15px;margin:18px 0 8px}
+.muted{color:#B7A480;font-weight:normal;font-size:12px}
+.sub{color:#B7A480;font-size:13px;margin-bottom:16px}
+table{width:100%;border-collapse:collapse}
+th,td{padding:8px 10px;border-bottom:1px solid #2a2018;text-align:left;font-size:13px}
+th{color:#D4AF37;text-transform:uppercase;font-size:11px;letter-spacing:0.5px}
+tr:hover{background:#1B140F}a{color:#D4AF37}
+.acc-block,.codes-block{border:1px solid rgba(212,175,55,0.15);border-radius:10px;padding:14px 16px;margin-bottom:14px}
+.gen-btn{background:linear-gradient(180deg,#F3DE9A,#D4AF37 60%,#8C6E2F);color:#241804;border:none;padding:10px 18px;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px;text-decoration:none;display:inline-block}
+.msg-card{background:#1B140F;border:1px solid rgba(224,138,138,0.35);border-radius:10px;padding:14px 16px;margin-bottom:12px}
+.msg-text{font-size:13.5px;margin-bottom:10px}
+.msg-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.wa-link{background:linear-gradient(180deg,#3ee06b,#25D366 60%,#128C4A)}
+</style></head><body>
+<h1>Aditya Studio — Admin</h1>
+<div class="sub">Data dir safe | <a href="/">Customer page</a></div>
 
-      <h2>Accounts (${accounts.length})</h2>
-      ${blocks || '<p>Abhi koi account nahi hai</p>'}
-      </body></html>`;
+<h2>💾 Data Backup (PC me save)</h2>
+<div class="codes-block">
+<p class="sub">Har 2–3 din backup download karke PC / Google Drive me rakho. Wipe hone par Restore karo.</p>
+<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center">
+<a class="gen-btn" href="/admin/backup">⬇️ Backup Download</a>
+<form method="POST" action="/admin/restore" enctype="multipart/form-data" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+<input type="file" name="backup" accept=".json,application/json" required style="color:#F4EAD6;font-size:13px;max-width:220px">
+<button class="gen-btn" type="submit" style="background:linear-gradient(180deg,#8fd19e,#3E7A4C)">⬆️ Restore Upload</button>
+</form>
+</div>
+<div id="restoreMsg" class="muted" style="margin-top:10px"></div>
+<script>
+(function(){var q=new URLSearchParams(location.search).get('restore');var el=document.getElementById('restoreMsg');
+if(q==='ok'){el.style.color='#8fd19e';el.textContent='✅ Restore successful';}
+if(q==='fail'){el.style.color='#e08a8a';el.textContent='❌ Restore fail — sahi JSON file choose karo';}})();
+</script>
+</div>
+
+<h2>⚠️ PIN Reset Requests (${pendingResets.length})</h2>
+<div>${resetCards}</div>
+
+<h2>Spin Codes</h2>
+<div class="codes-block">
+<form method="POST" action="/admin/generate-code"><button class="gen-btn" type="submit">+ Naya spin code banao</button></form>
+<table style="margin-top:16px"><thead><tr><th>Code</th><th>Status</th><th>Used By</th><th>Created</th></tr></thead>
+<tbody>${codeRows}</tbody></table>
+</div>
+
+<h2>Accounts (${accounts.length})</h2>
+${blocks}
+</body></html>`;
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(html);
     return;
