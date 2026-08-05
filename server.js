@@ -253,8 +253,26 @@ const server = http.createServer(async (req, res) => {
       const mobile = String(body.mobile || '').trim();
       if (!/^[6-9]\d{9}$/.test(mobile)) return sendJSON(res, 400, { ok: false, error: 'invalid-mobile' });
       const accounts = loadAccounts();
-      const acc = accounts.find(a => String(a.mobile) === mobile);
-      if (!acc) return sendJSON(res, 404, { ok: false, error: 'not-found' });
+      let acc = accounts.find(a => String(a.mobile) === mobile);
+      // Session se aaya data — account server pe nahi to soft create
+      if (!acc && body.name) {
+        acc = {
+          id: body.id || nextCustomerId(accounts),
+          name: String(body.name || '').trim(),
+          mobile,
+          village: String(body.village || '').trim(),
+          pin: String(body.pin || '0000'),
+          createdAt: new Date().toISOString(),
+          history: [],
+          mobileVerified: false,
+          freeSpinUsed: !!body.freeSpinUsed,
+          totalSpend: 0
+        };
+        accounts.push(acc);
+        saveAccounts(accounts);
+        console.log('OTP: soft account create', acc.id, mobile);
+      }
+      if (!acc) return sendJSON(res, 404, { ok: false, error: 'not-found', message: 'Account server pe nahi mila' });
       if (acc.mobileVerified) return sendJSON(res, 200, { ok: true, alreadyVerified: true });
       let list = loadOtpRequests();
       let row = list.find(r => r.mobile === mobile && !r.verified);
@@ -265,9 +283,10 @@ const server = http.createServer(async (req, res) => {
         saveOtpRequests(list);
       }
       console.log('Spin OTP request:', mobile, 'otp=', row.otp);
-      return sendJSON(res, 200, { ok: true, alreadyVerified: false });
+      return sendJSON(res, 200, { ok: true, alreadyVerified: false, otpHint: 'admin-panel' });
     } catch (e) {
-      return sendJSON(res, 500, { ok: false, error: 'server-error' });
+      console.error('request-spin-otp', e);
+      return sendJSON(res, 500, { ok: false, error: 'server-error', detail: String(e.message || e) });
     }
   }
 
@@ -435,8 +454,23 @@ const server = http.createServer(async (req, res) => {
       if (!row) return sendJSON(res, 404, { ok: false, error: 'not-found' });
       if (row.used) return sendJSON(res, 409, { ok: false, error: 'used' });
       const accounts = loadAccounts();
-      const acc = accounts.find(a => String(a.mobile) === mobile);
-      if (!acc) return sendJSON(res, 404, { ok: false, error: 'no-account' });
+      let acc = accounts.find(a => String(a.mobile) === mobile);
+      if (!acc && body.name) {
+        acc = {
+          id: body.id || nextCustomerId(accounts),
+          name: String(body.name || '').trim(),
+          mobile,
+          village: String(body.village || '').trim(),
+          pin: String(body.pin || '0000'),
+          createdAt: new Date().toISOString(),
+          history: [],
+          mobileVerified: false,
+          totalSpend: 0
+        };
+        accounts.push(acc);
+        console.log('Redeem: soft account', acc.id, mobile);
+      }
+      if (!acc) return sendJSON(res, 404, { ok: false, error: 'no-account', message: 'Account server pe nahi — dubara login/register karein' });
       const amount = Number(row.amount) || 0;
       row.used = true;
       row.usedBy = acc.id + ' / ' + mobile;
