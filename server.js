@@ -633,6 +633,47 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+
+  // ---- Notifications (all customers) ----
+  function notifFile(){ return path.join(DATA_DIR, 'notifications.json'); }
+  function loadNotifs(){
+    try {
+      const f = notifFile();
+      if(!fs.existsSync(f)) return [];
+      return JSON.parse(fs.readFileSync(f, 'utf8'));
+    } catch(e){ return []; }
+  }
+  function saveNotifs(list){
+    try {
+      fs.writeFileSync(notifFile(), JSON.stringify(list.slice(0, 50), null, 2));
+    } catch(e){ console.error('saveNotifs', e.message); }
+  }
+
+  if (req.method === 'GET' && req.url === '/api/notifications') {
+    sendJSON(res, 200, { ok: true, items: loadNotifs() });
+    return;
+  }
+
+  if (req.method === 'POST' && req.url === '/admin/send-notification') {
+    try {
+      const body = await readFormBody(req);
+      const title = String(body.title || '').trim() || 'Aditya Studio';
+      const bodyText = String(body.body || '').trim();
+      if(!bodyText){
+        res.writeHead(302, { Location: '/admin?notif=empty' });
+        return res.end();
+      }
+      const list = loadNotifs();
+      list.unshift({ title, body: bodyText, at: new Date().toISOString() });
+      saveNotifs(list);
+      res.writeHead(302, { Location: '/admin?notif=ok' });
+      return res.end();
+    } catch(e){
+      res.writeHead(302, { Location: '/admin?notif=fail' });
+      return res.end();
+    }
+  }
+
   if (req.method === 'GET' && req.url === '/api/customers') {
     const accounts = loadAccounts().map(a => ({ id: a.id, name: a.name, mobile: a.mobile, village: a.village, history: a.history }));
     sendJSON(res, 200, accounts);
@@ -798,6 +839,16 @@ th{color:#D4AF37;font-size:11px;text-transform:uppercase}
 <button class="gen-btn" type="submit" style="background:linear-gradient(180deg,#8fd19e,#3E7A4C)">⬆️ Restore</button>
 </form>
 </div>
+</div>
+
+<h2>🔔 Send Notification / Offer Alert</h2>
+<div class="codes-block">
+<p class="sub">Ye message sab customers ke home 🔔 me dikhega.</p>
+<form method="POST" action="/admin/send-notification" style="display:flex;flex-direction:column;gap:8px;max-width:480px">
+<input class="inp" name="title" placeholder="Title (jaise: Special Offer)" style="width:100%;max-width:100%">
+<textarea name="body" rows="3" placeholder="Message / offer detail..." style="width:100%;background:#0C0906;border:1px solid rgba(212,175,55,0.3);border-radius:8px;color:#F4EAD6;padding:8px;font-family:inherit"></textarea>
+<button class="gen-btn" type="submit">📢 Send to all</button>
+</form>
 </div>
 
 <h2>📱 Spin OTP Requests (${pendingOtps.length})</h2>
