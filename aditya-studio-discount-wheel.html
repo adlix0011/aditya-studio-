@@ -345,25 +345,166 @@
 
   #freeSpinOffer{display:none;}
   #freeWheelSection{display:none;}
+
+  /* ===== Premium celebration claim card ===== */
   .free-offer-card{
-    text-align:center; padding:28px 22px;
+    position:relative; text-align:center; padding:36px 24px 40px;
+    overflow:hidden;
+    background:
+      radial-gradient(ellipse at 50% 0%, rgba(255,215,0,0.22) 0%, transparent 55%),
+      radial-gradient(ellipse at 20% 80%, rgba(196,74,255,0.12) 0%, transparent 40%),
+      radial-gradient(ellipse at 80% 70%, rgba(255,100,50,0.1) 0%, transparent 40%),
+      linear-gradient(180deg, #1B140F 0%, #120e0a 100%);
+    border:2px solid rgba(255,215,0,0.55);
+    box-shadow:
+      0 0 0 1px rgba(255,215,0,0.15),
+      0 0 40px rgba(255,215,0,0.25),
+      0 0 80px rgba(196,74,255,0.12),
+      inset 0 1px 0 rgba(255,255,255,0.08);
+    animation: offerGlow 2.5s ease-in-out infinite alternate;
   }
-  .free-offer-emoji{font-size:3rem; margin-bottom:8px; animation:bounce 0.7s ease infinite alternate;}
+  @keyframes offerGlow{
+    from{ box-shadow:0 0 0 1px rgba(255,215,0,0.15), 0 0 30px rgba(255,215,0,0.2), 0 0 60px rgba(196,74,255,0.1); }
+    to{ box-shadow:0 0 0 1px rgba(255,215,0,0.35), 0 0 50px rgba(255,215,0,0.4), 0 0 90px rgba(196,74,255,0.2); }
+  }
+  .free-offer-card::before{
+    content:""; position:absolute; inset:-2px; border-radius:inherit; padding:2px;
+    background:conic-gradient(from 0deg, #FFD700, #ff6b9d, #c44aff, #00d4ff, #FFD700);
+    -webkit-mask:linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask:linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite:xor; mask-composite:exclude;
+    animation: borderSpin 4s linear infinite; pointer-events:none; opacity:0.85;
+  }
+  @keyframes borderSpin{ to{ transform:rotate(360deg); } }
+
+  .free-sparkles{position:absolute; inset:0; pointer-events:none; overflow:hidden; border-radius:inherit;}
+  .free-sparkles span{
+    position:absolute; width:6px; height:6px; border-radius:50%;
+    background:#FFD700; box-shadow:0 0 8px #FFD700, 0 0 14px #fff;
+    animation: sparkleFloat 3s ease-in-out infinite;
+    opacity:0;
+  }
+  .free-sparkles span:nth-child(1){left:8%; top:20%; animation-delay:0s;}
+  .free-sparkles span:nth-child(2){left:18%; top:70%; animation-delay:0.4s; background:#ff6b9d; box-shadow:0 0 8px #ff6b9d;}
+  .free-sparkles span:nth-child(3){left:78%; top:15%; animation-delay:0.8s; background:#c44aff; box-shadow:0 0 8px #c44aff;}
+  .free-sparkles span:nth-child(4){left:88%; top:55%; animation-delay:1.2s;}
+  .free-sparkles span:nth-child(5){left:50%; top:8%; animation-delay:0.6s; background:#fff; box-shadow:0 0 10px #fff;}
+  .free-sparkles span:nth-child(6){left:30%; top:85%; animation-delay:1.5s; background:#00d4ff; box-shadow:0 0 8px #00d4ff;}
+  .free-sparkles span:nth-child(7){left:65%; top:78%; animation-delay:0.2s;}
+  .free-sparkles span:nth-child(8){left:42%; top:40%; animation-delay:1.8s; width:4px; height:4px;}
+  @keyframes sparkleFloat{
+    0%,100%{opacity:0; transform:translateY(0) scale(0.5);}
+    20%{opacity:1; transform:translateY(-8px) scale(1.2);}
+    50%{opacity:0.9; transform:translateY(-16px) scale(1);}
+    80%{opacity:0.3; transform:translateY(-24px) scale(0.6);}
+  }
+
+  .free-offer-badge{
+    display:inline-block; margin-bottom:14px;
+    padding:6px 16px; border-radius:999px;
+    background:linear-gradient(90deg, rgba(255,215,0,0.2), rgba(196,74,255,0.2));
+    border:1px solid rgba(255,215,0,0.45);
+    color:#FFD700; font-size:0.72rem; font-weight:700;
+    letter-spacing:2px; text-transform:uppercase;
+    font-family:'Poppins',sans-serif;
+    animation: badgePulse 1.8s ease-in-out infinite;
+  }
+  @keyframes badgePulse{
+    0%,100%{ transform:scale(1); }
+    50%{ transform:scale(1.05); box-shadow:0 0 16px rgba(255,215,0,0.35); }
+  }
+
+  .free-offer-emoji{
+    font-size:4.2rem; margin-bottom:6px; line-height:1;
+    animation: giftBounce 1s ease infinite alternate;
+    filter:drop-shadow(0 0 18px rgba(255,215,0,0.6));
+    position:relative; z-index:1;
+  }
+  @keyframes giftBounce{
+    from{ transform:translateY(0) rotate(-6deg) scale(1); }
+    to{ transform:translateY(-12px) rotate(6deg) scale(1.08); }
+  }
+
   .free-offer-title{
-    color:var(--gold-light); font-size:1.35rem; font-weight:800; margin-bottom:8px;
-    text-shadow:0 2px 0 #6e5620;
+    position:relative; z-index:1;
+    font-family:'Cormorant Garamond',serif; font-weight:700;
+    font-size:clamp(2rem, 8vw, 2.6rem); margin-bottom:10px;
+    background:linear-gradient(180deg, #FFF8DC 0%, #FFD700 40%, #E8A800 70%, #B8860B 100%);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    text-shadow:none;
+    filter:drop-shadow(0 2px 0 #6e5620) drop-shadow(0 0 20px rgba(255,215,0,0.45));
+    letter-spacing:1px;
   }
-  .free-offer-msg{color:var(--cream); font-size:1rem; margin-bottom:6px; line-height:1.45;}
-  .free-offer-sub{color:var(--muted); font-size:0.85rem; margin-bottom:20px;}
+
+  .free-offer-msg{
+    position:relative; z-index:1;
+    color:#FFF8E4; font-size:1.15rem; font-weight:600;
+    margin-bottom:8px; line-height:1.5;
+    text-shadow:0 0 20px rgba(255,215,0,0.25);
+  }
+  .free-offer-msg b{
+    color:#FFD700;
+    text-shadow:0 0 12px rgba(255,215,0,0.6);
+    font-size:1.2em;
+  }
+
+  .free-offer-sub{
+    position:relative; z-index:1;
+    color:rgba(243,222,154,0.75); font-size:0.88rem;
+    margin-bottom:26px; letter-spacing:0.3px;
+  }
+
   .claim-spin-btn{
-    background:linear-gradient(180deg,#FFD700,#E8A800);
-    color:#1a0a2e; border:none; padding:14px 36px; border-radius:30px;
-    font-size:1.05rem; font-weight:800; cursor:pointer;
-    box-shadow:0 5px 0 #b8860b; font-family:'Poppins',sans-serif;
-    letter-spacing:0.5px; transition:all .15s;
+    position:relative; z-index:1; overflow:hidden;
+    background:linear-gradient(180deg, #FFE566 0%, #FFD700 35%, #E8A800 70%, #C9960A 100%);
+    color:#1a0a2e; border:none;
+    padding:16px 42px; border-radius:50px;
+    font-size:1.15rem; font-weight:800; cursor:pointer;
+    box-shadow:
+      0 6px 0 #9a7209,
+      0 10px 28px rgba(255,215,0,0.45),
+      0 0 40px rgba(255,215,0,0.25),
+      inset 0 2px 0 rgba(255,255,255,0.5);
+    font-family:'Poppins',sans-serif;
+    letter-spacing:1px; text-transform:uppercase;
+    transition:all .2s ease;
+    animation: claimPulse 2s ease-in-out infinite;
   }
-  .claim-spin-btn:hover{transform:translateY(-2px);}
-  .claim-spin-btn:active{transform:translateY(3px); box-shadow:0 2px 0 #b8860b;}
+  @keyframes claimPulse{
+    0%,100%{ box-shadow:0 6px 0 #9a7209, 0 10px 28px rgba(255,215,0,0.4), 0 0 30px rgba(255,215,0,0.2), inset 0 2px 0 rgba(255,255,255,0.5); }
+    50%{ box-shadow:0 6px 0 #9a7209, 0 12px 36px rgba(255,215,0,0.6), 0 0 55px rgba(255,215,0,0.4), inset 0 2px 0 rgba(255,255,255,0.5); }
+  }
+  .claim-spin-btn::after{
+    content:""; position:absolute; top:0; left:-100%; width:60%; height:100%;
+    background:linear-gradient(90deg, transparent, rgba(255,255,255,0.45), transparent);
+    transform:skewX(-20deg);
+    animation: shimmer 2.2s ease-in-out infinite;
+  }
+  @keyframes shimmer{
+    0%{ left:-100%; }
+    60%,100%{ left:130%; }
+  }
+  .claim-spin-btn:hover{
+    transform:translateY(-3px) scale(1.03);
+    box-shadow:0 8px 0 #9a7209, 0 16px 40px rgba(255,215,0,0.55), 0 0 50px rgba(255,215,0,0.35);
+  }
+  .claim-spin-btn:active{
+    transform:translateY(3px);
+    box-shadow:0 2px 0 #9a7209, 0 6px 16px rgba(255,215,0,0.3);
+  }
+
+  .free-prize-chips{
+    position:relative; z-index:1;
+    display:flex; flex-wrap:wrap; justify-content:center; gap:8px;
+    margin:18px 0 22px;
+  }
+  .free-prize-chips span{
+    font-size:0.7rem; font-weight:700; font-family:'Poppins',sans-serif;
+    padding:5px 10px; border-radius:999px;
+    background:rgba(255,215,0,0.1);
+    border:1px solid rgba(255,215,0,0.3);
+    color:#F3DE9A;
+  }
 
 </style>
 </head>
@@ -542,10 +683,19 @@
 
   <!-- Free spin offer after first register -->
   <div class="card free-offer-card" id="freeSpinOffer">
+    <div class="free-sparkles" aria-hidden="true">
+      <span></span><span></span><span></span><span></span>
+      <span></span><span></span><span></span><span></span>
+    </div>
+    <div class="free-offer-badge">✦ WELCOME GIFT ✦</div>
     <div class="free-offer-emoji">🎁</div>
     <div class="free-offer-title">बधाई हो!</div>
     <div class="free-offer-msg" id="freeOfferMsg">आपको <b>1 फ्री स्पिन</b> मिला है</div>
-    <div class="free-offer-sub">पहली बार रजिस्टर करने पर विशेष स्वागत उपहार</div>
+    <div class="free-offer-sub">पहली बार रजिस्टर — विशेष प्रीमियम स्वागत उपहार</div>
+    <div class="free-prize-chips">
+      <span>₹10</span><span>₹20</span><span>₹30</span><span>₹50</span>
+      <span>₹100</span><span>₹500</span><span>₹1000</span><span>🖼️ Frame</span>
+    </div>
     <button type="button" class="claim-spin-btn" id="claimFreeSpinBtn">🎡 स्पिन क्लेम करें</button>
   </div>
 
@@ -1140,19 +1290,27 @@ function buildFreeWheel(){
 }
 
 function showFreeSpinOffer(){
-  authCard.style.display = 'none';
-  dashboardCard.style.display = 'none';
-  codeCard.style.display = 'none';
-  wheelSection.style.display = 'none';
-  freeWheelSection.style.display = 'none';
-  document.body.classList.add('step-app');
-  document.body.classList.remove('step-code','step-wheel');
-  const msg = document.getElementById('freeOfferMsg');
-  if(msg && currentAccount){
-    msg.innerHTML = currentAccount.name + ', आपको <b>1 फ्री स्पिन</b> मिला है!';
+  try {
+    if(!freeSpinOffer){ enterDashboard(); return; }
+    authCard.style.display = 'none';
+    dashboardCard.style.display = 'none';
+    codeCard.style.display = 'none';
+    wheelSection.style.display = 'none';
+    if(freeWheelSection) freeWheelSection.style.display = 'none';
+    document.body.classList.add('step-app');
+    document.body.classList.remove('step-code','step-wheel');
+    const msg = document.getElementById('freeOfferMsg');
+    if(msg && currentAccount){
+      msg.innerHTML = (currentAccount.name || 'Customer') + ', आपको <b>1 फ्री स्पिन</b> मिला है!';
+    }
+    freeSpinOffer.style.display = 'block';
+    setTimeout(function(){ freeSpinOffer.scrollIntoView({behavior:'smooth', block:'start'}); }, 100);
+    try{ if(typeof startConfetti === 'function') startConfetti(); }catch(e){}
+    try{ if(typeof playFwWin === 'function') playFwWin(); }catch(e){}
+  } catch(e) {
+    console.error('showFreeSpinOffer', e);
+    enterDashboard();
   }
-  freeSpinOffer.style.display = 'block';
-  freeSpinOffer.scrollIntoView({behavior:'smooth', block:'start'});
 }
 
 if(claimFreeSpinBtn){
