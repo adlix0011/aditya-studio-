@@ -517,6 +517,29 @@
     color:#F3DE9A;
   }
 
+
+  .otp-step{display:none; margin-top:12px; padding-top:14px; border-top:1px dashed rgba(212,175,55,0.25);}
+  .otp-step.show{display:block;}
+  .otp-hint{font-size:13px; color:var(--muted); margin-bottom:10px; line-height:1.4;}
+  .otp-hint b{color:var(--gold-light);}
+  .otp-demo{display:none; background:rgba(255,215,0,0.12); border:1px solid rgba(255,215,0,0.35);
+    border-radius:8px; padding:8px 12px; margin-bottom:10px; font-size:13px; color:#FFD700;}
+  .otp-demo.show{display:block;}
+  .btn-secondary{
+    width:100%; margin-top:8px; padding:12px; border-radius:10px; cursor:pointer;
+    background:transparent; border:1px solid rgba(212,175,55,0.4); color:var(--gold-light);
+    font-family:'Poppins',sans-serif; font-weight:600; font-size:14px;
+  }
+  .btn-secondary:disabled{opacity:0.5; cursor:not-allowed;}
+
+
+  .spin-verify-box{
+    margin: 0 auto 18px; max-width: 340px; padding: 16px;
+    border: 1px solid rgba(255,215,0,0.4); border-radius: 14px;
+    background: rgba(255,215,0,0.06); text-align: center;
+  }
+  .spin-verify-title{color:#FFD700; font-weight:800; font-size:1rem; margin-bottom:6px;}
+  .spin-verify-msg{color:var(--muted); font-size:0.85rem; margin-bottom:12px; line-height:1.4;}
 </style>
 </head>
 <body>
@@ -558,7 +581,7 @@
 
   <div class="card" id="authCard" style="display:none;">
     <h2>अपना अकाउंट खोलें</h2>
-    <div class="sub">पहली बार आए हैं तो नया अकाउंट बनाएं, वरना अपने मोबाइल नंबर व PIN से लॉगिन करें</div>
+    <div class="sub">पहली बार → नया अकाउंट | स्पिन से पहले WhatsApp OTP से mobile verify</div>
 
     <div class="tabs">
       <button class="tab-btn active" id="tabRegister">नया कस्टमर</button>
@@ -606,7 +629,7 @@
       </div>
       <div class="field" id="lf-pin">
         <label>PIN</label>
-        <input type="password" inputmode="numeric" id="lPin" placeholder="4 अंकों का PIN" maxlength="4" autocomplete="current-password" inputmode="numeric">
+        <input type="password" inputmode="numeric" id="lPin" placeholder="4 अंकों का PIN" maxlength="4" autocomplete="current-password">
         <div class="err">PIN डालें</div>
       </div>
       <button type="submit" class="btn">लॉगिन करें →</button>
@@ -728,6 +751,20 @@
         </div>
       </div>
 
+      <div id="spinVerifyBox" class="spin-verify-box" style="display:none;">
+        <div class="spin-verify-title">📱 मोबाइल Verify ज़रूरी</div>
+        <div class="spin-verify-msg">स्पिन से पहले अपना नंबर WhatsApp OTP से verify करें। Admin आपको OTP भेजेगा।</div>
+        <button type="button" class="btn" id="requestSpinOtpBtn" style="margin-bottom:10px;">OTP Request भेजें (Admin को)</button>
+        <div id="spinOtpWait" style="display:none;">
+          <div class="otp-hint" style="margin-bottom:8px;">✅ Request चली गई। Admin WhatsApp पर OTP भेजेगा — मिलने पर नीचे डालें। जब चाहें verify कर सकते हैं।</div>
+          <div class="field" id="sv-otp">
+            <label>WhatsApp वाला OTP</label>
+            <input type="tel" inputmode="numeric" id="spinOtpInput" placeholder="OTP डालें" maxlength="6">
+          </div>
+          <button type="button" class="btn" id="verifySpinOtpBtn">OTP Verify करें</button>
+        </div>
+        <div class="auth-error" id="spinVerifyError" style="display:none;margin-top:8px;"></div>
+      </div>
       <button class="fw-spin-btn" id="freeSpinBtn">SPIN</button>
       <div class="fw-spins-left">⚡ <span id="freeSpinsLeft">1</span> Free Spin</div>
     </div>
@@ -1018,19 +1055,20 @@ async function tryRestoreSession() {
       mobile: out.mobile || s.mobile,
       village: out.village,
       history: out.history || [],
-      _pin: s.pin
+      _pin: s.pin,
+      mobileVerified: !!out.mobileVerified
     };
     enterDashboard();
     return true;
   } catch (e) {
-    // offline / server down — local session se soft restore (read-only feel)
     currentAccount = {
       id: s.id,
       name: s.name,
       mobile: s.mobile,
       village: s.village,
       history: [],
-      _pin: s.pin
+      _pin: s.pin,
+      mobileVerified: false
     };
     enterDashboard();
     return true;
@@ -1071,7 +1109,6 @@ registerForm.addEventListener('submit', async (e)=>{
   const village = document.getElementById('rVillage').value.trim();
   const pin = document.getElementById('rPin').value.trim();
   const pin2 = document.getElementById('rPin2').value.trim();
-
   showFieldError('rf-name', name.length < 2); if(name.length < 2) ok = false;
   const mobileOk = /^[6-9]\d{9}$/.test(mobile);
   showFieldError('rf-mobile', !mobileOk); if(!mobileOk) ok = false;
@@ -1080,8 +1117,7 @@ registerForm.addEventListener('submit', async (e)=>{
   showFieldError('rf-pin', !pinOk); if(!pinOk) ok = false;
   showFieldError('rf-pin2', pin !== pin2 || !pinOk); if(pin !== pin2) ok = false;
   if(!ok) return;
-
-  const btn = registerForm.querySelector('button');
+  const btn = registerForm.querySelector('button[type="submit"]');
   btn.disabled = true; btn.textContent = 'बन रहा है...';
   try{
     const res = await fetch(API_BASE + '/api/register', {
@@ -1091,26 +1127,19 @@ registerForm.addEventListener('submit', async (e)=>{
     const out = await res.json();
     btn.disabled = false; btn.textContent = 'अकाउंट बनाएं →';
     if(!out.ok){
-      if(out.error === 'exists'){
-        setAuthError('ये मोबाइल नंबर पहले से रजिस्टर है — "पुराना कस्टमर" टैब से लॉगिन करें');
-      } else if(out.error === 'invalid'){
-        setAuthError('मोबाइल (10 अंक) या PIN (4 अंक) सही डालें');
-      } else if(out.error === 'save-failed'){
-        setAuthError('सर्वर पर डेटा सेव नहीं हो पाया। Render env se DATA_DIR hata kar redeploy karo.');
-      } else {
-        setAuthError('कुछ गलत हो गया, दोबारा कोशिश करें' + (out.detail ? ' ('+out.detail+')' : ''));
-      }
+      if(out.error === 'exists') setAuthError('ये नंबर पहले से रजिस्टर है — पुराना कस्टमर से लॉगिन करें');
+      else setAuthError('अकाउंट नहीं बन पाया, दोबारा कोशिश करें');
       return;
     }
-    currentAccount = { id: out.id, name, mobile, village, history: [], _pin: pin, freeSpinUsed: false };
+    currentAccount = { id: out.id, name, mobile, village, history: [], _pin: pin, freeSpinUsed: false, mobileVerified: false };
     saveSession(currentAccount, pin);
-    // first-time register → free spin offer
     showFreeSpinOffer();
   }catch(err){
     btn.disabled = false; btn.textContent = 'अकाउंट बनाएं →';
-    setAuthError('सर्वर से जुड़ नहीं पाया। server.js चल रहा है यह जांच लें (node server.js).');
+    setAuthError('सर्वर से जुड़ नहीं पाया');
   }
 });
+
 
 loginForm.addEventListener('submit', async (e)=>{
   e.preventDefault();
@@ -1123,8 +1152,7 @@ loginForm.addEventListener('submit', async (e)=>{
   const pinOk = /^\d{4}$/.test(pin);
   showFieldError('lf-pin', !pinOk); if(!pinOk) ok = false;
   if(!ok) return;
-
-  const btn = loginForm.querySelector('button');
+  const btn = loginForm.querySelector('button[type="submit"]');
   btn.disabled = true; btn.textContent = 'लॉगिन हो रहा है...';
   try{
     const res = await fetch(API_BASE + '/api/login', {
@@ -1134,98 +1162,22 @@ loginForm.addEventListener('submit', async (e)=>{
     const out = await res.json();
     btn.disabled = false; btn.textContent = 'लॉगिन करें →';
     if(!out.ok){
-      if(out.error === 'not-found'){
-        setAuthError('यह नंबर रजिस्टर नहीं है। "नया कस्टमर" से अकाउंट बनाएं। (Render restart pe data wipe ho sakta hai)');
-      } else if(out.error === 'wrong-pin'){
-        setAuthError('PIN गलत है। "PIN भूल गए?" से reset request भेजें।');
-      } else {
-        setAuthError('मोबाइल नंबर या PIN गलत है');
-      }
+      if(out.error === 'not-found') setAuthError('यह नंबर रजिस्टर नहीं है — नया कस्टमर से अकाउंट बनाएं');
+      else if(out.error === 'wrong-pin') setAuthError('PIN गलत है');
+      else setAuthError('मोबाइल या PIN गलत है');
       return;
     }
-    currentAccount = { id: out.id, name: out.name, mobile, village: out.village, history: out.history || [], _pin: pin };
+    currentAccount = {
+      id: out.id, name: out.name, mobile, village: out.village,
+      history: out.history || [], _pin: pin, mobileVerified: !!out.mobileVerified
+    };
     saveSession(currentAccount, pin);
     enterDashboard();
   }catch(err){
     btn.disabled = false; btn.textContent = 'लॉगिन करें →';
-    setAuthError('सर्वर से जुड़ नहीं पाया। server.js चल रहा है यह जांच लें (node server.js).');
+    setAuthError('सर्वर से जुड़ नहीं पाया');
   }
 });
-
-const forgotPinLink = document.getElementById('forgotPinLink');
-const forgotPinBox = document.getElementById('forgotPinBox');
-const forgotPinSubmit = document.getElementById('forgotPinSubmit');
-const forgotPinMsg = document.getElementById('forgotPinMsg');
-
-forgotPinLink.addEventListener('click', ()=>{
-  forgotPinBox.style.display = forgotPinBox.style.display === 'none' ? 'block' : 'none';
-  forgotPinMsg.textContent = '';
-  const pinSuccessMsg = document.getElementById('pinSuccessMsg');
-  if(pinSuccessMsg) pinSuccessMsg.classList.remove('show');
-});
-
-forgotPinSubmit.addEventListener('click', async ()=>{
-  const mobile = document.getElementById('fpMobile').value.trim();
-  const mobileOk = /^[6-9]\d{9}$/.test(mobile);
-  showFieldError('fp-mobile', !mobileOk);
-  if(!mobileOk) return;
-
-  forgotPinSubmit.disabled = true; forgotPinSubmit.textContent = 'भेजा जा रहा है...';
-  try{
-    const res = await fetch(API_BASE + '/api/request-pin-reset', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ mobile })
-    });
-    const out = await res.json();
-    forgotPinSubmit.disabled = false; forgotPinSubmit.textContent = 'Request भेजें';
-    const pinSuccessMsg = document.getElementById('pinSuccessMsg');
-    if(out.ok){
-      forgotPinMsg.textContent = '';
-      if(pinSuccessMsg){ pinSuccessMsg.classList.add('show'); }
-    } else {
-      if(pinSuccessMsg){ pinSuccessMsg.classList.remove('show'); }
-      forgotPinMsg.style.color = '#e08a8a';
-      forgotPinMsg.textContent = 'ये मोबाइल नंबर registered नहीं है।';
-    }
-  }catch(err){
-    forgotPinSubmit.disabled = false; forgotPinSubmit.textContent = 'Request भेजें';
-    const pinSuccessMsg = document.getElementById('pinSuccessMsg');
-    if(pinSuccessMsg){ pinSuccessMsg.classList.remove('show'); }
-    forgotPinMsg.style.color = '#e08a8a';
-    forgotPinMsg.textContent = 'सर्वर से जुड़ नहीं पाया।';
-  }
-});
-
-function enterDashboard(){
-  authCard.style.display = 'none';
-  wheelSection.style.display = 'none';
-  codeCard.style.display = 'none';
-  if(typeof freeSpinOffer !== 'undefined' && freeSpinOffer) freeSpinOffer.style.display = 'none';
-  if(typeof freeWheelSection !== 'undefined' && freeWheelSection) freeWheelSection.style.display = 'none';
-  document.body.classList.remove('step-code','step-wheel');
-  document.body.classList.add('step-app');
-  dashboardCard.style.display = 'block';
-  dashGreeting.textContent = 'स्वागत है, ' + currentAccount.name + '!';
-  dashId.textContent = 'कस्टमर ID: ' + currentAccount.id;
-  renderHistory();
-  dashboardCard.scrollIntoView({behavior:'smooth', block:'start'});
-}
-
-function renderHistory(){
-  const items = currentAccount.history || [];
-  if(items.length === 0){
-    historyBox.innerHTML = '<div class="history-empty">अभी कोई पुराना रिकॉर्ड नहीं है — पहली बार आए हैं, स्वागत है!</div>';
-    return;
-  }
-  historyBox.innerHTML = items.slice().reverse().map(h => `
-    <div class="history-item">
-      <div>
-        <span class="h-amt">₹${h.amount}</span>
-        <span class="h-date">${new Date(h.timestamp).toLocaleDateString('en-IN')}</span>
-      </div>
-      <div>${h.discount != null ? '<span class="h-disc">'+h.discount+'% OFF</span>' : '<span class="h-pending">स्पिन बाकी</span>'}</div>
-    </div>`).join('');
-}
 
 logoutBtn.addEventListener('click', ()=>{
   currentAccount = null;
@@ -1325,7 +1277,7 @@ function showFreeSpinOffer(){
 }
 
 if(claimFreeSpinBtn){
-  claimFreeSpinBtn.addEventListener('click', ()=>{
+  claimFreeSpinBtn.addEventListener('click', async ()=>{
     freeSpinOffer.style.display = 'none';
     freeHasSpun = false;
     buildFreeWheel();
@@ -1335,12 +1287,115 @@ if(claimFreeSpinBtn){
     if(left) left.textContent = '1';
     freeWheelSection.style.display = 'block';
     freeWheelSection.scrollIntoView({behavior:'smooth', block:'start'});
+    const verified = await isMobileVerified();
+    showSpinVerifyUI(!verified);
   });
 }
 
+
+/* ===== Spin mobile verify (Admin WhatsApp OTP) ===== */
+async function isMobileVerified(){
+  if(!currentAccount || !currentAccount.mobile) return false;
+  if(currentAccount.mobileVerified) return true;
+  try{
+    const res = await fetch(API_BASE + '/api/check-verified', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ mobile: currentAccount.mobile })
+    });
+    const out = await res.json();
+    if(out.ok && out.verified){
+      currentAccount.mobileVerified = true;
+      return true;
+    }
+  }catch(e){}
+  return false;
+}
+function showSpinVerifyUI(show){
+  const box = document.getElementById('spinVerifyBox');
+  if(!box) return;
+  box.style.display = show ? 'block' : 'none';
+  if(freeSpinBtn) freeSpinBtn.style.display = show ? 'none' : 'inline-block';
+}
+function setSpinVerifyError(msg){
+  const el = document.getElementById('spinVerifyError');
+  if(!el) return;
+  el.textContent = msg || '';
+  el.style.display = msg ? 'block' : 'none';
+}
+const requestSpinOtpBtn = document.getElementById('requestSpinOtpBtn');
+const verifySpinOtpBtn = document.getElementById('verifySpinOtpBtn');
+if(requestSpinOtpBtn){
+  requestSpinOtpBtn.addEventListener('click', async ()=>{
+    setSpinVerifyError('');
+    if(!currentAccount){ setSpinVerifyError('पहले लॉगिन करें'); return; }
+    requestSpinOtpBtn.disabled = true;
+    requestSpinOtpBtn.textContent = 'Request जा रही है...';
+    try{
+      const res = await fetch(API_BASE + '/api/request-spin-otp', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ mobile: currentAccount.mobile })
+      });
+      const out = await res.json();
+      requestSpinOtpBtn.disabled = false;
+      requestSpinOtpBtn.textContent = 'OTP Request भेजें (Admin को)';
+      if(!out.ok){
+        setSpinVerifyError(out.error === 'not-found' ? 'अकाउंट नहीं मिला' : 'Request fail');
+        return;
+      }
+      if(out.alreadyVerified){
+        currentAccount.mobileVerified = true;
+        showSpinVerifyUI(false);
+        return;
+      }
+      document.getElementById('spinOtpWait').style.display = 'block';
+    }catch(e){
+      requestSpinOtpBtn.disabled = false;
+      requestSpinOtpBtn.textContent = 'OTP Request भेजें (Admin को)';
+      setSpinVerifyError('सर्वर से जुड़ नहीं पाया');
+    }
+  });
+}
+if(verifySpinOtpBtn){
+  verifySpinOtpBtn.addEventListener('click', async ()=>{
+    setSpinVerifyError('');
+    const otp = ((document.getElementById('spinOtpInput') || {}).value || '').trim();
+    if(!/^\d{4,8}$/.test(otp)){ setSpinVerifyError('सही OTP डालें'); return; }
+    verifySpinOtpBtn.disabled = true;
+    verifySpinOtpBtn.textContent = 'Verify...';
+    try{
+      const res = await fetch(API_BASE + '/api/verify-spin-otp', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ mobile: currentAccount.mobile, otp })
+      });
+      const out = await res.json();
+      verifySpinOtpBtn.disabled = false;
+      verifySpinOtpBtn.textContent = 'OTP Verify करें';
+      if(!out.ok){
+        setSpinVerifyError(out.error === 'wrong-otp' ? 'OTP गलत है' :
+          out.error === 'no-request' ? 'पहले OTP Request भेजें' : 'Verify fail');
+        return;
+      }
+      currentAccount.mobileVerified = true;
+      showSpinVerifyUI(false);
+      alert('✅ मोबाइल verify हो गया! अब SPIN दबाएं।');
+    }catch(e){
+      verifySpinOtpBtn.disabled = false;
+      verifySpinOtpBtn.textContent = 'OTP Verify करें';
+      setSpinVerifyError('सर्वर error');
+    }
+  });
+}
+
+
 if(freeSpinBtn){
-  freeSpinBtn.addEventListener('click', ()=>{
+  freeSpinBtn.addEventListener('click', async ()=>{
     if(freeHasSpun) return;
+    const verified = await isMobileVerified();
+    if(!verified){
+      showSpinVerifyUI(true);
+      setSpinVerifyError('पहले मोबाइल verify करें');
+      return;
+    }
     freeHasSpun = true;
     freeSpinBtn.disabled = true;
     getFwAudio && getFwAudio();
