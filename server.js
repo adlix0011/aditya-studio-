@@ -43,7 +43,6 @@ const crypto = require('crypto');
 const PORT = process.env.PORT || 4000;
 const PIN_SALT = process.env.PIN_SALT || 'aditya-studio-local-salt';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || null; // null = admin panel band (locked) rahega jab tak set na ho
-
 // DATA_DIR: sirf tab use karo jab Render pe Persistent Disk mount ho.
 // Bina disk ke /var/data likhne se write fail hota hai — auto fallback __dirname.
 function resolveDataDir() {
@@ -67,6 +66,32 @@ const DATA_FILE = path.join(DATA_DIR, 'accounts.json');
 const CSV_FILE = path.join(DATA_DIR, 'customers.csv');
 const HTML_FILE = path.join(__dirname, 'aditya-studio-discount-wheel.html');
 console.log('[boot] Using data dir:', DATA_DIR);
+
+function generateOtp() {
+  return String(Math.floor(1000 + Math.random() * 9000));
+}
+function otpFilePath() {
+  return path.join(DATA_DIR, 'otp-requests.json');
+}
+function loadOtpRequests() {
+  try {
+    const f = otpFilePath();
+    if (!fs.existsSync(f)) return [];
+    return JSON.parse(fs.readFileSync(f, 'utf8'));
+  } catch (e) { return []; }
+}
+function saveOtpRequests(list) {
+  const f = otpFilePath();
+  try {
+    const tmp = f + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(list, null, 2), 'utf8');
+    fs.renameSync(tmp, f);
+  } catch (e) {
+    try { fs.writeFileSync(f, JSON.stringify(list, null, 2), 'utf8'); } catch (e2) {}
+  }
+}
+
+
 
 function loadAccounts() {
   if (!fs.existsSync(DATA_FILE)) return [];
@@ -219,6 +244,101 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+
+
+  // ---- Spin mobile verify: request OTP (admin sends via WhatsApp) ----
+  if (req.method === 'POST' && req.url === '/api/request-spin-otp') {
+    try {
+      const body = await readBody(req);
+      const mobile = String(body.mobile || '').trim();
+      if (!/^[6-9]\d{9}$/.test(mobile)) {
+        return sendJSON(res, 400, { ok: false, error: 'invalid-mobile' });
+      }
+      const accounts = loadAccounts();
+      const acc = accounts.find(a => String(a.mobile) === mobile);
+      if (!acc) return sendJSON(res, 404, { ok: false, error: 'not-found' });
+      if (acc.mobileVerified) {
+        return sendJSON(res, 200, { ok: true, alreadyVerified: true });
+      }
+      let list = loadOtpRequests();
+      // reuse active pending OTP for same mobile
+      let row = list.find(r => r.mobile === mobile && !r.verified);
+      if (!row) {
+        row = {
+          mobile,
+          name: acc.name || '',
+          id: acc.id || '',
+          otp: generateOtp(),
+          createdAt: new Date().toISOString(),
+          verified: false,
+          purpose: 'spin'
+        };
+        list.unshift(row);
+        // keep last 100
+        list = list.slice(0, 100);
+        saveOtpRequests(list);
+      }
+      console.log('Spin OTP request:', mobile, 'otp=', row.otp);
+      sendJSON(res, 200, {
+        ok: true,
+        alreadyVerified: false,
+        message: 'Admin ko request chali — WhatsApp se OTP aayega'
+      });
+    } catch (e) {
+      console.error('request-spin-otp error:', e);
+      sendJSON(res, 500, { ok: false, error: 'server-error', detail: String(e.message || e) });
+    }
+    return;
+  }
+
+  // ---- Verify spin OTP (customer enters code admin sent on WA) ----
+  if (req.method === 'POST' && req.url === '/api/verify-spin-otp') {
+    try {
+      const body = await readBody(req);
+      const mobile = String(body.mobile || '').trim();
+      const otp = String(body.otp || '').trim();
+      if (!/^[6-9]\d{9}$/.test(mobile) || !/^\d{4,8}$/.test(otp)) {
+        return sendJSON(res, 400, { ok: false, error: 'invalid' });
+      }
+      const list = loadOtpRequests();
+      const row = list.find(r => r.mobile === mobile && !r.verified);
+      if (!row) {
+        return sendJSON(res, 400, { ok: false, error: 'no-request' });
+      }
+      if (String(row.otp) !== String(otp)) {
+        return sendJSON(res, 401, { ok: false, error: 'wrong-otp' });
+      }
+      row.verified = true;
+      row.verifiedAt = new Date().toISOString();
+      saveOtpRequests(list);
+      const accounts = loadAccounts();
+      const acc = accounts.find(a => String(a.mobile) === mobile);
+      if (acc) {
+        acc.mobileVerified = true;
+        saveAccounts(accounts);
+      }
+      console.log('Spin OTP verified:', mobile);
+      sendJSON(res, 200, { ok: true });
+    } catch (e) {
+      sendJSON(res, 500, { ok: false, error: 'server-error' });
+    }
+    return;
+  }
+
+  // ---- Check if mobile already verified ----
+  if (req.method === 'POST' && req.url === '/api/check-verified') {
+    try {
+      const body = await readBody(req);
+      const mobile = String(body.mobile || '').trim();
+      const accounts = loadAccounts();
+      const acc = accounts.find(a => String(a.mobile) === mobile);
+      sendJSON(res, 200, { ok: true, verified: !!(acc && acc.mobileVerified) });
+    } catch (e) {
+      sendJSON(res, 400, { ok: false });
+    }
+    return;
+  }
+
   if (req.method === 'POST' && req.url === '/api/register') {
     try {
       const body = await readBody(req);
@@ -273,7 +393,7 @@ const server = http.createServer(async (req, res) => {
       acc.lastVisitAt = new Date().toISOString();
       saveAccounts(accounts);
       console.log('Login hua:', acc.id, mobile);
-      sendJSON(res, 200, { ok: true, id: acc.id, name: acc.name, village: acc.village, mobile: acc.mobile, history: publicHistory(acc) });
+      sendJSON(res, 200, { ok: true, id: acc.id, name: acc.name, village: acc.village, mobile: acc.mobile, history: publicHistory(acc), mobileVerified: !!acc.mobileVerified });
     } catch (e) {
       sendJSON(res, 400, { ok: false, error: 'bad-request' });
     }
@@ -301,7 +421,8 @@ const server = http.createServer(async (req, res) => {
         name: acc.name,
         village: acc.village,
         mobile: acc.mobile,
-        history: publicHistory(acc)
+        history: publicHistory(acc),
+        mobileVerified: !!acc.mobileVerified
       });
     } catch (e) {
       sendJSON(res, 400, { ok: false, error: 'bad-request' });
@@ -494,6 +615,19 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && req.url === '/admin') {
     const accounts = loadAccounts().slice().reverse();
     const pendingResets = accounts.filter(a => a.pinResetRequested);
+    const pendingOtps = loadOtpRequests().filter(r => !r.verified);
+    const otpCards = pendingOtps.map(r => {
+      const msg = encodeURIComponent(
+        'Namaste ' + (r.name || '') + '!\nAditya Studio Spin OTP: *' + r.otp + '*\nYe code daal kar apni free / discount spin complete karein.\n— Aditya Studio'
+      );
+      return '<div class="msg-card">'
+        + '<div class="msg-text">🎡 <b>' + esc(r.name || 'Customer') + '</b> (' + esc(r.mobile) + ') — ID ' + esc(r.id || '')
+        + '<br>OTP: <span style="color:#FFD700;font-size:1.3rem;letter-spacing:3px;font-family:monospace;">' + esc(r.otp) + '</span>'
+        + '<br><span class="muted">' + esc(new Date(r.createdAt).toLocaleString('en-IN')) + '</span></div>'
+        + '<div class="msg-actions">'
+        + '<a class="gen-btn wa-link" href="https://wa.me/91' + esc(r.mobile) + '?text=' + msg + '" target="_blank" rel="noopener">💬 WhatsApp pe OTP bhejo</a>'
+        + '</div></div>';
+    }).join('') || '<div class="muted">Koi pending spin OTP request nahi</div>';
     const codes = loadCodes().slice().reverse();
 
     function esc(t) {
@@ -580,6 +714,9 @@ if(q==='fail'){el.style.color='#e08a8a';el.textContent='❌ Restore fail — sah
 </script>
 </div>
 
+<h2>📱 Spin OTP Requests (WhatsApp se bhejo)</h2>
+<div>${otpCards}</div>
+
 <h2>⚠️ PIN Reset Requests (${pendingResets.length})</h2>
 <div>${resetCards}</div>
 
@@ -607,4 +744,5 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log('Data folder:', DATA_DIR);
   console.log('Accounts file:', DATA_FILE);
   console.log('Admin panel:', ADMIN_PASSWORD ? '/admin (password protected)' : '/admin (LOCKED — ADMIN_PASSWORD env var set nahi hai)');
+  console.log('Spin OTP: admin WhatsApp mode');
 });
