@@ -2774,15 +2774,28 @@ async function loadNotifications(){
       try{
         var res = await fetch(API_BASE + '/api/redeem-code', {
           method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ code: code, mobile: currentAccount.mobile })
+          body: JSON.stringify({
+            code: code,
+            mobile: currentAccount.mobile,
+            name: currentAccount.name || '',
+            id: currentAccount.id || '',
+            village: currentAccount.village || '',
+            pin: currentAccount._pin || ''
+          })
         });
-        var out = await res.json();
+        var out = {};
+        try { out = await res.json(); } catch(parseE) {
+          if(btn){ btn.disabled=false; btn.textContent='कोड वेरिफ़ाई → स्पिन'; }
+          if(err) err.textContent='Server error '+res.status+' — naya server.js deploy karein';
+          return;
+        }
         if(btn){ btn.disabled=false; btn.textContent='कोड वेरिफ़ाई → स्पिन'; }
         if(!out.ok){
           if(err){
             if(out.error==='used') err.textContent='यह कोड पहले इस्तेमाल हो चुका है';
-            else if(out.error==='not-found') err.textContent='कोड गलत है';
-            else err.textContent='कोड verify fail';
+            else if(out.error==='not-found') err.textContent='कोड गलत है / admin ne nahi banaya';
+            else if(out.error==='no-account') err.textContent='Account server pe nahi — logout karke dubara login karein';
+            else err.textContent=(out.message || out.error || 'कोड verify fail')+' ['+res.status+']';
           }
           return;
         }
@@ -2816,7 +2829,13 @@ async function loadNotifications(){
           if(tb) tb.textContent = (out.tier || '') + ' · ₹' + out.amount;
           var cid = document.getElementById('custIdBadge');
           if(cid) cid.textContent = currentAccount.id;
+          var sb = document.getElementById('spinBtn');
+          if(sb){ sb.disabled = false; sb.textContent = 'SPIN'; }
+          hasSpun = false;
+          if(typeof fwHasSpun !== 'undefined') fwHasSpun = false;
           wheelSection.scrollIntoView({behavior:'smooth', block:'start'});
+        } else {
+          if(err) err.textContent = 'Wheel section nahi mili — page refresh karein';
         }
       }catch(ex){
         if(btn){ btn.disabled=false; btn.textContent='कोड वेरिफ़ाई → स्पिन'; }
@@ -2857,18 +2876,29 @@ async function loadBookImages(){
       try{
         const res = await fetch(API_BASE + '/api/request-spin-otp', {
           method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ mobile: currentAccount.mobile })
+          body: JSON.stringify({
+            mobile: currentAccount.mobile,
+            name: currentAccount.name || '',
+            id: currentAccount.id || '',
+            village: currentAccount.village || '',
+            pin: currentAccount._pin || '',
+            freeSpinUsed: !!currentAccount.freeSpinUsed
+          })
         });
-        const out = await res.json();
+        let out = {};
+        try { out = await res.json(); } catch(e) { setErr('Server response invalid ('+res.status+') — server.js deploy check karein'); reqBtn.disabled=false; reqBtn.textContent='OTP Request भेजें (Admin)'; return; }
         reqBtn.disabled = false; reqBtn.textContent = 'OTP Request भेजें (Admin)';
         if(out.alreadyVerified){
           currentAccount.mobileVerified = true;
           openProfileModal();
           return;
         }
-        if(!out.ok){ setErr('Request fail'); return; }
-        setErr(''); 
-        alert('✅ Admin ko OTP request chali — WhatsApp pe OTP aayega');
+        if(!out.ok){
+          setErr(out.error === 'not-found' ? 'Account server pe nahi mila' : (out.message || out.error || 'Request fail') + ' ['+res.status+']');
+          return;
+        }
+        setErr('');
+        alert('✅ OTP request admin panel me aa gayi. Admin WhatsApp se OTP bhejega.');
       }catch(e){
         reqBtn.disabled = false; reqBtn.textContent = 'OTP Request भेजें (Admin)';
         setErr('Server error');
