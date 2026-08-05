@@ -67,6 +67,21 @@ const CSV_FILE = path.join(DATA_DIR, 'customers.csv');
 const HTML_FILE = path.join(__dirname, 'aditya-studio-discount-wheel.html');
 console.log('[boot] Using data dir:', DATA_DIR);
 
+function notifFile(){ return path.join(DATA_DIR, 'notifications.json'); }
+function loadNotifs(){
+  try {
+    const f = notifFile();
+    if(!fs.existsSync(f)) return [];
+    return JSON.parse(fs.readFileSync(f, 'utf8'));
+  } catch(e){ return []; }
+}
+function saveNotifs(list){
+  try {
+    fs.writeFileSync(notifFile(), JSON.stringify(list.slice(0, 50), null, 2));
+  } catch(e){ console.error('saveNotifs', e.message); }
+}
+
+
 function generateOtp() {
   return String(Math.floor(1000 + Math.random() * 9000));
 }
@@ -226,6 +241,8 @@ function requireAdminAuth(req, res) {
 }
 
 const server = http.createServer(async (req, res) => {
+  const urlPath = (req.url || '/').split('?')[0];
+
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
       'Access-Control-Allow-Origin': '*',
@@ -539,7 +556,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   // Admin-only from here on
-  if (req.url === '/api/customers' || req.url === '/admin' || req.url.startsWith('/admin/')) {
+  if (req.url === '/api/customers' || req.url === '/admin' || urlPath.startsWith('/admin/')) {
     if (!isAdminAuthed(req)) return requireAdminAuth(req, res);
   }
 
@@ -649,16 +666,16 @@ const server = http.createServer(async (req, res) => {
     } catch(e){ console.error('saveNotifs', e.message); }
   }
 
-  if (req.method === 'GET' && req.url === '/api/notifications') {
+  if (req.method === 'GET' && urlPath === '/api/notifications') {
     sendJSON(res, 200, { ok: true, items: loadNotifs() });
     return;
   }
 
-  if (req.method === 'POST' && req.url === '/admin/send-notification') {
+  if (req.method === 'POST' && (urlPath === '/admin/send-notification' || req.url === '/admin/send-notification')) {
     try {
       const body = await readFormBody(req);
       const title = String(body.title || '').trim() || 'Aditya Studio';
-      const bodyText = String(body.body || '').trim();
+      const bodyText = String(body.body || body.message || '').trim();
       if(!bodyText){
         res.writeHead(302, { Location: '/admin?notif=empty' });
         return res.end();
@@ -666,9 +683,11 @@ const server = http.createServer(async (req, res) => {
       const list = loadNotifs();
       list.unshift({ title, body: bodyText, at: new Date().toISOString() });
       saveNotifs(list);
+      console.log('Notification saved:', title);
       res.writeHead(302, { Location: '/admin?notif=ok' });
       return res.end();
     } catch(e){
+      console.error('send-notification error:', e);
       res.writeHead(302, { Location: '/admin?notif=fail' });
       return res.end();
     }
