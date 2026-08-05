@@ -430,6 +430,33 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+
+  if (req.method === 'POST' && req.url === '/api/free-spin-result') {
+    try {
+      const body = await readBody(req);
+      const mobile = String(body.mobile || '').trim();
+      const accounts = loadAccounts();
+      const acc = accounts.find(a => String(a.mobile) === mobile);
+      if (!acc) return sendJSON(res, 404, { ok: false, error: 'no-account' });
+      acc.freeSpinUsed = true;
+      acc.history = acc.history || [];
+      acc.history.push({
+        entryId: acc.id + '-FREE',
+        amount: 0,
+        tier: 'Free',
+        discount: body.discount != null ? body.discount : null,
+        prize: body.prize || '',
+        freeSpin: true,
+        timestamp: new Date().toISOString()
+      });
+      saveAccounts(accounts);
+      sendJSON(res, 200, { ok: true });
+    } catch (e) {
+      sendJSON(res, 400, { ok: false });
+    }
+    return;
+  }
+
   if (req.method === 'POST' && req.url === '/api/work-entry') {
     try {
       const body = await readBody(req);
@@ -613,122 +640,190 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === 'GET' && req.url === '/admin') {
-    const accounts = loadAccounts().slice().reverse();
-    const pendingResets = accounts.filter(a => a.pinResetRequested);
-    const pendingOtps = loadOtpRequests().filter(r => !r.verified);
-    const otpCards = pendingOtps.map(r => {
-      const msg = encodeURIComponent(
-        'Namaste ' + (r.name || '') + '!\nAditya Studio Spin OTP: *' + r.otp + '*\nYe code daal kar apni free / discount spin complete karein.\n— Aditya Studio'
-      );
-      return '<div class="msg-card">'
-        + '<div class="msg-text">🎡 <b>' + esc(r.name || 'Customer') + '</b> (' + esc(r.mobile) + ') — ID ' + esc(r.id || '')
-        + '<br>OTP: <span style="color:#FFD700;font-size:1.3rem;letter-spacing:3px;font-family:monospace;">' + esc(r.otp) + '</span>'
-        + '<br><span class="muted">' + esc(new Date(r.createdAt).toLocaleString('en-IN')) + '</span></div>'
-        + '<div class="msg-actions">'
-        + '<a class="gen-btn wa-link" href="https://wa.me/91' + esc(r.mobile) + '?text=' + msg + '" target="_blank" rel="noopener">💬 WhatsApp pe OTP bhejo</a>'
-        + '</div></div>';
-    }).join('') || '<div class="muted">Koi pending spin OTP request nahi</div>';
-    const codes = loadCodes().slice().reverse();
-
     function esc(t) {
       return String(t == null ? '' : t)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
+    function fmtDate(d) {
+      try { return d ? new Date(d).toLocaleString('en-IN') : '—'; } catch(e) { return '—'; }
+    }
+    function lastPrize(acc) {
+      const h = (acc.history || []).slice().reverse();
+      for (const x of h) {
+        if (x.prize) return x.prize;
+        if (x.discount != null && x.discount !== '') return x.discount + '%';
+        if (x.freeSpin) return 'Free spin';
+      }
+      return '—';
+    }
+
+    const accounts = loadAccounts().slice().reverse();
+    const pendingResets = accounts.filter(a => a.pinResetRequested);
+    const pendingOtps = loadOtpRequests().filter(r => !r.verified);
+    const codes = loadCodes().slice().reverse();
+    const today = new Date().toDateString();
+    const newToday = accounts.filter(a => a.createdAt && new Date(a.createdAt).toDateString() === today).length;
+    const verifiedCount = accounts.filter(a => a.mobileVerified).length;
+    const freeUsed = accounts.filter(a => a.freeSpinUsed || (a.history || []).some(h => h.freeSpin)).length;
+
+    const otpCards = pendingOtps.map(r => {
+      const msg = encodeURIComponent(
+        'Namaste ' + (r.name || '') + '!\nAditya Studio Spin OTP: *' + r.otp + '*\nYe code daal kar apni spin complete karein.\n— Aditya Studio'
+      );
+      return '<div class="msg-card">'
+        + '<div class="msg-text">🎡 <b>' + esc(r.name || 'Customer') + '</b> (' + esc(r.mobile) + ') — ' + esc(r.id || '')
+        + '<br>OTP: <span class="otp-big">' + esc(r.otp) + '</span>'
+        + '<br><span class="muted">' + esc(fmtDate(r.createdAt)) + '</span></div>'
+        + '<div class="msg-actions">'
+        + '<a class="gen-btn wa-link" href="https://wa.me/91' + esc(r.mobile) + '?text=' + msg + '" target="_blank" rel="noopener">💬 WhatsApp pe OTP bhejo</a>'
+        + '</div></div>';
+    }).join('') || '<div class="muted">Koi pending spin OTP nahi</div>';
 
     const resetCards = pendingResets.map(acc => {
-      const existingMsg = encodeURIComponent('Hi ' + acc.name + ', aapka Aditya Studio PIN hai: ' + (acc.pin || '') + '. Isse login karke discount wheel spin kar sakte hain.');
+      const existingMsg = encodeURIComponent('Hi ' + acc.name + ', aapka Aditya Studio PIN hai: ' + (acc.pin || '') + '. Login karke spin karein.');
       return '<div class="msg-card">'
-        + '<div class="msg-text">🔔 <b>' + esc(acc.name) + '</b> (' + esc(acc.mobile) + ') ne PIN bhoolne ki request bheji — '
-        + (acc.pinResetRequestedAt ? new Date(acc.pinResetRequestedAt).toLocaleString('en-IN') : '') + '</div>'
+        + '<div class="msg-text">🔔 <b>' + esc(acc.name) + '</b> (' + esc(acc.mobile) + ') — PIN reset request — ' + esc(fmtDate(acc.pinResetRequestedAt)) + '</div>'
         + '<div class="msg-actions">'
-        + '<a class="gen-btn wa-link" href="https://wa.me/91' + esc(acc.mobile) + '?text=' + existingMsg + '" target="_blank" rel="noopener">💬 maujooda PIN bhejo</a>'
-        + '<form method="POST" action="/admin/reset-pin" style="display:flex;gap:6px;">'
+        + '<a class="gen-btn wa-link" href="https://wa.me/91' + esc(acc.mobile) + '?text=' + existingMsg + '" target="_blank" rel="noopener">💬 PIN bhejo</a>'
+        + '<form method="POST" action="/admin/reset-pin" style="display:flex;gap:6px;flex-wrap:wrap">'
         + '<input type="hidden" name="mobile" value="' + esc(acc.mobile) + '">'
-        + '<input type="text" name="newPin" placeholder="Naya PIN" maxlength="4" style="width:90px;background:#0C0906;border:1px solid rgba(212,175,55,0.3);border-radius:6px;padding:6px 8px;color:#F4EAD6;">'
-        + '<button class="gen-btn" type="submit" style="padding:6px 14px;font-size:12px;">Naya PIN → WhatsApp</button>'
-        + '</form></div></div>';
-    }).join('') || '<div class="muted">Koi pending request nahi</div>';
+        + '<input name="newPin" placeholder="Naya PIN" maxlength="4" class="inp">'
+        + '<button class="gen-btn" type="submit">Naya PIN → WA</button></form>'
+        + '</div></div>';
+    }).join('') || '<div class="muted">Koi PIN reset request nahi</div>';
 
     const codeRows = codes.map(c =>
-      '<tr><td style="font-family:monospace;letter-spacing:2px;">' + esc(c.code) + '</td>'
-      + '<td>' + (c.used ? '<span style="color:#e08a8a;">Used</span>' : '<span style="color:#8fd19e;">Unused</span>') + '</td>'
+      '<tr><td class="mono">' + esc(c.code) + '</td>'
+      + '<td>' + (c.used ? '<span class="bad">Used</span>' : '<span class="ok">Unused</span>') + '</td>'
       + '<td>' + esc(c.usedBy || '—') + '</td>'
-      + '<td>' + esc(new Date(c.createdAt).toLocaleString('en-IN')) + '</td></tr>'
+      + '<td>' + esc(fmtDate(c.createdAt)) + '</td></tr>'
     ).join('') || '<tr><td colspan="4">Abhi koi code nahi</td></tr>';
 
-    const blocks = accounts.map(acc => {
-      const rows = (acc.history || []).slice().reverse().map(h =>
-        '<tr><td>' + esc(h.entryId) + '</td><td>₹' + esc(h.amount) + '</td><td>' + esc(h.tier || '') + '</td>'
-        + '<td>' + (h.discount != null ? esc(h.discount) + '%' : '— spin baaki —') + '</td>'
-        + '<td>' + esc(new Date(h.timestamp).toLocaleString('en-IN')) + '</td></tr>'
-      ).join('') || '<tr><td colspan="5">Koi entry nahi</td></tr>';
-      return '<div class="acc-block">'
-        + '<h3>' + esc(acc.id) + ' — ' + esc(acc.name)
-        + ' <span class="muted">(' + esc(acc.mobile) + ', ' + esc(acc.village) + ')</span></h3>'
-        + '<div class="muted" style="margin-bottom:8px;">🔑 PIN: <span style="color:#F3DE9A;font-family:monospace;letter-spacing:2px;">'
-        + esc(acc.pin || '—') + '</span> | 👁️ Visits: ' + esc(acc.visitCount || 1)
-        + ' | Last: ' + (acc.lastVisitAt ? esc(new Date(acc.lastVisitAt).toLocaleString('en-IN')) : '—')
-        + ' | Joined: ' + esc(new Date(acc.createdAt).toLocaleDateString('en-IN')) + '</div>'
-        + '<table><thead><tr><th>Entry</th><th>Amount</th><th>Tier</th><th>Discount</th><th>Time</th></tr></thead>'
-        + '<tbody>' + rows + '</tbody></table></div>';
-    }).join('') || '<p>Abhi koi account nahi hai</p>';
+    const rows = accounts.map(acc => {
+      const hist = (acc.history || []).slice().reverse();
+      const histRows = hist.map(h =>
+        '<tr><td>' + esc(h.entryId || '—') + '</td><td>₹' + esc(h.amount != null ? h.amount : 0) + '</td>'
+        + '<td>' + esc(h.tier || (h.freeSpin ? 'Free' : '—')) + '</td>'
+        + '<td>' + esc(h.prize || (h.discount != null ? h.discount + '%' : '—')) + '</td>'
+        + '<td>' + esc(fmtDate(h.timestamp)) + '</td></tr>'
+      ).join('') || '<tr><td colspan="5" class="muted">Koi history nahi</td></tr>';
+      const wa = encodeURIComponent('Namaste ' + (acc.name || '') + ', Aditya Studio se message.');
+      return '<details class="acc">'
+        + '<summary>'
+        + '<span class="c-id">' + esc(acc.id) + '</span> '
+        + '<b>' + esc(acc.name) + '</b> '
+        + '<span class="muted">' + esc(acc.mobile) + '</span> '
+        + (acc.mobileVerified ? '<span class="ok">✓ Verified</span>' : '<span class="bad">✗ Unverified</span>') + ' '
+        + ((acc.freeSpinUsed || hist.some(h => h.freeSpin)) ? '<span class="tag">Free spin used</span>' : '<span class="tag tag2">Free spin pending</span>')
+        + '</summary>'
+        + '<div class="acc-body">'
+        + '<div class="grid">'
+        + '<div><span class="lbl">PIN</span><div class="mono gold">' + esc(acc.pin || '—') + '</div></div>'
+        + '<div><span class="lbl">Village</span><div>' + esc(acc.village || '—') + '</div></div>'
+        + '<div><span class="lbl">Visits</span><div>' + esc(acc.visitCount || 1) + '</div></div>'
+        + '<div><span class="lbl">Joined</span><div>' + esc(fmtDate(acc.createdAt)) + '</div></div>'
+        + '<div><span class="lbl">Last visit</span><div>' + esc(fmtDate(acc.lastVisitAt)) + '</div></div>'
+        + '<div><span class="lbl">Last prize</span><div>' + esc(lastPrize(acc)) + '</div></div>'
+        + '</div>'
+        + '<div class="msg-actions" style="margin:10px 0">'
+        + '<a class="gen-btn wa-link" href="https://wa.me/91' + esc(acc.mobile) + '?text=' + wa + '" target="_blank" rel="noopener">💬 WhatsApp</a>'
+        + '<form method="POST" action="/admin/reset-pin" style="display:flex;gap:6px;flex-wrap:wrap">'
+        + '<input type="hidden" name="mobile" value="' + esc(acc.mobile) + '">'
+        + '<input name="newPin" placeholder="Naya PIN" maxlength="4" class="inp">'
+        + '<button class="gen-btn" type="submit">PIN reset → WA</button></form>'
+        + '</div>'
+        + '<table><thead><tr><th>Entry</th><th>Amount</th><th>Tier</th><th>Prize/Discount</th><th>Time</th></tr></thead>'
+        + '<tbody>' + histRows + '</tbody></table>'
+        + '</div></details>';
+    }).join('') || '<p class="muted">Abhi koi customer nahi — jab register hoga yahan dikhega.</p>';
 
     const html = `<!DOCTYPE html>
 <html lang="hi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Aditya Studio — Admin</title>
 <style>
-body{font-family:sans-serif;background:#0F0C09;color:#F4EAD6;padding:24px;margin:0}
-h1{color:#D4AF37;font-size:22px}h2{color:#D4AF37;font-size:17px;margin:28px 0 10px}
-h3{color:#F3DE9A;font-size:15px;margin:18px 0 8px}
-.muted{color:#B7A480;font-weight:normal;font-size:12px}
+*{box-sizing:border-box}
+body{font-family:system-ui,sans-serif;background:#0F0C09;color:#F4EAD6;padding:20px;margin:0;line-height:1.4}
+h1{color:#D4AF37;font-size:1.4rem;margin:0 0 6px}
+h2{color:#D4AF37;font-size:1.05rem;margin:28px 0 12px}
 .sub{color:#B7A480;font-size:13px;margin-bottom:16px}
-table{width:100%;border-collapse:collapse}
-th,td{padding:8px 10px;border-bottom:1px solid #2a2018;text-align:left;font-size:13px}
-th{color:#D4AF37;text-transform:uppercase;font-size:11px;letter-spacing:0.5px}
-tr:hover{background:#1B140F}a{color:#D4AF37}
-.acc-block,.codes-block{border:1px solid rgba(212,175,55,0.15);border-radius:10px;padding:14px 16px;margin-bottom:14px}
-.gen-btn{background:linear-gradient(180deg,#F3DE9A,#D4AF37 60%,#8C6E2F);color:#241804;border:none;padding:10px 18px;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px;text-decoration:none;display:inline-block}
-.msg-card{background:#1B140F;border:1px solid rgba(224,138,138,0.35);border-radius:10px;padding:14px 16px;margin-bottom:12px}
-.msg-text{font-size:13.5px;margin-bottom:10px}
-.msg-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-.wa-link{background:linear-gradient(180deg,#3ee06b,#25D366 60%,#128C4A)}
+.sub a{color:#D4AF37}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:16px 0 8px}
+.card{background:#1B140F;border:1px solid rgba(212,175,55,0.2);border-radius:12px;padding:14px}
+.card .n{font-size:1.6rem;font-weight:800;color:#FFD700}
+.card .l{font-size:11px;color:#B7A480;text-transform:uppercase;letter-spacing:0.5px;margin-top:4px}
+.codes-block,.msg-card,.acc{border:1px solid rgba(212,175,55,0.15);border-radius:12px;padding:14px;margin-bottom:12px;background:#150f0b}
+.gen-btn{background:linear-gradient(180deg,#F3DE9A,#D4AF37 60%,#8C6E2F);color:#241804;border:none;padding:9px 14px;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px;text-decoration:none;display:inline-block}
+.wa-link{background:linear-gradient(180deg,#3ee06b,#25D366 60%,#128C4A);color:#062}
+.msg-text{margin-bottom:10px}
+.msg-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.otp-big{color:#FFD700;font-size:1.4rem;letter-spacing:4px;font-family:monospace;font-weight:700}
+.muted{color:#B7A480}
+.ok{color:#8fd19e;font-weight:600;font-size:12px}
+.bad{color:#e08a8a;font-weight:600;font-size:12px}
+.tag{background:rgba(143,209,158,0.15);color:#8fd19e;padding:2px 8px;border-radius:99px;font-size:11px}
+.tag2{background:rgba(255,215,0,0.12);color:#FFD700}
+.mono{font-family:monospace;letter-spacing:1px}
+.gold{color:#FFD700;font-size:1.1rem}
+table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}
+th,td{padding:8px;border-bottom:1px solid #2a2018;text-align:left}
+th{color:#D4AF37;font-size:11px;text-transform:uppercase}
+.inp{background:#0C0906;border:1px solid rgba(212,175,55,0.3);border-radius:6px;padding:6px 8px;color:#F4EAD6;width:90px}
+.acc summary{cursor:pointer;list-style:none;padding:4px 0}
+.acc summary::-webkit-details-marker{display:none}
+.acc summary .c-id{color:#D4AF37;font-family:monospace}
+.acc-body{margin-top:12px;padding-top:12px;border-top:1px solid rgba(212,175,55,0.12)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:8px}
+.lbl{font-size:10px;color:#B7A480;text-transform:uppercase;letter-spacing:0.4px}
+#search{width:100%;max-width:360px;padding:10px 12px;border-radius:8px;border:1px solid rgba(212,175,55,0.3);background:#0C0906;color:#F4EAD6;margin-bottom:12px}
 </style></head><body>
 <h1>Aditya Studio — Admin</h1>
-<div class="sub">Data dir safe | <a href="/">Customer page</a></div>
+<div class="sub">Live panel | <a href="/">Customer page</a></div>
 
-<h2>💾 Data Backup (PC me save)</h2>
+<div class="cards">
+  <div class="card"><div class="n">${accounts.length}</div><div class="l">Total customers</div></div>
+  <div class="card"><div class="n">${newToday}</div><div class="l">Aaj naye</div></div>
+  <div class="card"><div class="n">${pendingOtps.length}</div><div class="l">Pending OTP</div></div>
+  <div class="card"><div class="n">${verifiedCount}</div><div class="l">Mobile verified</div></div>
+  <div class="card"><div class="n">${freeUsed}</div><div class="l">Free spin used</div></div>
+  <div class="card"><div class="n">${codes.filter(c=>!c.used).length}</div><div class="l">Unused codes</div></div>
+</div>
+
+<h2>💾 Backup</h2>
 <div class="codes-block">
-<p class="sub">Har 2–3 din backup download karke PC / Google Drive me rakho. Wipe hone par Restore karo.</p>
-<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center">
+<p class="sub">Har 2–3 din backup lo. Render free pe data wipe ho sakta hai.</p>
+<div class="msg-actions">
 <a class="gen-btn" href="/admin/backup">⬇️ Backup Download</a>
-<form method="POST" action="/admin/restore" enctype="multipart/form-data" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-<input type="file" name="backup" accept=".json,application/json" required style="color:#F4EAD6;font-size:13px;max-width:220px">
-<button class="gen-btn" type="submit" style="background:linear-gradient(180deg,#8fd19e,#3E7A4C)">⬆️ Restore Upload</button>
+<form method="POST" action="/admin/restore" enctype="multipart/form-data" class="msg-actions">
+<input type="file" name="backup" accept=".json,application/json" required style="color:#F4EAD6;font-size:13px">
+<button class="gen-btn" type="submit" style="background:linear-gradient(180deg,#8fd19e,#3E7A4C)">⬆️ Restore</button>
 </form>
 </div>
-<div id="restoreMsg" class="muted" style="margin-top:10px"></div>
-<script>
-(function(){var q=new URLSearchParams(location.search).get('restore');var el=document.getElementById('restoreMsg');
-if(q==='ok'){el.style.color='#8fd19e';el.textContent='✅ Restore successful';}
-if(q==='fail'){el.style.color='#e08a8a';el.textContent='❌ Restore fail — sahi JSON file choose karo';}})();
-</script>
 </div>
 
-<h2>📱 Spin OTP Requests (WhatsApp se bhejo)</h2>
-<div>${otpCards}</div>
+<h2>📱 Spin OTP Requests (${pendingOtps.length})</h2>
+${otpCards}
 
-<h2>⚠️ PIN Reset Requests (${pendingResets.length})</h2>
-<div>${resetCards}</div>
+<h2>⚠️ PIN Reset (${pendingResets.length})</h2>
+${resetCards}
 
-<h2>Spin Codes</h2>
+<h2>🎫 Spin Codes</h2>
 <div class="codes-block">
-<form method="POST" action="/admin/generate-code"><button class="gen-btn" type="submit">+ Naya spin code banao</button></form>
-<table style="margin-top:16px"><thead><tr><th>Code</th><th>Status</th><th>Used By</th><th>Created</th></tr></thead>
+<form method="POST" action="/admin/generate-code"><button class="gen-btn" type="submit">+ Naya spin code</button></form>
+<table><thead><tr><th>Code</th><th>Status</th><th>Used By</th><th>Created</th></tr></thead>
 <tbody>${codeRows}</tbody></table>
 </div>
 
-<h2>Accounts (${accounts.length})</h2>
-${blocks}
+<h2>👥 Customers (${accounts.length})</h2>
+<input id="search" type="search" placeholder="Search name / mobile / ID..." oninput="filterAcc(this.value)">
+<div id="accList">${rows}</div>
+<script>
+function filterAcc(q){
+  q=(q||'').toLowerCase();
+  document.querySelectorAll('#accList .acc').forEach(function(el){
+    el.style.display = !q || el.textContent.toLowerCase().indexOf(q)>=0 ? '' : 'none';
+  });
+}
+</script>
 </body></html>`;
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(html);
