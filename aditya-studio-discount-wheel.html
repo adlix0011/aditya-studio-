@@ -1086,6 +1086,7 @@ function saveSession(acc, pin) {
       pin: String(pin),
       freeSpinUsed: !!(acc.freeSpinUsed),
       mobileVerified: !!(acc.mobileVerified),
+      history: Array.isArray(acc.history) ? acc.history.slice(-30) : [],
       savedAt: Date.now()
     }));
   } catch (e) { console.warn('localStorage save fail', e); }
@@ -1168,11 +1169,12 @@ async function tryRestoreSession() {
       name: s.name || '',
       mobile: s.mobile,
       village: s.village || '',
-      history: [],
+      history: Array.isArray(s.history) ? s.history : [],
       _pin: s.pin,
       mobileVerified: !!s.mobileVerified,
       freeSpinUsed: !!s.freeSpinUsed
     }, extra || {});
+    // server history preferred if provided in extra
     enterDashboard();
     return true;
   }
@@ -1862,7 +1864,8 @@ spinBtn.addEventListener('click', ()=>{
         body: JSON.stringify({ mobile: currentAccount.mobile, entryId: currentEntryId, discount: pct })
       });
     }catch(err){ console.warn('Discount save nahi ho paaya.', err); }
-    currentAccount.history.push({ amount: document.getElementById('workAmount').value, discount: pct, timestamp: new Date().toISOString() });
+    currentAccount.history.push({ amount: document.getElementById('workAmount').value, discount: pct, prize: currentPrizeLabel, timestamp: new Date().toISOString() });
+    try { saveSession(currentAccount, currentAccount._pin || '0000'); } catch(e){}
   }, 5200);
 });
 
@@ -1963,15 +1966,17 @@ function roundRect(ctx, x, y, w, h, r){
   ctx.closePath();
 }
 
-document.getElementById('claimBtn').addEventListener('click', ()=>{
+document.getElementById('claimBtn').addEventListener('click', function(){
   if(!currentAccount){ alert('Login required'); return; }
-  const prizeText = (typeof currentPrizeLabel !== 'undefined' && currentPrizeLabel)
-    ? currentPrizeLabel
+  var prizeText = (currentPrizeLabel && String(currentPrizeLabel).trim())
+    ? String(currentPrizeLabel)
     : (currentDiscountPct != null ? (Number(currentDiscountPct) <= 100 ? currentDiscountPct + '% DISCOUNT' : '₹' + currentDiscountPct) : 'SPECIAL PRIZE');
-  const c = document.getElementById('couponCanvas');
-  const cx = c.getContext('2d');
-  const W = 700, H = 400;
-  const grad = cx.createLinearGradient(0, 0, W, H);
+  var c = document.getElementById('couponCanvas');
+  if(!c){ alert('Canvas missing'); return; }
+  var cx = c.getContext('2d');
+  var W = 700, H = 400;
+  c.width = W; c.height = H;
+  var grad = cx.createLinearGradient(0, 0, W, H);
   grad.addColorStop(0, '#1B140F');
   grad.addColorStop(0.5, '#241A10');
   grad.addColorStop(1, '#0F0C09');
@@ -1988,36 +1993,117 @@ document.getElementById('claimBtn').addEventListener('click', ()=>{
   cx.font = '14px sans-serif';
   cx.fillText('OFFICIAL DISCOUNT COUPON', W/2, 110);
   cx.fillStyle = '#FFD700';
-  cx.font = 'bold 40px sans-serif';
-  cx.fillText(String(prizeText), W/2, 175);
+  cx.font = 'bold 36px sans-serif';
+  // wrap long text
+  var lines = [];
+  var words = String(prizeText).split(' ');
+  var line = '';
+  for(var i=0;i<words.length;i++){
+    var test = line ? line + ' ' + words[i] : words[i];
+    if(cx.measureText(test).width > W-80){ lines.push(line); line = words[i]; }
+    else line = test;
+  }
+  if(line) lines.push(line);
+  var y = 160;
+  lines.forEach(function(L){ cx.fillText(L, W/2, y); y += 42; });
   cx.fillStyle = '#F4EAD6';
   cx.font = '16px sans-serif';
-  cx.fillText('Customer ID: ' + (currentAccount.id || ''), W/2, 230);
+  cx.fillText('Customer ID: ' + (currentAccount.id || ''), W/2, y + 20);
   cx.fillStyle = 'rgba(244,234,214,0.85)';
   cx.font = '15px sans-serif';
-  cx.fillText((currentAccount.name || '') + '  •  ' + (currentAccount.mobile || ''), W/2, 265);
+  cx.fillText((currentAccount.name || '') + '  •  ' + (currentAccount.mobile || ''), W/2, y + 50);
   cx.fillStyle = 'rgba(212,175,55,0.85)';
   cx.font = '13px sans-serif';
-  cx.fillText('Show at Aditya Studio  •  Valid 30 days', W/2, 320);
+  cx.fillText('Show at Aditya Studio  •  Valid 30 days', W/2, y + 90);
   cx.fillStyle = 'rgba(244,234,214,0.45)';
   cx.font = '11px sans-serif';
-  cx.fillText(new Date().toLocaleString('en-IN'), W/2, 355);
-  c.toBlob(function(blob){
-    if(!blob){ alert('Download fail'); return; }
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'AdityaStudio_Coupon_' + (currentAccount.id || 'prize') + '.png';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    const btn = document.getElementById('claimBtn');
-    const original = btn.textContent;
-    btn.textContent = '✓ डाउनलोड हो गया';
-    setTimeout(function(){ btn.textContent = original; }, 2200);
-  }, 'image/png');
+  cx.fillText(new Date().toLocaleString('en-IN'), W/2, y + 120);
+
+  var dataUrl = c.toDataURL('image/png');
+  var fileName = 'AdityaStudio_Coupon_' + (currentAccount.id || 'prize') + '.png';
+
+  function markDone(){
+    var btn = document.getElementById('claimBtn');
+    if(!btn) return;
+    var original = btn.textContent;
+    btn.textContent = '✓ डाउनलोड / सेव हो गया';
+    setTimeout(function(){ btn.textContent = original; }, 2500);
+  }
+
+  // 1) Web Share API (mobile best)
+  try {
+    if(navigator.share && navigator.canShare){
+      var blobP = c.toBlob ? null : null;
+    }
+  } catch(e){}
+
+  if(c.toBlob){
+    c.toBlob(function(blob){
+      if(!blob){
+        fallbackDataUrl();
+        return;
+      }
+      var file = new File([blob], fileName, { type: 'image/png' });
+      if(navigator.canShare && navigator.canShare({ files: [file] })){
+        navigator.share({ files: [file], title: 'Aditya Studio Coupon', text: prizeText }).then(markDone).catch(function(){
+          triggerAnchor(blob);
+        });
+      } else {
+        triggerAnchor(blob);
+      }
+    }, 'image/png');
+  } else {
+    fallbackDataUrl();
+  }
+
+  function triggerAnchor(blob){
+    try {
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function(){
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 500);
+      markDone();
+      // Mobile fallback: show image so user can long-press save
+      showCouponPreview(dataUrl);
+    } catch(e){
+      fallbackDataUrl();
+    }
+  }
+
+  function fallbackDataUrl(){
+    try {
+      var a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      markDone();
+    } catch(e){}
+    showCouponPreview(dataUrl);
+  }
+
+  function showCouponPreview(src){
+    var prev = document.getElementById('couponPreviewWrap');
+    if(!prev){
+      prev = document.createElement('div');
+      prev.id = 'couponPreviewWrap';
+      prev.style.cssText = 'margin-top:14px;text-align:center;';
+      var claimBtn = document.getElementById('claimBtn');
+      if(claimBtn && claimBtn.parentNode) claimBtn.parentNode.insertBefore(prev, claimBtn.nextSibling);
+    }
+    prev.innerHTML = '<p style="color:#B7A480;font-size:12px;margin:8px 0">अगर download auto nahi hua — image pe long press karke Save Image karein</p>'
+      + '<img src="'+src+'" alt="Coupon" style="max-width:100%;border-radius:12px;border:1px solid rgba(212,175,55,0.4)"/>';
+  }
 });
+
 
 
 (function(){
