@@ -841,6 +841,47 @@
   .tier-badge-label.goldplus{ color:#FFA500; }
   .tier-badge-label.diamond{ color:#7DF9FF; border-color:#7DF9FF; }
 
+
+  .book-card{
+    position:relative; overflow:hidden; min-height:110px;
+    border-radius:16px; padding:0; cursor:pointer;
+    border:1px solid rgba(212,175,55,0.35);
+    background:#120e0a;
+    transition: transform .2s, box-shadow .2s;
+  }
+  .book-card:hover{ transform:translateY(-3px) scale(1.02); box-shadow:0 10px 28px rgba(0,0,0,0.45), 0 0 20px rgba(212,175,55,0.2); }
+  .book-card .bimg{
+    position:absolute; inset:0; width:100%; height:100%; object-fit:cover;
+    opacity:0.85; transition: transform .4s;
+  }
+  .book-card:hover .bimg{ transform:scale(1.08); }
+  .book-card .bshade{
+    position:absolute; inset:0;
+    background: linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(15,10,5,0.85) 100%);
+  }
+  .book-card .bmeta{
+    position:relative; z-index:1; padding:14px 10px 12px; text-align:center;
+    min-height:110px; display:flex; flex-direction:column; justify-content:flex-end;
+  }
+  .book-card .bt{
+    font-weight:800; font-size:13.5px; color:#FFD700;
+    text-shadow:0 1px 4px rgba(0,0,0,0.8), 0 0 12px rgba(255,215,0,0.35);
+    letter-spacing:0.3px;
+  }
+  .book-card .bs{ font-size:11px; color:rgba(244,234,214,0.85); margin-top:3px; }
+  .book-card::after{
+    content:''; position:absolute; inset:-40%; z-index:2; pointer-events:none;
+    background: linear-gradient(120deg, transparent 40%, rgba(255,255,255,0.12) 50%, transparent 60%);
+    animation: bookCardShine 3.5s ease-in-out infinite;
+  }
+  @keyframes bookCardShine{ 0%{transform:translateX(-30%)} 100%{transform:translateX(30%)} }
+  .verified-green{ color:#3ee06b !important; font-weight:700; text-shadow:0 0 8px rgba(62,224,107,0.4); }
+  .btn-verify-sm{
+    margin-top:8px; padding:8px 12px; border-radius:8px; width:100%;
+    border:1px solid rgba(212,175,55,0.4); background:rgba(255,215,0,0.1);
+    color:var(--gold-light); font-weight:600; cursor:pointer; font-size:13px;
+  }
+
 </style>
 </head>
 <body>
@@ -997,35 +1038,35 @@
     </div>
 
     <div class="book-grid" id="bookGrid">
-      <div class="book-card" data-book="Wedding">
-        <div class="bico">💍</div>
-        <div class="bt">Wedding Book</div>
-        <div class="bs">शादी / प्री-वेडिंग</div>
+      <div class="book-card" data-book="Wedding" data-key="wedding">
+        <img class="bimg" id="img-wedding" alt="" src="https://images.unsplash.com/photo-1519741497674-611481863552?w=400&q=80">
+        <div class="bshade"></div>
+        <div class="bmeta"><div class="bt">Wedding Book</div><div class="bs">शादी / प्री-वेडिंग</div></div>
       </div>
-      <div class="book-card" data-book="Birthday">
-        <div class="bico">🎂</div>
-        <div class="bt">Birthday Book</div>
-        <div class="bs">बर्थडे शूट</div>
+      <div class="book-card" data-book="Birthday" data-key="birthday">
+        <img class="bimg" id="img-birthday" alt="" src="https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=400&q=80">
+        <div class="bshade"></div>
+        <div class="bmeta"><div class="bt">Birthday Book</div><div class="bs">बर्थडे शूट</div></div>
       </div>
-      <div class="book-card" data-book="Personal Shoot">
-        <div class="bico">📷</div>
-        <div class="bt">Personal Shoot</div>
-        <div class="bs">पर्सनल फोटो</div>
+      <div class="book-card" data-book="Personal Shoot" data-key="personal">
+        <img class="bimg" id="img-personal" alt="" src="https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=400&q=80">
+        <div class="bshade"></div>
+        <div class="bmeta"><div class="bt">Personal Shoot</div><div class="bs">पर्सनल फोटो</div></div>
       </div>
-      <div class="book-card" data-book="Reel Shoot">
-        <div class="bico">🎬</div>
-        <div class="bt">Reel Shoot</div>
-        <div class="bs">रील / रील मेकिंग</div>
+      <div class="book-card" data-book="Reel Shoot" data-key="reel">
+        <img class="bimg" id="img-reel" alt="" src="https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=400&q=80">
+        <div class="bshade"></div>
+        <div class="bmeta"><div class="bt">Reel Shoot</div><div class="bs">रील मेकिंग</div></div>
       </div>
-      <div class="book-card" data-book="Event">
-        <div class="bico">🎉</div>
-        <div class="bt">Event Book</div>
-        <div class="bs">इवेंट कवरेज</div>
+      <div class="book-card" data-book="Event" data-key="event">
+        <img class="bimg" id="img-event" alt="" src="https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=400&q=80">
+        <div class="bshade"></div>
+        <div class="bmeta"><div class="bt">Event Book</div><div class="bs">इवेंट कवरेज</div></div>
       </div>
-      <div class="book-card" data-book="Other">
-        <div class="bico">✨</div>
-        <div class="bt">Other Book</div>
-        <div class="bs">और पूछें</div>
+      <div class="book-card" data-book="Other" data-key="other">
+        <img class="bimg" id="img-other" alt="" src="https://images.unsplash.com/photo-1478144592103-25e218a04891?w=400&q=80">
+        <div class="bshade"></div>
+        <div class="bmeta"><div class="bt">Other Book</div><div class="bs">और बुकिंग</div></div>
       </div>
     </div>
 
@@ -1073,6 +1114,14 @@
       <div class="p-row"><span class="pk">मोबाइल</span><span class="pv" id="prMobile">—</span></div>
       <div class="p-row"><span class="pk">गाँव / पता</span><span class="pv" id="prVillage">—</span></div>
       <div class="p-row"><span class="pk">Mobile verify</span><span class="pv" id="prVerified">—</span></div>
+      <div id="profileVerifyBox" style="display:none;margin:8px 0 4px;">
+        <button type="button" class="btn-verify-sm" id="profileRequestOtpBtn">OTP Request भेजें (Admin)</button>
+        <div style="margin-top:8px;">
+          <input type="tel" id="profileOtpInput" placeholder="WhatsApp OTP" maxlength="6" style="width:100%;padding:10px;border-radius:8px;border:1px solid rgba(212,175,55,0.35);background:#0C0906;color:#F4EAD6;text-align:center;letter-spacing:3px;">
+        </div>
+        <button type="button" class="btn" id="profileVerifyOtpBtn" style="margin-top:8px;">OTP Verify करें</button>
+        <div class="auth-error" id="profileVerifyErr" style="display:none;margin-top:6px;"></div>
+      </div>
       <div class="p-row"><span class="pk">Free / Spin</span><span class="pv" id="prSpin">—</span></div>
       <div class="p-row"><span class="pk">Coupons / prizes</span><span class="pv" id="prCoupons">—</span></div>
       <div style="margin-top:12px;color:var(--gold-light);font-size:13px;font-weight:700;">Order / History</div>
@@ -1478,6 +1527,7 @@ function enterDashboard(){
       renderHistory();
       if(typeof refreshHomeAvatar === 'function') refreshHomeAvatar();
       if(typeof updateTierBadge === 'function') updateTierBadge();
+      if(typeof loadBookImages === 'function') loadBookImages();
       if(typeof loadNotifications === 'function') loadNotifications();
       const ap = document.getElementById('amountPanel');
       if(ap) ap.classList.remove('show');
@@ -2535,7 +2585,15 @@ function openProfileModal(){
   document.getElementById('prId').textContent = currentAccount.id || '—';
   document.getElementById('prMobile').textContent = currentAccount.mobile || '—';
   document.getElementById('prVillage').textContent = currentAccount.village || '—';
-  document.getElementById('prVerified').textContent = currentAccount.mobileVerified ? '✅ Verified' : '⏳ Pending';
+  var prV = document.getElementById('prVerified');
+  var vBox = document.getElementById('profileVerifyBox');
+  if(currentAccount.mobileVerified){
+    if(prV){ prV.textContent = '✓ Verified'; prV.className = 'pv verified-green'; }
+    if(vBox) vBox.style.display = 'none';
+  } else {
+    if(prV){ prV.textContent = 'Pending — verify karein'; prV.className = 'pv'; }
+    if(vBox) vBox.style.display = 'block';
+  }
   document.getElementById('prSpin').textContent = currentAccount.freeSpinUsed ? 'Free spin used' : 'Free spin available';
   const prizes = (currentAccount.history || []).filter(h => h.prize || h.discount != null).map(h => h.prize || (h.discount + (Number(h.discount)<=100?'%':'')));
   document.getElementById('prCoupons').textContent = prizes.length ? prizes.slice(0,5).join(', ') : '—';
@@ -2769,6 +2827,84 @@ async function loadNotifications(){
 })();
 
 
+
+async function loadBookImages(){
+  try{
+    const res = await fetch(API_BASE + '/api/settings');
+    const out = await res.json();
+    const imgs = (out && out.settings && out.settings.bookImages) || {};
+    ['wedding','birthday','personal','reel','event','other'].forEach(function(k){
+      const el = document.getElementById('img-' + k);
+      if(el && imgs[k]) el.src = imgs[k];
+    });
+  }catch(e){}
+}
+
+(function wireProfileVerify(){
+  const reqBtn = document.getElementById('profileRequestOtpBtn');
+  const verBtn = document.getElementById('profileVerifyOtpBtn');
+  function setErr(m){
+    const el = document.getElementById('profileVerifyErr');
+    if(!el) return;
+    el.textContent = m || '';
+    el.style.display = m ? 'block' : 'none';
+  }
+  if(reqBtn){
+    reqBtn.addEventListener('click', async function(){
+      setErr('');
+      if(!currentAccount) return;
+      reqBtn.disabled = true; reqBtn.textContent = 'Request...';
+      try{
+        const res = await fetch(API_BASE + '/api/request-spin-otp', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ mobile: currentAccount.mobile })
+        });
+        const out = await res.json();
+        reqBtn.disabled = false; reqBtn.textContent = 'OTP Request भेजें (Admin)';
+        if(out.alreadyVerified){
+          currentAccount.mobileVerified = true;
+          openProfileModal();
+          return;
+        }
+        if(!out.ok){ setErr('Request fail'); return; }
+        setErr(''); 
+        alert('✅ Admin ko OTP request chali — WhatsApp pe OTP aayega');
+      }catch(e){
+        reqBtn.disabled = false; reqBtn.textContent = 'OTP Request भेजें (Admin)';
+        setErr('Server error');
+      }
+    });
+  }
+  if(verBtn){
+    verBtn.addEventListener('click', async function(){
+      setErr('');
+      const otp = (document.getElementById('profileOtpInput') || {}).value || '';
+      if(!/^\d{4,8}$/.test(otp.trim())){ setErr('Sahi OTP dalein'); return; }
+      verBtn.disabled = true;
+      try{
+        const res = await fetch(API_BASE + '/api/verify-spin-otp', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ mobile: currentAccount.mobile, otp: otp.trim() })
+        });
+        const out = await res.json();
+        verBtn.disabled = false;
+        if(!out.ok){ setErr(out.error === 'wrong-otp' ? 'OTP galat' : 'Verify fail'); return; }
+        currentAccount.mobileVerified = true;
+        try { saveSession(currentAccount, currentAccount._pin || '0000'); } catch(e){}
+        openProfileModal();
+        if(typeof updateTierBadge === 'function') updateTierBadge();
+      if(typeof loadBookImages === 'function') loadBookImages();
+        alert('✅ Mobile Verified!');
+      }catch(e){
+        verBtn.disabled = false;
+        setErr('Server error');
+      }
+    });
+  }
+})();
+
+
+loadBookImages();
 tryRestoreSession();
 
 const footYearEl = document.getElementById('footYear');
