@@ -410,7 +410,7 @@ const server = http.createServer(async (req, res) => {
       acc.lastVisitAt = new Date().toISOString();
       saveAccounts(accounts);
       console.log('Login hua:', acc.id, mobile);
-      sendJSON(res, 200, { ok: true, id: acc.id, name: acc.name, village: acc.village, mobile: acc.mobile, history: publicHistory(acc), mobileVerified: !!acc.mobileVerified });
+      sendJSON(res, 200, { ok: true, id: acc.id, name: acc.name, village: acc.village, mobile: acc.mobile, history: publicHistory(acc), mobileVerified: !!acc.mobileVerified, badge: acc.badge || null, totalSpend: acc.totalSpend || 0 });
     } catch (e) {
       sendJSON(res, 400, { ok: false, error: 'bad-request' });
     }
@@ -439,7 +439,9 @@ const server = http.createServer(async (req, res) => {
         village: acc.village,
         mobile: acc.mobile,
         history: publicHistory(acc),
-        mobileVerified: !!acc.mobileVerified
+        mobileVerified: !!acc.mobileVerified,
+        badge: acc.badge || null,
+        totalSpend: acc.totalSpend || 0
       });
     } catch (e) {
       sendJSON(res, 400, { ok: false, error: 'bad-request' });
@@ -519,23 +521,60 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && req.url === '/api/redeem-code') {
     try {
       const body = await readBody(req);
-      const mobile = (body.mobile || '').toString().trim();
-      const code = (body.code || '').toString().trim().toUpperCase();
+      const code = String(body.code || '').trim().toUpperCase();
+      const mobile = String(body.mobile || '').trim();
+      if (!code || code.length < 4) return sendJSON(res, 400, { ok: false, error: 'invalid-code' });
       const codes = loadCodes();
-      const found = codes.find(c => c.code === code);
-      if (!found) return sendJSON(res, 404, { ok: false, error: 'invalid' });
-      if (found.used) return sendJSON(res, 409, { ok: false, error: 'used' });
-      found.used = true;
-      found.usedBy = mobile;
-      found.usedAt = new Date().toISOString();
+      const row = codes.find(c => String(c.code).toUpperCase() === code);
+      if (!row) return sendJSON(res, 404, { ok: false, error: 'not-found' });
+      if (row.used) return sendJSON(res, 409, { ok: false, error: 'used' });
+      const accounts = loadAccounts();
+      const acc = accounts.find(a => String(a.mobile) === mobile);
+      if (!acc) return sendJSON(res, 404, { ok: false, error: 'no-account' });
+      const amount = Number(row.amount) || 0;
+      // mark code used
+      row.used = true;
+      row.usedBy = acc.id + ' / ' + mobile;
+      row.usedAt = new Date().toISOString();
       saveCodes(codes);
-      console.log('Code redeem hua:', code, 'by', mobile);
-      sendJSON(res, 200, { ok: true });
+      // work entry + tier from amount
+      function tierName(amt) {
+        if (amt >= 10000) return 'Diamond';
+        if (amt >= 5000) return 'Gold+';
+        if (amt >= 1000) return 'Gold';
+        return 'Silver';
+      }
+      const tier = tierName(amount);
+      const entryId = acc.id + '-E' + String((acc.history || []).length + 1);
+      acc.history = acc.history || [];
+      acc.history.push({
+        entryId,
+        amount,
+        tier,
+        discount: null,
+        code: row.code,
+        timestamp: new Date().toISOString()
+      });
+      // lifetime total for badge
+      acc.totalSpend = (acc.history || []).reduce((s, h) => s + (Number(h.amount) || 0), 0);
+      acc.badge = tierName(acc.totalSpend);
+      saveAccounts(accounts);
+      sendJSON(res, 200, {
+        ok: true,
+        amount,
+        tier,
+        entryId,
+        badge: acc.badge,
+        totalSpend: acc.totalSpend,
+        code: row.code
+      });
     } catch (e) {
-      sendJSON(res, 400, { ok: false, error: 'bad-request' });
+      console.error('redeem-code', e);
+      sendJSON(res, 500, { ok: false, error: 'server-error' });
     }
     return;
   }
+
 
   if (req.method === 'POST' && req.url === '/api/request-pin-reset') {
     try {
@@ -615,14 +654,32 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  if (req.method === 'POST' && req.url === '/admin/generate-code') {
-    const codes = loadCodes();
-    const newCode = generateCode();
-    codes.push({ code: newCode, used: false, usedBy: null, createdAt: new Date().toISOString(), usedAt: null });
-    saveCodes(codes);
-    console.log('Naya spin code bana:', newCode);
-    res.writeHead(302, { Location: '/admin' });
-    return res.end();
+  if (req.method === 'POST' && (req.url === '/admin/generate-code' || (typeof urlPath !== 'undefined' && urlPath === '/admin/generate-code'))) {
+    try {
+      const body = await readFormBody(req);
+      let amount = parseInt(String(body.amount || '0').replace(/[^0-9]/g, ''), 10);
+      if (!amount || amount < 1) amount = 0;
+      const note = String(body.note || '').trim();
+      const codes = loadCodes();
+      const newCode = generateCode();
+      codes.push({
+        code: newCode,
+        amount: amount,
+        note: note,
+        used: false,
+        usedBy: null,
+        createdAt: new Date().toISOString(),
+        usedAt: null
+      });
+      saveCodes(codes);
+      console.log('Naya spin code:', newCode, 'amount=', amount);
+      res.writeHead(302, { Location: '/admin?code=' + encodeURIComponent(newCode) });
+      return res.end();
+    } catch (e) {
+      console.error('generate-code', e);
+      res.writeHead(302, { Location: '/admin?code=fail' });
+      return res.end();
+    }
   }
 
   if (req.method === 'POST' && req.url === '/admin/reset-pin') {
@@ -754,10 +811,11 @@ const server = http.createServer(async (req, res) => {
 
     const codeRows = codes.map(c =>
       '<tr><td class="mono">' + esc(c.code) + '</td>'
+      + '<td>₹' + esc(c.amount != null ? c.amount : '—') + '</td>'
       + '<td>' + (c.used ? '<span class="bad">Used</span>' : '<span class="ok">Unused</span>') + '</td>'
       + '<td>' + esc(c.usedBy || '—') + '</td>'
       + '<td>' + esc(fmtDate(c.createdAt)) + '</td></tr>'
-    ).join('') || '<tr><td colspan="4">Abhi koi code nahi</td></tr>';
+    ).join('') || '<tr><td colspan="5">Abhi koi code nahi</td></tr>';
 
     const rows = accounts.map(acc => {
       const hist = (acc.history || []).slice().reverse();
@@ -878,8 +936,13 @@ ${resetCards}
 
 <h2>🎫 Spin Codes</h2>
 <div class="codes-block">
-<form method="POST" action="/admin/generate-code"><button class="gen-btn" type="submit">+ Naya spin code</button></form>
-<table><thead><tr><th>Code</th><th>Status</th><th>Used By</th><th>Created</th></tr></thead>
+<form method="POST" action="/admin/generate-code" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+<input class="inp" name="amount" type="number" min="1" placeholder="Kitne ka kaam (₹)" required style="width:140px">
+<input class="inp" name="note" placeholder="Note (optional)" style="width:160px">
+<button class="gen-btn" type="submit">+ Naya spin code</button>
+</form>
+<p class="sub">Code banate waqt amount zaroori — customer code daalte hi amount auto detect hoga.</p>
+<table><thead><tr><th>Code</th><th>Amount</th><th>Status</th><th>Used By</th><th>Created</th></tr></thead>
 <tbody>${codeRows}</tbody></table>
 </div>
 
