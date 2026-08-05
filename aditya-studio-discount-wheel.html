@@ -873,9 +873,15 @@ registerForm.addEventListener('submit', async (e)=>{
     const out = await res.json();
     btn.disabled = false; btn.textContent = 'अकाउंट बनाएं →';
     if(!out.ok){
-      setAuthError(out.error === 'exists'
-        ? 'ये मोबाइल नंबर पहले से रजिस्टर है — "पुराना कस्टमर" टैब से लॉगिन करें'
-        : 'कुछ गलत हो गया, दोबारा कोशिश करें');
+      if(out.error === 'exists'){
+        setAuthError('ये मोबाइल नंबर पहले से रजिस्टर है — "पुराना कस्टमर" टैब से लॉगिन करें');
+      } else if(out.error === 'invalid'){
+        setAuthError('मोबाइल (10 अंक) या PIN (4 अंक) सही डालें');
+      } else if(out.error === 'save-failed'){
+        setAuthError('सर्वर पर डेटा सेव नहीं हो पाया। Render env se DATA_DIR hata kar redeploy karo.');
+      } else {
+        setAuthError('कुछ गलत हो गया, दोबारा कोशिश करें' + (out.detail ? ' ('+out.detail+')' : ''));
+      }
       return;
     }
     currentAccount = { id: out.id, name, mobile, village, history: [], _pin: pin };
@@ -909,7 +915,13 @@ loginForm.addEventListener('submit', async (e)=>{
     const out = await res.json();
     btn.disabled = false; btn.textContent = 'लॉगिन करें →';
     if(!out.ok){
-      setAuthError('मोबाइल नंबर या PIN गलत है');
+      if(out.error === 'not-found'){
+        setAuthError('यह नंबर रजिस्टर नहीं है। "नया कस्टमर" से अकाउंट बनाएं। (Render restart pe data wipe ho sakta hai)');
+      } else if(out.error === 'wrong-pin'){
+        setAuthError('PIN गलत है। "PIN भूल गए?" से reset request भेजें।');
+      } else {
+        setAuthError('मोबाइल नंबर या PIN गलत है');
+      }
       return;
     }
     currentAccount = { id: out.id, name: out.name, mobile, village: out.village, history: out.history || [], _pin: pin };
