@@ -811,6 +811,36 @@
     50%{ box-shadow:0 0 0 10px rgba(255,80,80,0); }
   }
 
+
+  .home-avatar-wrap{ position:relative; }
+  .tier-ring{
+    position:absolute; inset:-5px; border-radius:50%; pointer-events:none;
+    border:3px solid transparent;
+  }
+  .tier-ring.silver{ border-color:#C0C0C0; box-shadow:0 0 12px rgba(192,192,192,0.55); }
+  .tier-ring.gold{ border-color:#FFD700; box-shadow:0 0 14px rgba(255,215,0,0.65); }
+  .tier-ring.goldplus{ border-color:#FFA500; box-shadow:0 0 16px rgba(255,165,0,0.7); }
+  .tier-ring.diamond{
+    border-color:#7DF9FF;
+    box-shadow:0 0 18px rgba(125,249,255,0.75), 0 0 4px #fff;
+    animation: diaGlow 2s ease-in-out infinite;
+  }
+  @keyframes diaGlow{
+    0%,100%{ box-shadow:0 0 12px rgba(125,249,255,0.5); }
+    50%{ box-shadow:0 0 22px rgba(125,249,255,0.95), 0 0 6px #fff; }
+  }
+  .tier-badge-label{
+    position:absolute; bottom:-6px; left:50%; transform:translateX(-50%);
+    font-size:9px; font-weight:800; letter-spacing:0.5px;
+    padding:2px 6px; border-radius:99px; white-space:nowrap;
+    background:#1a1308; border:1px solid rgba(212,175,55,0.4);
+    color:var(--gold-light); z-index:2;
+  }
+  .tier-badge-label.silver{ color:#ddd; border-color:#aaa; }
+  .tier-badge-label.gold{ color:#FFD700; }
+  .tier-badge-label.goldplus{ color:#FFA500; }
+  .tier-badge-label.diamond{ color:#7DF9FF; border-color:#7DF9FF; }
+
 </style>
 </head>
 <body>
@@ -927,8 +957,10 @@
   <div class="card" id="dashboardCard">
     <div class="home-top">
       <div class="home-avatar-wrap" id="homeAvatarBtn" title="Profile">
+        <div class="tier-ring" id="tierRing"></div>
         <div class="home-avatar placeholder" id="homeAvatar">👤</div>
         <div class="home-avatar-badge">✎</div>
+        <div class="tier-badge-label" id="tierBadgeLabel" style="display:none;">SILVER</div>
       </div>
       <div class="home-top-center">
         <div class="home-title3d" id="homeTitle3d" data-text="Aditya Studio">Aditya Studio</div>
@@ -1001,8 +1033,8 @@
     <div class="history-box" id="historyBox"></div>
 
     <div class="home-quick">
-      <button type="button" class="home-action-btn primary" id="btnOpenAmount">
-        <span class="ico">💰</span> आज का काम / नया स्पिन
+      <button type="button" class="home-action-btn primary" id="btnOpenCode">
+        <span class="ico">🎫</span> स्पिन कोड डालें / नया स्पिन
       </button>
       <button type="button" class="home-action-btn" id="btnContactWA">
         <span class="ico">💬</span> स्टूडियो WhatsApp (9755503929)
@@ -1010,14 +1042,20 @@
     </div>
 
     <div id="amountPanel">
-      <form id="amountForm" novalidate>
-        <div class="field" id="af-amount">
-          <label>आज कितने का काम कराया? (₹)</label>
-          <input type="number" id="workAmount" placeholder="जैसे: 350" min="1">
-          <div class="err">₹50 से ₹1,00,000 के बीच राशि डालें</div>
+      <form id="codeFormHome" novalidate>
+        <div class="field" id="hf-code">
+          <label>स्टूडियो वाला स्पिन कोड</label>
+          <input type="text" id="homeSpinCode" placeholder="जैसे: A3F9K2" maxlength="8" style="text-align:center;letter-spacing:3px;text-transform:uppercase;font-weight:700;">
+          <div class="err">सही कोड डालें</div>
         </div>
-        <button type="submit" class="btn">आगे बढ़ें → स्पिन कोड</button>
+        <div class="note" id="codeAmountHint" style="margin-bottom:8px;">कोड डालते ही amount auto detect होगा — अलग से पैसे डालने की ज़रूरत नहीं</div>
+        <div class="auth-error" id="homeCodeError"></div>
+        <button type="submit" class="btn">कोड वेरिफ़ाई → स्पिन</button>
         <button type="button" class="btn-secondary" id="btnCloseAmount">बंद करें</button>
+      </form>
+      <!-- hidden amount form kept for compatibility -->
+      <form id="amountForm" style="display:none;" novalidate>
+        <input type="number" id="workAmount" value="0">
       </form>
     </div>
   </div>
@@ -1439,6 +1477,7 @@ function enterDashboard(){
       }
       renderHistory();
       if(typeof refreshHomeAvatar === 'function') refreshHomeAvatar();
+      if(typeof updateTierBadge === 'function') updateTierBadge();
       if(typeof loadNotifications === 'function') loadNotifications();
       const ap = document.getElementById('amountPanel');
       if(ap) ap.classList.remove('show');
@@ -1608,7 +1647,9 @@ loginForm.addEventListener('submit', async (e)=>{
     }
     currentAccount = {
       id: out.id, name: out.name, mobile, village: out.village,
-      history: out.history || [], _pin: pin, mobileVerified: !!out.mobileVerified
+      history: out.history || [], _pin: pin, mobileVerified: !!out.mobileVerified,
+      badge: out.badge || null,
+      totalSpend: out.totalSpend || 0
     };
     saveSession(currentAccount, pin);
     enterDashboard();
@@ -2414,7 +2455,7 @@ document.getElementById('claimBtn').addEventListener('click', function(){
 
 
 (function(){
-  var openAmt = document.getElementById('btnOpenAmount');
+  var openAmt = document.getElementById('btnOpenCode');
   var closeAmt = document.getElementById('btnCloseAmount');
   var panel = document.getElementById('amountPanel');
   if(openAmt && panel){
@@ -2442,6 +2483,30 @@ const STUDIO_WA = '919755503929'; // 9755503929
 function photoKey(){
   return 'aditya_photo_' + ((currentAccount && currentAccount.mobile) || 'x');
 }
+
+function tierFromSpend(total){
+  total = Number(total) || 0;
+  if(total >= 10000) return { key:'diamond', label:'DIAMOND' };
+  if(total >= 5000) return { key:'goldplus', label:'GOLD+' };
+  if(total >= 1000) return { key:'gold', label:'GOLD' };
+  if(total > 0) return { key:'silver', label:'SILVER' };
+  return { key:'', label:'' };
+}
+function updateTierBadge(){
+  const ring = document.getElementById('tierRing');
+  const lab = document.getElementById('tierBadgeLabel');
+  if(!ring) return;
+  const total = (currentAccount && (currentAccount.totalSpend != null))
+    ? currentAccount.totalSpend
+    : ((currentAccount && currentAccount.history) || []).reduce(function(s,h){ return s + (Number(h.amount)||0); }, 0);
+  const t = tierFromSpend(total);
+  ring.className = 'tier-ring' + (t.key ? (' ' + t.key) : '');
+  if(lab){
+    if(t.label){ lab.style.display='block'; lab.className='tier-badge-label ' + t.key; lab.textContent=t.label; }
+    else { lab.style.display='none'; }
+  }
+}
+
 function refreshHomeAvatar(){
   const el = document.getElementById('homeAvatar');
   const lg = document.getElementById('profilePhotoLg');
@@ -2618,6 +2683,88 @@ async function loadNotifications(){
       var id = currentAccount && currentAccount.id ? currentAccount.id : '';
       window.open('https://wa.me/' + STUDIO_WA + '?text=' + encodeURIComponent('Namaste Aditya Studio, mera customer ID: ' + id), '_blank');
     };
+  }
+})();
+
+
+
+(function(){
+  var openBtn = document.getElementById('btnOpenCode');
+  var closeAmt = document.getElementById('btnCloseAmount');
+  var panel = document.getElementById('amountPanel');
+  if(openBtn && panel){
+    openBtn.addEventListener('click', function(){
+      panel.classList.add('show');
+      var inp = document.getElementById('homeSpinCode');
+      if(inp){ inp.value=''; inp.focus(); }
+    });
+  }
+  if(closeAmt && panel){
+    closeAmt.addEventListener('click', function(){ panel.classList.remove('show'); });
+  }
+  var form = document.getElementById('codeFormHome');
+  if(form){
+    form.addEventListener('submit', async function(e){
+      e.preventDefault();
+      var err = document.getElementById('homeCodeError');
+      if(err) err.textContent = '';
+      if(!currentAccount){ if(err) err.textContent='पहले लॉगिन करें'; return; }
+      var code = (document.getElementById('homeSpinCode').value || '').trim().toUpperCase();
+      if(code.length < 4){ if(err) err.textContent='सही कोड डालें'; return; }
+      var btn = form.querySelector('button[type="submit"]');
+      if(btn){ btn.disabled=true; btn.textContent='Verify...'; }
+      try{
+        var res = await fetch(API_BASE + '/api/redeem-code', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ code: code, mobile: currentAccount.mobile })
+        });
+        var out = await res.json();
+        if(btn){ btn.disabled=false; btn.textContent='कोड वेरिफ़ाई → स्पिन'; }
+        if(!out.ok){
+          if(err){
+            if(out.error==='used') err.textContent='यह कोड पहले इस्तेमाल हो चुका है';
+            else if(out.error==='not-found') err.textContent='कोड गलत है';
+            else err.textContent='कोड verify fail';
+          }
+          return;
+        }
+        // amount from code
+        currentEntryId = out.entryId;
+        currentAccount.totalSpend = out.totalSpend;
+        currentAccount.badge = out.badge;
+        currentAccount.history = currentAccount.history || [];
+        currentAccount.history.push({
+          entryId: out.entryId, amount: out.amount, tier: out.tier,
+          code: out.code, timestamp: new Date().toISOString()
+        });
+        try { saveSession(currentAccount, currentAccount._pin || '0000'); } catch(e){}
+        updateTierBadge();
+        if(panel) panel.classList.remove('show');
+        // go to wheel with tier from amount
+        currentTier = (typeof tierFor === 'function') ? tierFor(out.amount) : null;
+        var wa = document.getElementById('workAmount');
+        if(wa) wa.value = out.amount;
+        if(dashboardCard) dashboardCard.style.display='none';
+        if(codeCard) codeCard.style.display='none';
+        if(wheelSection){
+          document.body.classList.add('step-wheel');
+          document.body.classList.add('step-app');
+          wheelSection.style.display='block';
+          hasSpun = false;
+          if(typeof buildWheel === 'function') buildWheel(currentTier);
+          var tg = document.getElementById('wheelGreeting');
+          if(tg) tg.textContent = '₹' + out.amount + ' · ' + (out.tier || '') + ' tier — SPIN करें!';
+          var tb = document.getElementById('tierBadge');
+          if(tb) tb.textContent = (out.tier || '') + ' · ₹' + out.amount;
+          var cid = document.getElementById('custIdBadge');
+          if(cid) cid.textContent = currentAccount.id;
+          wheelSection.scrollIntoView({behavior:'smooth', block:'start'});
+        }
+      }catch(ex){
+        if(btn){ btn.disabled=false; btn.textContent='कोड वेरिफ़ाई → स्पिन'; }
+        if(err) err.textContent='सर्वर से जुड़ नहीं पाया';
+      }
+    });
   }
 })();
 
