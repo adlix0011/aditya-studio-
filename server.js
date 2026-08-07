@@ -50,21 +50,42 @@ let mongoDb = null;
 let useMongo = false;
 
 async function initMongo() {
-  if (!MONGODB_URI) {
+  let uri = (MONGODB_URI || '').trim().replace(/^["']|["']$/g, '');
+  if (!uri) {
     console.log('[db] JSON file mode (MONGODB_URI nahi set)');
+    return;
+  }
+  // password me @ ho to break hota hai — basic check
+  if (uri.includes('<') || uri.includes('db_password')) {
+    console.error('[db] MONGODB_URI me abhi bhi <password> placeholder hai — real password lagao');
     return;
   }
   try {
     const { MongoClient } = require('mongodb');
-    mongoClient = new MongoClient(MONGODB_URI, { serverSelectionTimeoutMS: 12000 });
+    console.log('[db] Connecting Atlas host:', uri.split('@')[1] ? uri.split('@')[1].split('/')[0] : '(parse?)');
+    mongoClient = new MongoClient(uri, {
+      serverSelectionTimeoutMS: 20000,
+      connectTimeoutMS: 20000,
+      tls: true,
+      retryWrites: true
+    });
     await mongoClient.connect();
+    // URI me /aditya_studio ho to wahi, warna env ya default
     mongoDb = mongoClient.db(process.env.MONGODB_DB || 'aditya_studio');
     useMongo = true;
     await mongoDb.collection('accounts').createIndex({ mobile: 1 }, { unique: true }).catch(() => {});
     await mongoDb.collection('codes').createIndex({ code: 1 }, { unique: true }).catch(() => {});
+    // ping
+    await mongoDb.command({ ping: 1 });
     console.log('[db] MongoDB Atlas CONNECTED ✅ database:', mongoDb.databaseName);
   } catch (e) {
     console.error('[db] MongoDB connect FAIL — JSON fallback:', e.message);
+    if (e.message && e.message.includes('SSL')) {
+      console.error('[db] SSL tip: Network Access me 0.0.0.0/0 allow karo; password special char to URL-encode; URI me /aditya_studio ho');
+    }
+    if (e.message && (e.message.includes('auth') || e.message.includes('Authentication'))) {
+      console.error('[db] Auth tip: username/password galat — Atlas Database Access check karo');
+    }
     useMongo = false;
   }
 }
