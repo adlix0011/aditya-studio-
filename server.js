@@ -55,39 +55,77 @@ async function initMongo() {
     console.log('[db] JSON file mode (MONGODB_URI nahi set)');
     return;
   }
-  // password me @ ho to break hota hai — basic check
   if (uri.includes('<') || uri.includes('db_password')) {
-    console.error('[db] MONGODB_URI me abhi bhi <password> placeholder hai — real password lagao');
+    console.error('[db] MONGODB_URI me placeholder password hai — real password lagao');
     return;
   }
-  try {
-    const { MongoClient } = require('mongodb');
-    console.log('[db] Connecting Atlas host:', uri.split('@')[1] ? uri.split('@')[1].split('/')[0] : '(parse?)');
-    mongoClient = new MongoClient(uri, {
-      serverSelectionTimeoutMS: 20000,
-      connectTimeoutMS: 20000,
-      tls: true,
-      retryWrites: true
-    });
-    await mongoClient.connect();
-    // URI me /aditya_studio ho to wahi, warna env ya default
-    mongoDb = mongoClient.db(process.env.MONGODB_DB || 'aditya_studio');
-    useMongo = true;
-    await mongoDb.collection('accounts').createIndex({ mobile: 1 }, { unique: true }).catch(() => {});
-    await mongoDb.collection('codes').createIndex({ code: 1 }, { unique: true }).catch(() => {});
-    // ping
-    await mongoDb.command({ ping: 1 });
-    console.log('[db] MongoDB Atlas CONNECTED ✅ database:', mongoDb.databaseName);
-  } catch (e) {
-    console.error('[db] MongoDB connect FAIL — JSON fallback:', e.message);
-    if (e.message && e.message.includes('SSL')) {
-      console.error('[db] SSL tip: Network Access me 0.0.0.0/0 allow karo; password special char to URL-encode; URI me /aditya_studio ho');
-    }
-    if (e.message && (e.message.includes('auth') || e.message.includes('Authentication'))) {
-      console.error('[db] Auth tip: username/password galat — Atlas Database Access check karo');
-    }
-    useMongo = false;
+  // ensure db name in path
+  if (uri.includes('mongodb.net/?') && !uri.includes('mongodb.net/aditya_studio')) {
+    uri = uri.replace('mongodb.net/?', 'mongodb.net/aditya_studio?');
+    console.log('[db] URI me /aditya_studio auto-add kiya');
   }
+  let hostPart = '(unknown)';
+  try {
+    hostPart = uri.split('@')[1].split('/')[0];
+  } catch (e) {}
+  console.log('[db] Connecting Atlas host:', hostPart);
+
+  const { MongoClient } = require('mongodb');
+  const attempts = [
+    {
+      name: 'ipv4+tls',
+      opts: {
+        serverSelectionTimeoutMS: 25000,
+        connectTimeoutMS: 25000,
+        tls: true,
+        family: 4,
+        retryWrites: true
+      }
+    },
+    {
+      name: 'ipv4-default',
+      opts: {
+        serverSelectionTimeoutMS: 25000,
+        connectTimeoutMS: 25000,
+        family: 4
+      }
+    },
+    {
+      name: 'default',
+      opts: {
+        serverSelectionTimeoutMS: 25000,
+        connectTimeoutMS: 25000
+      }
+    }
+  ];
+
+  let lastErr = null;
+  for (const attempt of attempts) {
+    try {
+      console.log('[db] Try connect:', attempt.name);
+      const client = new MongoClient(uri, attempt.opts);
+      await client.connect();
+      const db = client.db(process.env.MONGODB_DB || 'aditya_studio');
+      await db.command({ ping: 1 });
+      mongoClient = client;
+      mongoDb = db;
+      useMongo = true;
+      await mongoDb.collection('accounts').createIndex({ mobile: 1 }, { unique: true }).catch(() => {});
+      await mongoDb.collection('codes').createIndex({ code: 1 }, { unique: true }).catch(() => {});
+      console.log('[db] MongoDB Atlas CONNECTED ✅ database:', mongoDb.databaseName, 'via', attempt.name);
+      return;
+    } catch (e) {
+      lastErr = e;
+      console.error('[db] Attempt', attempt.name, 'fail:', e.message);
+      try { /* ignore */ } catch (e2) {}
+    }
+  }
+
+  console.error('[db] MongoDB connect FAIL — JSON fallback:', lastErr && lastErr.message);
+  console.error('[db] FIX: Atlas → Network Access → Add IP → Allow Access from Anywhere (0.0.0.0/0)');
+  console.error('[db] FIX: Database Access → user password reset → naya simple password (sirf a-z 0-9)');
+  console.error('[db] FIX: Render MONGODB_URI = mongodb+srv://USER:PASS@HOST/aditya_studio?retryWrites=true&w=majority');
+  useMongo = false;
 }
 
 
