@@ -868,6 +868,32 @@ const server = http.createServer(async (req, res) => {
     return sendJSON(res, 200, accounts);
   }
 
+
+  if (req.method === 'GET' && urlPath === '/admin/live-json') {
+    const accounts = loadAccounts();
+    const pendingResets = accounts.filter(a => a.pinResetRequested).map(a => ({
+      id: a.id, name: a.name, mobile: a.mobile,
+      at: a.pinResetRequestedAt || null
+    }));
+    const pendingOtps = loadOtpRequests().filter(r => !r.verified).map(r => ({
+      mobile: r.mobile, name: r.name || '', id: r.id || '', otp: r.otp,
+      at: r.createdAt || null
+    }));
+    const codes = loadCodes();
+    return sendJSON(res, 200, {
+      ok: true,
+      at: new Date().toISOString(),
+      counts: {
+        customers: accounts.length,
+        pendingOtp: pendingOtps.length,
+        pendingPin: pendingResets.length,
+        unusedCodes: codes.filter(c => !c.used).length
+      },
+      pendingOtps,
+      pendingResets
+    });
+  }
+
   if (req.method === 'GET' && urlPath === '/admin') {
     const accounts = loadAccounts().slice().reverse();
     const settings = loadSettings();
@@ -952,12 +978,13 @@ label.muted{display:block;font-size:12px}
 <h1>Aditya Studio — Admin</h1>
 <div class="sub"><a href="/">Customer page</a></div>
 <div class="cards">
-<div class="card"><div class="n">${accounts.length}</div><div class="l">Customers</div></div>
+<div class="card"><div class="n" id="cntCust">${accounts.length}</div><div class="l">Customers</div></div>
 <div class="card"><div class="n">${newToday}</div><div class="l">Aaj naye</div></div>
-<div class="card"><div class="n">${pendingOtps.length}</div><div class="l">Pending OTP</div></div>
+<div class="card"><div class="n" id="cntOtp">${pendingOtps.length}</div><div class="l">Pending OTP</div></div>
+<div class="card"><div class="n" id="cntPin">${pendingResets.length}</div><div class="l">PIN Reset</div></div>
 <div class="card"><div class="n">${verifiedCount}</div><div class="l">Verified</div></div>
 <div class="card"><div class="n">${freeUsed}</div><div class="l">Free spin used</div></div>
-<div class="card"><div class="n">${codes.filter(c=>!c.used).length}</div><div class="l">Unused codes</div></div>
+<div class="card"><div class="n" id="cntCodes">${codes.filter(c=>!c.used).length}</div><div class="l">Unused codes</div></div>
 </div>
 
 <h2>💾 Backup</h2>
@@ -978,11 +1005,11 @@ label.muted{display:block;font-size:12px}
 </form>
 </div>
 
-<h2>📱 Spin OTP (${pendingOtps.length})</h2>
-${otpCards}
+<h2 id="h2Otp">📱 Spin OTP (${pendingOtps.length})</h2>
+<div id="otpLiveBox">${otpCards}</div>
 
-<h2>⚠️ PIN Reset (${pendingResets.length})</h2>
-${resetCards}
+<h2 id="h2Pin">⚠️ PIN Reset (${pendingResets.length})</h2>
+<div id="pinLiveBox">${resetCards}</div>
 
 <h2>🖼️ Book card photos</h2>
 <div class="codes-block">
@@ -1025,8 +1052,139 @@ ${resetCards}
 <h2>👥 Customers (${accounts.length})</h2>
 <input id="search" type="search" placeholder="Search..." oninput="filterAcc(this.value)">
 <div id="accList">${rows}</div>
+<div id="liveBar" style="position:fixed;bottom:12px;right:12px;background:#1B140F;border:1px solid rgba(212,175,55,0.4);border-radius:10px;padding:8px 12px;font-size:12px;color:#B7A480;z-index:99;">
+🔄 Live: <span id="liveStatus">connecting…</span>
+<label style="margin-left:10px;cursor:pointer;color:#D4AF37;"><input type="checkbox" id="soundToggle" checked> Sound</label>
+</div>
 <script>
 function filterAcc(q){q=(q||'').toLowerCase();document.querySelectorAll('#accList .acc').forEach(function(el){el.style.display=!q||el.textContent.toLowerCase().indexOf(q)>=0?'':'none';});}
+
+var lastSig = '';
+var audioCtx = null;
+function playAlert() {
+  if (document.getElementById('soundToggle') && !document.getElementById('soundToggle').checked) return;
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    var t = audioCtx.currentTime;
+    [880, 1174, 880].forEach(function(freq, i) {
+      var o = audioCtx.createOscillator();
+      var g = audioCtx.createGain();
+      o.type = 'sine';
+      o.frequency.value = freq;
+      g.gain.setValueAtTime(0.0001, t + i * 0.15);
+      g.gain.exponentialRampToValueAtTime(0.2, t + i * 0.15 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.15 + 0.2);
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start(t + i * 0.15); o.stop(t + i * 0.15 + 0.25);
+    });
+  } catch (e) {}
+}
+
+function esc(t) {
+  return String(t == null ? '' : t)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function fmt(d) {
+  try { return d ? new Date(d).toLocaleString('en-IN') : ''; } catch(e) { return ''; }
+}
+
+function renderOtps(list) {
+  var box = document.getElementById('otpLiveBox');
+  if (!box) return;
+  if (!list.length) { box.innerHTML = '<div class="muted">No pending OTP</div>'; return; }
+  box.innerHTML = list.map(function(r) {
+    var msg = encodeURIComponent('Namaste ' + (r.name || '') + '!\\nAditya Studio Spin OTP: *' + r.otp + '*\\n— Aditya Studio');
+    return '<div class="msg-card" style="border-color:rgba(255,80,80,0.4);box-shadow:0 0 12px rgba(255,80,80,0.15)">'
+      + '<div class="msg-text">🎡 <b>' + esc(r.name || '') + '</b> (' + esc(r.mobile) + ')<br>OTP: <span class="otp-big">' + esc(r.otp) + '</span><br><span class="muted">' + esc(fmt(r.at)) + '</span></div>'
+      + '<div class="msg-actions"><a class="gen-btn wa-link" href="https://wa.me/91' + esc(r.mobile) + '?text=' + msg + '" target="_blank">💬 WhatsApp OTP</a></div></div>';
+  }).join('');
+}
+
+function renderPins(list) {
+  var box = document.getElementById('pinLiveBox');
+  if (!box) return;
+  if (!list.length) { box.innerHTML = '<div class="muted">No PIN resets</div>'; return; }
+  box.innerHTML = list.map(function(a) {
+    return '<div class="msg-card" style="border-color:rgba(255,200,0,0.35)">'
+      + '<div class="msg-text">🔔 <b>' + esc(a.name) + '</b> (' + esc(a.mobile) + ') ' + esc(fmt(a.at)) + '</div>'
+      + '<div class="msg-actions"><form method="POST" action="/admin/reset-pin" style="display:flex;gap:6px"><input type="hidden" name="mobile" value="' + esc(a.mobile) + '"><input class="inp" name="newPin" placeholder="Naya PIN" maxlength="4"><button class="gen-btn" type="submit">Reset → WA</button></form></div></div>';
+  }).join('');
+}
+
+function setCount(id, n) {
+  var el = document.getElementById(id);
+  if (el) el.textContent = n;
+}
+
+async function pollLive() {
+  var st = document.getElementById('liveStatus');
+  try {
+    var res = await fetch('/admin/live-json', { credentials: 'same-origin', cache: 'no-store' });
+    if (res.status === 401) {
+      if (st) st.textContent = 'login needed';
+      return;
+    }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    var data = await res.json();
+    if (!data.ok) throw new Error('bad');
+    var sig = JSON.stringify({ o: data.pendingOtps, p: data.pendingResets });
+    if (lastSig && sig !== lastSig) {
+      var prev = {};
+      try { prev = JSON.parse(lastSig); } catch(e) {}
+      var newOtp = (data.pendingOtps || []).length > ((prev.o || []).length || 0);
+      var newPin = (data.pendingResets || []).length > ((prev.p || []).length || 0);
+      // also detect brand-new mobile
+      var prevOtpKeys = (prev.o || []).map(function(x){ return x.mobile + ':' + x.otp; }).join('|');
+      (data.pendingOtps || []).forEach(function(r) {
+        if (prevOtpKeys && prevOtpKeys.indexOf(r.mobile + ':' + r.otp) < 0) newOtp = true;
+      });
+      if (newOtp || newPin) {
+        playAlert();
+        if (st) st.innerHTML = '<span style="color:#3ee06b">🔔 NEW request!</span>';
+        try {
+          if (document.hidden && Notification && Notification.permission === 'granted') {
+            new Notification('Aditya Studio Admin', { body: newOtp ? 'Naya OTP request' : 'Naya PIN reset request' });
+          }
+        } catch(e) {}
+      } else if (st) {
+        st.textContent = 'ok · ' + new Date().toLocaleTimeString('en-IN');
+      }
+    } else if (st) {
+      st.textContent = 'ok · ' + new Date().toLocaleTimeString('en-IN');
+    }
+    lastSig = sig;
+    renderOtps(data.pendingOtps || []);
+    renderPins(data.pendingResets || []);
+    if (data.counts) {
+      setCount('cntOtp', data.counts.pendingOtp);
+      setCount('cntPin', data.counts.pendingPin);
+      setCount('cntCust', data.counts.customers);
+      setCount('cntCodes', data.counts.unusedCodes);
+      var h2o = document.getElementById('h2Otp');
+      var h2p = document.getElementById('h2Pin');
+      if (h2o) h2o.textContent = '📱 Spin OTP (' + data.counts.pendingOtp + ')';
+      if (h2p) h2p.textContent = '⚠️ PIN Reset (' + data.counts.pendingPin + ')';
+    }
+  } catch (e) {
+    if (st) st.textContent = 'retry…';
+  }
+}
+
+// Unlock audio on first click (browser policy)
+document.addEventListener('click', function once() {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    audioCtx.resume();
+  } catch(e) {}
+  if (window.Notification && Notification.permission === 'default') {
+    Notification.requestPermission().catch(function(){});
+  }
+  document.removeEventListener('click', once);
+});
+
+pollLive();
+setInterval(pollLive, 5000);
 </script>
 </body></html>`;
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
