@@ -477,16 +477,36 @@ function assignWorkPrize(amount) {
 }
 
 
+function pruneNotifs(list) {
+  const now = Date.now();
+  return (list || []).filter(n => {
+    if (!n) return false;
+    if (n.expiresAt && new Date(n.expiresAt).getTime() < now) return false;
+    return true;
+  });
+}
 function loadNotifs() {
-  if (_cache.notifs) return _cache.notifs.slice();
-  try {
-    if (!fs.existsSync(NOTIF_FILE)) { _cache.notifs = []; return []; }
-    _cache.notifs = JSON.parse(fs.readFileSync(NOTIF_FILE, 'utf8'));
-    return _cache.notifs.slice();
-  } catch (e) { _cache.notifs = []; return []; }
+  let list = [];
+  if (_cache.notifs) list = _cache.notifs.slice();
+  else {
+    try {
+      if (!fs.existsSync(NOTIF_FILE)) { _cache.notifs = []; return []; }
+      list = JSON.parse(fs.readFileSync(NOTIF_FILE, 'utf8')) || [];
+    } catch (e) { list = []; }
+  }
+  const pruned = pruneNotifs(list);
+  // auto-save if expired removed
+  if (pruned.length !== list.length) {
+    _cache.notifs = pruned;
+    try { fs.writeFileSync(NOTIF_FILE, JSON.stringify(pruned, null, 2)); } catch (e) {}
+    if (useMongo) mongoSaveNotifs(pruned).catch(() => {});
+  } else {
+    _cache.notifs = pruned;
+  }
+  return pruned.slice();
 }
 function saveNotifs(list) {
-  _cache.notifs = list.slice(0, 50);
+  _cache.notifs = pruneNotifs(list).slice(0, 50);
   try { fs.writeFileSync(NOTIF_FILE, JSON.stringify(_cache.notifs, null, 2)); }
   catch (e) { console.error('saveNotifs', e.message); }
   if (useMongo) {
@@ -1045,14 +1065,41 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(302, { Location: '/admin?notif=empty' });
         return res.end();
       }
+      // expiresIn: hours (0 = never)
+      let hours = parseInt(String(body.expiresIn || '24'), 10);
+      if (isNaN(hours) || hours < 0) hours = 24;
+      const id = 'N-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
+      const item = {
+        id,
+        title,
+        body: bodyText,
+        at: new Date().toISOString(),
+        expiresAt: hours > 0 ? new Date(Date.now() + hours * 60 * 60 * 1000).toISOString() : null
+      };
       const list = loadNotifs();
-      list.unshift({ title, body: bodyText, at: new Date().toISOString() });
+      list.unshift(item);
       saveNotifs(list);
-      console.log('Notif saved:', title);
+      console.log('Notif saved:', title, 'expires', item.expiresAt || 'never');
       res.writeHead(302, { Location: '/admin?notif=ok' });
       return res.end();
     } catch (e) {
       console.error('notif', e);
+      res.writeHead(302, { Location: '/admin?notif=fail' });
+      return res.end();
+    }
+  }
+
+  if (req.method === 'POST' && urlPath === '/admin/delete-notification') {
+    try {
+      const body = await readFormBody(req);
+      const id = String(body.id || '').trim();
+      let list = loadNotifs();
+      list = list.filter(n => String(n.id || n.at) !== id);
+      saveNotifs(list);
+      console.log('Notif deleted:', id);
+      res.writeHead(302, { Location: '/admin?notif=deleted' });
+      return res.end();
+    } catch (e) {
       res.writeHead(302, { Location: '/admin?notif=fail' });
       return res.end();
     }
@@ -1226,7 +1273,16 @@ const server = http.createServer(async (req, res) => {
       return '—';
     }
 
-    const rows = accounts.map(acc => {
+    const notifAdminCards = (loadNotifs() || []).map(n => {
+      const nid = esc(n.id || n.at || '');
+      const exp = n.expiresAt ? fmtDate(n.expiresAt) : 'Never';
+      return '<div class="msg-card" style="margin-top:8px"><div class="msg-text"><b>' + esc(n.title || '') + '</b><br>' + esc(n.body || '') +
+        '<br><span class="muted">Sent: ' + esc(fmtDate(n.at)) + ' · Exp: ' + esc(exp) + '</span></div>' +
+        '<div class="msg-actions"><form method="POST" action="/admin/delete-notification"><input type="hidden" name="id" value="' + nid + '">' +
+        '<button type="submit" style="padding:6px 10px;background:#5a1a1a;color:#fca5a5;border:1px solid #7f1d1d;border-radius:6px;cursor:pointer">🗑 Delete</button></form></div></div>';
+    }).join('') || '<div class="muted">No active notifications</div>';
+
+        const rows = accounts.map(acc => {
       const hist = (acc.history || []).slice().reverse();
       const couponRows = hist.filter(h => h.prize || h.discount != null).map(h => {
         const cid = esc(h.couponId || h.entryId || '');
@@ -1315,8 +1371,23 @@ label.muted{display:block;font-size:12px}
 <form method="POST" action="/admin/send-notification" style="display:flex;flex-direction:column;gap:8px;max-width:480px">
 <input class="inp" name="title" placeholder="Title" style="width:100%">
 <textarea name="body" rows="3" placeholder="Message..." required style="width:100%;background:#0C0906;border:1px solid rgba(212,175,55,0.3);border-radius:8px;color:#F4EAD6;padding:8px"></textarea>
+<label class="muted">Expire after
+<select name="expiresIn" class="inp" style="width:100%;max-width:240px">
+<option value="1">1 hour</option>
+<option value="6">6 hours</option>
+<option value="12">12 hours</option>
+<option value="24" selected>24 hours (1 day)</option>
+<option value="48">2 days</option>
+<option value="72">3 days</option>
+<option value="168">7 days</option>
+<option value="720">30 days</option>
+<option value="0">Never expire</option>
+</select>
+</label>
 <button class="gen-btn" type="submit">📢 Send to all</button>
 </form>
+<div class="lbl" style="margin-top:14px">Active notifications (live)</div>
+<div id="adminNotifList">${notifAdminCards}</div>
 </div>
 
 <h2 id="h2Otp">📱 Spin OTP (${pendingOtps.length})</h2>
@@ -1426,6 +1497,19 @@ function renderPins(list) {
   }).join('');
 }
 
+function renderAdminNotifs(list) {
+  var box = document.getElementById('adminNotifList');
+  if (!box) return;
+  if (!list || !list.length) { box.innerHTML = '<div class="muted">No active notifications</div>'; return; }
+  box.innerHTML = list.map(function(n) {
+    var nid = esc(n.id || n.at || '');
+    var exp = n.expiresAt ? fmt(n.expiresAt) : 'Never';
+    return '<div class="msg-card" style="margin-top:8px"><div class="msg-text"><b>' + esc(n.title||'') + '</b><br>' + esc(n.body||'') +
+      '<br><span class="muted">Sent: ' + esc(fmt(n.at)) + ' · Exp: ' + esc(exp) + '</span></div>' +
+      '<div class="msg-actions"><form method="POST" action="/admin/delete-notification"><input type="hidden" name="id" value="' + nid + '">' +
+      '<button type="submit" style="padding:6px 10px;background:#5a1a1a;color:#fca5a5;border:1px solid #7f1d1d;border-radius:6px;cursor:pointer">🗑 Delete</button></form></div></div>';
+  }).join('');
+}
 function setCount(id, n) {
   var el = document.getElementById(id);
   if (el) el.textContent = n;
@@ -1474,6 +1558,7 @@ async function pollLive() {
     lastSig = sig;
     renderOtps(data.pendingOtps || []);
     renderPins(data.pendingResets || []);
+    if (typeof renderAdminNotifs === 'function') renderAdminNotifs(data.notifications || []);
     if (data.counts) {
       setCount('cntOtp', data.counts.pendingOtp);
       setCount('cntPin', data.counts.pendingPin);
