@@ -38,20 +38,150 @@ const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
 const HTML_FILE = path.join(__dirname, 'aditya-studio-discount-wheel.html');
 console.log('[boot] Using data dir:', DATA_DIR);
 
+/* ========== MongoDB Atlas (optional) ==========
+   Render Environment:
+     MONGODB_URI = mongodb+srv://USER:PASS@cluster.../aditya?retryWrites=true&w=majority
+   Agar MONGODB_URI set hai to saara data Atlas pe save hoga (Render wipe se safe).
+   Agar nahi hai to pehle jaisa JSON files (local/demo).
+*/
+const MONGODB_URI = process.env.MONGODB_URI || '';
+let mongoClient = null;
+let mongoDb = null;
+let useMongo = false;
+
+async function initMongo() {
+  if (!MONGODB_URI) {
+    console.log('[db] JSON file mode (MONGODB_URI nahi set)');
+    return;
+  }
+  try {
+    const { MongoClient } = require('mongodb');
+    mongoClient = new MongoClient(MONGODB_URI, { serverSelectionTimeoutMS: 12000 });
+    await mongoClient.connect();
+    mongoDb = mongoClient.db(process.env.MONGODB_DB || 'aditya_studio');
+    useMongo = true;
+    await mongoDb.collection('accounts').createIndex({ mobile: 1 }, { unique: true }).catch(() => {});
+    await mongoDb.collection('codes').createIndex({ code: 1 }, { unique: true }).catch(() => {});
+    console.log('[db] MongoDB Atlas CONNECTED ✅ database:', mongoDb.databaseName);
+  } catch (e) {
+    console.error('[db] MongoDB connect FAIL — JSON fallback:', e.message);
+    useMongo = false;
+  }
+}
+
+
+
+
+/* In-memory cache — Mongo ya JSON se load, har save pe dono me write */
+let _cache = {
+  accounts: null,
+  codes: null,
+  otps: null,
+  notifs: null,
+  settings: null
+};
+
+function normalizeAccount(a) {
+  return {
+    ...a,
+    mobile: String(a.mobile || ''),
+    pin: String(a.pin || '')
+  };
+}
+
+async function mongoLoadAccounts() {
+  const rows = await mongoDb.collection('accounts').find({}).project({ _id: 0 }).toArray();
+  return rows.map(normalizeAccount);
+}
+async function mongoSaveAccounts(accounts) {
+  const col = mongoDb.collection('accounts');
+  const ops = accounts.map(a => {
+    const doc = normalizeAccount(a);
+    return {
+      updateOne: {
+        filter: { mobile: doc.mobile },
+        update: { $set: doc },
+        upsert: true
+      }
+    };
+  });
+  if (ops.length) await col.bulkWrite(ops, { ordered: false });
+  // remove deleted mobiles
+  const mobiles = accounts.map(a => String(a.mobile));
+  if (mobiles.length) {
+    await col.deleteMany({ mobile: { $nin: mobiles } });
+  } else {
+    await col.deleteMany({});
+  }
+}
+
+async function mongoLoadCodes() {
+  return await mongoDb.collection('codes').find({}).project({ _id: 0 }).toArray();
+}
+async function mongoSaveCodes(codes) {
+  const col = mongoDb.collection('codes');
+  const ops = codes.map(c => ({
+    updateOne: {
+      filter: { code: String(c.code) },
+      update: { $set: { ...c, code: String(c.code) } },
+      upsert: true
+    }
+  }));
+  if (ops.length) await col.bulkWrite(ops, { ordered: false });
+  const list = codes.map(c => String(c.code));
+  if (list.length) await col.deleteMany({ code: { $nin: list } });
+  else await col.deleteMany({});
+}
+
+async function mongoLoadOtps() {
+  return await mongoDb.collection('otp_requests').find({}).project({ _id: 0 }).toArray();
+}
+async function mongoSaveOtps(list) {
+  const col = mongoDb.collection('otp_requests');
+  await col.deleteMany({});
+  if (list.length) await col.insertMany(list.map(r => ({ ...r })));
+}
+
+async function mongoLoadNotifs() {
+  const doc = await mongoDb.collection('meta').findOne({ _id: 'notifications' });
+  return (doc && Array.isArray(doc.items)) ? doc.items : [];
+}
+async function mongoSaveNotifs(list) {
+  await mongoDb.collection('meta').updateOne(
+    { _id: 'notifications' },
+    { $set: { items: list.slice(0, 50) } },
+    { upsert: true }
+  );
+}
+
+async function mongoLoadSettings() {
+  const doc = await mongoDb.collection('meta').findOne({ _id: 'settings' });
+  if (!doc) return null;
+  const { _id, ...rest } = doc;
+  return rest;
+}
+async function mongoSaveSettings(obj) {
+  await mongoDb.collection('meta').updateOne(
+    { _id: 'settings' },
+    { $set: { ...obj } },
+    { upsert: true }
+  );
+}
+
 function loadAccounts() {
-  if (!fs.existsSync(DATA_FILE)) return [];
+  if (_cache.accounts) return _cache.accounts.map(normalizeAccount);
+  if (!fs.existsSync(DATA_FILE)) { _cache.accounts = []; return []; }
   try {
     const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-    return (Array.isArray(data) ? data : []).map(a => ({
-      ...a,
-      mobile: String(a.mobile || ''),
-      pin: String(a.pin || '')
-    }));
+    _cache.accounts = (Array.isArray(data) ? data : []).map(normalizeAccount);
+    return _cache.accounts.slice();
   } catch (e) {
     console.error('accounts read error:', e.message);
+    _cache.accounts = [];
     return [];
   }
 }
+
 
 function writeCSV(accounts) {
   const header = ['id', 'name', 'mobile', 'village', 'entryId', 'amount', 'tier', 'discount', 'prize', 'timestamp'];
@@ -69,24 +199,35 @@ function writeCSV(accounts) {
 
 function saveAccounts(accounts) {
   accounts.forEach(a => { a.pin = String(a.pin || ''); a.mobile = String(a.mobile || ''); });
+  _cache.accounts = accounts.map(normalizeAccount);
   const json = JSON.stringify(accounts, null, 2);
   try {
     const tmp = DATA_FILE + '.tmp';
     fs.writeFileSync(tmp, json, 'utf8');
     fs.renameSync(tmp, DATA_FILE);
   } catch (e) {
-    fs.writeFileSync(DATA_FILE, json, 'utf8');
+    try { fs.writeFileSync(DATA_FILE, json, 'utf8'); } catch (e2) {}
   }
   try { writeCSV(accounts); } catch (e) { console.error('CSV error:', e.message); }
+  if (useMongo) {
+    mongoSaveAccounts(_cache.accounts).catch(e => console.error('mongo save accounts:', e.message));
+  }
 }
 
 function loadCodes() {
-  if (!fs.existsSync(CODES_FILE)) return [];
-  try { return JSON.parse(fs.readFileSync(CODES_FILE, 'utf8')); }
-  catch (e) { return []; }
+  if (_cache.codes) return _cache.codes.slice();
+  if (!fs.existsSync(CODES_FILE)) { _cache.codes = []; return []; }
+  try {
+    _cache.codes = JSON.parse(fs.readFileSync(CODES_FILE, 'utf8'));
+    return _cache.codes.slice();
+  } catch (e) { _cache.codes = []; return []; }
 }
 function saveCodes(codes) {
-  fs.writeFileSync(CODES_FILE, JSON.stringify(codes, null, 2), 'utf8');
+  _cache.codes = codes.slice();
+  try { fs.writeFileSync(CODES_FILE, JSON.stringify(codes, null, 2), 'utf8'); } catch (e) {}
+  if (useMongo) {
+    mongoSaveCodes(codes).catch(e => console.error('mongo save codes:', e.message));
+  }
 }
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function generateCode() {
@@ -98,12 +239,15 @@ function generateOtp() {
   return String(Math.floor(1000 + Math.random() * 9000));
 }
 function loadOtpRequests() {
+  if (_cache.otps) return _cache.otps.slice();
   try {
-    if (!fs.existsSync(OTP_FILE)) return [];
-    return JSON.parse(fs.readFileSync(OTP_FILE, 'utf8'));
-  } catch (e) { return []; }
+    if (!fs.existsSync(OTP_FILE)) { _cache.otps = []; return []; }
+    _cache.otps = JSON.parse(fs.readFileSync(OTP_FILE, 'utf8'));
+    return _cache.otps.slice();
+  } catch (e) { _cache.otps = []; return []; }
 }
 function saveOtpRequests(list) {
+  _cache.otps = list.slice();
   try {
     const tmp = OTP_FILE + '.tmp';
     fs.writeFileSync(tmp, JSON.stringify(list, null, 2), 'utf8');
@@ -111,16 +255,25 @@ function saveOtpRequests(list) {
   } catch (e) {
     try { fs.writeFileSync(OTP_FILE, JSON.stringify(list, null, 2), 'utf8'); } catch (e2) {}
   }
+  if (useMongo) {
+    mongoSaveOtps(list).catch(e => console.error('mongo save otp:', e.message));
+  }
 }
 function loadNotifs() {
+  if (_cache.notifs) return _cache.notifs.slice();
   try {
-    if (!fs.existsSync(NOTIF_FILE)) return [];
-    return JSON.parse(fs.readFileSync(NOTIF_FILE, 'utf8'));
-  } catch (e) { return []; }
+    if (!fs.existsSync(NOTIF_FILE)) { _cache.notifs = []; return []; }
+    _cache.notifs = JSON.parse(fs.readFileSync(NOTIF_FILE, 'utf8'));
+    return _cache.notifs.slice();
+  } catch (e) { _cache.notifs = []; return []; }
 }
 function saveNotifs(list) {
-  try { fs.writeFileSync(NOTIF_FILE, JSON.stringify(list.slice(0, 50), null, 2)); }
+  _cache.notifs = list.slice(0, 50);
+  try { fs.writeFileSync(NOTIF_FILE, JSON.stringify(_cache.notifs, null, 2)); }
   catch (e) { console.error('saveNotifs', e.message); }
+  if (useMongo) {
+    mongoSaveNotifs(_cache.notifs).catch(e => console.error('mongo save notifs:', e.message));
+  }
 }
 function defaultSettings() {
   return {
@@ -140,19 +293,29 @@ function defaultSettings() {
 }
 function loadSettings() {
   const defaults = defaultSettings();
-  try {
-    if (!fs.existsSync(SETTINGS_FILE)) return defaults;
-    const data = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'));
-    return {
-      ...defaults,
-      ...data,
-      bookImages: { ...defaults.bookImages, ...(data.bookImages || {}) }
-    };
-  } catch (e) { return defaults; }
+  let data = null;
+  if (_cache.settings) data = _cache.settings;
+  else {
+    try {
+      if (fs.existsSync(SETTINGS_FILE)) data = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'));
+    } catch (e) {}
+  }
+  if (!data) return defaults;
+  _cache.settings = data;
+  return {
+    ...defaults,
+    ...data,
+    bookImages: { ...defaults.bookImages, ...(data.bookImages || {}) },
+    offerImages: data.offerImages || defaults.offerImages
+  };
 }
 function saveSettings(obj) {
+  _cache.settings = obj;
   try { fs.writeFileSync(SETTINGS_FILE, JSON.stringify(obj, null, 2)); }
   catch (e) { console.error('saveSettings', e.message); }
+  if (useMongo) {
+    mongoSaveSettings(obj).catch(e => console.error('mongo save settings:', e.message));
+  }
 }
 
 function nextCustomerId(accounts) {
@@ -854,8 +1017,33 @@ function filterAcc(q){q=(q||'').toLowerCase();document.querySelectorAll('#accLis
   res.end('Not found: ' + req.method + ' ' + urlPath);
 });
 
-server.listen(PORT, '0.0.0.0', () => {
-  console.log('Aditya Studio server port:', PORT);
-  console.log('Data folder:', DATA_DIR);
-  console.log('Admin:', ADMIN_PASSWORD ? 'password protected' : 'LOCKED — set ADMIN_PASSWORD');
-});
+async function hydrateFromMongo() {
+  if (!useMongo) return;
+  try {
+    _cache.accounts = await mongoLoadAccounts();
+    _cache.codes = await mongoLoadCodes();
+    _cache.otps = await mongoLoadOtps();
+    _cache.notifs = await mongoLoadNotifs();
+    const st = await mongoLoadSettings();
+    if (st) _cache.settings = st;
+    // mirror to local files as secondary backup
+    try {
+      fs.writeFileSync(DATA_FILE, JSON.stringify(_cache.accounts, null, 2));
+      fs.writeFileSync(CODES_FILE, JSON.stringify(_cache.codes, null, 2));
+    } catch (e) {}
+    console.log('[db] Hydrated from Atlas — accounts:', _cache.accounts.length, 'codes:', _cache.codes.length);
+  } catch (e) {
+    console.error('[db] hydrate error:', e.message);
+  }
+}
+
+(async () => {
+  await initMongo();
+  await hydrateFromMongo();
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log('Aditya Studio server port:', PORT);
+    console.log('Data folder:', DATA_DIR);
+    console.log('DB mode:', useMongo ? 'MongoDB Atlas ✅' : 'JSON files (Render pe wipe ho sakta hai)');
+    console.log('Admin:', ADMIN_PASSWORD ? 'password protected' : 'LOCKED — set ADMIN_PASSWORD');
+  });
+})();
