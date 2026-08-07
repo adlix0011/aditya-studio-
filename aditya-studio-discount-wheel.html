@@ -2023,14 +2023,47 @@ if(freeSpinBtn){
       showSpinVerifyUI(true);
       return;
     }
-    freeHasSpun = true;
     freeSpinBtn.disabled = true;
+    freeSpinBtn.textContent = 'Assigning...';
+
+    // Server fair bag: 100 me → 1 Frame, 10×₹30, 40×₹20, 49×₹10
+    let assigned = null;
+    try {
+      const res = await fetch(API_BASE + '/api/assign-free-spin', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ mobile: currentAccount.mobile })
+      });
+      const out = await res.json();
+      if(!out.ok){
+        freeSpinBtn.disabled = false;
+        freeSpinBtn.textContent = 'SPIN';
+        if(out.error === 'already-used'){ freeHasSpun = true; alert('Free spin pehle use ho chuki hai'); }
+        else if(out.error === 'not-verified'){ showSpinVerifyUI(true); }
+        else alert('Prize assign nahi hua — dubara try karein');
+        return;
+      }
+      assigned = out.prize;
+    } catch(e){
+      freeSpinBtn.disabled = false;
+      freeSpinBtn.textContent = 'SPIN';
+      alert('Server se connect nahi hua');
+      return;
+    }
+
+    freeHasSpun = true;
+    freeSpinBtn.textContent = 'SPIN';
     getFwAudio && getFwAudio();
     playFwStart && playFwStart();
     const left = document.getElementById('freeSpinsLeft');
     if(left) left.textContent = '0';
 
-    const idx = Math.floor(Math.random() * FREE_PRIZES.length);
+    let idx = FREE_PRIZES.findIndex(function(p){
+      if(assigned.type === 'frame') return p.type === 'frame';
+      return p.type === assigned.type && Number(p.value) === Number(assigned.value);
+    });
+    if(idx < 0) idx = FREE_PRIZES.findIndex(function(p){ return p.value === 10; });
+    if(idx < 0) idx = 0;
+
     const targetCenter = FREE_OFFSET + idx*FREE_SEG + FREE_SEG/2;
     const normCenter = ((targetCenter % 360)+360)%360;
     const targetMod = (360 - normCenter) % 360;
@@ -2057,10 +2090,15 @@ if(freeSpinBtn){
     }
     requestAnimationFrame(tickLoop);
 
-    setTimeout(()=>{
+    setTimeout(function(){
       ticking = false;
       playFwWin && playFwWin();
-      const prize = FREE_PRIZES[idx];
+      const prize = {
+        val: assigned.val || FREE_PRIZES[idx].val,
+        type: assigned.type,
+        value: assigned.value,
+        label: assigned.label || FREE_PRIZES[idx].label
+      };
       resultPct.textContent = prize.val;
       resultLine.textContent = 'बधाई हो, ' + (currentAccount ? currentAccount.name : '') + '! ' + prize.label;
       resultId.textContent = currentAccount ? ('कस्टमर ID: ' + currentAccount.id) : '';
@@ -2069,7 +2107,6 @@ if(freeSpinBtn){
       modalBg.style.display = 'flex';
       startConfetti && startConfetti();
 
-      // mark free spin used in session
       try {
         const s = loadSession && loadSession();
         if(s){ s.freeSpinUsed = true; localStorage.setItem(SESSION_KEY, JSON.stringify(s)); }
@@ -2098,9 +2135,8 @@ if(freeSpinBtn){
         } catch(e){}
       }
 
-      // after modal close, go dashboard — hook below
       window._afterFreeSpin = true;
-    }, 5200);
+    }, duration + 80);
   });
 }
 
@@ -2785,12 +2821,33 @@ function closeProfileModal(){
   }
 })();
 
+let _notifAudioCtx = null;
+let _lastNotifSig = null;
+function playNotifSound(){
+  try {
+    if(!_notifAudioCtx) _notifAudioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    if(_notifAudioCtx.state === 'suspended') _notifAudioCtx.resume();
+    var t = _notifAudioCtx.currentTime;
+    [1046, 1318, 1568].forEach(function(freq, i){
+      var o = _notifAudioCtx.createOscillator();
+      var g = _notifAudioCtx.createGain();
+      o.type = 'sine';
+      o.frequency.value = freq;
+      g.gain.setValueAtTime(0.0001, t + i*0.12);
+      g.gain.exponentialRampToValueAtTime(0.18, t + i*0.12 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + i*0.12 + 0.28);
+      o.connect(g); g.connect(_notifAudioCtx.destination);
+      o.start(t + i*0.12); o.stop(t + i*0.12 + 0.32);
+    });
+  } catch(e){}
+}
+
 async function loadNotifications(){
   const list = document.getElementById('notifList');
   const dot = document.getElementById('notifDot');
   const bell = document.getElementById('notifBtn');
   try {
-    const res = await fetch(API_BASE + '/api/notifications');
+    const res = await fetch(API_BASE + '/api/notifications', { cache: 'no-store' });
     if(!res.ok){
       if(list) list.innerHTML = '<div class="notif-item">सूचना सर्वर से नहीं मिली ('+res.status+')</div>';
       return;
@@ -2798,6 +2855,25 @@ async function loadNotifications(){
     const out = await res.json();
     const items = (out && out.items) ? out.items : [];
     if(!list) return;
+    const sig = items.length
+      ? String(items[0].at || '') + '|' + String(items[0].title || '') + '|' + String(items[0].body || '')
+      : 'empty';
+    // New notification arrived (after first load)
+    if(_lastNotifSig !== null && sig !== _lastNotifSig && sig !== 'empty'){
+      playNotifSound();
+      if(dot) dot.classList.add('show');
+      if(bell) bell.classList.add('pulse');
+      // brief toast style: auto-open panel
+      var panel = document.getElementById('notifPanel');
+      if(panel) panel.classList.add('show');
+      try {
+        if(document.hidden && window.Notification && Notification.permission === 'granted'){
+          new Notification(items[0].title || 'Aditya Studio', { body: items[0].body || 'Nayi notification' });
+        }
+      } catch(e){}
+    }
+    _lastNotifSig = sig;
+
     if(!items.length){
       list.innerHTML = '<div class="notif-item">✨ कोई नई सूचना नहीं</div>';
       if(bell) bell.classList.remove('pulse');
@@ -2810,11 +2886,30 @@ async function loadNotifications(){
     try { seen = Number(localStorage.getItem('aditya_notif_seen') || 0); } catch(e){}
     const newest = items[0] && items[0].at ? new Date(items[0].at).getTime() : 0;
     if(dot && newest > seen){ dot.classList.add('show'); if(bell) bell.classList.add('pulse'); }
-    else if(bell) bell.classList.remove('pulse');
+    else if(bell && _lastNotifSig === sig){ /* keep pulse if just arrived */ }
   } catch(e){
     if(list) list.innerHTML = '<div class="notif-item">सूचना लोड नहीं हुई — server.js update deploy करें</div>';
   }
 }
+
+// Auto-refresh notifications every 5s (no page refresh needed)
+setInterval(function(){
+  try {
+    if(typeof loadNotifications === 'function') loadNotifications();
+  } catch(e){}
+}, 5000);
+
+// Unlock audio + browser notification permission on first tap
+document.addEventListener('click', function notifUnlockOnce(){
+  try {
+    if(!_notifAudioCtx) _notifAudioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    _notifAudioCtx.resume();
+  } catch(e){}
+  try {
+    if(window.Notification && Notification.permission === 'default') Notification.requestPermission();
+  } catch(e){}
+  document.removeEventListener('click', notifUnlockOnce);
+}, { once: true });
 
 // Update contact WA button
 (function(){
