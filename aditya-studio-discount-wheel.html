@@ -963,6 +963,49 @@
     display:block; font-size:11px; font-weight:500; color:rgba(244,234,214,0.9); margin-top:2px;
   }
 
+
+  /* Premium coupon cards (profile only) */
+  .coupon-stack{ display:flex; flex-direction:column; gap:10px; margin-top:8px; }
+  .coupon-card{
+    position:relative; border-radius:14px; padding:14px 16px;
+    background: linear-gradient(135deg, rgba(40,28,12,0.95), rgba(20,14,8,0.98));
+    border: 1px solid rgba(212,175,55,0.35);
+    overflow:hidden;
+  }
+  .coupon-card.active{
+    border-color: rgba(255,215,0,0.65);
+    box-shadow: 0 0 18px rgba(255,200,50,0.35), inset 0 0 20px rgba(255,200,50,0.08);
+    animation: couponGlow 2.2s ease-in-out infinite;
+  }
+  .coupon-card.active::before{
+    content:''; position:absolute; inset:-2px;
+    background: linear-gradient(110deg, transparent 30%, rgba(255,230,120,0.35) 50%, transparent 70%);
+    animation: couponShine 2.8s linear infinite;
+    pointer-events:none;
+  }
+  @keyframes couponGlow{
+    0%,100%{ box-shadow:0 0 12px rgba(255,200,50,0.3), inset 0 0 12px rgba(255,200,50,0.06); }
+    50%{ box-shadow:0 0 24px rgba(255,215,0,0.55), inset 0 0 22px rgba(255,215,0,0.12); }
+  }
+  @keyframes couponShine{
+    0%{ transform:translateX(-120%); }
+    100%{ transform:translateX(120%); }
+  }
+  .coupon-card.accepted{
+    opacity:0.72; border-color:rgba(150,150,150,0.35);
+    box-shadow:none; animation:none; background:#161210;
+  }
+  .coupon-card.accepted::before{ display:none; }
+  .coupon-title{ font-weight:800; font-size:15px; color:#FFD700; position:relative; z-index:1; }
+  .coupon-card.accepted .coupon-title{ color:#B7A480; }
+  .coupon-meta{ font-size:11px; color:rgba(244,234,214,0.7); margin-top:4px; position:relative; z-index:1; }
+  .coupon-badge{
+    display:inline-block; margin-top:8px; font-size:10px; font-weight:700;
+    padding:3px 8px; border-radius:999px; position:relative; z-index:1;
+  }
+  .coupon-badge.on{ background:rgba(255,215,0,0.15); color:#FFD700; border:1px solid rgba(255,215,0,0.4); }
+  .coupon-badge.off{ background:rgba(120,120,120,0.2); color:#aaa; border:1px solid rgba(150,150,150,0.3); }
+
 </style>
 </head>
 <body>
@@ -1621,16 +1664,20 @@ function enterDashboard(){
 function renderHistory(){
   const box = document.getElementById('historyBox');
   if(!box) return;
-  const items = (currentAccount && currentAccount.history) ? currentAccount.history.slice().reverse() : [];
+  // Home pe sirf order/spin activity — coupon code yahan nahi (sirf profile me)
+  const items = (currentAccount && currentAccount.history) ? currentAccount.history.filter(function(h){
+    return h.couponStatus !== 'deleted';
+  }).slice().reverse() : [];
   if(!items.length){
     box.innerHTML = '<div class="history-empty">अभी कोई रिकॉर्ड नहीं — स्पिन के बाद यहाँ दिखेगा</div>';
     return;
   }
   box.innerHTML = items.map(function(h){
-    const prize = h.prize || (h.discount != null && h.discount !== '' ? (String(h.discount).indexOf('%')>=0 ? h.discount : h.discount + (h.freeSpin || Number(h.discount)>30 ? '' : '%')) : '—');
-    const amt = h.amount != null && h.amount !== '' ? ('₹' + h.amount) : (h.freeSpin ? 'Free spin' : '—');
+    const amt = h.amount != null && h.amount !== '' && Number(h.amount) > 0
+      ? ('₹' + h.amount + ' काम')
+      : (h.freeSpin ? 'Free welcome spin' : 'Spin');
     const t = h.timestamp ? new Date(h.timestamp).toLocaleString('en-IN') : '';
-    return '<div class="history-item"><div class="h-left"><div>' + amt + (h.tier ? ' · ' + h.tier : '') + '</div><div class="h-time">' + t + '</div></div><div class="h-disc">' + prize + '</div></div>';
+    return '<div class="history-item"><div class="h-left"><div>' + amt + (h.tier ? ' · ' + h.tier : '') + '</div><div class="h-time">' + t + '</div></div><div class="h-disc" style="opacity:0.7">Profile में कूपन देखें</div></div>';
   }).join('');
 }
 
@@ -2120,7 +2167,9 @@ if(freeSpinBtn){
           discount: prize.type === 'rupee' ? prize.value : 0,
           prize: prize.label,
           freeSpin: true,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          couponId: 'C-local-'+Date.now(),
+          couponStatus: 'active'
         });
         try {
           saveSession(currentAccount, currentAccount._pin || '0000');
@@ -2141,18 +2190,19 @@ if(freeSpinBtn){
 }
 
 
+/* Work spin wheel — show mixed prizes; fair bag controls landing (₹500–1000 rules) */
 const FW_PRIZES = [
-  { val: "90%",  sub: "DISCOUNT",    icon: "🔥", type: "pct",    value: 90 },
-  { val: "₹100", sub: "COUPON CODE", icon: "🎫", type: "coupon", value: 100 },
-  { val: "₹50",  sub: "COUPON CODE", icon: "🎫", type: "coupon", value: 50 },
-  { val: "₹40",  sub: "COUPON CODE", icon: "🎫", type: "coupon", value: 40 },
-  { val: "₹20",  sub: "COUPON CODE", icon: "🎫", type: "coupon", value: 20 },
-  { val: "100%", sub: "DISCOUNT",    icon: "🏆", type: "pct",    value: 100 },
-  { val: "10%",  sub: "DISCOUNT",    icon: "✨", type: "pct",    value: 10 },
-  { val: "5%",   sub: "DISCOUNT",    icon: "🛍️", type: "pct",    value: 5 },
-  { val: "25%",  sub: "DISCOUNT",    icon: "🛍️", type: "pct",    value: 25 }
+  { val: "₹50",  sub: "COUPON CODE", icon: "🎫", type: "coupon", value: 50,  label: "₹50 COUPON" },
+  { val: "₹100", sub: "COUPON CODE", icon: "🎫", type: "coupon", value: 100, label: "₹100 COUPON" },
+  { val: "₹30",  sub: "COUPON CODE", icon: "🎫", type: "coupon", value: 30,  label: "₹30 COUPON" },
+  { val: "Photo",sub: "FRAME",       icon: "🖼️", type: "frame",  value: 0,   label: "फ्री फोटो फ्रेम" },
+  { val: "Good", sub: "LUCK",        icon: "🍀", type: "luck",   value: 0,   label: "Good Luck" },
+  { val: "₹50",  sub: "COUPON CODE", icon: "🎫", type: "coupon", value: 50,  label: "₹50 COUPON" },
+  { val: "90%",  sub: "DISCOUNT",    icon: "🔥", type: "pct",    value: 90,  label: "90% DISCOUNT" },
+  { val: "₹20",  sub: "COUPON CODE", icon: "🎫", type: "coupon", value: 20,  label: "₹20 COUPON" },
+  { val: "10%",  sub: "DISCOUNT",    icon: "✨", type: "pct",    value: 10,  label: "10% DISCOUNT" }
 ];
-const FW_COLORS = ['#E8B923','#D4A017','#C41E3A','#1E5AA8','#2E86AB','#7B2CBF','#1B9C3A','#C47A1A','#E67E22'];
+const FW_COLORS = ['#E8B923','#D4A017','#C41E3A','#7B2CBF','#5B2C6F','#1E5AA8','#C47A1A','#2E86AB','#1B9C3A'];
 const FW_SEG = 360 / FW_PRIZES.length;
 const FW_OFFSET = -20;
 let fwRotation = 0;
@@ -2316,19 +2366,63 @@ codeForm.addEventListener('submit', async (e)=>{
   wheelSection.scrollIntoView({behavior:'smooth', block:'start'});
 });
 
-spinBtn.addEventListener('click', ()=>{
+spinBtn.addEventListener('click', async ()=>{
   if(hasSpun || !currentTier) return;
-  hasSpun = true;
+
+  // amount from work form or last redeemed code
+  var amountEl = document.getElementById('workAmount');
+  var amount = amountEl && amountEl.value ? parseFloat(amountEl.value) : 0;
+  if(!amount && currentAccount && currentAccount.history && currentAccount.history.length){
+    var last = currentAccount.history[currentAccount.history.length-1];
+    if(last && last.amount) amount = parseFloat(last.amount) || 0;
+  }
+  if(!amount || amount < 50){
+    alert('काम की राशि सही नहीं — code / amount check karein');
+    return;
+  }
+
   spinBtn.disabled = true;
+  spinBtn.textContent = 'Assigning...';
+
+  var assigned = null;
+  try {
+    var res = await fetch(API_BASE + '/api/assign-work-spin', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ mobile: currentAccount.mobile, amount: amount })
+    });
+    var out = await res.json();
+    if(!out.ok){
+      spinBtn.disabled = false;
+      spinBtn.textContent = 'SPIN';
+      alert('Prize assign fail — dubara try karein');
+      return;
+    }
+    assigned = out.prize;
+  } catch(e){
+    spinBtn.disabled = false;
+    spinBtn.textContent = 'SPIN';
+    alert('Server se connect nahi hua');
+    return;
+  }
+
+  hasSpun = true;
+  spinBtn.textContent = 'SPIN';
   getFwAudio();
   playFwStart();
   if(document.getElementById('fwSpinsLeft')) document.getElementById('fwSpinsLeft').textContent = '0';
 
-  const idx = Math.floor(Math.random() * FW_PRIZES.length);
+  // Match segment on wheel (show prizes stay, land only on assigned)
+  var idx = FW_PRIZES.findIndex(function(p){
+    if(assigned.type === 'frame') return p.type === 'frame';
+    if(assigned.type === 'luck') return p.type === 'luck';
+    if(assigned.type === 'pct') return p.type === 'pct' && Number(p.value) === Number(assigned.value);
+    return p.type === assigned.type && Number(p.value) === Number(assigned.value);
+  });
+  if(idx < 0) idx = FW_PRIZES.findIndex(function(p){ return Number(p.value) === 50; });
+  if(idx < 0) idx = 0;
+
   const targetCenter = FW_OFFSET + idx*FW_SEG + FW_SEG/2;
   const normCenter = ((targetCenter % 360) + 360) % 360;
-  // After rotate(R), content under pointer was at (360 - R%360) % 360
-  // Want that equal to normCenter => R%360 = (360 - normCenter) % 360
   const targetMod = (360 - normCenter) % 360;
   const curMod = ((fwRotation % 360) + 360) % 360;
   let delta = targetMod - curMod;
@@ -2361,29 +2455,36 @@ spinBtn.addEventListener('click', ()=>{
   setTimeout(async ()=>{
     ticking = false;
     playFwWin();
-    const prize = FW_PRIZES[idx];
-    const pct = prize.type === 'pct' ? prize.value : prize.value; // store number either way
+    const prize = assigned;
+    const pct = prize.type === 'pct' ? prize.value : (prize.type === 'coupon' ? prize.value : prize.value);
     currentDiscountPct = pct;
-    currentPrizeLabel = prize.type === 'pct' ? (prize.value + '% DISCOUNT') : ('₹' + prize.value + ' COUPON');
-    if(prize.type === 'pct'){
-      resultPct.textContent = prize.value + '%';
-      resultLine.textContent = 'बधाई हो, ' + currentAccount.name + '! आपको ' + prize.value + '% डिस्काउंट मिला';
-    } else {
-      resultPct.textContent = '₹' + prize.value;
-      resultLine.textContent = 'बधाई हो, ' + currentAccount.name + '! आपको ₹' + prize.value + ' का कूपन मिला';
-    }
-    resultId.textContent = 'कस्टमर ID: ' + currentAccount.id;
+    currentPrizeLabel = prize.label || (prize.type === 'pct' ? (prize.value + '% DISCOUNT') : (prize.val + (prize.type === 'coupon' ? ' COUPON' : '')));
+    resultPct.textContent = prize.val;
+    resultLine.textContent = 'बधाई हो, ' + (currentAccount ? currentAccount.name : '') + '! ' + currentPrizeLabel;
+    resultId.textContent = currentAccount ? ('कस्टमर ID: ' + currentAccount.id) : '';
     modalBg.style.display = 'flex';
-    startConfetti();
+    startConfetti && startConfetti();
+
     try{
       await fetch(API_BASE + '/api/spin-result', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ mobile: currentAccount.mobile, entryId: currentEntryId, discount: pct, prize: currentPrizeLabel || (pct + '%') })
+        body: JSON.stringify({
+          mobile: currentAccount.mobile,
+          entryId: currentEntryId,
+          discount: prize.type === 'coupon' || prize.type === 'pct' ? prize.value : null,
+          prize: currentPrizeLabel || prize.label
+        })
       });
     }catch(err){ console.warn('Discount save nahi ho paaya.', err); }
-    currentAccount.history.push({ amount: document.getElementById('workAmount').value, discount: pct, prize: currentPrizeLabel, timestamp: new Date().toISOString() });
+    currentAccount.history = currentAccount.history || [];
+    currentAccount.history.push({
+      amount: amount,
+      discount: prize.type === 'coupon' || prize.type === 'pct' ? prize.value : null,
+      prize: currentPrizeLabel,
+      timestamp: new Date().toISOString()
+    });
     try { saveSession(currentAccount, currentAccount._pin || '0000'); } catch(e){}
-  }, 5200);
+  }, duration + 80);
 });
 
 document.getElementById('closeModal').addEventListener('click', ()=>{
@@ -2715,15 +2816,32 @@ function openProfileModal(){
     if(vBox) vBox.style.display = 'block';
   }
   document.getElementById('prSpin').textContent = currentAccount.freeSpinUsed ? 'Free spin used' : 'Free spin available';
-  const prizes = (currentAccount.history || []).filter(h => h.prize || h.discount != null).map(h => h.prize || (h.discount + (Number(h.discount)<=100?'%':'')));
-  document.getElementById('prCoupons').textContent = prizes.length ? prizes.slice(0,5).join(', ') : '—';
+  const coupons = (currentAccount.history || []).filter(function(h){
+    return (h.prize || h.discount != null) && h.couponStatus !== 'deleted';
+  }).slice().reverse();
+  const prC = document.getElementById('prCoupons');
+  if(prC){
+    prC.textContent = '';
+    prC.innerHTML = coupons.length
+      ? ('<div class="coupon-stack">' + coupons.map(function(h){
+          const st = h.couponStatus || 'active';
+          const title = h.prize || (h.discount != null ? (String(h.discount) + (Number(h.discount)<=100 && String(h.discount).indexOf('%')<0 ? '' : '')) : 'Coupon');
+          const t = h.timestamp ? new Date(h.timestamp).toLocaleString('en-IN') : '';
+          const from = h.freeSpin ? 'Free spin' : (h.amount ? ('₹' + h.amount + ' काम') : 'Spin');
+          if(st === 'accepted'){
+            return '<div class="coupon-card accepted"><div class="coupon-title">'+title+'</div><div class="coupon-meta">'+from+' · '+t+'</div><span class="coupon-badge off">Used / Accepted</span></div>';
+          }
+          return '<div class="coupon-card active"><div class="coupon-title">'+title+'</div><div class="coupon-meta">'+from+' · '+t+'</div><span class="coupon-badge on">✨ Active Coupon</span></div>';
+        }).join('') + '</div>')
+      : '—';
+  }
   const ph = document.getElementById('profileHistoryBox');
   if(ph){
-    const items = (currentAccount.history || []).slice().reverse();
-    ph.innerHTML = items.length ? items.map(h => {
-      const prize = h.prize || (h.discount != null ? h.discount + '%' : '—');
+    const items = (currentAccount.history || []).filter(function(h){ return h.couponStatus !== 'deleted'; }).slice().reverse();
+    ph.innerHTML = items.length ? items.map(function(h){
+      const amt = h.freeSpin ? 'Free spin' : ('₹' + (h.amount || 0));
       const t = h.timestamp ? new Date(h.timestamp).toLocaleString('en-IN') : '';
-      return '<div class="history-item"><div class="h-left"><div>'+(h.freeSpin?'Free spin':('₹'+(h.amount||0)))+'</div><div class="h-time">'+t+'</div></div><div class="h-disc">'+prize+'</div></div>';
+      return '<div class="history-item"><div class="h-left"><div>'+amt+'</div><div class="h-time">'+t+'</div></div><div class="h-disc">Order</div></div>';
     }).join('') : '<div class="history-empty">अभी कोई order / spin record नहीं</div>';
   }
   refreshHomeAvatar();
