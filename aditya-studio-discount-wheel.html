@@ -1023,6 +1023,70 @@
   }
   .coupon-card.expired::before{ display:none; }
   .coupon-card.expired .coupon-title{ color:#999; }
+
+  /* Free spin nudge popup (home) */
+  .spin-nudge-popup{
+    display:none; position:fixed; inset:0; z-index:12000;
+    background:rgba(0,0,0,0.72); backdrop-filter:blur(6px);
+    align-items:center; justify-content:center; padding:20px;
+  }
+  .spin-nudge-popup.show{ display:flex; animation: nudgeIn 0.35s ease; }
+  @keyframes nudgeIn{
+    from{ opacity:0; transform:scale(0.92); }
+    to{ opacity:1; transform:scale(1); }
+  }
+  .spin-nudge-card{
+    width:min(360px, 100%);
+    background: linear-gradient(160deg, #2a1c0e 0%, #120e0a 100%);
+    border:1px solid rgba(255,215,0,0.5);
+    border-radius:20px; padding:28px 22px 22px;
+    text-align:center;
+    box-shadow:0 0 40px rgba(255,200,50,0.25), 0 20px 50px rgba(0,0,0,0.5);
+    position:relative;
+  }
+  .spin-nudge-card::before{
+    content:''; position:absolute; inset:-1px; border-radius:20px;
+    background:linear-gradient(120deg, transparent, rgba(255,215,0,0.25), transparent);
+    animation: couponShine 3s linear infinite; pointer-events:none; z-index:0;
+  }
+  .spin-nudge-card > *{ position:relative; z-index:1; }
+  .spin-nudge-emoji{ font-size:48px; margin-bottom:8px; animation: badgePulse 1.5s ease-in-out infinite; }
+  .spin-nudge-title{ font-size:20px; font-weight:800; color:#FFD700; margin-bottom:6px; }
+  .spin-nudge-msg{ font-size:14px; color:rgba(244,234,214,0.9); line-height:1.45; margin-bottom:18px; }
+  .spin-nudge-msg b{ color:#FFD700; }
+  .spin-nudge-actions{ display:flex; flex-direction:column; gap:10px; }
+  .spin-nudge-go{
+    background:linear-gradient(90deg,#D4AF37,#F5D76E,#D4AF37);
+    color:#1a1208; font-weight:800; border:none; border-radius:12px;
+    padding:14px; font-size:15px; cursor:pointer;
+    box-shadow:0 4px 18px rgba(212,175,55,0.4);
+  }
+  .spin-nudge-later{
+    background:transparent; border:1px solid rgba(212,175,55,0.35);
+    color:#B7A480; border-radius:12px; padding:10px; cursor:pointer; font-size:13px;
+  }
+  .home-free-spin-banner{
+    display:none; margin:12px 0; padding:14px 16px; border-radius:14px;
+    background:linear-gradient(135deg, rgba(60,40,10,0.9), rgba(30,20,8,0.95));
+    border:1px solid rgba(255,215,0,0.45);
+    box-shadow:0 0 16px rgba(255,200,50,0.2);
+    animation: couponGlow 2.5s ease-in-out infinite;
+  }
+  .home-free-spin-banner.show{ display:block; }
+  .home-free-spin-banner .hf-title{ font-weight:800; color:#FFD700; font-size:14px; }
+  .home-free-spin-banner .hf-sub{ font-size:12px; color:rgba(244,234,214,0.85); margin:4px 0 10px; }
+  .home-free-spin-banner button{
+    width:100%; padding:11px; border:none; border-radius:10px; cursor:pointer;
+    font-weight:800; background:linear-gradient(90deg,#D4AF37,#F5D76E); color:#1a1208;
+  }
+  .profile-spin-btn{
+    display:none; width:100%; margin:12px 0 4px; padding:13px;
+    border:none; border-radius:12px; cursor:pointer; font-weight:800; font-size:14px;
+    background:linear-gradient(90deg,#D4AF37,#F5D76E,#D4AF37); color:#1a1208;
+    box-shadow:0 0 16px rgba(255,200,50,0.35);
+    animation: couponGlow 2.5s ease-in-out infinite;
+  }
+  .profile-spin-btn.show{ display:block; }
 </style>
 </head>
 <body>
@@ -1216,6 +1280,12 @@
     <div style="color:var(--gold-light);font-weight:700;font-size:13px;margin:4px 0;">📜 आपका रिकॉर्ड</div>
     <div class="history-box" id="historyBox"></div>
 
+    <div class="home-free-spin-banner" id="homeFreeSpinBanner">
+      <div class="hf-title">🎁 आपकी 1 फ्री स्पिन बची है!</div>
+      <div class="hf-sub">अभी स्पिन करें और डिस्काउंट / फोटो फ्रेम जीतें</div>
+      <button type="button" id="btnHomeFreeSpin">🎡 अभी स्पिन करें</button>
+    </div>
+
     <div class="home-quick">
       <button type="button" class="home-action-btn primary" id="btnOpenCode">
         <span class="ico">🎫</span> स्पिन कोड डालें / नया स्पिन
@@ -1266,6 +1336,7 @@
         <div class="auth-error" id="profileVerifyErr" style="display:none;margin-top:6px;"></div>
       </div>
       <div class="p-row"><span class="pk">Free / Spin</span><span class="pv" id="prSpin">—</span></div>
+      <button type="button" class="profile-spin-btn" id="profileSpinBtn">🎡 फ्री स्पिन करें</button>
       <div class="p-row"><span class="pk">Coupons / prizes</span><span class="pv" id="prCoupons">—</span></div>
       <div style="margin-top:12px;color:var(--gold-light);font-size:13px;font-weight:700;">Order / History</div>
       <div class="history-box" id="profileHistoryBox" style="max-height:160px;"></div>
@@ -1314,6 +1385,19 @@
 
 
   <!-- Free spin offer after first register -->
+  <!-- Periodic free-spin nudge on home -->
+  <div class="spin-nudge-popup" id="spinNudgePopup" aria-hidden="true">
+    <div class="spin-nudge-card">
+      <div class="spin-nudge-emoji">🎡</div>
+      <div class="spin-nudge-title">फ्री स्पिन बाकी है!</div>
+      <div class="spin-nudge-msg" id="spinNudgeMsg">आपकी <b>1 फ्री स्पिन</b> अभी तक इस्तेमाल नहीं हुई।<br>अभी स्पिन करें!</div>
+      <div class="spin-nudge-actions">
+        <button type="button" class="spin-nudge-go" id="spinNudgeGo">🎁 स्पिन पर जाएँ</button>
+        <button type="button" class="spin-nudge-later" id="spinNudgeLater">बाद में</button>
+      </div>
+    </div>
+  </div>
+
   <div class="card free-offer-card" id="freeSpinOffer">
     <div class="free-sparkles" aria-hidden="true">
       <span></span><span></span><span></span><span></span>
@@ -1672,6 +1756,7 @@ function enterDashboard(){
       if(typeof updateTierBadge === 'function') updateTierBadge();
       if(typeof loadBookImages === 'function') loadBookImages();
       if(typeof loadNotifications === 'function') loadNotifications();
+      if(typeof refreshFreeSpinUI === 'function') refreshFreeSpinUI();
       const ap = document.getElementById('amountPanel');
       if(ap) ap.classList.remove('show');
     }
@@ -2902,6 +2987,7 @@ function openProfileModal(){
     }).join('') : '<div class="history-empty">अभी कोई order / spin record नहीं</div>';
   }
   refreshHomeAvatar();
+  if(typeof refreshFreeSpinUI === 'function') refreshFreeSpinUI();
   m.classList.add('show');
   m.style.display = 'flex';
 }
@@ -3071,6 +3157,7 @@ async function loadNotifications(){
 setInterval(function(){
   try {
     if(typeof loadNotifications === 'function') loadNotifications();
+      if(typeof refreshFreeSpinUI === 'function') refreshFreeSpinUI();
   } catch(e){}
 }, 5000);
 
@@ -3304,6 +3391,92 @@ async function loadBookImages(){
       }
     });
   }
+})();
+
+
+
+/* ===== Free spin remaining: home popup + profile button ===== */
+function hasFreeSpinLeft(){
+  return !!(currentAccount && currentAccount.freeSpinUsed === false);
+}
+async function goToFreeSpin(){
+  if(!currentAccount){ alert('पहले लॉगिन करें'); return; }
+  if(currentAccount.freeSpinUsed){ alert('Free spin pehle use ho chuki hai'); return; }
+  hideSpinNudge();
+  closeProfileModal && closeProfileModal();
+  if(dashboardCard) dashboardCard.style.display = 'none';
+  if(codeCard) codeCard.style.display = 'none';
+  if(wheelSection) wheelSection.style.display = 'none';
+  if(freeSpinOffer) freeSpinOffer.style.display = 'none';
+  freeHasSpun = false;
+  if(typeof buildFreeWheel === 'function') buildFreeWheel();
+  if(freeSpinBtn){ freeSpinBtn.disabled = false; freeSpinBtn.textContent = 'SPIN'; }
+  var left = document.getElementById('freeSpinsLeft');
+  if(left) left.textContent = '1';
+  if(freeWheelSection){
+    freeWheelSection.style.display = 'block';
+    freeWheelSection.scrollIntoView({ behavior:'smooth', block:'start' });
+  }
+  var verified = await isMobileVerified();
+  if(typeof showSpinVerifyUI === 'function') showSpinVerifyUI(!verified);
+}
+function showSpinNudge(){
+  if(!hasFreeSpinLeft()) return;
+  // don't interrupt if already on free wheel / offer
+  if(freeWheelSection && freeWheelSection.style.display === 'block') return;
+  if(freeSpinOffer && freeSpinOffer.style.display === 'block') return;
+  if(wheelSection && wheelSection.style.display === 'block') return;
+  var pop = document.getElementById('spinNudgePopup');
+  var msg = document.getElementById('spinNudgeMsg');
+  if(msg && currentAccount){
+    msg.innerHTML = (currentAccount.name ? currentAccount.name + ', a' : 'A') + 'pki <b>1 फ्री स्पिन</b> अभी तक बची है।<br>अभी स्पिन करके इनाम जीतें!';
+  }
+  if(pop){ pop.classList.add('show'); pop.setAttribute('aria-hidden','false'); }
+}
+function hideSpinNudge(){
+  var pop = document.getElementById('spinNudgePopup');
+  if(pop){ pop.classList.remove('show'); pop.setAttribute('aria-hidden','true'); }
+}
+function refreshFreeSpinUI(){
+  var banner = document.getElementById('homeFreeSpinBanner');
+  var pbtn = document.getElementById('profileSpinBtn');
+  var left = hasFreeSpinLeft();
+  if(banner) banner.classList.toggle('show', left && dashboardCard && dashboardCard.style.display !== 'none');
+  if(pbtn) pbtn.classList.toggle('show', left);
+  var prSpin = document.getElementById('prSpin');
+  if(prSpin && currentAccount){
+    prSpin.textContent = currentAccount.freeSpinUsed ? 'Free spin used' : '🎁 1 Free spin available';
+  }
+}
+
+(function wireFreeSpinNudge(){
+  var go = document.getElementById('spinNudgeGo');
+  var later = document.getElementById('spinNudgeLater');
+  var homeBtn = document.getElementById('btnHomeFreeSpin');
+  var pbtn = document.getElementById('profileSpinBtn');
+  if(go) go.addEventListener('click', function(){ goToFreeSpin(); });
+  if(later) later.addEventListener('click', hideSpinNudge);
+  if(homeBtn) homeBtn.addEventListener('click', function(){ goToFreeSpin(); });
+  if(pbtn) pbtn.addEventListener('click', function(){ goToFreeSpin(); });
+  var pop = document.getElementById('spinNudgePopup');
+  if(pop) pop.addEventListener('click', function(e){ if(e.target === pop) hideSpinNudge(); });
+
+  // Har 40 second pe popup (sirf free spin bachi ho)
+  setInterval(function(){
+    try {
+      if(!hasFreeSpinLeft()) return;
+      if(!document.body.classList.contains('step-app')) return;
+      if(dashboardCard && dashboardCard.style.display === 'none') return;
+      showSpinNudge();
+    } catch(e){}
+  }, 40000);
+
+  // pehli baar dashboard pe 8 sec baad
+  setTimeout(function(){
+    try {
+      if(hasFreeSpinLeft() && document.body.classList.contains('step-app')) showSpinNudge();
+    } catch(e){}
+  }, 8000);
 })();
 
 
