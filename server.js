@@ -318,6 +318,80 @@ function saveOtpRequests(list) {
     mongoSaveOtps(list).catch(e => console.error('mongo save otp:', e.message));
   }
 }
+
+/* ===== Free-spin fair bag (register users only) =====
+   Har 100 spins:
+     1  × Photo Frame
+    10  × ₹30
+    40  × ₹20
+    49  × ₹10
+   Bade prizes (₹50/100/500/1000) register free-spin me NAHI.
+*/
+function buildFreeSpinBag() {
+  const items = [];
+  items.push({ key: 'frame', type: 'frame', value: 0, val: 'Photo', label: 'फ्री फोटो फ्रेम' });
+  for (let i = 0; i < 10; i++) items.push({ key: '30', type: 'rupee', value: 30, val: '₹30', label: '₹30 डिस्काउंट' });
+  for (let i = 0; i < 40; i++) items.push({ key: '20', type: 'rupee', value: 20, val: '₹20', label: '₹20 डिस्काउंट' });
+  for (let i = 0; i < 49; i++) items.push({ key: '10', type: 'rupee', value: 10, val: '₹10', label: '₹10 डिस्काउंट' });
+  // Fisher-Yates shuffle
+  for (let i = items.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const t = items[i]; items[i] = items[j]; items[j] = t;
+  }
+  return items;
+}
+
+function loadFreeSpinBag() {
+  if (useMongo && mongoDb) {
+    // sync path uses cache file too
+  }
+  const file = path.join(DATA_DIR, 'free-spin-bag.json');
+  try {
+    if (fs.existsSync(file)) {
+      const data = JSON.parse(fs.readFileSync(file, 'utf8'));
+      if (data && Array.isArray(data.remaining)) return data;
+    }
+  } catch (e) {}
+  return { remaining: buildFreeSpinBag(), given: 0, batches: 1 };
+}
+
+function saveFreeSpinBag(bag) {
+  const file = path.join(DATA_DIR, 'free-spin-bag.json');
+  try {
+    fs.writeFileSync(file, JSON.stringify(bag, null, 2));
+  } catch (e) {}
+  if (useMongo) {
+    mongoDb.collection('meta').updateOne(
+      { _id: 'freeSpinBag' },
+      { $set: { remaining: bag.remaining, given: bag.given, batches: bag.batches } },
+      { upsert: true }
+    ).catch(() => {});
+  }
+}
+
+async function hydrateFreeSpinBag() {
+  if (!useMongo || !mongoDb) return;
+  try {
+    const doc = await mongoDb.collection('meta').findOne({ _id: 'freeSpinBag' });
+    if (doc && Array.isArray(doc.remaining)) {
+      saveFreeSpinBag({ remaining: doc.remaining, given: doc.given || 0, batches: doc.batches || 1 });
+    }
+  } catch (e) {}
+}
+
+function assignNextFreePrize() {
+  let bag = loadFreeSpinBag();
+  if (!bag.remaining || bag.remaining.length === 0) {
+    bag.remaining = buildFreeSpinBag();
+    bag.batches = (bag.batches || 0) + 1;
+  }
+  const prize = bag.remaining.shift();
+  bag.given = (bag.given || 0) + 1;
+  saveFreeSpinBag(bag);
+  return { prize, stats: { given: bag.given, leftInBatch: bag.remaining.length, batch: bag.batches || 1 } };
+}
+
+
 function loadNotifs() {
   if (_cache.notifs) return _cache.notifs.slice();
   try {
@@ -607,6 +681,27 @@ const server = http.createServer(async (req, res) => {
       });
     } catch (e) {
       return sendJSON(res, 400, { ok: false });
+    }
+  }
+
+
+  if (req.method === 'POST' && urlPath === '/api/assign-free-spin') {
+    try {
+      const body = await readBody(req);
+      const mobile = String(body.mobile || '').trim();
+      if (!/^[6-9]\d{9}$/.test(mobile)) return sendJSON(res, 400, { ok: false, error: 'invalid-mobile' });
+      const accounts = loadAccounts();
+      const acc = accounts.find(a => String(a.mobile) === mobile);
+      if (!acc) return sendJSON(res, 404, { ok: false, error: 'no-account' });
+      if (acc.freeSpinUsed) return sendJSON(res, 409, { ok: false, error: 'already-used' });
+      if (!acc.mobileVerified) return sendJSON(res, 403, { ok: false, error: 'not-verified' });
+      const { prize, stats } = assignNextFreePrize();
+      // reserve: do not mark used yet — free-spin-result will mark used
+      console.log('Free-spin assign', mobile, prize.val, 'batch left', stats.leftInBatch);
+      return sendJSON(res, 200, { ok: true, prize, stats });
+    } catch (e) {
+      console.error('assign-free-spin', e);
+      return sendJSON(res, 500, { ok: false, error: 'server-error' });
     }
   }
 
@@ -918,6 +1013,7 @@ const server = http.createServer(async (req, res) => {
       at: r.createdAt || null
     }));
     const codes = loadCodes();
+    const notifs = loadNotifs().slice(0, 10);
     return sendJSON(res, 200, {
       ok: true,
       at: new Date().toISOString(),
@@ -925,10 +1021,12 @@ const server = http.createServer(async (req, res) => {
         customers: accounts.length,
         pendingOtp: pendingOtps.length,
         pendingPin: pendingResets.length,
-        unusedCodes: codes.filter(c => !c.used).length
+        unusedCodes: codes.filter(c => !c.used).length,
+        notifs: notifs.length
       },
       pendingOtps,
-      pendingResets
+      pendingResets,
+      notifications: notifs
     });
   }
 
@@ -1166,20 +1264,24 @@ async function pollLive() {
     if (!res.ok) throw new Error('HTTP ' + res.status);
     var data = await res.json();
     if (!data.ok) throw new Error('bad');
-    var sig = JSON.stringify({ o: data.pendingOtps, p: data.pendingResets });
+    var sig = JSON.stringify({ o: data.pendingOtps, p: data.pendingResets, n: data.notifications });
     if (lastSig && sig !== lastSig) {
       var prev = {};
       try { prev = JSON.parse(lastSig); } catch(e) {}
       var newOtp = (data.pendingOtps || []).length > ((prev.o || []).length || 0);
       var newPin = (data.pendingResets || []).length > ((prev.p || []).length || 0);
+      var newNotif = false;
+      var prevN0 = (prev.n && prev.n[0]) ? (prev.n[0].at + '|' + prev.n[0].title) : '';
+      var curN0 = (data.notifications && data.notifications[0]) ? (data.notifications[0].at + '|' + data.notifications[0].title) : '';
+      if (curN0 && curN0 !== prevN0) newNotif = true;
       // also detect brand-new mobile
       var prevOtpKeys = (prev.o || []).map(function(x){ return x.mobile + ':' + x.otp; }).join('|');
       (data.pendingOtps || []).forEach(function(r) {
         if (prevOtpKeys && prevOtpKeys.indexOf(r.mobile + ':' + r.otp) < 0) newOtp = true;
       });
-      if (newOtp || newPin) {
+      if (newOtp || newPin || newNotif) {
         playAlert();
-        if (st) st.innerHTML = '<span style="color:#3ee06b">🔔 NEW request!</span>';
+        if (st) st.innerHTML = '<span style="color:#3ee06b">🔔 NEW ' + (newOtp ? 'OTP' : newPin ? 'PIN' : 'Notification') + '!</span>';
         try {
           if (document.hidden && Notification && Notification.permission === 'granted') {
             new Notification('Aditya Studio Admin', { body: newOtp ? 'Naya OTP request' : 'Naya PIN reset request' });
@@ -1257,6 +1359,7 @@ async function hydrateFromMongo() {
 (async () => {
   await initMongo();
   await hydrateFromMongo();
+  await hydrateFreeSpinBag();
   server.listen(PORT, '0.0.0.0', () => {
     console.log('Aditya Studio server port:', PORT);
     console.log('Data folder:', DATA_DIR);
