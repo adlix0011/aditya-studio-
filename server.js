@@ -321,17 +321,18 @@ function saveOtpRequests(list) {
 
 /* ===== Free-spin fair bag (register users only) =====
    Har 100 spins:
-     1  × Photo Frame
+     5  × Photo Frame
     10  × ₹30
-    40  × ₹20
+    36  × ₹20
     49  × ₹10
    Bade prizes (₹50/100/500/1000) register free-spin me NAHI.
 */
 function buildFreeSpinBag() {
   const items = [];
-  items.push({ key: 'frame', type: 'frame', value: 0, val: 'Photo', label: 'फ्री फोटो फ्रेम' });
+  // Har 100: 5 Frame, 10×₹30, 36×₹20, 49×₹10
+  for (let i = 0; i < 5; i++) items.push({ key: 'frame', type: 'frame', value: 0, val: 'Photo', label: 'फ्री फोटो फ्रेम' });
   for (let i = 0; i < 10; i++) items.push({ key: '30', type: 'rupee', value: 30, val: '₹30', label: '₹30 डिस्काउंट' });
-  for (let i = 0; i < 40; i++) items.push({ key: '20', type: 'rupee', value: 20, val: '₹20', label: '₹20 डिस्काउंट' });
+  for (let i = 0; i < 36; i++) items.push({ key: '20', type: 'rupee', value: 20, val: '₹20', label: '₹20 डिस्काउंट' });
   for (let i = 0; i < 49; i++) items.push({ key: '10', type: 'rupee', value: 10, val: '₹10', label: '₹10 डिस्काउंट' });
   // Fisher-Yates shuffle
   for (let i = items.length - 1; i > 0; i--) {
@@ -389,6 +390,90 @@ function assignNextFreePrize() {
   bag.given = (bag.given || 0) + 1;
   saveFreeSpinBag(bag);
   return { prize, stats: { given: bag.given, leftInBatch: bag.remaining.length, batch: bag.batches || 1 } };
+}
+
+
+
+/* ===== Work-spin fair bags (amount based) =====
+   ₹500–₹1000 (100 spins):
+     70 × ₹50 coupon
+     10 × ₹100 coupon
+      5 × Photo frame
+      5 × Good luck
+     10 × ₹30 coupon
+*/
+function buildWorkBag500_1000() {
+  const items = [];
+  for (let i = 0; i < 70; i++) items.push({ key: '50', type: 'coupon', value: 50, val: '₹50', label: '₹50 COUPON', sub: 'COUPON CODE' });
+  for (let i = 0; i < 10; i++) items.push({ key: '100', type: 'coupon', value: 100, val: '₹100', label: '₹100 COUPON', sub: 'COUPON CODE' });
+  for (let i = 0; i < 5; i++) items.push({ key: 'frame', type: 'frame', value: 0, val: 'Photo', label: 'फ्री फोटो फ्रेम', sub: 'FRAME' });
+  for (let i = 0; i < 5; i++) items.push({ key: 'luck', type: 'luck', value: 0, val: 'Good', label: 'Good Luck', sub: 'LUCK' });
+  for (let i = 0; i < 10; i++) items.push({ key: '30', type: 'coupon', value: 30, val: '₹30', label: '₹30 COUPON', sub: 'COUPON CODE' });
+  for (let i = items.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const t = items[i]; items[i] = items[j]; items[j] = t;
+  }
+  return items;
+}
+
+function workBagKey(amount) {
+  const a = Number(amount) || 0;
+  if (a >= 500 && a <= 1000) return 'work_500_1000';
+  if (a < 500) return 'work_under_500';
+  return 'work_over_1000';
+}
+
+function buildWorkBagDefault() {
+  // temporary defaults for other amounts — mostly small coupons
+  const items = [];
+  for (let i = 0; i < 50; i++) items.push({ key: '20', type: 'coupon', value: 20, val: '₹20', label: '₹20 COUPON', sub: 'COUPON CODE' });
+  for (let i = 0; i < 30; i++) items.push({ key: '30', type: 'coupon', value: 30, val: '₹30', label: '₹30 COUPON', sub: 'COUPON CODE' });
+  for (let i = 0; i < 15; i++) items.push({ key: '50', type: 'coupon', value: 50, val: '₹50', label: '₹50 COUPON', sub: 'COUPON CODE' });
+  for (let i = 0; i < 5; i++) items.push({ key: 'luck', type: 'luck', value: 0, val: 'Good', label: 'Good Luck', sub: 'LUCK' });
+  for (let i = items.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const t = items[i]; items[i] = items[j]; items[j] = t;
+  }
+  return items;
+}
+
+function loadWorkBag(key) {
+  const file = path.join(DATA_DIR, 'work-spin-bags.json');
+  let all = {};
+  try {
+    if (fs.existsSync(file)) all = JSON.parse(fs.readFileSync(file, 'utf8')) || {};
+  } catch (e) {}
+  if (!all[key] || !Array.isArray(all[key].remaining) || all[key].remaining.length === 0) {
+    const remaining = key === 'work_500_1000' ? buildWorkBag500_1000() : buildWorkBagDefault();
+    all[key] = { remaining, given: all[key] ? (all[key].given || 0) : 0, batches: (all[key] && all[key].batches) ? all[key].batches + 1 : 1 };
+  }
+  return { all, bag: all[key] };
+}
+
+function saveWorkBags(all) {
+  const file = path.join(DATA_DIR, 'work-spin-bags.json');
+  try { fs.writeFileSync(file, JSON.stringify(all, null, 2)); } catch (e) {}
+  if (useMongo && mongoDb) {
+    mongoDb.collection('meta').updateOne(
+      { _id: 'workSpinBags' },
+      { $set: { bags: all } },
+      { upsert: true }
+    ).catch(() => {});
+  }
+}
+
+function assignWorkPrize(amount) {
+  const key = workBagKey(amount);
+  const { all, bag } = loadWorkBag(key);
+  if (!bag.remaining.length) {
+    bag.remaining = key === 'work_500_1000' ? buildWorkBag500_1000() : buildWorkBagDefault();
+    bag.batches = (bag.batches || 0) + 1;
+  }
+  const prize = bag.remaining.shift();
+  bag.given = (bag.given || 0) + 1;
+  all[key] = bag;
+  saveWorkBags(all);
+  return { prize, stats: { key, given: bag.given, left: bag.remaining.length, batch: bag.batches || 1 } };
 }
 
 
@@ -455,10 +540,14 @@ function nextCustomerId(accounts) {
   return 'AS-' + String(accounts.length + 1).padStart(4, '0');
 }
 function publicHistory(acc) {
-  return (acc.history || []).map(h => ({
-    amount: h.amount, tier: h.tier, discount: h.discount,
-    prize: h.prize, freeSpin: h.freeSpin, timestamp: h.timestamp, entryId: h.entryId
-  }));
+  return (acc.history || [])
+    .filter(h => h.couponStatus !== 'deleted')
+    .map(h => ({
+      amount: h.amount, tier: h.tier, discount: h.discount,
+      prize: h.prize, freeSpin: h.freeSpin, timestamp: h.timestamp, entryId: h.entryId,
+      couponId: h.couponId || h.entryId || null,
+      couponStatus: h.couponStatus || 'active'
+    }));
 }
 function tierName(amt) {
   amt = Number(amt) || 0;
@@ -685,6 +774,26 @@ const server = http.createServer(async (req, res) => {
   }
 
 
+
+  if (req.method === 'POST' && urlPath === '/api/assign-work-spin') {
+    try {
+      const body = await readBody(req);
+      const mobile = String(body.mobile || '').trim();
+      const amount = Number(body.amount) || 0;
+      if (!/^[6-9]\d{9}$/.test(mobile)) return sendJSON(res, 400, { ok: false, error: 'invalid-mobile' });
+      if (amount < 50) return sendJSON(res, 400, { ok: false, error: 'invalid-amount' });
+      const accounts = loadAccounts();
+      const acc = accounts.find(a => String(a.mobile) === mobile);
+      if (!acc) return sendJSON(res, 404, { ok: false, error: 'no-account' });
+      const { prize, stats } = assignWorkPrize(amount);
+      console.log('Work-spin assign', mobile, '₹' + amount, prize.val, stats.key, 'left', stats.left);
+      return sendJSON(res, 200, { ok: true, prize, stats });
+    } catch (e) {
+      console.error('assign-work-spin', e);
+      return sendJSON(res, 500, { ok: false, error: 'server-error' });
+    }
+  }
+
   if (req.method === 'POST' && urlPath === '/api/assign-free-spin') {
     try {
       const body = await readBody(req);
@@ -714,13 +823,15 @@ const server = http.createServer(async (req, res) => {
       if (!acc) return sendJSON(res, 404, { ok: false });
       acc.freeSpinUsed = true;
       acc.history = acc.history || [];
+      const couponId = 'C-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
       acc.history.push({
         entryId: acc.id + '-FREE', amount: 0, tier: 'Free',
         discount: body.discount != null ? body.discount : null,
-        prize: body.prize || '', freeSpin: true, timestamp: new Date().toISOString()
+        prize: body.prize || '', freeSpin: true, timestamp: new Date().toISOString(),
+        couponId, couponStatus: 'active'
       });
       saveAccounts(accounts);
-      return sendJSON(res, 200, { ok: true });
+      return sendJSON(res, 200, { ok: true, couponId });
     } catch (e) {
       return sendJSON(res, 400, { ok: false });
     }
@@ -757,8 +868,9 @@ const server = http.createServer(async (req, res) => {
       if (entry) {
         entry.discount = body.discount;
         entry.prize = body.prize || entry.prize || (body.discount != null ? body.discount + '%' : '');
+        if (!entry.couponId) entry.couponId = 'C-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
+        if (!entry.couponStatus) entry.couponStatus = 'active';
         saveAccounts(accounts);
-        // link prize to spin code history
         if (entry.code) {
           const codes = loadCodes();
           const crow = codes.find(c => String(c.code).toUpperCase() === String(entry.code).toUpperCase());
@@ -769,6 +881,19 @@ const server = http.createServer(async (req, res) => {
             saveCodes(codes);
           }
         }
+      } else if (body.prize) {
+        // fallback push
+        acc.history = acc.history || [];
+        acc.history.push({
+          entryId: body.entryId || ('E-' + Date.now()),
+          amount: body.amount || 0,
+          prize: body.prize,
+          discount: body.discount,
+          timestamp: new Date().toISOString(),
+          couponId: 'C-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6),
+          couponStatus: 'active'
+        });
+        saveAccounts(accounts);
       }
       return sendJSON(res, 200, { ok: true });
     } catch (e) {
@@ -970,6 +1095,33 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+
+  if (req.method === 'POST' && urlPath === '/admin/coupon-action') {
+    try {
+      const body = await readFormBody(req);
+      const mobile = String(body.mobile || '').trim();
+      const couponId = String(body.couponId || '').trim();
+      const action = String(body.action || '').trim(); // accept | delete
+      const accounts = loadAccounts();
+      const acc = accounts.find(a => String(a.mobile) === mobile);
+      if (acc && couponId && (action === 'accept' || action === 'delete')) {
+        acc.history = (acc.history || []).map(h => {
+          const id = String(h.couponId || h.entryId || '');
+          if (id !== couponId) return h;
+          if (action === 'delete') return { ...h, couponStatus: 'deleted', deletedAt: new Date().toISOString() };
+          return { ...h, couponStatus: 'accepted', acceptedAt: new Date().toISOString() };
+        });
+        saveAccounts(accounts);
+        console.log('Coupon', action, mobile, couponId);
+      }
+      res.writeHead(302, { Location: '/admin#accList' });
+      return res.end();
+    } catch (e) {
+      res.writeHead(302, { Location: '/admin' });
+      return res.end();
+    }
+  }
+
   if (req.method === 'POST' && urlPath === '/admin/reset-pin') {
     try {
       const body = await readFormBody(req);
@@ -1072,9 +1224,27 @@ const server = http.createServer(async (req, res) => {
 
     const rows = accounts.map(acc => {
       const hist = (acc.history || []).slice().reverse();
-      const histRows = hist.map(h =>
-        '<tr><td>' + esc(h.entryId || '—') + '</td><td>₹' + esc(h.amount || 0) + '</td><td>' + esc(h.tier || '—') + '</td><td>' + esc(h.prize || (h.discount != null ? h.discount + '%' : '—')) + '</td><td>' + esc(fmtDate(h.timestamp)) + '</td></tr>'
-      ).join('') || '<tr><td colspan="5" class="muted">No history</td></tr>';
+      const couponRows = hist.filter(h => h.prize || h.discount != null).map(h => {
+        const cid = esc(h.couponId || h.entryId || '');
+        const st = h.couponStatus || 'active';
+        if (st === 'deleted') return '';
+        const statusBadge = st === 'accepted'
+          ? '<span class="ok">Accepted / Used</span>'
+          : '<span class="tag">Active</span>';
+        const actions = st === 'active'
+          ? ('<form method="POST" action="/admin/coupon-action" style="display:inline-flex;gap:4px;flex-wrap:wrap">'
+            + '<input type="hidden" name="mobile" value="' + esc(acc.mobile) + '">'
+            + '<input type="hidden" name="couponId" value="' + cid + '">'
+            + '<button class="gen-btn" type="submit" name="action" value="accept" style="padding:4px 8px;font-size:11px">✓ Accept</button>'
+            + '<button type="submit" name="action" value="delete" style="padding:4px 8px;font-size:11px;background:#5a1a1a;color:#fca5a5;border:1px solid #7f1d1d;border-radius:6px;cursor:pointer">🗑 Delete</button>'
+            + '</form>')
+          : '<span class="muted">—</span>';
+        return '<tr><td>' + esc(h.prize || (h.discount != null ? h.discount : '—')) + '</td>'
+          + '<td>' + (h.freeSpin ? 'Free' : ('₹' + esc(h.amount || 0))) + '</td>'
+          + '<td>' + statusBadge + '</td>'
+          + '<td>' + esc(fmtDate(h.timestamp)) + '</td>'
+          + '<td>' + actions + '</td></tr>';
+      }).filter(Boolean).join('') || '<tr><td colspan="5" class="muted">No coupons</td></tr>';
       return '<details class="acc"><summary><span class="c-id">' + esc(acc.id) + '</span> <b>' + esc(acc.name) + '</b> <span class="muted">' + esc(acc.mobile) + '</span> ' +
         (acc.mobileVerified ? '<span class="ok">✓ Verified</span>' : '<span class="bad">✗ Unverified</span>') +
         ' <span class="tag">' + esc(acc.badge || tierName(acc.totalSpend || 0)) + '</span></summary><div class="acc-body"><div class="grid">' +
@@ -1082,7 +1252,8 @@ const server = http.createServer(async (req, res) => {
         '<div><span class="lbl">Village</span><div>' + esc(acc.village || '—') + '</div></div>' +
         '<div><span class="lbl">Total spend</span><div>₹' + esc(acc.totalSpend || 0) + '</div></div>' +
         '<div><span class="lbl">Last prize</span><div>' + esc(lastPrize(acc)) + '</div></div></div>' +
-        '<table><thead><tr><th>Entry</th><th>Amount</th><th>Tier</th><th>Prize</th><th>Time</th></tr></thead><tbody>' + histRows + '</tbody></table></div></details>';
+        '<div class="lbl" style="margin-top:12px">Coupons</div>' +
+        '<table><thead><tr><th>Coupon</th><th>From</th><th>Status</th><th>Time</th><th>Action</th></tr></thead><tbody>' + couponRows + '</tbody></table></div></details>';
     }).join('') || '<p class="muted">No customers yet</p>';
 
     const html = `<!DOCTYPE html><html lang="hi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
