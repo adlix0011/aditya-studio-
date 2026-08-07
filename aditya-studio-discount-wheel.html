@@ -1006,6 +1006,23 @@
   .coupon-badge.on{ background:rgba(255,215,0,0.15); color:#FFD700; border:1px solid rgba(255,215,0,0.4); }
   .coupon-badge.off{ background:rgba(120,120,120,0.2); color:#aaa; border:1px solid rgba(150,150,150,0.3); }
 
+
+  .coupon-timer{
+    margin-top:8px; font-size:12px; font-weight:700; position:relative; z-index:1;
+    color:#FFD700; letter-spacing:0.3px;
+  }
+  .coupon-timer.urgent{ color:#ff6b6b; animation: timerBlink 1s ease-in-out infinite; }
+  .coupon-timer.expired{ color:#999; }
+  @keyframes timerBlink{
+    0%,100%{ opacity:1; }
+    50%{ opacity:0.55; }
+  }
+  .coupon-card.expired{
+    opacity:0.65; border-color:rgba(120,120,120,0.35);
+    box-shadow:none; animation:none; background:#161210;
+  }
+  .coupon-card.expired::before{ display:none; }
+  .coupon-card.expired .coupon-title{ color:#999; }
 </style>
 </head>
 <body>
@@ -2169,7 +2186,8 @@ if(freeSpinBtn){
           freeSpin: true,
           timestamp: new Date().toISOString(),
           couponId: 'C-local-'+Date.now(),
-          couponStatus: 'active'
+          couponStatus: 'active',
+          expiresAt: new Date(Date.now() + 30*24*60*60*1000).toISOString()
         });
         try {
           saveSession(currentAccount, currentAccount._pin || '0000');
@@ -2799,6 +2817,41 @@ function refreshHomeAvatar(){
   }
 }
 
+function formatCouponCountdown(expMs){
+  if(!expMs) return { text: '—', urgent:false, expired:false };
+  var left = expMs - Date.now();
+  if(left <= 0) return { text: '⛔ Expired', urgent:false, expired:true };
+  var days = Math.floor(left / (24*60*60*1000));
+  var hours = Math.floor((left % (24*60*60*1000)) / (60*60*1000));
+  var mins = Math.floor((left % (60*60*1000)) / (60*1000));
+  var text = '⏳ ' + days + 'd ' + hours + 'h ' + mins + 'm left';
+  return { text: text, urgent: days <= 3, expired: false };
+}
+function updateCouponTimers(){
+  document.querySelectorAll('.coupon-card.active[data-expires]').forEach(function(card){
+    var exp = card.getAttribute('data-expires');
+    var expMs = exp ? new Date(exp).getTime() : 0;
+    var info = formatCouponCountdown(expMs);
+    var el = card.querySelector('.coupon-timer');
+    if(!el) return;
+    el.textContent = info.text;
+    el.className = 'coupon-timer' + (info.expired ? ' expired' : (info.urgent ? ' urgent' : ''));
+    if(info.expired){
+      card.classList.remove('active');
+      card.classList.add('expired');
+      var badge = card.querySelector('.coupon-badge');
+      if(badge){ badge.className = 'coupon-badge off'; badge.textContent = 'Expired'; }
+    }
+  });
+}
+if(!window._couponTimerInterval){
+  window._couponTimerInterval = setInterval(function(){
+    if(document.getElementById('profileModal') && document.getElementById('profileModal').classList.contains('show')){
+      updateCouponTimers();
+    }
+  }, 30000); // every 30s while profile open
+}
+
 function openProfileModal(){
   const m = document.getElementById('profileModal');
   if(!m || !currentAccount) return;
@@ -2823,17 +2876,21 @@ function openProfileModal(){
   if(prC){
     prC.textContent = '';
     prC.innerHTML = coupons.length
-      ? ('<div class="coupon-stack">' + coupons.map(function(h){
+      ? ('<div class="coupon-stack" id="couponStack">' + coupons.map(function(h){
           const st = h.couponStatus || 'active';
-          const title = h.prize || (h.discount != null ? (String(h.discount) + (Number(h.discount)<=100 && String(h.discount).indexOf('%')<0 ? '' : '')) : 'Coupon');
+          const title = h.prize || (h.discount != null ? String(h.discount) : 'Coupon');
           const t = h.timestamp ? new Date(h.timestamp).toLocaleString('en-IN') : '';
           const from = h.freeSpin ? 'Free spin' : (h.amount ? ('₹' + h.amount + ' काम') : 'Spin');
+          // default 30 days from timestamp if expiresAt missing (old coupons)
+          var expMs = h.expiresAt ? new Date(h.expiresAt).getTime() : (h.timestamp ? new Date(h.timestamp).getTime() + 30*24*60*60*1000 : 0);
+          var expAttr = expMs ? new Date(expMs).toISOString() : '';
           if(st === 'accepted'){
             return '<div class="coupon-card accepted"><div class="coupon-title">'+title+'</div><div class="coupon-meta">'+from+' · '+t+'</div><span class="coupon-badge off">Used / Accepted</span></div>';
           }
-          return '<div class="coupon-card active"><div class="coupon-title">'+title+'</div><div class="coupon-meta">'+from+' · '+t+'</div><span class="coupon-badge on">✨ Active Coupon</span></div>';
+          return '<div class="coupon-card active" data-expires="'+expAttr+'"><div class="coupon-title">'+title+'</div><div class="coupon-meta">'+from+' · '+t+'</div><div class="coupon-timer">⏳ Loading...</div><span class="coupon-badge on">✨ Active · 30 Days</span></div>';
         }).join('') + '</div>')
       : '—';
+    if(typeof updateCouponTimers === 'function') updateCouponTimers();
   }
   const ph = document.getElementById('profileHistoryBox');
   if(ph){
