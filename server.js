@@ -546,7 +546,9 @@ function publicHistory(acc) {
       amount: h.amount, tier: h.tier, discount: h.discount,
       prize: h.prize, freeSpin: h.freeSpin, timestamp: h.timestamp, entryId: h.entryId,
       couponId: h.couponId || h.entryId || null,
-      couponStatus: h.couponStatus || 'active'
+      couponStatus: h.couponStatus || 'active',
+      expiresAt: h.expiresAt || null,
+      acceptedAt: h.acceptedAt || null
     }));
 }
 function tierName(amt) {
@@ -824,14 +826,15 @@ const server = http.createServer(async (req, res) => {
       acc.freeSpinUsed = true;
       acc.history = acc.history || [];
       const couponId = 'C-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
       acc.history.push({
         entryId: acc.id + '-FREE', amount: 0, tier: 'Free',
         discount: body.discount != null ? body.discount : null,
         prize: body.prize || '', freeSpin: true, timestamp: new Date().toISOString(),
-        couponId, couponStatus: 'active'
+        couponId, couponStatus: 'active', expiresAt
       });
       saveAccounts(accounts);
-      return sendJSON(res, 200, { ok: true, couponId });
+      return sendJSON(res, 200, { ok: true, couponId, expiresAt });
     } catch (e) {
       return sendJSON(res, 400, { ok: false });
     }
@@ -870,6 +873,7 @@ const server = http.createServer(async (req, res) => {
         entry.prize = body.prize || entry.prize || (body.discount != null ? body.discount + '%' : '');
         if (!entry.couponId) entry.couponId = 'C-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
         if (!entry.couponStatus) entry.couponStatus = 'active';
+        if (!entry.expiresAt) entry.expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
         saveAccounts(accounts);
         if (entry.code) {
           const codes = loadCodes();
@@ -1239,10 +1243,13 @@ const server = http.createServer(async (req, res) => {
             + '<button type="submit" name="action" value="delete" style="padding:4px 8px;font-size:11px;background:#5a1a1a;color:#fca5a5;border:1px solid #7f1d1d;border-radius:6px;cursor:pointer">🗑 Delete</button>'
             + '</form>')
           : '<span class="muted">—</span>';
+        const exp = h.expiresAt ? fmtDate(h.expiresAt) : '—';
+        const expired = h.expiresAt && new Date(h.expiresAt).getTime() < Date.now() && st === 'active';
+        const statusBadge2 = expired ? '<span class="bad">Expired</span>' : statusBadge;
         return '<tr><td>' + esc(h.prize || (h.discount != null ? h.discount : '—')) + '</td>'
           + '<td>' + (h.freeSpin ? 'Free' : ('₹' + esc(h.amount || 0))) + '</td>'
-          + '<td>' + statusBadge + '</td>'
-          + '<td>' + esc(fmtDate(h.timestamp)) + '</td>'
+          + '<td>' + statusBadge2 + '</td>'
+          + '<td>' + esc(fmtDate(h.timestamp)) + '<br><span class="muted">Exp: ' + esc(exp) + '</span></td>'
           + '<td>' + actions + '</td></tr>';
       }).filter(Boolean).join('') || '<tr><td colspan="5" class="muted">No coupons</td></tr>';
       return '<details class="acc"><summary><span class="c-id">' + esc(acc.id) + '</span> <b>' + esc(acc.name) + '</b> <span class="muted">' + esc(acc.mobile) + '</span> ' +
