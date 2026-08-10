@@ -822,17 +822,39 @@ const server = http.createServer(async (req, res) => {
       const mobile = String(body.mobile || '').trim();
       if (!/^[6-9]\d{9}$/.test(mobile)) return sendJSON(res, 400, { ok: false, error: 'invalid-mobile' });
       const accounts = loadAccounts();
-      const acc = accounts.find(a => String(a.mobile) === mobile);
-      if (!acc) return sendJSON(res, 404, { ok: false, error: 'no-account' });
-      if (acc.freeSpinUsed) return sendJSON(res, 409, { ok: false, error: 'already-used' });
-      if (!acc.mobileVerified) return sendJSON(res, 403, { ok: false, error: 'not-verified' });
+      let acc = accounts.find(a => String(a.mobile) === mobile);
+      // Soft create if session exists on client but not on server (after wipe/migrate)
+      if (!acc && body.name) {
+        acc = {
+          id: body.id || nextCustomerId(accounts),
+          name: String(body.name || '').trim(),
+          mobile,
+          village: String(body.village || '').trim(),
+          pin: String(body.pin || '0000'),
+          createdAt: new Date().toISOString(),
+          history: [],
+          mobileVerified: !!body.mobileVerified,
+          freeSpinUsed: false,
+          totalSpend: 0
+        };
+        accounts.push(acc);
+        saveAccounts(accounts);
+        console.log('assign-free-spin soft account', acc.id, mobile);
+      }
+      if (!acc) return sendJSON(res, 404, { ok: false, error: 'no-account', message: 'Account server pe nahi — dubara login/register karein' });
+      if (acc.freeSpinUsed) return sendJSON(res, 409, { ok: false, error: 'already-used', message: 'Free spin pehle use ho chuki hai' });
+      // Sync verify flag from client if already verified in session
+      if (!acc.mobileVerified && body.mobileVerified) {
+        acc.mobileVerified = true;
+        saveAccounts(accounts);
+      }
+      if (!acc.mobileVerified) return sendJSON(res, 403, { ok: false, error: 'not-verified', message: 'Pehle mobile OTP verify karein' });
       const { prize, stats } = assignNextFreePrize();
-      // reserve: do not mark used yet — free-spin-result will mark used
       console.log('Free-spin assign', mobile, prize.val, 'batch left', stats.leftInBatch);
       return sendJSON(res, 200, { ok: true, prize, stats });
     } catch (e) {
       console.error('assign-free-spin', e);
-      return sendJSON(res, 500, { ok: false, error: 'server-error' });
+      return sendJSON(res, 500, { ok: false, error: 'server-error', message: String(e.message || e) });
     }
   }
 
@@ -1156,16 +1178,88 @@ const server = http.createServer(async (req, res) => {
       const accounts = loadAccounts();
       const acc = accounts.find(a => String(a.mobile) === mobile);
       if (acc && couponId && (action === 'accept' || action === 'delete')) {
+        let linkedCode = null;
         acc.history = (acc.history || []).map(h => {
           const id = String(h.couponId || h.entryId || '');
           if (id !== couponId) return h;
+          linkedCode = h.code || null;
           if (action === 'delete') return { ...h, couponStatus: 'deleted', deletedAt: new Date().toISOString() };
           return { ...h, couponStatus: 'accepted', acceptedAt: new Date().toISOString() };
         });
         saveAccounts(accounts);
+        // Accept → spin code history se prize "redeemed at shop" mark; hide from active coupon lists
+        if (action === 'accept') {
+          const codes = loadCodes();
+          let changed = false;
+          codes.forEach(c => {
+            const matchUser = c.usedBy && (String(c.usedBy).includes(mobile) || String(c.usedBy).includes(acc.id));
+            const matchCode = linkedCode && String(c.code).toUpperCase() === String(linkedCode).toUpperCase();
+            if (matchUser || matchCode) {
+              c.couponAccepted = true;
+              c.couponAcceptedAt = new Date().toISOString();
+              c.prize = (c.prize || '') + ' (Redeemed)';
+              changed = true;
+            }
+          });
+          if (changed) saveCodes(codes);
+        }
         console.log('Coupon', action, mobile, couponId);
       }
       res.writeHead(302, { Location: '/admin#accList' });
+      return res.end();
+    } catch (e) {
+      res.writeHead(302, { Location: '/admin' });
+      return res.end();
+    }
+  }
+
+  if (req.method === 'POST' && urlPath === '/admin/delete-account') {
+    try {
+      const body = await readFormBody(req);
+      const mobile = String(body.mobile || '').trim();
+      let accounts = loadAccounts();
+      const before = accounts.length;
+      accounts = accounts.filter(a => String(a.mobile) !== mobile);
+      if (accounts.length < before) {
+        saveAccounts(accounts);
+        console.log('Account deleted:', mobile);
+      }
+      res.writeHead(302, { Location: '/admin?del=ok#accList' });
+      return res.end();
+    } catch (e) {
+      res.writeHead(302, { Location: '/admin' });
+      return res.end();
+    }
+  }
+
+  if (req.method === 'POST' && urlPath === '/admin/verify-account') {
+    try {
+      const body = await readFormBody(req);
+      const mobile = String(body.mobile || '').trim();
+      const accounts = loadAccounts();
+      const acc = accounts.find(a => String(a.mobile) === mobile);
+      if (acc) {
+        acc.mobileVerified = true;
+        saveAccounts(accounts);
+        console.log('Account verified by admin:', mobile);
+      }
+      res.writeHead(302, { Location: '/admin?ver=ok#accList' });
+      return res.end();
+    } catch (e) {
+      res.writeHead(302, { Location: '/admin' });
+      return res.end();
+    }
+  }
+
+  if (req.method === 'POST' && urlPath === '/admin/delete-spin-code') {
+    try {
+      const body = await readFormBody(req);
+      const code = String(body.code || '').trim().toUpperCase();
+      let codes = loadCodes();
+      codes = codes.filter(c => String(c.code).toUpperCase() !== code);
+      saveCodes(codes);
+      console.log('Spin code deleted:', code);
+      res.writeHead(302, { Location: '/admin?codeel=ok#codes' });
       return res.end();
     } catch (e) {
       res.writeHead(302, { Location: '/admin' });
@@ -1254,15 +1348,16 @@ const server = http.createServer(async (req, res) => {
       return '<div class="msg-card"><div class="msg-text">🔔 <b>' + esc(acc.name) + '</b> (' + esc(acc.mobile) + ')</div><div class="msg-actions"><form method="POST" action="/admin/reset-pin" style="display:flex;gap:6px"><input type="hidden" name="mobile" value="' + esc(acc.mobile) + '"><input class="inp" name="newPin" placeholder="Naya PIN" maxlength="4"><button class="gen-btn" type="submit">Reset → WA</button></form></div></div>';
     }).join('') || '<div class="muted">No PIN resets</div>';
 
-    const codeRows = codes.map(c =>
+        const codeRows = codes.filter(c => !c.couponAccepted).map(c =>
       '<tr><td class="mono">' + esc(c.code) + '</td>'
       + '<td>₹' + esc(c.amount != null ? c.amount : '—') + '</td>'
       + '<td>' + (c.used ? '<span class="bad">Used</span>' : '<span class="ok">Unused</span>') + '</td>'
       + '<td>' + esc(c.usedBy || '—') + '</td>'
       + '<td>' + esc(c.prize || (c.discount != null ? c.discount + '%' : (c.used ? 'Spin pending/unknown' : '—'))) + '</td>'
       + '<td>' + esc(fmtDate(c.createdAt)) + '</td>'
-      + '<td>' + esc(c.usedAt ? fmtDate(c.usedAt) : '—') + '</td></tr>'
-    ).join('') || '<tr><td colspan="7">No codes yet</td></tr>';
+      + '<td>' + esc(c.usedAt ? fmtDate(c.usedAt) : '—') + '</td>'
+      + '<td><form method="POST" action="/admin/delete-spin-code" style="display:inline" onsubmit="return confirm(\'Delete code '+esc(c.code)+'?\')"><input type="hidden" name="code" value="'+esc(c.code)+'"><button type="submit" style="padding:3px 8px;font-size:11px;background:#5a1a1a;color:#fca5a5;border:1px solid #7f1d1d;border-radius:6px;cursor:pointer">🗑</button></form></td></tr>'
+    ).join('') || '<tr><td colspan="8">No codes yet (accepted coupons auto-hidden)</td></tr>';
 
     function lastPrize(acc) {
       const h = (acc.history || []).slice().reverse();
@@ -1308,13 +1403,32 @@ const server = http.createServer(async (req, res) => {
           + '<td>' + esc(fmtDate(h.timestamp)) + '<br><span class="muted">Exp: ' + esc(exp) + '</span></td>'
           + '<td>' + actions + '</td></tr>';
       }).filter(Boolean).join('') || '<tr><td colspan="5" class="muted">No coupons</td></tr>';
-      return '<details class="acc"><summary><span class="c-id">' + esc(acc.id) + '</span> <b>' + esc(acc.name) + '</b> <span class="muted">' + esc(acc.mobile) + '</span> ' +
+      const todayStr = new Date().toDateString();
+      const isNewToday = acc.createdAt && new Date(acc.createdAt).toDateString() === todayStr;
+      const filters = [
+        'all',
+        acc.mobileVerified ? 'verified' : 'unverified',
+        acc.freeSpinUsed ? 'freespin' : 'freespin-left',
+        isNewToday ? 'today' : '',
+        (acc.pinResetRequested ? 'pinreset' : '')
+      ].filter(Boolean).join(' ');
+      const adminBtns =
+        '<div style="display:flex;flex-wrap:wrap;gap:8px;margin:12px 0">' +
+        (!acc.mobileVerified
+          ? '<form method="POST" action="/admin/verify-account"><input type="hidden" name="mobile" value="' + esc(acc.mobile) + '"><button class="gen-btn" type="submit" style="padding:6px 12px;font-size:12px">✓ Verify now</button></form>'
+          : '<span class="ok">Already verified</span>') +
+        '<form method="POST" action="/admin/delete-account" onsubmit="return confirm(\'Delete account ' + esc(acc.name) + ' (' + esc(acc.mobile) + ')? Ye undo nahi hoga.\')">' +
+        '<input type="hidden" name="mobile" value="' + esc(acc.mobile) + '">' +
+        '<button type="submit" style="padding:6px 12px;font-size:12px;background:#5a1a1a;color:#fca5a5;border:1px solid #7f1d1d;border-radius:6px;cursor:pointer">🗑 Delete account</button></form>' +
+        '</div>';
+      return '<details class="acc" data-filter="' + filters + '" data-id="' + esc(acc.id) + '"><summary><span class="c-id">' + esc(acc.id) + '</span> <b>' + esc(acc.name) + '</b> <span class="muted">' + esc(acc.mobile) + '</span> ' +
         (acc.mobileVerified ? '<span class="ok">✓ Verified</span>' : '<span class="bad">✗ Unverified</span>') +
         ' <span class="tag">' + esc(acc.badge || tierName(acc.totalSpend || 0)) + '</span></summary><div class="acc-body"><div class="grid">' +
         '<div><span class="lbl">PIN</span><div class="mono gold">' + esc(acc.pin) + '</div></div>' +
         '<div><span class="lbl">Village</span><div>' + esc(acc.village || '—') + '</div></div>' +
         '<div><span class="lbl">Total spend</span><div>₹' + esc(acc.totalSpend || 0) + '</div></div>' +
         '<div><span class="lbl">Last prize</span><div>' + esc(lastPrize(acc)) + '</div></div></div>' +
+        adminBtns +
         '<div class="lbl" style="margin-top:12px">Coupons</div>' +
         '<table><thead><tr><th>Coupon</th><th>From</th><th>Status</th><th>Time</th><th>Action</th></tr></thead><tbody>' + couponRows + '</tbody></table></div></details>';
     }).join('') || '<p class="muted">No customers yet</p>';
@@ -1326,7 +1440,7 @@ const server = http.createServer(async (req, res) => {
 h1{color:#D4AF37;font-size:1.4rem}h2{color:#D4AF37;font-size:1.05rem;margin:28px 0 12px}
 .sub{color:#B7A480;font-size:13px;margin-bottom:16px}.sub a{color:#D4AF37}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:16px 0}
-.card{background:#1B140F;border:1px solid rgba(212,175,55,0.2);border-radius:12px;padding:14px}
+.card-click{cursor:pointer;transition:transform .15s,box-shadow .15s}.card-click:hover{transform:translateY(-2px);box-shadow:0 0 14px rgba(212,175,55,0.35);border-color:rgba(212,175,55,0.6)}.card-click.active-filter{outline:2px solid #D4AF37}.card{background:#1B140F;border:1px solid rgba(212,175,55,0.2);border-radius:12px;padding:14px}
 .card .n{font-size:1.5rem;font-weight:800;color:#FFD700}.card .l{font-size:11px;color:#B7A480;text-transform:uppercase}
 .codes-block,.msg-card,.acc{border:1px solid rgba(212,175,55,0.15);border-radius:12px;padding:14px;margin-bottom:12px;background:#150f0b}
 .gen-btn{background:linear-gradient(180deg,#F3DE9A,#D4AF37);color:#241804;border:none;padding:9px 14px;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px;text-decoration:none;display:inline-block}
@@ -1348,13 +1462,17 @@ label.muted{display:block;font-size:12px}
 <h1>Aditya Studio — Admin</h1>
 <div class="sub"><a href="/">Customer page</a></div>
 <div class="cards">
-<div class="card"><div class="n" id="cntCust">${accounts.length}</div><div class="l">Customers</div></div>
-<div class="card"><div class="n">${newToday}</div><div class="l">Aaj naye</div></div>
-<div class="card"><div class="n" id="cntOtp">${pendingOtps.length}</div><div class="l">Pending OTP</div></div>
-<div class="card"><div class="n" id="cntPin">${pendingResets.length}</div><div class="l">PIN Reset</div></div>
-<div class="card"><div class="n">${verifiedCount}</div><div class="l">Verified</div></div>
-<div class="card"><div class="n">${freeUsed}</div><div class="l">Free spin used</div></div>
-<div class="card"><div class="n" id="cntCodes">${codes.filter(c=>!c.used).length}</div><div class="l">Unused codes</div></div>
+<div class="card card-click" onclick="filterPanel('all')" title="Saare customers"><div class="n" id="cntCust">${accounts.length}</div><div class="l">Customers</div></div>
+<div class="card card-click" onclick="filterPanel('today')" title="Aaj naye"><div class="n" id="cntToday">${newToday}</div><div class="l">Aaj naye</div></div>
+<div class="card card-click" onclick="filterPanel('otp')" title="Pending OTP"><div class="n" id="cntOtp">${pendingOtps.length}</div><div class="l">Pending OTP</div></div>
+<div class="card card-click" onclick="filterPanel('pin')" title="PIN Reset"><div class="n" id="cntPin">${pendingResets.length}</div><div class="l">PIN Reset</div></div>
+<div class="card card-click" onclick="filterPanel('verified')" title="Verified"><div class="n" id="cntVer">${verifiedCount}</div><div class="l">Verified</div></div>
+<div class="card card-click" onclick="filterPanel('freespin')" title="Free spin used"><div class="n" id="cntFree">${freeUsed}</div><div class="l">Free spin used</div></div>
+<div class="card card-click" onclick="filterPanel('codes')" title="Unused codes"><div class="n" id="cntCodes">${codes.filter(c=>!c.used).length}</div><div class="l">Unused codes</div></div>
+</div>
+<div id="filterBar" style="display:none;margin:8px 0 16px;padding:10px 14px;background:#1B140F;border:1px solid rgba(212,175,55,0.35);border-radius:10px;align-items:center;gap:10px;flex-wrap:wrap">
+<span style="color:#D4AF37;font-weight:700" id="filterLabel">Filter:</span>
+<button type="button" class="gen-btn" style="padding:6px 12px;font-size:12px" onclick="filterPanel('all')">Show all</button>
 </div>
 
 <h2>💾 Backup</h2>
@@ -1430,7 +1548,7 @@ label.muted{display:block;font-size:12px}
 <input class="inp" name="note" placeholder="Note" style="width:140px">
 <button class="gen-btn" type="submit">+ Naya spin code</button>
 </form>
-<table><thead><tr><th>Code</th><th>Amount</th><th>Status</th><th>Used By</th><th>Coupon/Prize</th><th>Created</th><th>Used At</th></tr></thead>
+<table id="codesTable"><thead><tr><th>Code</th><th>Amount</th><th>Status</th><th>Used By</th><th>Coupon/Prize</th><th>Created</th><th>Used At</th><th>Action</th></tr></thead>
 <tbody>${codeRows}</tbody></table>
 </div>
 
@@ -1443,6 +1561,45 @@ label.muted{display:block;font-size:12px}
 </div>
 <script>
 function filterAcc(q){q=(q||'').toLowerCase();document.querySelectorAll('#accList .acc').forEach(function(el){el.style.display=!q||el.textContent.toLowerCase().indexOf(q)>=0?'':'none';});}
+function filterPanel(kind){
+  document.querySelectorAll('.card-click').forEach(function(c){ c.classList.remove('active-filter'); });
+  var bar = document.getElementById('filterBar');
+  var label = document.getElementById('filterLabel');
+  var custH = document.querySelector('h2');
+  // scroll targets
+  if(kind === 'otp'){
+    var el = document.getElementById('h2Otp'); if(el) el.scrollIntoView({behavior:'smooth'});
+    if(bar){ bar.style.display='flex'; if(label) label.textContent='Filter: Pending OTP section'; }
+    return;
+  }
+  if(kind === 'pin'){
+    var el2 = document.getElementById('h2Pin'); if(el2) el2.scrollIntoView({behavior:'smooth'});
+    if(bar){ bar.style.display='flex'; if(label) label.textContent='Filter: PIN Reset section'; }
+    return;
+  }
+  if(kind === 'codes'){
+    var el3 = document.getElementById('codesTable'); if(el3) el3.scrollIntoView({behavior:'smooth'});
+    if(bar){ bar.style.display='flex'; if(label) label.textContent='Filter: Unused / spin codes'; }
+    return;
+  }
+  // customer list filters
+  var map = { all:'all', today:'today', verified:'verified', freespin:'freespin', unverified:'unverified' };
+  var f = map[kind] || 'all';
+  document.querySelectorAll('#accList .acc').forEach(function(el){
+    var df = (el.getAttribute('data-filter')||'');
+    el.style.display = (f==='all' || df.indexOf(f)>=0) ? '' : 'none';
+  });
+  var list = document.getElementById('accList');
+  if(list) list.scrollIntoView({behavior:'smooth'});
+  if(bar){
+    bar.style.display = f==='all' ? 'none' : 'flex';
+    if(label) label.textContent = 'Filter: ' + kind;
+  }
+  // highlight card
+  document.querySelectorAll('.card-click').forEach(function(c){
+    if((c.getAttribute('onclick')||'').indexOf("'"+kind+"'")>=0) c.classList.add('active-filter');
+  });
+}
 
 var lastSig = '';
 var audioCtx = null;
