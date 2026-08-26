@@ -1,6 +1,6 @@
 /*
   Aditya Studio — Data Server
-  LOCAL: node server.js -> http://localhost:4000
+  LOCAL: node server.js -> http://localhost:8000
   RENDER: set ADMIN_PASSWORD, optional PIN_SALT
 */
 const http = require('http');
@@ -8,9 +8,10 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 8000;
 const PIN_SALT = process.env.PIN_SALT || 'aditya-studio-local-salt';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || null;
+// Local default password — production pe env se set karo: ADMIN_PASSWORD
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'ADlix08';
 
 function resolveDataDir() {
   const preferred = process.env.DATA_DIR || __dirname;
@@ -35,7 +36,14 @@ const CODES_FILE = path.join(DATA_DIR, 'codes.json');
 const OTP_FILE = path.join(DATA_DIR, 'otp-requests.json');
 const NOTIF_FILE = path.join(DATA_DIR, 'notifications.json');
 const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
-const HTML_FILE = path.join(__dirname, 'aditya-studio-discount-wheel.html');
+const FRAMES_FILE = path.join(DATA_DIR, 'photo-frames.json');
+const FRAME_ORDERS_FILE = path.join(DATA_DIR, 'frame-orders.json');
+const EDIT_REQUESTS_FILE = path.join(DATA_DIR, 'edit-requests.json');
+const INDEX_HTML_FILE = path.join(__dirname, 'index.html');
+const BOOK_NOW_HTML_FILE = path.join(__dirname, 'aditya-studio-discount-wheel.html');
+const FRAMES_HTML_FILE = path.join(__dirname, 'frames-home.html'); // 3D frames shop + order
+const BOOK_SERVICE_HTML_FILE = path.join(__dirname, 'book-service-sample.html');
+const HTML_FILE = BOOK_NOW_HTML_FILE; // legacy alias
 console.log('[boot] Using data dir:', DATA_DIR);
 
 /* ========== MongoDB Atlas (optional) ==========
@@ -137,7 +145,9 @@ let _cache = {
   codes: null,
   otps: null,
   notifs: null,
-  settings: null
+  settings: null,
+  frames: null,
+  frameOrders: null
 };
 
 function normalizeAccount(a) {
@@ -526,7 +536,26 @@ function defaultSettings() {
     offerImages: [
       { url: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80', title: '🎡 स्पिन ऑफ़र चल रहा है!', sub: 'कोड डालो → व्हील → डिस्काउंट' },
       { url: 'https://images.unsplash.com/photo-1519741497674-611481863552?w=800&q=80', title: '📸 Book Your Day', sub: 'Wedding · Birthday · Event' }
-    ]
+    ],
+    // Home hero intro animation (sparkly text → then premium block)
+    heroIntro: {
+      welcomeText: 'Aditya Studio me aapka swagat hai',
+      welcomeDurationSec: 5,
+      eyebrow: 'Premium Photography',
+      headline: 'Preserving Memories in',
+      headlineGold: 'Aurelian Noir',
+      headlineRest: 'Excellence',
+      subtext: 'Exclusive bookings for Weddings, Birthdays, and Special Events. Experience high-end digital craftsmanship.',
+      btnPrimary: 'Book a Session',
+      btnSecondary: 'View Portfolio'
+    },
+    // 3D frames shop rotating sample photos (admin upload)
+    frames3dPhotos: [],
+    // Home page floating hero frame photos (max 5)
+    homeHeroFramePhotos: [],
+    // Hero SECTION background slideshow (sides visible) — admin 4–6 photos + duration
+    heroSideBgPhotos: [],
+    heroSideBgDurationSec: 5
   };
 }
 function loadSettings() {
@@ -544,7 +573,12 @@ function loadSettings() {
     ...defaults,
     ...data,
     bookImages: { ...defaults.bookImages, ...(data.bookImages || {}) },
-    offerImages: data.offerImages || defaults.offerImages
+    offerImages: data.offerImages || defaults.offerImages,
+    heroIntro: { ...defaults.heroIntro, ...(data.heroIntro || {}) },
+    frames3dPhotos: Array.isArray(data.frames3dPhotos) ? data.frames3dPhotos : defaults.frames3dPhotos,
+    homeHeroFramePhotos: Array.isArray(data.homeHeroFramePhotos) ? data.homeHeroFramePhotos : defaults.homeHeroFramePhotos,
+    heroSideBgPhotos: Array.isArray(data.heroSideBgPhotos) ? data.heroSideBgPhotos : defaults.heroSideBgPhotos,
+    heroSideBgDurationSec: Math.max(2, Math.min(20, Number(data.heroSideBgDurationSec) || defaults.heroSideBgDurationSec))
   };
 }
 function saveSettings(obj) {
@@ -556,9 +590,177 @@ function saveSettings(obj) {
   }
 }
 
+/* ========== Photo Frames + Orders ========== */
+const DEMO_FRAME_PRICES = {
+  '8x12': 299, '10x12': 349, '10x15': 399, '12x15': 449, '12x18': 499, '12x36': 899,
+  '16x20': 599, '16x24': 699, '20x24': 799, '20x30': 999, '20x40': 1299, '20x50': 1499,
+  '24x36': 1399, '24x40': 1599, '24x50': 1899
+};
+function seedDemoFrames() {
+  const list = Object.keys(DEMO_FRAME_PRICES).map((size, i) => ({
+    id: 'demo-' + size,
+    size,
+    title: size + ' Frame',
+    price: DEMO_FRAME_PRICES[size],
+    discountPercent: 15,
+    active: true,
+    imageUrl: '',
+    imageData: '',
+    createdAt: new Date().toISOString()
+  }));
+  saveFrames(list);
+  console.log('[frames] Seeded', list.length, 'demo frames with 15% discount');
+  return list;
+}
+function loadFrames() {
+  if (_cache.frames) return _cache.frames.slice();
+  try {
+    if (fs.existsSync(FRAMES_FILE)) {
+      _cache.frames = JSON.parse(fs.readFileSync(FRAMES_FILE, 'utf8')) || [];
+      if (_cache.frames.length) return _cache.frames.slice();
+    }
+  } catch (e) {}
+  _cache.frames = seedDemoFrames();
+  return _cache.frames.slice();
+}
+function saveFrames(list) {
+  _cache.frames = (list || []).slice();
+  try { fs.writeFileSync(FRAMES_FILE, JSON.stringify(_cache.frames, null, 2)); } catch (e) {}
+  if (useMongo && mongoDb) {
+    mongoDb.collection('meta').updateOne(
+      { _id: 'photoFrames' },
+      { $set: { items: _cache.frames } },
+      { upsert: true }
+    ).catch(() => {});
+  }
+}
+function loadFrameOrders() {
+  if (_cache.frameOrders) return _cache.frameOrders.slice();
+  try {
+    if (fs.existsSync(FRAME_ORDERS_FILE)) {
+      _cache.frameOrders = JSON.parse(fs.readFileSync(FRAME_ORDERS_FILE, 'utf8')) || [];
+      return _cache.frameOrders.slice();
+    }
+  } catch (e) {}
+  _cache.frameOrders = [];
+  return [];
+}
+function saveFrameOrders(list) {
+  _cache.frameOrders = (list || []).slice();
+  try { fs.writeFileSync(FRAME_ORDERS_FILE, JSON.stringify(_cache.frameOrders, null, 2)); } catch (e) {}
+  if (useMongo && mongoDb) {
+    mongoDb.collection('meta').updateOne(
+      { _id: 'frameOrders' },
+      { $set: { items: _cache.frameOrders } },
+      { upsert: true }
+    ).catch(() => {});
+  }
+}
+function nextFrameOrderId(orders) {
+  return 'FO-' + String((orders.length || 0) + 1).padStart(4, '0') + '-' + Date.now().toString(36).slice(-4).toUpperCase();
+}
+function loadEditRequests() {
+  if (_cache.editRequests) return _cache.editRequests.slice();
+  try {
+    if (fs.existsSync(EDIT_REQUESTS_FILE)) {
+      _cache.editRequests = JSON.parse(fs.readFileSync(EDIT_REQUESTS_FILE, 'utf8')) || [];
+      return _cache.editRequests.slice();
+    }
+  } catch (e) {}
+  _cache.editRequests = [];
+  return [];
+}
+function saveEditRequests(list) {
+  _cache.editRequests = (list || []).slice();
+  try { fs.writeFileSync(EDIT_REQUESTS_FILE, JSON.stringify(_cache.editRequests, null, 2)); } catch (e) {}
+}
+function nextEditRequestId(list) {
+  return 'ER-' + String((list.length || 0) + 1).padStart(4, '0') + '-' + Date.now().toString(36).slice(-4).toUpperCase();
+}
+
 function nextCustomerId(accounts) {
   return 'AS-' + String(accounts.length + 1).padStart(4, '0');
 }
+function todayIST() {
+  try {
+    return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+  } catch (e) {
+    return new Date().toISOString().slice(0, 10);
+  }
+}
+function publicTokenFields(acc) {
+  const adTokens = Math.max(0, Number(acc.adTokens) || 0);
+  const spinBalance = Math.max(0, Number(acc.spinBalance) || 0);
+  const lastAdTokenClaim = acc.lastAdTokenClaim || '';
+  const canClaimAdToken = lastAdTokenClaim !== todayIST();
+  return { adTokens, spinBalance, canClaimAdToken, lastAdTokenClaim };
+}
+
+/* ===== Wallet helpers ===== */
+function ensureWallet(acc) {
+  if (typeof acc.walletBalance !== 'number' || isNaN(acc.walletBalance)) acc.walletBalance = 0;
+  if (!Array.isArray(acc.walletHistory)) acc.walletHistory = [];
+  return acc;
+}
+function walletHistoryId() {
+  return 'WH-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
+}
+/** Credit/debit wallet. amount > 0. Returns entry or null if debit fails. */
+function walletTxn(acc, type, amount, meta) {
+  ensureWallet(acc);
+  amount = Math.round(Number(amount) || 0);
+  if (amount <= 0) return null;
+  if (type === 'debit' && acc.walletBalance < amount) return null;
+  if (type === 'credit') acc.walletBalance += amount;
+  else acc.walletBalance -= amount;
+  const entry = {
+    id: walletHistoryId(),
+    type: type === 'debit' ? 'debit' : 'credit',
+    amount,
+    balanceAfter: acc.walletBalance,
+    reason: (meta && meta.reason) || (type === 'credit' ? 'Credit' : 'Debit'),
+    source: (meta && meta.source) || 'system',
+    ref: (meta && meta.ref) || '',
+    couponId: (meta && meta.couponId) || null,
+    orderId: (meta && meta.orderId) || null,
+    byAdmin: !!(meta && meta.byAdmin),
+    timestamp: new Date().toISOString()
+  };
+  acc.walletHistory.unshift(entry);
+  if (acc.walletHistory.length > 200) acc.walletHistory = acc.walletHistory.slice(0, 200);
+  return entry;
+}
+/** Extract ₹ value from a spin/coupon history entry */
+function couponRupeeValue(h) {
+  if (!h) return 0;
+  const d = Number(h.discount);
+  if (!isNaN(d) && d > 0) return Math.round(d);
+  const v = Number(h.value);
+  if (!isNaN(v) && v > 0) return Math.round(v);
+  const m = String(h.prize || h.label || h.val || '').match(/₹\s*(\d+)/);
+  if (m) return Math.round(Number(m[1]));
+  return 0;
+}
+
+function accountPublicPayload(acc) {
+  ensureWallet(acc);
+  return {
+    ok: true,
+    id: acc.id,
+    name: acc.name,
+    village: acc.village,
+    mobile: acc.mobile,
+    history: publicHistory(acc),
+    mobileVerified: !!acc.mobileVerified,
+    badge: acc.badge || null,
+    totalSpend: acc.totalSpend || 0,
+    freeSpinUsed: !!acc.freeSpinUsed,
+    walletBalance: acc.walletBalance || 0,
+    walletHistory: (acc.walletHistory || []).slice(0, 30),
+    ...publicTokenFields(acc)
+  };
+}
+
 function publicHistory(acc) {
   return (acc.history || [])
     .filter(h => h.couponStatus !== 'deleted')
@@ -568,7 +770,8 @@ function publicHistory(acc) {
       couponId: h.couponId || h.entryId || null,
       couponStatus: h.couponStatus || 'active',
       expiresAt: h.expiresAt || null,
-      acceptedAt: h.acceptedAt || null
+      acceptedAt: h.acceptedAt || null,
+      walletValue: couponRupeeValue(h)
     }));
 }
 function tierName(amt) {
@@ -582,10 +785,11 @@ function sendJSON(res, code, obj) {
   res.writeHead(code, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
   res.end(JSON.stringify(obj));
 }
-function readBody(req) {
+function readBody(req, maxBytes) {
+  const limit = maxBytes || 2e6;
   return new Promise((resolve, reject) => {
     let body = '';
-    req.on('data', c => { body += c; if (body.length > 2e6) reject(new Error('too large')); });
+    req.on('data', c => { body += c; if (body.length > limit) reject(new Error('too large')); });
     req.on('end', () => {
       try { resolve(body ? JSON.parse(body) : {}); }
       catch (e) { resolve({}); }
@@ -641,9 +845,39 @@ const server = http.createServer(async (req, res) => {
     return res.end();
   }
 
+  // New luxury homepage (Artisan Collection)
   if (req.method === 'GET' && (urlPath === '/' || urlPath === '/index.html')) {
-    fs.readFile(HTML_FILE, (err, data) => {
-      if (err) { res.writeHead(404); return res.end('HTML file missing'); }
+    fs.readFile(INDEX_HTML_FILE, (err, data) => {
+      if (err) { res.writeHead(404); return res.end('index.html missing'); }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(data);
+    });
+    return;
+  }
+
+  // Old home page — BOOK NOW
+  if (req.method === 'GET' && (urlPath === '/book-now' || urlPath === '/book-now.html' || urlPath === '/aditya-studio-discount-wheel.html')) {
+    fs.readFile(BOOK_NOW_HTML_FILE, (err, data) => {
+      if (err) { res.writeHead(404); return res.end('Book Now page missing'); }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(data);
+    });
+    return;
+  }
+
+  if (req.method === 'GET' && (urlPath === '/photo-frames.html' || urlPath === '/photo-frames' || urlPath === '/frames')) {
+    fs.readFile(FRAMES_HTML_FILE, (err, data) => {
+      if (err) { res.writeHead(404); return res.end('Photo Frames page missing'); }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(data);
+    });
+    return;
+  }
+
+  // Service booking form (?service=wedding|birthday|event|baby|studio|pvt|reel|other)
+  if (req.method === 'GET' && (urlPath === '/book' || urlPath === '/book-service' || urlPath === '/book-service-sample.html')) {
+    fs.readFile(BOOK_SERVICE_HTML_FILE, (err, data) => {
+      if (err) { res.writeHead(404); return res.end('Book service page missing'); }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(data);
     });
@@ -656,6 +890,179 @@ const server = http.createServer(async (req, res) => {
   }
   if (req.method === 'GET' && urlPath === '/api/notifications') {
     return sendJSON(res, 200, { ok: true, items: loadNotifs() });
+  }
+
+  /* ---- Photo Frames public APIs ---- */
+  if (req.method === 'GET' && urlPath === '/api/frames') {
+    const frames = loadFrames().map(f => ({
+      id: f.id, size: f.size, title: f.title, price: f.price,
+      discountPercent: f.discountPercent || 0, active: f.active !== false,
+      imageUrl: f.imageUrl || '', imageData: f.imageData || '', createdAt: f.createdAt
+    }));
+    return sendJSON(res, 200, { ok: true, frames });
+  }
+
+  if (req.method === 'POST' && urlPath === '/api/frame-order') {
+    try {
+      const body = await readBody(req);
+      const name = String(body.name || '').trim();
+      const mobile = String(body.mobile || '').trim();
+      const village = String(body.village || '').trim();
+      const address = String(body.address || '').trim();
+      const pincode = String(body.pincode || '').trim();
+      const district = String(body.district || '').trim();
+      const state = String(body.state || '').trim();
+      const note = String(body.note || '').trim();
+      const frameId = String(body.frameId || '').trim();
+      if (!name || !/^[6-9]\d{9}$/.test(mobile) || address.length < 5) {
+        return sendJSON(res, 400, { ok: false, error: 'invalid', message: 'Name, mobile, address zaroori hai' });
+      }
+      if (pincode && !/^\d{6}$/.test(pincode)) {
+        return sendJSON(res, 400, { ok: false, error: 'invalid', message: 'Pincode 6 digit hona chahiye' });
+      }
+      const frames = loadFrames();
+      const frame = frames.find(f => f.id === frameId && f.active !== false);
+      if (!frame) return sendJSON(res, 404, { ok: false, error: 'frame-not-found', message: 'Frame nahi mila' });
+      const price = Number(frame.price) || 0;
+      const disc = Number(frame.discountPercent) || 0;
+      let finalAmount = Math.round(price * (1 - disc / 100));
+      const orders = loadFrameOrders();
+      const orderId = nextFrameOrderId(orders);
+      const paymentClaimed = body.paymentClaimed === true || body.paymentClaimed === 'true';
+      const useWallet = body.useWallet === true || body.useWallet === 'true';
+      let walletPaid = 0;
+      let paymentStatus = paymentClaimed ? 'paid_claimed' : 'unpaid';
+      // Wallet pay (partial or full)
+      if (useWallet) {
+        const accounts = loadAccounts();
+        const acc = accounts.find(a => String(a.mobile) === mobile);
+        if (acc) {
+          ensureWallet(acc);
+          const want = Math.min(acc.walletBalance, finalAmount);
+          if (want > 0) {
+            const txn = walletTxn(acc, 'debit', want, {
+              reason: 'Frame order ' + orderId + ' — ' + (frame.title || frame.size),
+              source: 'frame_order',
+              orderId,
+              ref: orderId
+            });
+            if (txn) {
+              walletPaid = want;
+              finalAmount = finalAmount - walletPaid;
+              saveAccounts(accounts);
+              if (finalAmount <= 0) {
+                finalAmount = 0;
+                paymentStatus = 'confirmed';
+              } else if (walletPaid > 0) {
+                paymentStatus = paymentClaimed ? 'paid_claimed' : 'partial_wallet';
+              }
+            }
+          }
+        }
+      }
+      const order = {
+        orderId, frameId: frame.id, frameTitle: frame.title || '', size: frame.size,
+        price, discountPercent: disc, finalAmount: finalAmount + walletPaid,
+        amountDue: finalAmount,
+        walletPaid,
+        name, mobile, village, address, pincode, district, state, note,
+        status: 'processing',
+        paymentStatus,
+        deliveryDate: '', deliveryTime: '', adminNote: '',
+        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+      };
+      orders.unshift(order);
+      saveFrameOrders(orders);
+      // customer notification
+      const notifs = loadNotifs();
+      notifs.unshift({
+        id: 'n-' + Date.now(),
+        title: '📦 Order Received — ' + orderId,
+        body: (frame.title || 'Photo Frame') + ' (' + frame.size + ') · Total ₹' + (finalAmount + walletPaid)
+          + (walletPaid ? (' · Wallet −₹' + walletPaid) : '')
+          + (finalAmount > 0 ? (' · Due ₹' + finalAmount) : ' · Paid via Wallet')
+          + ' · Status: Processing · Payment: ' + paymentStatus,
+        at: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        mobile: mobile
+      });
+      saveNotifs(notifs.slice(0, 50));
+      console.log('Frame order:', orderId, mobile, frame.size, 'total', order.finalAmount, 'wallet', walletPaid, 'due', finalAmount, paymentStatus);
+      return sendJSON(res, 200, {
+        ok: true, orderId,
+        finalAmount: order.finalAmount,
+        amountDue: finalAmount,
+        walletPaid,
+        status: order.status,
+        paymentStatus: order.paymentStatus
+      });
+    } catch (e) {
+      console.error('frame-order', e);
+      return sendJSON(res, 500, { ok: false, error: 'server-error' });
+    }
+  }
+
+  if (req.method === 'GET' && urlPath === '/api/my-frame-orders') {
+    try {
+      const q = (req.url || '').split('?')[1] || '';
+      const params = new URLSearchParams(q);
+      const mobile = String(params.get('mobile') || '').trim();
+      if (!/^[6-9]\d{9}$/.test(mobile)) return sendJSON(res, 400, { ok: false, error: 'invalid-mobile' });
+      const orders = loadFrameOrders().filter(o => String(o.mobile) === mobile);
+      return sendJSON(res, 200, { ok: true, orders });
+    } catch (e) {
+      return sendJSON(res, 500, { ok: false, error: 'server-error' });
+    }
+  }
+
+  // Photo editing request — up to 10 photos
+  if (req.method === 'POST' && urlPath === '/api/edit-request') {
+    try {
+      const body = await readBody(req, 25e6);
+      const name = String(body.name || '').trim();
+      const mobile = String(body.mobile || '').trim();
+      const note = String(body.note || '').trim();
+      const photosIn = Array.isArray(body.photos) ? body.photos : [];
+      if (!name || !/^[6-9]\d{9}$/.test(mobile)) {
+        return sendJSON(res, 400, { ok: false, error: 'invalid', message: 'Name aur valid mobile zaroori hai' });
+      }
+      if (!photosIn.length || photosIn.length > 10) {
+        return sendJSON(res, 400, { ok: false, error: 'invalid', message: '1 se 10 photos allowed' });
+      }
+      const photos = photosIn.slice(0, 10).map((p, i) => ({
+        name: String(p.name || ('photo-' + (i + 1) + '.jpg')).slice(0, 120),
+        dataUrl: String(p.dataUrl || '').slice(0, 5e6) // safety cap per image
+      })).filter(p => p.dataUrl.indexOf('data:image') === 0);
+      if (!photos.length) {
+        return sendJSON(res, 400, { ok: false, error: 'invalid', message: 'Valid photos chahiye' });
+      }
+      const list = loadEditRequests();
+      const requestId = nextEditRequestId(list);
+      const row = {
+        requestId, name, mobile, note,
+        photoCount: photos.length,
+        photos,
+        status: 'pending',
+        createdAt: new Date().toISOString()
+      };
+      list.unshift(row);
+      saveEditRequests(list.slice(0, 100));
+      const notifs = loadNotifs();
+      notifs.unshift({
+        id: 'n-' + Date.now(),
+        title: '✏️ Editing Request — ' + requestId,
+        body: photos.length + ' photo(s) · Status: Pending',
+        at: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        mobile
+      });
+      saveNotifs(notifs.slice(0, 50));
+      console.log('Edit request:', requestId, mobile, photos.length);
+      return sendJSON(res, 200, { ok: true, requestId, photoCount: photos.length });
+    } catch (e) {
+      console.error('edit-request', e);
+      return sendJSON(res, 500, { ok: false, error: 'server-error', message: e.message || 'fail' });
+    }
   }
 
   if (req.method === 'POST' && urlPath === '/api/request-spin-otp') {
@@ -743,13 +1150,16 @@ const server = http.createServer(async (req, res) => {
       const accounts = loadAccounts();
       if (accounts.find(a => a.mobile === mobile)) return sendJSON(res, 409, { ok: false, error: 'exists' });
       const id = nextCustomerId(accounts);
-      accounts.push({
+      const acc = {
         id, name: String(body.name || '').trim(), mobile, village: String(body.village || '').trim(),
         pin, createdAt: new Date().toISOString(), visitCount: 1, lastVisitAt: new Date().toISOString(),
-        pinResetRequested: false, freeSpinUsed: false, mobileVerified: false, history: [], totalSpend: 0
-      });
+        pinResetRequested: false, freeSpinUsed: false, mobileVerified: false, history: [], totalSpend: 0,
+        adTokens: 0, spinBalance: 1, lastAdTokenClaim: '',
+        walletBalance: 0, walletHistory: []
+      };
+      accounts.push(acc);
       saveAccounts(accounts);
-      return sendJSON(res, 200, { ok: true, id });
+      return sendJSON(res, 200, { ...accountPublicPayload(acc), freeSpinGift: true });
     } catch (e) {
       return sendJSON(res, 500, { ok: false, error: 'save-failed' });
     }
@@ -767,11 +1177,7 @@ const server = http.createServer(async (req, res) => {
       acc.visitCount = (acc.visitCount || 0) + 1;
       acc.lastVisitAt = new Date().toISOString();
       saveAccounts(accounts);
-      return sendJSON(res, 200, {
-        ok: true, id: acc.id, name: acc.name, village: acc.village, mobile: acc.mobile,
-        history: publicHistory(acc), mobileVerified: !!acc.mobileVerified,
-        badge: acc.badge || null, totalSpend: acc.totalSpend || 0, freeSpinUsed: !!acc.freeSpinUsed
-      });
+      return sendJSON(res, 200, accountPublicPayload(acc));
     } catch (e) {
       return sendJSON(res, 400, { ok: false, error: 'bad-request' });
     }
@@ -785,17 +1191,194 @@ const server = http.createServer(async (req, res) => {
       const accounts = loadAccounts();
       const acc = accounts.find(a => String(a.mobile) === mobile);
       if (!acc || String(acc.pin) !== pin) return sendJSON(res, 401, { ok: false, error: 'not-found' });
-      return sendJSON(res, 200, {
-        ok: true, id: acc.id, name: acc.name, village: acc.village, mobile: acc.mobile,
-        history: publicHistory(acc), mobileVerified: !!acc.mobileVerified,
-        badge: acc.badge || null, totalSpend: acc.totalSpend || 0, freeSpinUsed: !!acc.freeSpinUsed
-      });
+      return sendJSON(res, 200, accountPublicPayload(acc));
     } catch (e) {
       return sendJSON(res, 400, { ok: false });
     }
   }
 
+  // Daily AD token — 1 per day; 10 AD tokens → 1 spin
+  if (req.method === 'POST' && urlPath === '/api/claim-ad-token') {
+    try {
+      const body = await readBody(req);
+      const mobile = String(body.mobile || '').trim();
+      const pin = String(body.pin || '').trim();
+      const accounts = loadAccounts();
+      const acc = accounts.find(a => String(a.mobile) === mobile);
+      if (!acc || String(acc.pin) !== pin) return sendJSON(res, 401, { ok: false, error: 'auth', message: 'Login required' });
+      const today = todayIST();
+      if ((acc.lastAdTokenClaim || '') === today) {
+        return sendJSON(res, 400, {
+          ok: false,
+          error: 'already-claimed',
+          message: 'Aaj ka AD Token already claim ho chuka hai',
+          ...publicTokenFields(acc)
+        });
+      }
+      acc.adTokens = (Number(acc.adTokens) || 0) + 1;
+      acc.lastAdTokenClaim = today;
+      saveAccounts(accounts);
+      return sendJSON(res, 200, {
+        ok: true,
+        message: '1 AD Token mil gaya!',
+        ...publicTokenFields(acc)
+      });
+    } catch (e) {
+      return sendJSON(res, 500, { ok: false, error: 'server-error' });
+    }
+  }
 
+  if (req.method === 'POST' && urlPath === '/api/exchange-ad-tokens') {
+    try {
+      const body = await readBody(req);
+      const mobile = String(body.mobile || '').trim();
+      const pin = String(body.pin || '').trim();
+      const accounts = loadAccounts();
+      const acc = accounts.find(a => String(a.mobile) === mobile);
+      if (!acc || String(acc.pin) !== pin) return sendJSON(res, 401, { ok: false, error: 'auth', message: 'Login required' });
+      const tokens = Number(acc.adTokens) || 0;
+      if (tokens < 10) {
+        return sendJSON(res, 400, {
+          ok: false,
+          error: 'not-enough',
+          message: '10 AD Tokens chahiye 1 spin ke liye (abhi: ' + tokens + ')',
+          ...publicTokenFields(acc)
+        });
+      }
+      acc.adTokens = tokens - 10;
+      acc.spinBalance = (Number(acc.spinBalance) || 0) + 1;
+      saveAccounts(accounts);
+      return sendJSON(res, 200, {
+        ok: true,
+        message: '10 AD Tokens → 1 Spin convert!',
+        ...publicTokenFields(acc)
+      });
+    } catch (e) {
+      return sendJSON(res, 500, { ok: false, error: 'server-error' });
+    }
+  }
+
+  /* ===== Wallet APIs ===== */
+  // Apply own active coupon → credit wallet
+  if (req.method === 'POST' && urlPath === '/api/wallet/apply-coupon') {
+    try {
+      const body = await readBody(req);
+      const mobile = String(body.mobile || '').trim();
+      const pin = String(body.pin || '').trim();
+      const couponId = String(body.couponId || '').trim();
+      if (!/^[6-9]\d{9}$/.test(mobile) || !couponId) {
+        return sendJSON(res, 400, { ok: false, error: 'invalid', message: 'Mobile aur couponId zaroori' });
+      }
+      const accounts = loadAccounts();
+      const acc = accounts.find(a => String(a.mobile) === mobile);
+      if (!acc) return sendJSON(res, 404, { ok: false, error: 'not-found', message: 'Account nahi mila' });
+      if (pin && String(acc.pin) !== pin) {
+        return sendJSON(res, 401, { ok: false, error: 'wrong-pin', message: 'PIN galat' });
+      }
+      ensureWallet(acc);
+      acc.history = acc.history || [];
+      const entry = acc.history.find(h => String(h.couponId || h.entryId || '') === couponId);
+      if (!entry) return sendJSON(res, 404, { ok: false, error: 'coupon-not-found', message: 'Coupon nahi mila' });
+      const st = entry.couponStatus || 'active';
+      if (st === 'used' || st === 'wallet_credited' || st === 'accepted' || st === 'deleted') {
+        return sendJSON(res, 400, { ok: false, error: 'already-used', message: 'Coupon pehle use / credit ho chuka hai' });
+      }
+      if (entry.expiresAt && new Date(entry.expiresAt).getTime() < Date.now()) {
+        return sendJSON(res, 400, { ok: false, error: 'expired', message: 'Coupon expire ho gaya' });
+      }
+      const rupees = couponRupeeValue(entry);
+      if (rupees <= 0) {
+        return sendJSON(res, 400, { ok: false, error: 'no-value', message: 'Is coupon me wallet credit value nahi (frame/luck)' });
+      }
+      const txn = walletTxn(acc, 'credit', rupees, {
+        reason: 'Coupon → Wallet: ' + (entry.prize || ('₹' + rupees)),
+        source: 'coupon',
+        ref: couponId,
+        couponId
+      });
+      entry.couponStatus = 'wallet_credited';
+      entry.walletCreditedAt = new Date().toISOString();
+      entry.walletCreditedAmount = rupees;
+      saveAccounts(accounts);
+      return sendJSON(res, 200, {
+        ok: true,
+        message: '₹' + rupees + ' wallet me add ho gaya!',
+        credited: rupees,
+        walletBalance: acc.walletBalance,
+        walletHistory: (acc.walletHistory || []).slice(0, 30),
+        history: publicHistory(acc)
+      });
+    } catch (e) {
+      console.error('wallet/apply-coupon', e);
+      return sendJSON(res, 500, { ok: false, error: 'server-error' });
+    }
+  }
+
+  // Redeem admin-issued wallet code (codes.json with type wallet / walletAmount)
+  if (req.method === 'POST' && urlPath === '/api/wallet/redeem-code') {
+    try {
+      const body = await readBody(req);
+      const mobile = String(body.mobile || '').trim();
+      const pin = String(body.pin || '').trim();
+      const code = String(body.code || '').trim().toUpperCase();
+      if (!/^[6-9]\d{9}$/.test(mobile) || !code) {
+        return sendJSON(res, 400, { ok: false, error: 'invalid', message: 'Mobile aur code zaroori' });
+      }
+      const accounts = loadAccounts();
+      const acc = accounts.find(a => String(a.mobile) === mobile);
+      if (!acc) return sendJSON(res, 404, { ok: false, error: 'not-found' });
+      if (pin && String(acc.pin) !== pin) return sendJSON(res, 401, { ok: false, error: 'wrong-pin' });
+      const codes = loadCodes();
+      const row = codes.find(c => String(c.code).toUpperCase() === code);
+      if (!row) return sendJSON(res, 404, { ok: false, error: 'invalid-code', message: 'Code galat hai' });
+      if (row.used) return sendJSON(res, 400, { ok: false, error: 'used', message: 'Code pehle use ho chuka' });
+      const walletAmt = Number(row.walletAmount || row.amount || 0);
+      const isWallet = row.type === 'wallet' || row.walletAmount > 0;
+      if (!isWallet || walletAmt <= 0) {
+        return sendJSON(res, 400, { ok: false, error: 'not-wallet-code', message: 'Ye spin code hai, wallet code nahi. /book-now pe use karo.' });
+      }
+      ensureWallet(acc);
+      walletTxn(acc, 'credit', walletAmt, {
+        reason: 'Wallet code: ' + code,
+        source: 'wallet_code',
+        ref: code
+      });
+      row.used = true;
+      row.usedBy = mobile;
+      row.usedAt = new Date().toISOString();
+      saveCodes(codes);
+      saveAccounts(accounts);
+      return sendJSON(res, 200, {
+        ok: true,
+        message: '₹' + walletAmt + ' wallet me add!',
+        credited: walletAmt,
+        walletBalance: acc.walletBalance,
+        walletHistory: (acc.walletHistory || []).slice(0, 30)
+      });
+    } catch (e) {
+      console.error('wallet/redeem-code', e);
+      return sendJSON(res, 500, { ok: false, error: 'server-error' });
+    }
+  }
+
+  if (req.method === 'GET' && urlPath === '/api/wallet/history') {
+    try {
+      const u = new URL(req.url, 'http://x');
+      const mobile = String(u.searchParams.get('mobile') || '').trim();
+      if (!/^[6-9]\d{9}$/.test(mobile)) return sendJSON(res, 400, { ok: false, error: 'invalid' });
+      const accounts = loadAccounts();
+      const acc = accounts.find(a => String(a.mobile) === mobile);
+      if (!acc) return sendJSON(res, 404, { ok: false, error: 'not-found' });
+      ensureWallet(acc);
+      return sendJSON(res, 200, {
+        ok: true,
+        walletBalance: acc.walletBalance,
+        walletHistory: acc.walletHistory || []
+      });
+    } catch (e) {
+      return sendJSON(res, 500, { ok: false, error: 'server-error' });
+    }
+  }
 
   if (req.method === 'POST' && urlPath === '/api/assign-work-spin') {
     try {
@@ -843,12 +1426,11 @@ const server = http.createServer(async (req, res) => {
       }
       if (!acc) return sendJSON(res, 404, { ok: false, error: 'no-account', message: 'Account server pe nahi — dubara login/register karein' });
       if (acc.freeSpinUsed) return sendJSON(res, 409, { ok: false, error: 'already-used', message: 'Free spin pehle use ho chuki hai' });
-      // Sync verify flag from client if already verified in session
+      // Welcome free spin: OTP NOT required — register gift direct spin
       if (!acc.mobileVerified && body.mobileVerified) {
         acc.mobileVerified = true;
         saveAccounts(accounts);
       }
-      if (!acc.mobileVerified) return sendJSON(res, 403, { ok: false, error: 'not-verified', message: 'Pehle mobile OTP verify karein' });
       const { prize, stats } = assignNextFreePrize();
       console.log('Free-spin assign', mobile, prize.val, 'batch left', stats.leftInBatch);
       return sendJSON(res, 200, { ok: true, prize, stats });
@@ -1064,17 +1646,156 @@ const server = http.createServer(async (req, res) => {
       const body = await readFormBody(req);
       let amount = parseInt(String(body.amount || '0').replace(/[^0-9]/g, ''), 10) || 0;
       const note = String(body.note || '').trim();
+      const codeType = String(body.codeType || 'spin').trim(); // spin | wallet
       const codes = loadCodes();
       const newCode = generateCode();
-      codes.push({ code: newCode, amount, note, used: false, usedBy: null, createdAt: new Date().toISOString(), usedAt: null });
+      const row = {
+        code: newCode,
+        amount: codeType === 'wallet' ? 0 : amount,
+        walletAmount: codeType === 'wallet' ? amount : 0,
+        type: codeType === 'wallet' ? 'wallet' : 'spin',
+        note,
+        used: false,
+        usedBy: null,
+        createdAt: new Date().toISOString(),
+        usedAt: null
+      };
+      codes.push(row);
       saveCodes(codes);
-      console.log('Code:', newCode, '₹' + amount);
-      res.writeHead(302, { Location: '/admin?code=' + encodeURIComponent(newCode) });
+      console.log('Code:', newCode, codeType, '₹' + amount);
+      res.writeHead(302, { Location: '/admin?code=' + encodeURIComponent(newCode) + (codeType === 'wallet' ? '&w=1' : '') });
       return res.end();
     } catch (e) {
       console.error('generate-code', e);
       res.writeHead(302, { Location: '/admin?code=fail' });
       return res.end();
+    }
+  }
+
+  // Admin: credit / debit customer wallet
+  if (req.method === 'POST' && urlPath === '/admin/wallet-adjust') {
+    try {
+      const body = await readFormBody(req);
+      const mobile = String(body.mobile || '').trim();
+      const type = String(body.type || 'credit').trim() === 'debit' ? 'debit' : 'credit';
+      const amount = Math.round(Number(body.amount) || 0);
+      const reason = String(body.reason || '').trim() || ('Admin ' + type);
+      const accounts = loadAccounts();
+      const acc = accounts.find(a => String(a.mobile) === mobile);
+      if (!acc || amount <= 0) {
+        res.writeHead(302, { Location: '/admin?wallet=fail#accList' });
+        return res.end();
+      }
+      ensureWallet(acc);
+      const txn = walletTxn(acc, type, amount, {
+        reason,
+        source: 'admin',
+        byAdmin: true,
+        ref: 'admin'
+      });
+      if (!txn) {
+        res.writeHead(302, { Location: '/admin?wallet=insufficient#accList' });
+        return res.end();
+      }
+      saveAccounts(accounts);
+      console.log('Admin wallet', type, mobile, amount, '→', acc.walletBalance);
+      res.writeHead(302, { Location: '/admin?wallet=ok#accList' });
+      return res.end();
+    } catch (e) {
+      console.error('wallet-adjust', e);
+      res.writeHead(302, { Location: '/admin?wallet=fail' });
+      return res.end();
+    }
+  }
+
+  /* ---- Admin: Photo Frames CRUD ---- */
+  if (req.method === 'GET' && urlPath === '/admin/frames-json') {
+    return sendJSON(res, 200, { ok: true, frames: loadFrames(), orders: loadFrameOrders() });
+  }
+
+  if (req.method === 'POST' && urlPath === '/admin/frame-save') {
+    try {
+      const body = await readBody(req);
+      const frames = loadFrames();
+      const id = String(body.id || '').trim() || ('FR-' + Date.now().toString(36));
+      const size = String(body.size || '').trim();
+      const title = String(body.title || '').trim() || size + ' Frame';
+      const price = Number(body.price) || 0;
+      const discountPercent = Math.min(90, Math.max(0, Number(body.discountPercent) || 0));
+      const active = body.active !== false && body.active !== 'false';
+      const imageData = String(body.imageData || '').slice(0, 2.5e6); // ~2.5MB cap
+      const imageUrl = String(body.imageUrl || '').trim();
+      if (!size) return sendJSON(res, 400, { ok: false, error: 'size-required' });
+      const idx = frames.findIndex(f => f.id === id);
+      const row = {
+        id, size, title, price, discountPercent, active,
+        imageData: imageData || (idx >= 0 ? frames[idx].imageData : '') || '',
+        imageUrl: imageUrl || (idx >= 0 ? frames[idx].imageUrl : '') || '',
+        createdAt: idx >= 0 ? frames[idx].createdAt : new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      if (idx >= 0) frames[idx] = row; else frames.unshift(row);
+      saveFrames(frames);
+      return sendJSON(res, 200, { ok: true, frame: { id: row.id, size: row.size, title: row.title, price: row.price, discountPercent: row.discountPercent, active: row.active } });
+    } catch (e) {
+      console.error('frame-save', e);
+      return sendJSON(res, 500, { ok: false, error: 'server-error' });
+    }
+  }
+
+  if (req.method === 'POST' && urlPath === '/admin/frame-delete') {
+    try {
+      const body = await readBody(req);
+      const id = String(body.id || '').trim();
+      let frames = loadFrames().filter(f => f.id !== id);
+      saveFrames(frames);
+      return sendJSON(res, 200, { ok: true });
+    } catch (e) {
+      return sendJSON(res, 500, { ok: false });
+    }
+  }
+
+  if (req.method === 'POST' && urlPath === '/admin/frame-order-update') {
+    try {
+      const body = await readBody(req);
+      const orderId = String(body.orderId || '').trim();
+      const orders = loadFrameOrders();
+      const ord = orders.find(o => o.orderId === orderId);
+      if (!ord) return sendJSON(res, 404, { ok: false, error: 'not-found' });
+      if (body.status) ord.status = String(body.status);
+      if (body.paymentStatus) ord.paymentStatus = String(body.paymentStatus);
+      if (body.deliveryDate !== undefined) ord.deliveryDate = String(body.deliveryDate || '');
+      if (body.deliveryTime !== undefined) ord.deliveryTime = String(body.deliveryTime || '');
+      if (body.adminNote !== undefined) ord.adminNote = String(body.adminNote || '');
+      // Admin payment confirm shortcut
+      if (body.confirmPayment === true || body.confirmPayment === 'true') {
+        ord.paymentStatus = 'confirmed';
+        if (!ord.status || ord.status === 'processing' || ord.status === 'pending') {
+          ord.status = 'confirmed';
+        }
+      }
+      ord.updatedAt = new Date().toISOString();
+      saveFrameOrders(orders);
+      // notify customer
+      const notifs = loadNotifs();
+      const stLabel = ord.status || 'updated';
+      const payLabel = ord.paymentStatus || '';
+      notifs.unshift({
+        id: 'n-' + Date.now(),
+        title: '📦 Order Update — ' + orderId,
+        body: (ord.frameTitle || 'Frame') + ' · Status: ' + stLabel
+          + (payLabel ? ' · Payment: ' + payLabel : '')
+          + (ord.deliveryDate ? ' · Delivery: ' + ord.deliveryDate + ' ' + (ord.deliveryTime || '') : '')
+          + (ord.adminNote ? ' · Note: ' + ord.adminNote : ''),
+        at: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        mobile: ord.mobile
+      });
+      saveNotifs(notifs.slice(0, 50));
+      return sendJSON(res, 200, { ok: true, order: ord });
+    } catch (e) {
+      console.error('frame-order-update', e);
+      return sendJSON(res, 500, { ok: false });
     }
   }
 
@@ -1151,6 +1872,181 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  // Banner photos — multi upload (base64) from admin — unlimited list (cap 30)
+  if (req.method === 'POST' && urlPath === '/admin/banner-upload') {
+    try {
+      const body = await readBody(req, 40e6);
+      const cur = loadSettings();
+      const items = Array.isArray(body.items) ? body.items : [];
+      if (!items.length) return sendJSON(res, 400, { ok: false, error: 'no-items' });
+      const mapped = items.slice(0, 30).map((it, i) => ({
+        url: String(it.url || it.dataUrl || '').slice(0, 2.5e6),
+        title: String(it.title || ('Banner ' + (i + 1))).slice(0, 120),
+        sub: String(it.sub || '').slice(0, 200)
+      })).filter(x => x.url);
+      if (!mapped.length) return sendJSON(res, 400, { ok: false, error: 'invalid' });
+      if (body.replace === true || body.replace === 'true') {
+        cur.offerImages = mapped;
+      } else {
+        cur.offerImages = (cur.offerImages || []).concat(mapped).slice(0, 30);
+      }
+      saveSettings(cur);
+      return sendJSON(res, 200, { ok: true, count: cur.offerImages.length });
+    } catch (e) {
+      console.error('banner-upload', e);
+      return sendJSON(res, 500, { ok: false, error: 'server-error' });
+    }
+  }
+
+  // Home hero intro text (admin editable)
+  if (req.method === 'POST' && urlPath === '/admin/save-hero-intro') {
+    try {
+      const body = await readFormBody(req);
+      const cur = loadSettings();
+      const d = defaultSettings().heroIntro;
+      cur.heroIntro = {
+        welcomeText: String(body.welcomeText || d.welcomeText).slice(0, 200),
+        welcomeDurationSec: Math.max(2, Math.min(20, Number(body.welcomeDurationSec) || d.welcomeDurationSec)),
+        eyebrow: String(body.eyebrow || d.eyebrow).slice(0, 80),
+        headline: String(body.headline || d.headline).slice(0, 120),
+        headlineGold: String(body.headlineGold || d.headlineGold).slice(0, 80),
+        headlineRest: String(body.headlineRest || d.headlineRest).slice(0, 80),
+        subtext: String(body.subtext || d.subtext).slice(0, 400),
+        btnPrimary: String(body.btnPrimary || d.btnPrimary).slice(0, 60),
+        btnSecondary: String(body.btnSecondary || d.btnSecondary).slice(0, 60)
+      };
+      saveSettings(cur);
+      res.writeHead(302, { Location: '/admin?hero=ok#sec-hero' });
+      return res.end();
+    } catch (e) {
+      res.writeHead(302, { Location: '/admin?hero=fail#sec-hero' });
+      return res.end();
+    }
+  }
+
+  // 3D frames shop sample photos (rotate in viewer)
+  if (req.method === 'POST' && urlPath === '/admin/frames3d-upload') {
+    try {
+      const body = await readBody(req, 40e6);
+      const cur = loadSettings();
+      const items = Array.isArray(body.items) ? body.items : [];
+      if (!items.length) return sendJSON(res, 400, { ok: false, error: 'no-items' });
+      const mapped = items.slice(0, 20).map((it, i) => ({
+        url: String(it.url || it.dataUrl || '').slice(0, 2.5e6),
+        title: String(it.title || ('Photo ' + (i + 1))).slice(0, 80)
+      })).filter(x => x.url);
+      if (!mapped.length) return sendJSON(res, 400, { ok: false, error: 'invalid' });
+      if (body.replace === true || body.replace === 'true') {
+        cur.frames3dPhotos = mapped;
+      } else {
+        cur.frames3dPhotos = (cur.frames3dPhotos || []).concat(mapped).slice(0, 30);
+      }
+      saveSettings(cur);
+      return sendJSON(res, 200, { ok: true, count: (cur.frames3dPhotos || []).length });
+    } catch (e) {
+      console.error('frames3d-upload', e);
+      return sendJSON(res, 500, { ok: false, error: 'server-error' });
+    }
+  }
+  if (req.method === 'POST' && urlPath === '/admin/frames3d-clear') {
+    try {
+      const cur = loadSettings();
+      cur.frames3dPhotos = [];
+      saveSettings(cur);
+      return sendJSON(res, 200, { ok: true, count: 0 });
+    } catch (e) {
+      return sendJSON(res, 500, { ok: false, error: 'server-error' });
+    }
+  }
+
+  // Home page hero floating-frame photos (max 5)
+  if (req.method === 'POST' && urlPath === '/admin/home-hero-frame-upload') {
+    try {
+      const body = await readBody(req, 25e6);
+      const cur = loadSettings();
+      const items = Array.isArray(body.items) ? body.items : [];
+      if (!items.length) return sendJSON(res, 400, { ok: false, error: 'no-items' });
+      const mapped = items.slice(0, 5).map((it, i) => ({
+        url: String(it.url || it.dataUrl || '').slice(0, 2.5e6),
+        title: String(it.title || ('Hero ' + (i + 1))).slice(0, 80)
+      })).filter(x => x.url);
+      if (!mapped.length) return sendJSON(res, 400, { ok: false, error: 'invalid' });
+      if (body.replace === true || body.replace === 'true') {
+        cur.homeHeroFramePhotos = mapped.slice(0, 5);
+      } else {
+        cur.homeHeroFramePhotos = (cur.homeHeroFramePhotos || []).concat(mapped).slice(0, 5);
+      }
+      saveSettings(cur);
+      return sendJSON(res, 200, { ok: true, count: (cur.homeHeroFramePhotos || []).length });
+    } catch (e) {
+      console.error('home-hero-frame-upload', e);
+      return sendJSON(res, 500, { ok: false, error: 'server-error' });
+    }
+  }
+  if (req.method === 'POST' && urlPath === '/admin/home-hero-frame-clear') {
+    try {
+      const cur = loadSettings();
+      cur.homeHeroFramePhotos = [];
+      saveSettings(cur);
+      return sendJSON(res, 200, { ok: true, count: 0 });
+    } catch (e) {
+      return sendJSON(res, 500, { ok: false, error: 'server-error' });
+    }
+  }
+
+  // Hero section SIDE background photos (4–6) + duration
+  if (req.method === 'POST' && urlPath === '/admin/hero-side-bg-upload') {
+    try {
+      const body = await readBody(req, 30e6);
+      const cur = loadSettings();
+      const items = Array.isArray(body.items) ? body.items : [];
+      if (!items.length) return sendJSON(res, 400, { ok: false, error: 'no-items' });
+      const mapped = items.slice(0, 6).map((it, i) => ({
+        url: String(it.url || it.dataUrl || '').slice(0, 2.5e6),
+        title: String(it.title || ('BG ' + (i + 1))).slice(0, 80)
+      })).filter(x => x.url);
+      if (!mapped.length) return sendJSON(res, 400, { ok: false, error: 'invalid' });
+      if (body.replace === true || body.replace === 'true') {
+        cur.heroSideBgPhotos = mapped.slice(0, 6);
+      } else {
+        cur.heroSideBgPhotos = (cur.heroSideBgPhotos || []).concat(mapped).slice(0, 6);
+      }
+      if (body.durationSec != null) {
+        cur.heroSideBgDurationSec = Math.max(2, Math.min(20, Number(body.durationSec) || 5));
+      }
+      saveSettings(cur);
+      return sendJSON(res, 200, {
+        ok: true,
+        count: (cur.heroSideBgPhotos || []).length,
+        durationSec: cur.heroSideBgDurationSec
+      });
+    } catch (e) {
+      console.error('hero-side-bg-upload', e);
+      return sendJSON(res, 500, { ok: false, error: 'server-error' });
+    }
+  }
+  if (req.method === 'POST' && urlPath === '/admin/hero-side-bg-duration') {
+    try {
+      const body = await readBody(req, 1e5);
+      const cur = loadSettings();
+      cur.heroSideBgDurationSec = Math.max(2, Math.min(20, Number(body.durationSec) || 5));
+      saveSettings(cur);
+      return sendJSON(res, 200, { ok: true, durationSec: cur.heroSideBgDurationSec });
+    } catch (e) {
+      return sendJSON(res, 500, { ok: false, error: 'server-error' });
+    }
+  }
+  if (req.method === 'POST' && urlPath === '/admin/hero-side-bg-clear') {
+    try {
+      const cur = loadSettings();
+      cur.heroSideBgPhotos = [];
+      saveSettings(cur);
+      return sendJSON(res, 200, { ok: true, count: 0 });
+    } catch (e) {
+      return sendJSON(res, 500, { ok: false, error: 'server-error' });
+    }
+  }
+
   if (req.method === 'POST' && urlPath === '/admin/save-book-images') {
     try {
       const body = await readFormBody(req);
@@ -1160,11 +2056,31 @@ const server = http.createServer(async (req, res) => {
         if (body[k] != null && String(body[k]).trim()) cur.bookImages[k] = String(body[k]).trim();
       });
       saveSettings(cur);
-      res.writeHead(302, { Location: '/admin?books=ok' });
+      res.writeHead(302, { Location: '/admin?books=ok#sec-book' });
       return res.end();
     } catch (e) {
-      res.writeHead(302, { Location: '/admin?books=fail' });
+      res.writeHead(302, { Location: '/admin?books=fail#sec-book' });
       return res.end();
+    }
+  }
+
+  // Book card photo — direct file upload (base64 JSON)
+  if (req.method === 'POST' && urlPath === '/admin/book-image-upload') {
+    try {
+      const body = await readBody(req, 8e6);
+      const key = String(body.key || '').trim().toLowerCase();
+      const allowed = ['wedding', 'birthday', 'personal', 'reel', 'event', 'other'];
+      if (!allowed.includes(key)) return sendJSON(res, 400, { ok: false, error: 'invalid-key' });
+      const url = String(body.url || body.dataUrl || '').slice(0, 2.5e6);
+      if (!url || !url.startsWith('data:image/')) return sendJSON(res, 400, { ok: false, error: 'invalid-image' });
+      const cur = loadSettings();
+      cur.bookImages = cur.bookImages || {};
+      cur.bookImages[key] = url;
+      saveSettings(cur);
+      return sendJSON(res, 200, { ok: true, key, preview: url.slice(0, 80) + '…' });
+    } catch (e) {
+      console.error('book-image-upload', e);
+      return sendJSON(res, 500, { ok: false, error: 'server-error' });
     }
   }
 
@@ -1348,16 +2264,19 @@ const server = http.createServer(async (req, res) => {
       return '<div class="msg-card"><div class="msg-text">🔔 <b>' + esc(acc.name) + '</b> (' + esc(acc.mobile) + ')</div><div class="msg-actions"><form method="POST" action="/admin/reset-pin" style="display:flex;gap:6px"><input type="hidden" name="mobile" value="' + esc(acc.mobile) + '"><input class="inp" name="newPin" placeholder="Naya PIN" maxlength="4"><button class="gen-btn" type="submit">Reset → WA</button></form></div></div>';
     }).join('') || '<div class="muted">No PIN resets</div>';
 
-        const codeRows = codes.filter(c => !c.couponAccepted).map(c =>
-      '<tr><td class="mono">' + esc(c.code) + '</td>'
-      + '<td>₹' + esc(c.amount != null ? c.amount : '—') + '</td>'
+        const codeRows = codes.filter(c => !c.couponAccepted).map(c => {
+      const isW = c.type === 'wallet' || (Number(c.walletAmount) > 0);
+      const amtShow = isW ? ('💰 ₹' + (c.walletAmount || c.amount || 0)) : ('₹' + (c.amount != null ? c.amount : '—'));
+      const typeLabel = isW ? '<span class="tag">Wallet</span>' : '<span class="muted">Spin</span>';
+      return '<tr><td class="mono">' + esc(c.code) + '</td>'
+      + '<td>' + amtShow + ' ' + typeLabel + '</td>'
       + '<td>' + (c.used ? '<span class="bad">Used</span>' : '<span class="ok">Unused</span>') + '</td>'
       + '<td>' + esc(c.usedBy || '—') + '</td>'
-      + '<td>' + esc(c.prize || (c.discount != null ? c.discount + '%' : (c.used ? 'Spin pending/unknown' : '—'))) + '</td>'
+      + '<td>' + esc(c.prize || (c.discount != null ? c.discount + '%' : (isW ? 'Wallet credit' : (c.used ? 'Spin pending/unknown' : '—')))) + '</td>'
       + '<td>' + esc(fmtDate(c.createdAt)) + '</td>'
       + '<td>' + esc(c.usedAt ? fmtDate(c.usedAt) : '—') + '</td>'
-      + '<td><form method="POST" action="/admin/delete-spin-code" style="display:inline" onsubmit="return confirm(\'Delete code '+esc(c.code)+'?\')"><input type="hidden" name="code" value="'+esc(c.code)+'"><button type="submit" style="padding:3px 8px;font-size:11px;background:#5a1a1a;color:#fca5a5;border:1px solid #7f1d1d;border-radius:6px;cursor:pointer">🗑</button></form></td></tr>'
-    ).join('') || '<tr><td colspan="8">No codes yet (accepted coupons auto-hidden)</td></tr>';
+      + '<td><form method="POST" action="/admin/delete-spin-code" style="display:inline" onsubmit="return confirm(\'Delete code '+esc(c.code)+'?\')"><input type="hidden" name="code" value="'+esc(c.code)+'"><button type="submit" style="padding:3px 8px;font-size:11px;background:#5a1a1a;color:#fca5a5;border:1px solid #7f1d1d;border-radius:6px;cursor:pointer">🗑</button></form></td></tr>';
+    }).join('') || '<tr><td colspan="8">No codes yet (accepted coupons auto-hidden)</td></tr>';
 
     function lastPrize(acc) {
       const h = (acc.history || []).slice().reverse();
@@ -1385,7 +2304,7 @@ const server = http.createServer(async (req, res) => {
         if (st === 'deleted') return '';
         const statusBadge = st === 'accepted'
           ? '<span class="ok">Accepted / Used</span>'
-          : '<span class="tag">Active</span>';
+          : (st === 'wallet_credited' ? '<span class="ok">→ Wallet</span>' : (st === 'used' ? '<span class="ok">Used</span>' : '<span class="tag">Active</span>'));
         const actions = st === 'active'
           ? ('<form method="POST" action="/admin/coupon-action" style="display:inline-flex;gap:4px;flex-wrap:wrap">'
             + '<input type="hidden" name="mobile" value="' + esc(acc.mobile) + '">'
@@ -1403,6 +2322,13 @@ const server = http.createServer(async (req, res) => {
           + '<td>' + esc(fmtDate(h.timestamp)) + '<br><span class="muted">Exp: ' + esc(exp) + '</span></td>'
           + '<td>' + actions + '</td></tr>';
       }).filter(Boolean).join('') || '<tr><td colspan="5" class="muted">No coupons</td></tr>';
+      const wBal = Number(acc.walletBalance) || 0;
+      const wHist = (acc.walletHistory || []).slice(0, 12);
+      const wHistRows = wHist.map(function(w) {
+        const sign = w.type === 'credit' ? '+' : '−';
+        const col = w.type === 'credit' ? '#7dcea0' : '#f0a0a0';
+        return '<tr><td style="color:' + col + '">' + sign + '₹' + esc(w.amount) + '</td><td>₹' + esc(w.balanceAfter) + '</td><td>' + esc(w.reason || w.source || '') + '</td><td class="muted">' + esc(fmtDate(w.timestamp)) + '</td></tr>';
+      }).join('') || '<tr><td colspan="4" class="muted">No wallet history</td></tr>';
       const todayStr = new Date().toDateString();
       const isNewToday = acc.createdAt && new Date(acc.createdAt).toDateString() === todayStr;
       const filters = [
@@ -1421,14 +2347,25 @@ const server = http.createServer(async (req, res) => {
         '<input type="hidden" name="mobile" value="' + esc(acc.mobile) + '">' +
         '<button type="submit" style="padding:6px 12px;font-size:12px;background:#5a1a1a;color:#fca5a5;border:1px solid #7f1d1d;border-radius:6px;cursor:pointer">🗑 Delete account</button></form>' +
         '</div>';
+      const walletBox =
+        '<div class="lbl" style="margin-top:14px">💰 Wallet · ₹' + esc(wBal) + '</div>' +
+        '<form method="POST" action="/admin/wallet-adjust" class="form-row" style="margin:8px 0;flex-wrap:wrap;gap:6px">' +
+        '<input type="hidden" name="mobile" value="' + esc(acc.mobile) + '">' +
+        '<select name="type" class="inp" style="max-width:110px"><option value="credit">+ Credit</option><option value="debit">− Debit</option></select>' +
+        '<input class="inp" name="amount" type="number" min="1" placeholder="₹ Amount" required style="max-width:110px">' +
+        '<input class="inp" name="reason" placeholder="Reason" style="max-width:160px">' +
+        '<button class="gen-btn" type="submit" style="padding:6px 12px;font-size:12px">Apply</button></form>' +
+        '<table style="margin-top:6px"><thead><tr><th>Amt</th><th>Bal</th><th>Reason</th><th>Time</th></tr></thead><tbody>' + wHistRows + '</tbody></table>';
       return '<details class="acc" data-filter="' + filters + '" data-id="' + esc(acc.id) + '"><summary><span class="c-id">' + esc(acc.id) + '</span> <b>' + esc(acc.name) + '</b> <span class="muted">' + esc(acc.mobile) + '</span> ' +
         (acc.mobileVerified ? '<span class="ok">✓ Verified</span>' : '<span class="bad">✗ Unverified</span>') +
-        ' <span class="tag">' + esc(acc.badge || tierName(acc.totalSpend || 0)) + '</span></summary><div class="acc-body"><div class="grid">' +
+        ' <span class="tag">' + esc(acc.badge || tierName(acc.totalSpend || 0)) + '</span>' +
+        ' <span class="tag" style="background:rgba(212,175,55,0.2)">💰 ₹' + esc(wBal) + '</span></summary><div class="acc-body"><div class="grid">' +
         '<div><span class="lbl">PIN</span><div class="mono gold">' + esc(acc.pin) + '</div></div>' +
         '<div><span class="lbl">Village</span><div>' + esc(acc.village || '—') + '</div></div>' +
         '<div><span class="lbl">Total spend</span><div>₹' + esc(acc.totalSpend || 0) + '</div></div>' +
-        '<div><span class="lbl">Last prize</span><div>' + esc(lastPrize(acc)) + '</div></div></div>' +
+        '<div><span class="lbl">Wallet</span><div class="gold">₹' + esc(wBal) + '</div></div></div>' +
         adminBtns +
+        walletBox +
         '<div class="lbl" style="margin-top:12px">Coupons</div>' +
         '<table><thead><tr><th>Coupon</th><th>From</th><th>Status</th><th>Time</th><th>Action</th></tr></thead><tbody>' + couponRows + '</tbody></table></div></details>';
     }).join('') || '<p class="muted">No customers yet</p>';
@@ -1436,31 +2373,89 @@ const server = http.createServer(async (req, res) => {
     const html = `<!DOCTYPE html><html lang="hi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Aditya Studio Admin</title>
 <style>
-*{box-sizing:border-box}body{font-family:system-ui,sans-serif;background:#0F0C09;color:#F4EAD6;padding:20px;margin:0}
-h1{color:#D4AF37;font-size:1.4rem}h2{color:#D4AF37;font-size:1.05rem;margin:28px 0 12px}
-.sub{color:#B7A480;font-size:13px;margin-bottom:16px}.sub a{color:#D4AF37}
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:16px 0}
-.card-click{cursor:pointer;transition:transform .15s,box-shadow .15s}.card-click:hover{transform:translateY(-2px);box-shadow:0 0 14px rgba(212,175,55,0.35);border-color:rgba(212,175,55,0.6)}.card-click.active-filter{outline:2px solid #D4AF37}.card{background:#1B140F;border:1px solid rgba(212,175,55,0.2);border-radius:12px;padding:14px}
-.card .n{font-size:1.5rem;font-weight:800;color:#FFD700}.card .l{font-size:11px;color:#B7A480;text-transform:uppercase}
-.codes-block,.msg-card,.acc{border:1px solid rgba(212,175,55,0.15);border-radius:12px;padding:14px;margin-bottom:12px;background:#150f0b}
-.gen-btn{background:linear-gradient(180deg,#F3DE9A,#D4AF37);color:#241804;border:none;padding:9px 14px;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px;text-decoration:none;display:inline-block}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{font-family:Inter,system-ui,sans-serif;background:#0a0806;color:#F4EAD6;margin:0;min-height:100vh}
+a{color:#D4AF37;text-decoration:none}
+.layout{display:flex;min-height:100vh}
+.sidebar{width:240px;background:#120e0a;border-right:1px solid rgba(212,175,55,.15);padding:20px 14px;position:fixed;top:0;left:0;bottom:0;overflow-y:auto;z-index:40}
+.sidebar .brand{font-size:1.1rem;font-weight:700;color:#D4AF37;margin-bottom:4px;letter-spacing:.02em}
+.sidebar .brand-sub{font-size:11px;color:#8a7a62;margin-bottom:20px}
+.nav-link{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:8px;color:#c4b496;font-size:13px;margin-bottom:3px;transition:.15s}
+.nav-link:hover,.nav-link.active{background:rgba(212,175,55,.12);color:#F3DE9A}
+.main{margin-left:240px;flex:1;padding:24px 28px 80px;max-width:1100px}
+.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px;flex-wrap:wrap;gap:12px}
+.topbar h1{margin:0;font-size:1.35rem;color:#F4EAD6;font-weight:600}
+.topbar .links a{margin-left:12px;font-size:13px;color:#B7A480}
+.topbar .links a:hover{color:#D4AF37}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:28px}
+.card{background:linear-gradient(160deg,#1a1410,#120e0a);border:1px solid rgba(212,175,55,.18);border-radius:14px;padding:16px}
+.card-click{cursor:pointer;transition:transform .15s,border-color .15s}
+.card-click:hover{transform:translateY(-2px);border-color:rgba(212,175,55,.45)}
+.card-click.active-filter{border-color:#D4AF37;box-shadow:0 0 0 1px #D4AF37}
+.card .n{font-size:1.55rem;font-weight:800;color:#FFD700;line-height:1.1}
+.card .l{font-size:11px;color:#8a7a62;text-transform:uppercase;margin-top:6px;letter-spacing:.04em}
+.panel{background:#120e0a;border:1px solid rgba(212,175,55,.12);border-radius:16px;padding:20px 22px;margin-bottom:22px}
+.panel h2{margin:0 0 14px;font-size:1rem;color:#D4AF37;font-weight:600;display:flex;align-items:center;gap:8px}
+.panel h2 span.badge{background:rgba(212,175,55,.15);color:#F3DE9A;font-size:11px;padding:2px 8px;border-radius:99px}
+.sub{color:#8a7a62;font-size:13px;margin:0 0 14px;line-height:1.45}
+.codes-block,.msg-card,.acc{border:1px solid rgba(212,175,55,.1);border-radius:12px;padding:14px;margin-bottom:10px;background:#0d0a08}
+.gen-btn{background:linear-gradient(180deg,#F3DE9A,#D4AF37);color:#241804;border:none;padding:9px 16px;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px;text-decoration:none;display:inline-block}
+.gen-btn:hover{filter:brightness(1.05)}
 .wa-link{background:linear-gradient(180deg,#3ee06b,#25D366);color:#062}
+.btn-danger{padding:6px 12px;font-size:12px;background:#3a1515;color:#fca5a5;border:1px solid #7f1d1d;border-radius:6px;cursor:pointer}
 .msg-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
-.otp-big{color:#FFD700;font-size:1.3rem;letter-spacing:3px;font-family:monospace}
-.muted{color:#B7A480}.ok{color:#8fd19e;font-weight:600;font-size:12px}.bad{color:#e08a8a;font-weight:600;font-size:12px}
-.tag{background:rgba(255,215,0,0.12);color:#FFD700;padding:2px 8px;border-radius:99px;font-size:11px}
-.mono{font-family:monospace}.gold{color:#FFD700}
+.otp-big{color:#FFD700;font-size:1.3rem;letter-spacing:3px;font-family:ui-monospace,monospace}
+.muted{color:#8a7a62}.ok{color:#8fd19e;font-weight:600;font-size:12px}.bad{color:#e08a8a;font-weight:600;font-size:12px}
+.tag{background:rgba(255,215,0,.12);color:#FFD700;padding:2px 8px;border-radius:99px;font-size:11px}
+.mono{font-family:ui-monospace,monospace}.gold{color:#FFD700}
 table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}
-th,td{padding:8px;border-bottom:1px solid #2a2018;text-align:left}th{color:#D4AF37;font-size:11px;text-transform:uppercase}
-.inp{background:#0C0906;border:1px solid rgba(212,175,55,0.3);border-radius:6px;padding:6px 8px;color:#F4EAD6;width:100px}
-.acc summary{cursor:pointer}.c-id{color:#D4AF37;font-family:monospace}
+th,td{padding:10px 8px;border-bottom:1px solid #221a14;text-align:left}th{color:#D4AF37;font-size:11px;text-transform:uppercase;letter-spacing:.03em}
+.inp,textarea,select.inp{background:#0a0806;border:1px solid rgba(212,175,55,.28);border-radius:8px;padding:8px 10px;color:#F4EAD6;font-size:13px}
+.inp{width:100%;max-width:100%}
+.form-grid{display:grid;gap:10px;max-width:520px}
+.form-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.acc summary{cursor:pointer;padding:4px 0}.c-id{color:#D4AF37;font-family:ui-monospace,monospace}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin:10px 0}
-.lbl{font-size:10px;color:#B7A480;text-transform:uppercase}
-#search{width:100%;max-width:360px;padding:10px;border-radius:8px;border:1px solid rgba(212,175,55,0.3);background:#0C0906;color:#F4EAD6;margin-bottom:12px}
-label.muted{display:block;font-size:12px}
+.lbl{font-size:10px;color:#8a7a62;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
+#search{width:100%;max-width:360px;padding:11px 14px;border-radius:10px;border:1px solid rgba(212,175,55,.28);background:#0a0806;color:#F4EAD6;margin-bottom:14px}
+label.muted{display:block;font-size:12px;margin-bottom:2px}
+.field-file{font-size:12px;color:#B7A480}
+#liveBar{position:fixed;bottom:16px;right:16px;background:#1B140F;border:1px solid rgba(212,175,55,.35);border-radius:12px;padding:10px 14px;font-size:12px;color:#B7A480;z-index:99;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+@media(max-width:900px){
+  .sidebar{width:100%;position:relative;border-right:none;border-bottom:1px solid rgba(212,175,55,.15)}
+  .layout{flex-direction:column}
+  .main{margin-left:0;padding:16px}
+  .nav-link{display:inline-flex;margin:2px}
+}
 </style></head><body>
-<h1>Aditya Studio — Admin</h1>
-<div class="sub"><a href="/">Customer page</a></div>
+<div class="layout">
+<aside class="sidebar">
+  <div class="brand">Aditya Studio</div>
+  <div class="brand-sub">Admin Dashboard</div>
+  <a class="nav-link" href="#sec-overview">📊 Overview</a>
+  <a class="nav-link" href="#sec-orders">📦 Frame Orders</a>
+  <a class="nav-link" href="#sec-frames">🖼️ Frame Types</a>
+  <a class="nav-link" href="#sec-banner">🎬 Home Banner</a>
+  <a class="nav-link" href="#sec-hero">✨ Hero Text + BG Photos</a>
+  <a class="nav-link" href="#sec-home-frame">🖼️ Home 3D Frame (5 photos)</a>
+  <a class="nav-link" href="#sec-book">📷 Book Cards</a>
+  <a class="nav-link" href="#sec-otp">📱 OTP / PIN</a>
+  <a class="nav-link" href="#sec-codes">🎫 Spin Codes</a>
+  <a class="nav-link" href="#sec-customers">👥 Customers</a>
+  <a class="nav-link" href="#sec-notif">🔔 Notifications</a>
+  <a class="nav-link" href="#sec-backup">💾 Backup</a>
+  <div style="margin-top:20px;padding-top:14px;border-top:1px solid rgba(212,175,55,.12)">
+    <a class="nav-link" href="/" target="_blank">↗ Open storefront</a>
+  </div>
+</aside>
+<main class="main">
+<div class="topbar">
+  <h1>Dashboard</h1>
+  <div class="links"><a href="/">Home</a><a href="/book-now">Studio page</a></div>
+</div>
+
+<section class="panel" id="sec-overview">
+<h2>Overview</h2>
 <div class="cards">
 <div class="card card-click" onclick="filterPanel('all')" title="Saare customers"><div class="n" id="cntCust">${accounts.length}</div><div class="l">Customers</div></div>
 <div class="card card-click" onclick="filterPanel('today')" title="Aaj naye"><div class="n" id="cntToday">${newToday}</div><div class="l">Aaj naye</div></div>
@@ -1470,27 +2465,208 @@ label.muted{display:block;font-size:12px}
 <div class="card card-click" onclick="filterPanel('freespin')" title="Free spin used"><div class="n" id="cntFree">${freeUsed}</div><div class="l">Free spin used</div></div>
 <div class="card card-click" onclick="filterPanel('codes')" title="Unused codes"><div class="n" id="cntCodes">${codes.filter(c=>!c.used).length}</div><div class="l">Unused codes</div></div>
 </div>
-<div id="filterBar" style="display:none;margin:8px 0 16px;padding:10px 14px;background:#1B140F;border:1px solid rgba(212,175,55,0.35);border-radius:10px;align-items:center;gap:10px;flex-wrap:wrap">
+<div id="filterBar" style="display:none;margin-top:4px;padding:10px 14px;background:#1B140F;border:1px solid rgba(212,175,55,0.35);border-radius:10px;align-items:center;gap:10px;flex-wrap:wrap">
 <span style="color:#D4AF37;font-weight:700" id="filterLabel">Filter:</span>
 <button type="button" class="gen-btn" style="padding:6px 12px;font-size:12px" onclick="filterPanel('all')">Show all</button>
 </div>
+</section>
 
-<h2>💾 Backup</h2>
-<div class="codes-block">
-<a class="gen-btn" href="/admin/backup">⬇️ Backup</a>
-<form method="POST" action="/admin/restore" enctype="multipart/form-data" style="display:inline-flex;gap:8px;margin-left:8px;flex-wrap:wrap">
-<input type="file" name="backup" accept=".json" required style="color:#F4EAD6;font-size:12px">
-<button class="gen-btn" type="submit">⬆️ Restore</button>
-</form>
+<section class="panel" id="sec-orders">
+<h2>📦 Frame Orders</h2>
+<p class="sub">Customer frame orders — status, payment confirm, delivery date/time.</p>
+<div id="adminOrdersList" class="muted">Loading orders…</div>
+</section>
+
+<section class="panel" id="sec-frames">
+<h2>🖼️ Frame Types</h2>
+<p class="sub">Har size ke alag frame types (name + photo). Customer detail mein type select + photo dikhega. <a href="/">Storefront →</a></p>
+<div class="form-grid" style="margin-bottom:16px">
+<label class="muted">Size
+<select id="frSize" class="inp">
+<option>8x12</option><option>10x12</option><option>10x15</option><option>12x15</option>
+<option>12x18</option><option>12x36</option><option>16x20</option><option>16x24</option>
+<option>20x24</option><option>20x30</option><option>20x40</option><option>20x50</option>
+<option>24x36</option><option>24x40</option><option>24x50</option>
+</select></label>
+<label class="muted">Frame Type name<input class="inp" id="frTitle" placeholder="Golden Border / Wooden Classic"></label>
+<label class="muted">Price ₹<input class="inp" id="frPrice" type="number" min="0" placeholder="500" style="max-width:140px"></label>
+<label class="muted">Discount %<input class="inp" id="frDisc" type="number" min="0" max="90" placeholder="10" style="max-width:140px"></label>
+<label class="muted">Frame Type photo<input type="file" id="frFile" accept="image/*" class="field-file"></label>
+<button class="gen-btn" type="button" onclick="adminSaveFrame()">💾 Save Frame Type</button>
 </div>
+<div id="adminFramesList" class="muted">Loading frames…</div>
+</section>
 
-<h2>🔔 Send Notification</h2>
-<div class="codes-block">
-<form method="POST" action="/admin/send-notification" style="display:flex;flex-direction:column;gap:8px;max-width:480px">
-<input class="inp" name="title" placeholder="Title" style="width:100%">
-<textarea name="body" rows="3" placeholder="Message..." required style="width:100%;background:#0C0906;border:1px solid rgba(212,175,55,0.3);border-radius:8px;color:#F4EAD6;padding:8px"></textarea>
+<section class="panel" id="sec-banner">
+<h2>🎬 Home Banner</h2>
+<p class="sub">Ek hi jagah se jitni chahe banners upload karo (max 30). Har photo ~2MB tak. Frames home + offers carousel dono me use hoti hain.</p>
+<p class="muted" style="margin-bottom:10px">Abhi banners: <b>${(settings.offerImages||[]).length}</b></p>
+<div class="form-grid" style="margin-bottom:16px">
+<label class="muted">Photos choose (multiple select)
+<input type="file" id="bannerFiles" accept="image/*" multiple class="field-file"></label>
+<label class="muted">Default title<input class="inp" id="bannerTitle" placeholder="Aditya Studio" value="Aditya Studio"></label>
+<label class="muted">Default subtitle<input class="inp" id="bannerSub" placeholder="Museum-quality frames"></label>
+<label class="muted" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+<input type="checkbox" id="bannerReplace"> Purani saari hata ke sirf nayi rakho</label>
+<button class="gen-btn" type="button" onclick="adminUploadBanners()">📤 Upload (jitni select ki)</button>
+<p id="bannerUploadStatus" class="muted"></p>
+</div>
+</section>
+
+<section class="panel" id="sec-hero">
+<h2>✨ Home Hero Text + Side Background</h2>
+<p class="sub">Text cycle + hero section ke <b>sides</b> pe background photos (slideshow).</p>
+
+<form method="POST" action="/admin/save-hero-intro" class="form-grid">
+<label class="muted">Welcome text (sparkly)
+<input class="inp" name="welcomeText" value="${esc((settings.heroIntro||{}).welcomeText||'Aditya Studio me aapka swagat hai')}"></label>
+<label class="muted">Text hold duration (seconds)
+<input class="inp" name="welcomeDurationSec" type="number" min="2" max="20" value="${esc((settings.heroIntro||{}).welcomeDurationSec||5)}" style="max-width:120px"></label>
+<label class="muted">Second text (cycle)
+<input class="inp" name="eyebrow" value="${esc((settings.heroIntro||{}).eyebrow||'Premium Photography')}"></label>
+<input type="hidden" name="headline" value="${esc((settings.heroIntro||{}).headline||'Preserving Memories in')}"/>
+<input type="hidden" name="headlineGold" value="${esc((settings.heroIntro||{}).headlineGold||'Aurelian Noir')}"/>
+<input type="hidden" name="headlineRest" value="${esc((settings.heroIntro||{}).headlineRest||'Excellence')}"/>
+<input type="hidden" name="subtext" value="${esc((settings.heroIntro||{}).subtext||'')}"/>
+<input type="hidden" name="btnPrimary" value="${esc((settings.heroIntro||{}).btnPrimary||'Book a Session')}"/>
+<input type="hidden" name="btnSecondary" value="${esc((settings.heroIntro||{}).btnSecondary||'View Portfolio')}"/>
+<button class="gen-btn" type="submit">💾 Save Hero Text</button>
+</form>
+
+<hr style="border:none;border-top:1px solid rgba(212,175,55,.2);margin:20px 0">
+
+<h3 style="color:#f2ca50;margin:0 0 8px;font-size:1.05rem">🖼️ Hero Side Background Photos</h3>
+<p class="sub">Sirf hero block ke peeche / sides pe dikhengi. Max <b>6</b> · duration set kar sakte ho.</p>
+<p class="muted">Abhi: <b>${(settings.heroSideBgPhotos||[]).length}</b> / 6 · Duration: <b>${settings.heroSideBgDurationSec||5}</b>s</p>
+<div style="display:flex;flex-wrap:wrap;gap:10px;margin:12px 0">
+${(function(){
+  const list = settings.heroSideBgPhotos || [];
+  if (!list.length) return '<span class="muted">Abhi koi photo nahi — neeche se upload karo</span>';
+  return list.map((p,i)=>{
+    const u = typeof p === 'string' ? p : (p&&p.url)||'';
+    if (!u) return '';
+    return '<img src="'+esc(u)+'" alt="#'+(i+1)+'" style="width:100px;height:64px;object-fit:cover;border-radius:8px;border:1px solid rgba(212,175,55,.45)"/>';
+  }).join('');
+})()}
+</div>
+<div class="form-grid">
+<label class="muted">Photos choose (multiple · max 6)
+<input type="file" id="heroBgFiles" accept="image/*" multiple class="field-file"></label>
+<label class="muted">BG change duration (seconds)
+<input class="inp" type="number" id="heroBgDuration" min="2" max="20" value="${esc(settings.heroSideBgDurationSec||5)}" style="max-width:120px"></label>
+<label class="muted" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+<input type="checkbox" id="heroBgReplace" checked> Purani hata ke nayi</label>
+<button class="gen-btn" type="button" onclick="adminUploadHeroSideBg()">📤 Upload Background Photos</button>
+<button type="button" onclick="adminSaveHeroBgDuration()" style="padding:8px 12px;background:#2a2418;color:#f2ca50;border:1px solid rgba(212,175,55,.4);border-radius:8px;cursor:pointer">⏱ Only duration save</button>
+<button type="button" onclick="adminClearHeroSideBg()" style="padding:8px 12px;background:#5a1a1a;color:#fca5a5;border:1px solid #7f1d1d;border-radius:8px;cursor:pointer">🗑 Clear BG</button>
+<p id="heroBgStatus" class="muted"></p>
+</div>
+</section>
+
+<section class="panel" id="sec-home-frame">
+<h2>🖼️ Home Page 3D Frame — 5 Photos</h2>
+<p class="sub" style="color:#f2ca50">Sirf <b>HOME PAGE</b> floating frame (Photo Frame · Book Now). Max 5 photos · har 5 second change.</p>
+<p class="muted" style="margin-bottom:12px">Abhi saved: <b id="homeFrameCount">${(settings.homeHeroFramePhotos||[]).length}</b> / 5</p>
+<div id="homeFramePreview" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+${(function(){
+  const list = settings.homeHeroFramePhotos || [];
+  if (!list.length) return '<span class="muted">Abhi koi photo nahi — neeche se 5 tak upload karo</span>';
+  return list.map((p,i) => {
+    const u = (typeof p === 'string' ? p : (p && p.url)) || '';
+    if (!u) return '';
+    return '<div style="width:100px;text-align:center">'
+      + '<img src="'+esc(u)+'" alt="#'+(i+1)+'" style="width:100px;height:130px;object-fit:cover;border-radius:10px;border:2px solid rgba(212,175,55,.45);display:block;background:#111"/>'
+      + '<div class="muted" style="font-size:11px;margin-top:4px">#'+(i+1)+'</div></div>';
+  }).join('');
+})()}
+</div>
+<div class="form-grid">
+<label class="muted">Photos choose (Ctrl/Cmd se multiple · max 5)
+<input type="file" id="homeFrameFiles" accept="image/*" multiple class="field-file"></label>
+<label class="muted" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+<input type="checkbox" id="homeFrameReplace" checked> Purani hata ke sirf nayi rakho</label>
+<button class="gen-btn" type="button" onclick="adminUploadHomeFrame()">📤 Upload Home 3D Photos</button>
+<button type="button" onclick="adminClearHomeFrame()" style="padding:8px 12px;background:#5a1a1a;color:#fca5a5;border:1px solid #7f1d1d;border-radius:8px;cursor:pointer">🗑 Clear all</button>
+<p id="homeFrameStatus" class="muted"></p>
+</div>
+</section>
+
+<section class="panel" id="sec-book">
+<h2>📷 Book card photos</h2>
+<p class="sub">Direct photo upload — Wedding / Birthday / Personal / Reel / Event / Other. Har card ke liye alag photo.</p>
+<div class="form-grid" id="bookUploadGrid">
+${['wedding','birthday','personal','reel','event','other'].map(k => {
+  const src = (bi[k] || '');
+  const label = k.charAt(0).toUpperCase() + k.slice(1);
+  const prev = src
+    ? '<img src="'+esc(src)+'" alt="'+label+'" style="width:72px;height:72px;object-fit:cover;border-radius:10px;border:1px solid rgba(212,175,55,.35);display:block"/>'
+    : '<div style="width:72px;height:72px;border-radius:10px;background:#1a1510;border:1px dashed rgba(212,175,55,.3);display:flex;align-items:center;justify-content:center;font-size:11px;color:#999">No photo</div>';
+  return '<div style="display:flex;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.06)">'
+    + prev
+    + '<div style="flex:1;min-width:0">'
+    + '<div class="muted" style="margin-bottom:6px;font-weight:600;color:#f2ca50">'+label+'</div>'
+    + '<input type="file" accept="image/*" class="field-file book-file" data-key="'+k+'" id="bookFile_'+k+'"/>'
+    + '<p class="muted" style="font-size:11px;margin-top:4px" id="bookSt_'+k+'"></p>'
+    + '</div>'
+    + '<button type="button" class="gen-btn book-up-btn" style="max-width:120px;padding:8px 12px" data-key="'+k+'">📤 Upload</button>'
+    + '</div>';
+}).join('')}
+</div>
+<script>
+document.querySelectorAll('.book-up-btn').forEach(function(btn){
+  btn.addEventListener('click', function(){ adminUploadBookImage(btn.getAttribute('data-key')); });
+});
+</script>
+<p class="muted" style="margin-top:12px">Optional — URL se bhi set kar sakte ho:</p>
+<form method="POST" action="/admin/save-book-images" class="form-grid">
+<label class="muted">Wedding URL<input class="inp" name="wedding" value="${esc((bi.wedding||'').startsWith('data:')?'':(bi.wedding||''))}" placeholder="https://..."></label>
+<label class="muted">Birthday URL<input class="inp" name="birthday" value="${esc((bi.birthday||'').startsWith('data:')?'':(bi.birthday||''))}" placeholder="https://..."></label>
+<label class="muted">Personal URL<input class="inp" name="personal" value="${esc((bi.personal||'').startsWith('data:')?'':(bi.personal||''))}" placeholder="https://..."></label>
+<label class="muted">Reel URL<input class="inp" name="reel" value="${esc((bi.reel||'').startsWith('data:')?'':(bi.reel||''))}" placeholder="https://..."></label>
+<label class="muted">Event URL<input class="inp" name="event" value="${esc((bi.event||'').startsWith('data:')?'':(bi.event||''))}" placeholder="https://..."></label>
+<label class="muted">Other URL<input class="inp" name="other" value="${esc((bi.other||'').startsWith('data:')?'':(bi.other||''))}" placeholder="https://..."></label>
+<button class="gen-btn" type="submit">💾 Save URLs</button>
+</form>
+</section>
+
+<section class="panel" id="sec-otp">
+<h2 id="h2Otp">📱 Spin OTP <span class="badge">${pendingOtps.length}</span></h2>
+<div id="otpLiveBox">${otpCards}</div>
+<h2 id="h2Pin" style="margin-top:20px">⚠️ PIN Reset <span class="badge">${pendingResets.length}</span></h2>
+<div id="pinLiveBox">${resetCards}</div>
+</section>
+
+<section class="panel" id="sec-codes">
+<h2>🎫 Spin / Wallet Codes</h2>
+<form method="POST" action="/admin/generate-code" class="form-row" style="margin-bottom:14px;flex-wrap:wrap">
+<select name="codeType" class="inp" style="max-width:140px">
+<option value="spin">Spin code (work amount)</option>
+<option value="wallet">💰 Wallet credit code</option>
+</select>
+<input class="inp" name="amount" type="number" min="1" placeholder="Amount ₹" required style="max-width:120px">
+<input class="inp" name="note" placeholder="Note / customer" style="max-width:160px">
+<button class="gen-btn" type="submit">+ Naya code</button>
+</form>
+<p class="muted" style="font-size:12px;margin:-6px 0 12px">Wallet code customer profile se redeem karke seedha balance me aata hai. Spin code /book-now pe use hota hai.</p>
+<div style="overflow-x:auto">
+<table id="codesTable"><thead><tr><th>Code</th><th>Amount</th><th>Status</th><th>Used By</th><th>Coupon/Prize</th><th>Created</th><th>Used At</th><th>Action</th></tr></thead>
+<tbody>${codeRows}</tbody></table>
+</div>
+</section>
+
+<section class="panel" id="sec-customers">
+<h2>👥 Customers <span class="badge">${accounts.length}</span></h2>
+<input id="search" type="search" placeholder="Search name / mobile / ID…" oninput="filterAcc(this.value)">
+<div id="accList">${rows}</div>
+</section>
+
+<section class="panel" id="sec-notif">
+<h2>🔔 Notifications</h2>
+<form method="POST" action="/admin/send-notification" class="form-grid">
+<input class="inp" name="title" placeholder="Title">
+<textarea name="body" rows="3" placeholder="Message..." required class="inp"></textarea>
 <label class="muted">Expire after
-<select name="expiresIn" class="inp" style="width:100%;max-width:240px">
+<select name="expiresIn" class="inp" style="max-width:240px">
 <option value="1">1 hour</option>
 <option value="6">6 hours</option>
 <option value="12">12 hours</option>
@@ -1504,58 +2680,24 @@ label.muted{display:block;font-size:12px}
 </label>
 <button class="gen-btn" type="submit">📢 Send to all</button>
 </form>
-<div class="lbl" style="margin-top:14px">Active notifications (live)</div>
+<div class="lbl" style="margin-top:16px">Active notifications</div>
 <div id="adminNotifList">${notifAdminCards}</div>
-</div>
+</section>
 
-<h2 id="h2Otp">📱 Spin OTP (${pendingOtps.length})</h2>
-<div id="otpLiveBox">${otpCards}</div>
-
-<h2 id="h2Pin">⚠️ PIN Reset (${pendingResets.length})</h2>
-<div id="pinLiveBox">${resetCards}</div>
-
-<h2>🖼️ Book card photos</h2>
-<div class="codes-block">
-<form method="POST" action="/admin/save-book-images" style="display:grid;gap:8px;max-width:560px">
-<label class="muted">Wedding URL<input class="inp" name="wedding" value="${esc(bi.wedding||'')}" style="width:100%"></label>
-<label class="muted">Birthday URL<input class="inp" name="birthday" value="${esc(bi.birthday||'')}" style="width:100%"></label>
-<label class="muted">Personal URL<input class="inp" name="personal" value="${esc(bi.personal||'')}" style="width:100%"></label>
-<label class="muted">Reel URL<input class="inp" name="reel" value="${esc(bi.reel||'')}" style="width:100%"></label>
-<label class="muted">Event URL<input class="inp" name="event" value="${esc(bi.event||'')}" style="width:100%"></label>
-<label class="muted">Other URL<input class="inp" name="other" value="${esc(bi.other||'')}" style="width:100%"></label>
-<button class="gen-btn" type="submit">💾 Save photos</button>
+<section class="panel" id="sec-backup">
+<h2>💾 Backup & Restore</h2>
+<div class="form-row">
+<a class="gen-btn" href="/admin/backup">⬇️ Download Backup</a>
+<form method="POST" action="/admin/restore" enctype="multipart/form-data" class="form-row">
+<input type="file" name="backup" accept=".json" required class="field-file">
+<button class="gen-btn" type="submit">⬆️ Restore</button>
 </form>
 </div>
+</section>
 
-<h2>🎬 Home Offer photos (animated)</h2>
-<div class="codes-block">
-<p class="sub">Har line ek photo URL. Titles/subs optional (same order). Save ke baad home offer carousel me animation chalega.</p>
-<form method="POST" action="/admin/save-offer-images" style="display:grid;gap:8px;max-width:560px">
-<label class="muted">Image URLs (one per line)
-<textarea name="urls" rows="4" style="width:100%;background:#0C0906;border:1px solid rgba(212,175,55,0.3);border-radius:8px;color:#F4EAD6;padding:8px">${esc((settings.offerImages||[]).map(o=>o.url||o).join('\n'))}</textarea></label>
-<label class="muted">Titles (one per line)
-<textarea name="titles" rows="3" style="width:100%;background:#0C0906;border:1px solid rgba(212,175,55,0.3);border-radius:8px;color:#F4EAD6;padding:8px">${esc((settings.offerImages||[]).map(o=>o.title||'').join('\n'))}</textarea></label>
-<label class="muted">Subtitles (one per line)
-<textarea name="subs" rows="3" style="width:100%;background:#0C0906;border:1px solid rgba(212,175,55,0.3);border-radius:8px;color:#F4EAD6;padding:8px">${esc((settings.offerImages||[]).map(o=>o.sub||'').join('\n'))}</textarea></label>
-<button class="gen-btn" type="submit">💾 Save offer photos</button>
-</form>
+</main>
 </div>
-
-<h2>🎫 Spin Codes History</h2>
-<div class="codes-block">
-<form method="POST" action="/admin/generate-code" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
-<input class="inp" name="amount" type="number" min="1" placeholder="Amount ₹" required style="width:120px">
-<input class="inp" name="note" placeholder="Note" style="width:140px">
-<button class="gen-btn" type="submit">+ Naya spin code</button>
-</form>
-<table id="codesTable"><thead><tr><th>Code</th><th>Amount</th><th>Status</th><th>Used By</th><th>Coupon/Prize</th><th>Created</th><th>Used At</th><th>Action</th></tr></thead>
-<tbody>${codeRows}</tbody></table>
-</div>
-
-<h2>👥 Customers (${accounts.length})</h2>
-<input id="search" type="search" placeholder="Search..." oninput="filterAcc(this.value)">
-<div id="accList">${rows}</div>
-<div id="liveBar" style="position:fixed;bottom:12px;right:12px;background:#1B140F;border:1px solid rgba(212,175,55,0.4);border-radius:10px;padding:8px 12px;font-size:12px;color:#B7A480;z-index:99;">
+<div id="liveBar">
 🔄 Live: <span id="liveStatus">connecting…</span>
 <label style="margin-left:10px;cursor:pointer;color:#D4AF37;"><input type="checkbox" id="soundToggle" checked> Sound</label>
 </div>
@@ -1743,6 +2885,387 @@ document.addEventListener('click', function once() {
   document.removeEventListener('click', once);
 });
 
+/* ---- Home banner photo upload ---- */
+async function adminUploadBanners() {
+  var input = document.getElementById('bannerFiles');
+  var status = document.getElementById('bannerUploadStatus');
+  var files = input && input.files ? Array.from(input.files) : [];
+  if (!files.length) { alert('Pehle photos choose karo'); return; }
+  var title = (document.getElementById('bannerTitle') || {}).value || 'Aditya Studio';
+  var sub = (document.getElementById('bannerSub') || {}).value || '';
+  var replace = !!(document.getElementById('bannerReplace') || {}).checked;
+  status.textContent = 'Uploading ' + files.length + ' photo(s)…';
+  try {
+    var items = [];
+    for (var i = 0; i < files.length; i++) {
+      var f = files[i];
+      if (f.size > 2.2e6) { alert(f.name + ' 2MB se chhoti rakho'); return; }
+      var dataUrl = await new Promise(function(resolve, reject) {
+        var r = new FileReader();
+        r.onload = function() { resolve(r.result); };
+        r.onerror = reject;
+        r.readAsDataURL(f);
+      });
+      items.push({ url: dataUrl, title: title, sub: sub });
+    }
+    var res = await fetch('/admin/banner-upload', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items: items, replace: replace })
+    });
+    var data = await res.json();
+    if (!data.ok) { status.textContent = 'Fail'; alert('Upload fail'); return; }
+    status.textContent = 'Saved ✅ Total banners: ' + data.count;
+    alert('Banner photos saved! Home / Frames page refresh karo.');
+    if (input) input.value = '';
+  } catch (e) {
+    status.textContent = 'Error';
+    alert('Network error');
+  }
+}
+
+async function adminUpload3dPhotos() {
+  var input = document.getElementById('f3dFiles');
+  var status = document.getElementById('f3dStatus');
+  var files = input && input.files ? Array.from(input.files) : [];
+  if (!files.length) { alert('Pehle photos choose karo'); return; }
+  var replace = !!(document.getElementById('f3dReplace') || {}).checked;
+  status.textContent = 'Uploading ' + files.length + '…';
+  try {
+    var items = [];
+    for (var i = 0; i < files.length; i++) {
+      var f = files[i];
+      if (f.size > 2.2e6) { alert(f.name + ' 2MB se chhoti rakho'); return; }
+      var dataUrl = await new Promise(function(resolve, reject) {
+        var r = new FileReader();
+        r.onload = function() { resolve(r.result); };
+        r.onerror = reject;
+        r.readAsDataURL(f);
+      });
+      items.push({ url: dataUrl, title: f.name });
+    }
+    var res = await fetch('/admin/frames3d-upload', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items: items, replace: replace })
+    });
+    var data = await res.json();
+    if (!data.ok) { status.textContent = 'Fail'; return; }
+    status.textContent = 'Saved ✅ Total 3D photos: ' + data.count;
+    alert('3D sample photos saved!');
+    if (input) input.value = '';
+  } catch (e) {
+    status.textContent = 'Error';
+    alert('Network error');
+  }
+}
+async function adminClear3dPhotos() {
+  if (!confirm('Saari 3D sample photos delete?')) return;
+  var res = await fetch('/admin/frames3d-clear', { method: 'POST', credentials: 'same-origin' });
+  var data = await res.json();
+  var st = document.getElementById('f3dStatus');
+  if (st) st.textContent = data.ok ? 'Cleared' : 'Fail';
+}
+
+function compressImageFile(file, maxW, quality) {
+  maxW = maxW || 1200;
+  quality = quality || 0.82;
+  return new Promise(function(resolve, reject) {
+    var r = new FileReader();
+    r.onerror = reject;
+    r.onload = function() {
+      var img = new Image();
+      img.onerror = reject;
+      img.onload = function() {
+        var w = img.width, h = img.height;
+        if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+        var c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(c.toDataURL('image/jpeg', quality));
+      };
+      img.src = r.result;
+    };
+    r.readAsDataURL(file);
+  });
+}
+async function adminUploadHomeFrame() {
+  var input = document.getElementById('homeFrameFiles');
+  var status = document.getElementById('homeFrameStatus');
+  var files = input && input.files ? Array.from(input.files) : [];
+  if (!files.length) { alert('Pehle photos choose karo (max 5)\\nWindows: Ctrl+click se multiple select'); return; }
+  if (files.length > 5) { alert('Maximum 5 photos select karo'); return; }
+  var replace = !!(document.getElementById('homeFrameReplace') || {}).checked;
+  status.textContent = 'Compress + upload ' + files.length + ' photo(s)…';
+  try {
+    var items = [];
+    for (var i = 0; i < files.length; i++) {
+      status.textContent = 'Photo ' + (i+1) + '/' + files.length + '…';
+      var dataUrl = await compressImageFile(files[i], 1200, 0.82);
+      items.push({ url: dataUrl, title: files[i].name || ('Photo ' + (i+1)) });
+    }
+    var res = await fetch('/admin/home-hero-frame-upload', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items: items, replace: replace })
+    });
+    var data = await res.json();
+    if (!data.ok) { status.textContent = 'Fail: ' + (data.error || ''); alert('Upload fail'); return; }
+    status.textContent = 'Saved ✅ ' + data.count + ' / 5 — page reload…';
+    alert('Home 3D frame: ' + data.count + ' photos saved!\\nHome page refresh karo.');
+    location.href = '/admin#sec-home-frame';
+    location.reload();
+  } catch (e) {
+    console.error(e);
+    status.textContent = 'Error: ' + (e.message || 'network');
+    alert('Upload error — photo size chhoti try karo');
+  }
+}
+async function adminClearHomeFrame() {
+  if (!confirm('Home frame ki saari photos clear?')) return;
+  var res = await fetch('/admin/home-hero-frame-clear', { method: 'POST', credentials: 'same-origin' });
+  var data = await res.json();
+  var st = document.getElementById('homeFrameStatus');
+  if (st) st.textContent = data.ok ? 'Cleared' : 'Fail';
+  if (data.ok) location.reload();
+}
+
+async function adminUploadHeroSideBg() {
+  var input = document.getElementById('heroBgFiles');
+  var status = document.getElementById('heroBgStatus');
+  var files = input && input.files ? Array.from(input.files) : [];
+  if (!files.length) { alert('Pehle 4–6 photos choose karo'); return; }
+  if (files.length > 6) { alert('Maximum 6 photos'); return; }
+  var replace = !!(document.getElementById('heroBgReplace') || {}).checked;
+  var durationSec = Number((document.getElementById('heroBgDuration') || {}).value || 5);
+  status.textContent = 'Uploading ' + files.length + '…';
+  try {
+    var items = [];
+    for (var i = 0; i < files.length; i++) {
+      status.textContent = 'Photo ' + (i+1) + '/' + files.length + '…';
+      var dataUrl = await compressImageFile(files[i], 1400, 0.8);
+      items.push({ url: dataUrl, title: files[i].name });
+    }
+    var res = await fetch('/admin/hero-side-bg-upload', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items: items, replace: replace, durationSec: durationSec })
+    });
+    var data = await res.json();
+    if (!data.ok) { status.textContent = 'Fail'; alert('Upload fail'); return; }
+    status.textContent = 'Saved ✅ ' + data.count + ' photos · ' + data.durationSec + 's';
+    alert('Hero side BG saved! Home page refresh karo.');
+    location.href = '/admin#sec-hero';
+    location.reload();
+  } catch (e) {
+    status.textContent = 'Error';
+    alert('Upload error');
+  }
+}
+async function adminSaveHeroBgDuration() {
+  var sec = Number((document.getElementById('heroBgDuration') || {}).value || 5);
+  var res = await fetch('/admin/hero-side-bg-duration', {
+    method: 'POST', credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ durationSec: sec })
+  });
+  var data = await res.json();
+  var st = document.getElementById('heroBgStatus');
+  if (st) st.textContent = data.ok ? ('Duration: ' + data.durationSec + 's saved') : 'Fail';
+}
+async function adminClearHeroSideBg() {
+  if (!confirm('Hero BG photos clear?')) return;
+  var res = await fetch('/admin/hero-side-bg-clear', { method: 'POST', credentials: 'same-origin' });
+  var data = await res.json();
+  if (data.ok) location.reload();
+}
+
+async function adminUploadBookImage(key) {
+  var input = document.getElementById('bookFile_' + key);
+  var st = document.getElementById('bookSt_' + key);
+  if (!input || !input.files || !input.files[0]) {
+    alert(key + ' ke liye pehle photo choose karo');
+    return;
+  }
+  var file = input.files[0];
+  if (st) st.textContent = 'Uploading…';
+  try {
+    var dataUrl;
+    if (typeof compressImageFile === 'function') {
+      dataUrl = await compressImageFile(file, 1000, 0.82);
+    } else {
+      dataUrl = await new Promise(function(resolve, reject) {
+        var r = new FileReader();
+        r.onload = function() { resolve(r.result); };
+        r.onerror = reject;
+        r.readAsDataURL(file);
+      });
+    }
+    var res = await fetch('/admin/book-image-upload', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: key, url: dataUrl })
+    });
+    var data = await res.json();
+    if (!data.ok) {
+      if (st) st.textContent = 'Fail';
+      alert('Upload fail: ' + (data.error || ''));
+      return;
+    }
+    if (st) st.textContent = 'Saved ✅';
+    alert(key + ' photo saved! Page reload…');
+    location.href = '/admin#sec-book';
+    location.reload();
+  } catch (e) {
+    if (st) st.textContent = 'Error';
+    alert('Network / compress error');
+  }
+}
+
+/* ---- Photo Frames admin ---- */
+var _frImageData = '';
+var frFileEl = document.getElementById('frFile');
+if (frFileEl) frFileEl.addEventListener('change', function(e) {
+  var f = e.target.files && e.target.files[0];
+  if (!f) { _frImageData = ''; return; }
+  if (f.size > 1.8e6) { alert('Image 1.8MB se chhoti rakho'); e.target.value=''; _frImageData=''; return; }
+  var r = new FileReader();
+  r.onload = function() { _frImageData = r.result || ''; };
+  r.readAsDataURL(f);
+});
+
+async function adminSaveFrame() {
+  var size = (document.getElementById('frSize') || {}).value || '';
+  var title = (document.getElementById('frTitle') || {}).value || '';
+  var price = Number((document.getElementById('frPrice') || {}).value || 0);
+  var disc = Number((document.getElementById('frDisc') || {}).value || 0);
+  if (!size) return alert('Size choose karo');
+  if (!_frImageData && !title) { /* allow without image on edit */ }
+  try {
+    var res = await fetch('/admin/frame-save', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ size: size, title: title, price: price, discountPercent: disc, imageData: _frImageData, active: true })
+    });
+    var data = await res.json();
+    if (!data.ok) return alert('Save fail');
+    alert('Frame saved ✅');
+    _frImageData = '';
+    if (frFileEl) frFileEl.value = '';
+    loadAdminFrames();
+  } catch (e) { alert('Network error'); }
+}
+
+async function adminDeleteFrame(id) {
+  if (!confirm('Delete this frame?')) return;
+  await fetch('/admin/frame-delete', {
+    method: 'POST', credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: id })
+  });
+  loadAdminFrames();
+}
+
+async function adminUpdateOrder(orderId) {
+  var st = (document.getElementById('st-' + orderId) || {}).value;
+  var pay = (document.getElementById('pay-' + orderId) || {}).value;
+  var dd = (document.getElementById('dd-' + orderId) || {}).value || '';
+  var dt = (document.getElementById('dt-' + orderId) || {}).value || '';
+  var note = (document.getElementById('an-' + orderId) || {}).value || '';
+  try {
+    var res = await fetch('/admin/frame-order-update', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderId: orderId, status: st, paymentStatus: pay, deliveryDate: dd, deliveryTime: dt, adminNote: note })
+    });
+    var data = await res.json();
+    if (data.ok) { alert('Order updated + customer notified ✅'); loadAdminFrames(); }
+    else alert('Update fail');
+  } catch (e) { alert('Network error'); }
+}
+
+async function adminConfirmPay(orderId) {
+  if (!confirm('Payment successful confirm karein? Customer ko notify hoga.')) return;
+  var dd = (document.getElementById('dd-' + orderId) || {}).value || '';
+  var dt = (document.getElementById('dt-' + orderId) || {}).value || '';
+  try {
+    var res = await fetch('/admin/frame-order-update', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderId: orderId, confirmPayment: true, status: 'confirmed', deliveryDate: dd, deliveryTime: dt })
+    });
+    var data = await res.json();
+    if (data.ok) { alert('Payment confirmed ✅ Customer notified'); loadAdminFrames(); }
+    else alert('Fail');
+  } catch (e) { alert('Network error'); }
+}
+
+async function loadAdminFrames() {
+  var fBox = document.getElementById('adminFramesList');
+  var oBox = document.getElementById('adminOrdersList');
+  try {
+    var res = await fetch('/admin/frames-json', { credentials: 'same-origin', cache: 'no-store' });
+    var data = await res.json();
+    if (!data.ok) return;
+    var frames = data.frames || [];
+    var orders = data.orders || [];
+    if (fBox) {
+      if (!frames.length) fBox.innerHTML = '<div class="muted">Abhi koi frame nahi — upar se add karo</div>';
+      else fBox.innerHTML = frames.map(function(f) {
+        var img = f.imageData || f.imageUrl || '';
+        var fp = Math.round((Number(f.price)||0) * (1 - (Number(f.discountPercent)||0)/100));
+        return '<div class="msg-card" style="display:flex;gap:10px;align-items:flex-start;margin-top:8px">'
+          + (img ? '<img src="'+img+'" style="width:56px;height:56px;object-fit:cover;border-radius:8px;background:#111">' : '<div style="width:56px;height:56px;background:#222;border-radius:8px"></div>')
+          + '<div class="msg-text" style="flex:1"><b>'+esc(f.title||'')+'</b> · '+esc(f.size)
+          + '<br>₹'+fp+(f.discountPercent?(' <span class="muted">('+f.discountPercent+'% off, MRP ₹'+f.price+')</span>'):'')
+          + '<br><span class="muted">'+(f.active===false?'Inactive':'Active')+' · '+esc(f.id)+'</span></div>'
+          + '<div class="msg-actions"><button type="button" style="padding:6px 10px;background:#5a1a1a;color:#fca5a5;border:1px solid #7f1d1d;border-radius:6px;cursor:pointer" onclick="adminDeleteFrame(\\''+esc(f.id)+'\\')">🗑</button></div></div>';
+      }).join('');
+    }
+    if (oBox) {
+      if (!orders.length) oBox.innerHTML = '<div class="muted">Abhi koi frame order nahi</div>';
+      else oBox.innerHTML = orders.map(function(o) {
+        return '<div class="msg-card" style="margin-top:10px">'
+          + '<div class="msg-text"><b>'+esc(o.orderId)+'</b> · '+esc(o.frameTitle||'')+' ('+esc(o.size)+')'
+          + '<br>👤 '+esc(o.name)+' · '+esc(o.mobile)+' · ₹'+(o.finalAmount||0)
+          + '<br>📍 '+esc(o.address||'')
+          + (o.village ? ' · गाँव: '+esc(o.village) : '')
+          + (o.district ? ' · जिला: '+esc(o.district) : '')
+          + (o.state ? ' · राज्य: '+esc(o.state) : '')
+          + (o.pincode ? ' · PIN: '+esc(o.pincode) : '')
+          + (o.note ? '<br>📝 '+esc(o.note) : '')
+          + '<br>💳 Payment: <b>'+esc(o.paymentStatus||'unpaid')+'</b>'
+          + '<br><span class="muted">'+esc(fmt(o.createdAt))+'</span></div>'
+          + '<div style="display:grid;gap:6px;margin-top:8px;max-width:420px">'
+          + '<label class="muted">Status <select class="inp" id="st-'+esc(o.orderId)+'" style="width:100%;max-width:200px">'
+          + ['processing','pending','confirmed','ready','delivered','cancelled'].map(function(s){
+              return '<option value="'+s+'"'+(o.status===s?' selected':'')+'>'+s+'</option>';
+            }).join('')
+          + '</select></label>'
+          + '<label class="muted">Payment <select class="inp" id="pay-'+esc(o.orderId)+'" style="width:100%;max-width:200px">'
+          + ['unpaid','paid_claimed','confirmed'].map(function(s){
+              return '<option value="'+s+'"'+((o.paymentStatus||'unpaid')===s?' selected':'')+'>'+s+'</option>';
+            }).join('')
+          + '</select></label>'
+          + '<label class="muted">Delivery date <input class="inp" id="dd-'+esc(o.orderId)+'" type="date" value="'+esc(o.deliveryDate||'')+'" style="width:100%;max-width:200px"></label>'
+          + '<label class="muted">Delivery time <input class="inp" id="dt-'+esc(o.orderId)+'" type="time" value="'+esc(o.deliveryTime||'')+'" style="width:100%;max-width:200px"></label>'
+          + '<label class="muted">Admin note <input class="inp" id="an-'+esc(o.orderId)+'" value="'+esc(o.adminNote||'')+'" style="width:100%"></label>'
+          + '<div style="display:flex;gap:8px;flex-wrap:wrap">'
+          + '<button class="gen-btn" type="button" onclick="adminUpdateOrder(\\''+esc(o.orderId)+'\\')">Update + Notify</button>'
+          + (o.paymentStatus !== 'confirmed'
+              ? '<button type="button" style="padding:8px 12px;background:#14532d;color:#bbf7d0;border:1px solid #166534;border-radius:8px;cursor:pointer" onclick="adminConfirmPay(\\''+esc(o.orderId)+'\\')">✅ Confirm Payment</button>'
+              : '<span class="muted">Payment confirmed</span>')
+          + '</div>'
+          + '</div></div>';
+      }).join('');
+    }
+  } catch (e) {
+    if (fBox) fBox.innerHTML = '<div class="muted">Load fail</div>';
+  }
+}
+loadAdminFrames();
+setInterval(loadAdminFrames, 15000);
+
 pollLive();
 setInterval(pollLive, 5000);
 </script>
@@ -1765,10 +3288,18 @@ async function hydrateFromMongo() {
     _cache.notifs = await mongoLoadNotifs();
     const st = await mongoLoadSettings();
     if (st) _cache.settings = st;
+    try {
+      const fr = await mongoDb.collection('meta').findOne({ _id: 'photoFrames' });
+      if (fr && Array.isArray(fr.items)) _cache.frames = fr.items;
+      const fo = await mongoDb.collection('meta').findOne({ _id: 'frameOrders' });
+      if (fo && Array.isArray(fo.items)) _cache.frameOrders = fo.items;
+    } catch (e2) {}
     // mirror to local files as secondary backup
     try {
       fs.writeFileSync(DATA_FILE, JSON.stringify(_cache.accounts, null, 2));
       fs.writeFileSync(CODES_FILE, JSON.stringify(_cache.codes, null, 2));
+      if (_cache.frames) fs.writeFileSync(FRAMES_FILE, JSON.stringify(_cache.frames, null, 2));
+      if (_cache.frameOrders) fs.writeFileSync(FRAME_ORDERS_FILE, JSON.stringify(_cache.frameOrders, null, 2));
     } catch (e) {}
     console.log('[db] Hydrated from Atlas — accounts:', _cache.accounts.length, 'codes:', _cache.codes.length);
   } catch (e) {

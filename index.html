@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <title>Aditya Studio - Premium Photography &amp; Gifts</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600;700&amp;family=Hanken+Grotesk:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+  <script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "on-tertiary": "#4a0080",
+            "on-secondary-fixed": "#40000c",
+            "surface-container-high": "#2d2a21",
+            "surface-container-highest": "#38342b",
+            "primary-fixed-dim": "#e9c349",
+            "surface-container-low": "#1f1b13",
+            "on-secondary-fixed-variant": "#7f2832",
+            "inverse-primary": "#735c00",
+            "secondary-fixed": "#ffdada",
+            "surface-dim": "#16130b",
+            "tertiary": "#e3c2ff",
+            "surface": "#16130b",
+            "primary-container": "#d4af37",
+            "on-primary-fixed": "#241a00",
+            "on-tertiary-container": "#602397",
+            "surface-tint": "#e9c349",
+            "primary-fixed": "#ffe088",
+            "error": "#ffb4ab",
+            "outline": "#99907c",
+            "secondary": "#ffb3b5",
+            "tertiary-fixed": "#f0dbff",
+            "on-tertiary-fixed-variant": "#622599",
+            "on-surface": "#eae1d4",
+            "on-background": "#eae1d4",
+            "tertiary-fixed-dim": "#ddb7ff",
+            "on-primary-container": "#554300",
+            "on-primary": "#3c2f00",
+            "surface-bright": "#3d392f",
+            "error-container": "#93000a",
+            "surface-container-lowest": "#110e07",
+            "outline-variant": "#4d4635",
+            "on-tertiary-fixed": "#2c0050",
+            "secondary-container": "#822a34",
+            "surface-container": "#231f17",
+            "primary": "#f2ca50",
+            "background": "#16130b",
+            "surface-variant": "#38342b",
+            "inverse-on-surface": "#343027",
+            "on-surface-variant": "#d0c5af",
+            "on-error-container": "#ffdad6",
+            "on-error": "#690005",
+            "on-secondary": "#61101d",
+            "secondary-fixed-dim": "#ffb3b5",
+            "inverse-surface": "#eae1d4",
+            "on-primary-fixed-variant": "#574500",
+            "on-secondary-container": "#ff9da2",
+            "tertiary-container": "#d09eff"
+          },
+          borderRadius: {
+            DEFAULT: "0.25rem",
+            lg: "0.5rem",
+            xl: "0.75rem",
+            full: "9999px"
+          },
+          spacing: {
+            "container-max": "1280px",
+            unit: "8px",
+            gutter: "24px",
+            "margin-desktop": "64px",
+            "margin-mobile": "16px"
+          },
+          fontFamily: {
+            "label-md": ["Hanken Grotesk"],
+            "headline-lg-mobile": ["EB Garamond"],
+            "display-lg": ["EB Garamond"],
+            "body-lg": ["Hanken Grotesk"],
+            "title-lg": ["Hanken Grotesk"],
+            "body-md": ["Hanken Grotesk"],
+            "headline-md": ["EB Garamond"],
+            "headline-lg": ["EB Garamond"]
+          },
+          fontSize: {
+            "label-md": ["14px", { lineHeight: "20px", letterSpacing: "0.05em", fontWeight: "600" }],
+            "headline-lg-mobile": ["32px", { lineHeight: "40px", fontWeight: "500" }],
+            "display-lg": ["64px", { lineHeight: "72px", letterSpacing: "-0.02em", fontWeight: "600" }],
+            "body-lg": ["18px", { lineHeight: "28px", fontWeight: "400" }],
+            "title-lg": ["22px", { lineHeight: "28px", fontWeight: "600" }],
+            "body-md": ["16px", { lineHeight: "24px", fontWeight: "400" }],
+            "headline-md": ["36px", { lineHeight: "44px", fontWeight: "500" }],
+            "headline-lg": ["48px", { lineHeight: "56px", letterSpacing: "-0.01em", fontWeight: "500" }]
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    .glass-panel {
+      background: rgba(45, 42, 33, 0.4);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .jewel-glow {
+      box-shadow: 0 0 20px rgba(212, 175, 55, 0.15);
+    }
+    .jewel-glow:hover {
+      box-shadow: 0 0 30px rgba(212, 175, 55, 0.3);
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+    .text-gradient-gold {
+      background: linear-gradient(135deg, #D4AF37 0%, #FFBF00 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .bg-gradient-gold {
+      background: linear-gradient(135deg, #D4AF37 0%, #FFBF00 100%);
+    }
+    @keyframes spin-ring {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .profile-ring {
+      background: conic-gradient(from 0deg, #D4AF37, #FFBF00, #fff, #D4AF37);
+      animation: spin-ring 4s linear infinite;
+    }
+    @keyframes float-spin {
+      0% { transform: perspective(1000px) rotateY(0deg) translateY(0px); }
+      50% { transform: perspective(1000px) rotateY(180deg) translateY(-20px); }
+      100% { transform: perspective(1000px) rotateY(360deg) translateY(0px); }
+    }
+    .hero-frame-container { perspective: 1000px; }
+    .hero-frame {
+      animation: float-spin 15s infinite linear;
+      transform-style: preserve-3d;
+    }
+    /* Hero side BG slideshow — only inside #portfolio */
+    .bg-slide {
+      position: absolute;
+      inset: 0;
+      background-size: cover;
+      background-position: center;
+      opacity: 0;
+      transform: scale(1.06);
+      transition: opacity 1.2s ease, transform 6s ease-out;
+    }
+    .bg-slide.active {
+      opacity: 1;
+      transform: scale(1);
+    }
+    @keyframes pulse-ring {
+      0% { transform: scale(0.8); opacity: 0.5; }
+      100% { transform: scale(2); opacity: 0; }
+    }
+    .notification-pulse::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background-color: #D4AF37;
+      animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+    }
+    #sideNav {
+      transform: translateX(100%);
+      transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    #sideNav.open { transform: translateX(0); }
+    @keyframes slide {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+    .carousel-track { animation: slide 20s linear infinite; }
+    .carousel-track:hover { animation-play-state: paused; }
+    /* Real spin wheel (same as /book-now landing) */
+    .home-lw-stage{position:relative;width:min(280px,78vw);aspect-ratio:1/1;margin:0 auto}
+    .home-lw-pointer{position:absolute;top:-12px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:12px solid transparent;border-right:12px solid transparent;border-top:24px solid #e9c349;z-index:5;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))}
+    .home-lw-outer{position:absolute;inset:0;border-radius:50%;background:linear-gradient(145deg,#ffe088,#c9a227,#ffe088);padding:10px;box-shadow:0 0 34px rgba(212,175,55,.45),inset 0 0 18px rgba(0,0,0,.35)}
+    .home-lw-rim{position:absolute;inset:3px;border-radius:50%;background:#150F0B;overflow:hidden}
+    .home-lw-rim::before{content:"";position:absolute;inset:0;border-radius:50%;background:repeating-conic-gradient(from 0deg,#ffe088 0deg 7deg,transparent 7deg 18deg);animation:lwBlink .9s linear infinite;opacity:.85}
+    @keyframes lwBlink{0%,100%{opacity:.85}50%{opacity:.3}}
+    .home-lw-wheel{position:absolute;inset:15px;border-radius:50%;overflow:hidden;box-shadow:inset 0 0 22px rgba(0,0,0,.5);will-change:transform}
+    .home-lw-segments{width:100%;height:100%;border-radius:50%;position:relative}
+    .home-lw-label{position:absolute;left:50%;top:50%;width:48%;height:52px;margin-top:-26px;transform-origin:0 50%;display:flex;align-items:center;justify-content:flex-end;padding-right:6px;pointer-events:none;text-align:center}
+    .home-lw-label-inner{display:flex;flex-direction:column;align-items:center;line-height:1.05}
+    .home-lw-label.flip .home-lw-label-inner{transform:rotate(180deg)}
+    .home-lw-val{font-weight:800;font-size:.72rem;color:#FFF8E4;text-shadow:0 1px 2px rgba(0,0,0,.5)}
+    .home-lw-sub{font-weight:700;font-size:.38rem;letter-spacing:.3px;opacity:.9;color:#FFF8E4}
+    .home-lw-hub{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:48px;height:48px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffe088,#d4af37 55%,#8a6a10);border:3px solid #1a1305;display:flex;align-items:center;justify-content:center;font-size:1.2rem;z-index:4;box-shadow:0 4px 12px rgba(0,0,0,.45)}
+    a.home-lw-link{display:block;text-decoration:none;cursor:pointer}
+    a.home-lw-link:hover .home-lw-outer{box-shadow:0 0 48px rgba(212,175,55,.65),inset 0 0 18px rgba(0,0,0,.35)}
+    .btn-claim-token {
+      border: none;
+      cursor: pointer;
+      color: #1a1208;
+      background: linear-gradient(135deg, #fff6d4, #d4af37 50%, #c9a227);
+      background-size: 200% 200%;
+      box-shadow: 0 0 24px rgba(212,175,55,0.35);
+      transition: all 0.25s ease;
+      opacity: 0.55;
+    }
+    .btn-claim-token.claimable {
+      opacity: 1;
+      animation: claim-shine 3s ease-in-out infinite;
+      box-shadow: 0 0 28px rgba(212,175,55,0.55), 0 0 0 1px rgba(255,236,180,0.4);
+    }
+    .btn-claim-token.claimable:hover {
+      transform: translateY(-2px) scale(1.03);
+      box-shadow: 0 0 40px rgba(212,175,55,0.7);
+    }
+    .btn-claim-token:disabled {
+      cursor: not-allowed;
+      animation: none;
+      opacity: 0.45;
+      filter: grayscale(0.3);
+    }
+    html { scroll-behavior: smooth; }
+    a:focus-visible, button:focus-visible, input:focus-visible {
+      outline: 2px solid #f2ca50;
+      outline-offset: 2px;
+    }
+    /* Sparkle text — multi-color glow (same style you liked) */
+    .sparkle-text {
+      font-family: 'EB Garamond', serif;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      line-height: 1.25;
+      background: linear-gradient(120deg, #c4b5fd 0%, #a78bfa 18%, #f0abfc 32%, #ffe088 48%, #f2ca50 60%, #93c5fd 78%, #a78bfa 100%);
+      background-size: 220% auto;
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      filter:
+        drop-shadow(0 0 10px rgba(196,181,253,0.55))
+        drop-shadow(0 0 22px rgba(212,175,55,0.4))
+        drop-shadow(0 0 36px rgba(147,197,253,0.3));
+      animation: sparkleShift 3.5s ease-in-out infinite, sparkleGlow 2s ease-in-out infinite alternate;
+      white-space: pre-wrap;
+    }
+    @keyframes sparkleShift {
+      0% { background-position: 0% center; }
+      50% { background-position: 100% center; }
+      100% { background-position: 0% center; }
+    }
+    @keyframes sparkleGlow {
+      from {
+        filter:
+          drop-shadow(0 0 8px rgba(196,181,253,0.4))
+          drop-shadow(0 0 18px rgba(212,175,55,0.3));
+      }
+      to {
+        filter:
+          drop-shadow(0 0 16px rgba(240,171,252,0.7))
+          drop-shadow(0 0 32px rgba(255,224,136,0.55))
+          drop-shadow(0 0 48px rgba(147,197,253,0.4));
+      }
+    }
+    .hero-type-wrap {
+      position: relative;
+      min-height: 7.5rem;
+      display: flex;
+      align-items: center;
+    }
+    .hero-type-line {
+      opacity: 0;
+      transform: scale(0.94);
+      transition: opacity 0.5s ease, transform 0.5s ease;
+    }
+    .hero-type-line.show {
+      opacity: 1;
+      transform: scale(1);
+    }
+    .hero-type-line.zoom-out {
+      opacity: 0;
+      transform: scale(1.28);
+      transition: opacity 0.65s ease, transform 0.65s ease;
+    }
+    .hero-cursor {
+      display: inline-block;
+      width: 3px;
+      height: 0.85em;
+      margin-left: 2px;
+      vertical-align: text-bottom;
+      background: linear-gradient(180deg, #fde68a, #c4b5fd);
+      box-shadow: 0 0 8px rgba(212,175,55,0.8);
+      animation: blinkCur 0.7s step-end infinite;
+    }
+    @keyframes blinkCur { 50% { opacity: 0; } }
+  
+    /* book-card-link */
+    a.glass-panel[href*="/book"] {
+      cursor: pointer !important;
+      position: relative;
+      z-index: 2;
+      display: flex;
+      pointer-events: auto !important;
+    }
+    a.glass-panel[href*="/book"] * {
+      pointer-events: none;
+    }
+
+  </style>
+</head>
+<body class="bg-background text-on-background min-h-screen flex flex-col font-body-md text-body-md overflow-x-hidden selection:bg-primary/30 selection:text-primary">
+
+  <!-- TopAppBar -->
+  <header class="fixed top-0 w-full z-50 bg-surface/40 backdrop-blur-xl border-b border-white/10 shadow-[0_0_20px_rgba(212,175,55,0.15)] transition-all duration-500 ease-in-out">
+    <div class="flex justify-between items-center px-margin-mobile md:px-margin-desktop py-4 max-w-container-max mx-auto">
+      <a class="font-display-lg text-headline-lg-mobile md:text-headline-lg text-primary tracking-tighter" href="/">Aditya Studio</a>
+      <nav class="hidden md:flex items-center gap-8" aria-label="Main navigation">
+        <a class="text-primary font-bold border-b-2 border-primary pb-1 font-label-md text-label-md hover:backdrop-blur-2xl hover:bg-surface/60 rounded-sm px-1" href="/">Home</a>
+        <a class="text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md hover:backdrop-blur-2xl hover:bg-surface/60 rounded-sm px-1" href="#portfolio">Portfolio</a>
+        <a class="text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md hover:backdrop-blur-2xl hover:bg-surface/60 rounded-sm px-1" href="#gift-shop">Gift Shop</a>
+        <a class="text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md hover:backdrop-blur-2xl hover:bg-surface/60 rounded-sm px-1" href="/frames">Photo Frames</a>
+        <a class="text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md hover:backdrop-blur-2xl hover:bg-surface/60 rounded-sm px-1" href="#bookings">Bookings</a>
+        <a class="text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md hover:backdrop-blur-2xl hover:bg-surface/60 rounded-sm px-1" href="#galleries">Galleries</a>
+      </nav>
+      <div class="flex items-center gap-4">
+        <button class="relative p-2 text-primary hover:bg-surface-variant rounded-full transition-colors group" aria-label="Notifications" type="button">
+          <span class="material-symbols-outlined notification-pulse relative z-10">notifications</span>
+        </button>
+        <button class="relative p-1 rounded-full group cursor-pointer" id="profileBtn" aria-label="Open client portal" type="button">
+          <div class="absolute inset-0 rounded-full profile-ring opacity-50 group-hover:opacity-100 transition-opacity"></div>
+          <div class="relative bg-surface p-2 rounded-full border border-primary/30 z-10">
+            <span class="material-symbols-outlined text-primary">person</span>
+          </div>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- SideNavBar / Profile -->
+  <aside class="fixed right-0 top-0 h-full w-80 z-[60] bg-surface-container-highest/80 backdrop-blur-2xl border-l border-white/10 shadow-[-10px_0_30px_rgba(74,0,128,0.3)] flex flex-col p-gutter gap-4 overflow-y-auto" id="sideNav" aria-label="Client portal" aria-hidden="true">
+    <div class="flex justify-between items-start pt-4">
+      <div>
+        <h2 class="font-headline-md text-headline-md text-primary">Profile</h2>
+        <p class="text-on-surface-variant font-body-md text-sm mt-1" id="profileTierLabel">Login to claim AD Tokens</p>
+      </div>
+      <button class="p-2 text-on-surface-variant hover:text-primary rounded-full hover:bg-white/5" id="closeSideNav" aria-label="Close portal" type="button">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+
+    <div id="profileLoginBox" class="flex flex-col gap-2">
+      <input id="profMobile" class="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 text-on-surface text-sm" placeholder="Mobile" maxlength="10" type="tel"/>
+      <input id="profPin" class="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 text-on-surface text-sm" placeholder="PIN" maxlength="4" type="password"/>
+      <button type="button" id="profLoginBtn" class="w-full bg-gradient-gold text-on-primary font-label-md text-label-md py-3 rounded-lg">Login</button>
+      <p class="text-xs text-on-surface-variant">Naya account? <a href="/book-now" class="text-primary underline">Studio page se register</a></p>
+      <p id="profLoginErr" class="text-error text-xs hidden"></p>
+    </div>
+
+    <div id="profileUserBox" class="hidden flex flex-col gap-3">
+      <!-- Level badge -->
+      <div class="relative overflow-hidden rounded-2xl p-4 border border-primary/40" style="background:linear-gradient(145deg,#2a2210,#16120b)">
+        <div class="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-primary/20 blur-2xl"></div>
+        <div class="flex items-center gap-3 relative z-[1]">
+          <div class="w-14 h-14 rounded-full border-2 border-primary flex items-center justify-center text-xl font-bold text-primary bg-surface" id="profLevelIcon">★</div>
+          <div class="flex-1 min-w-0">
+            <p class="text-on-surface font-title-lg text-base truncate" id="profName">—</p>
+            <p class="text-primary text-xs font-semibold tracking-wide" id="profLevelName">Bronze Member</p>
+            <p class="text-on-surface-variant text-xs" id="profMobileShow">—</p>
+          </div>
+        </div>
+        <p class="text-[11px] text-on-surface-variant mt-2 relative z-[1]" id="profAddressLine">Address: —</p>
+        <p class="text-[10px] text-on-surface-variant mt-0.5 relative z-[1]">ID: <span class="text-primary" id="profId">—</span> · Spend ₹<span id="profSpend">0</span></p>
+      </div>
+
+      <!-- Wallet balance -->
+      <div class="rounded-2xl border border-primary/50 p-4 text-center relative overflow-hidden" style="background:linear-gradient(145deg,#2a2210,#16120b);box-shadow:0 0 24px rgba(212,175,55,0.25)">
+        <div class="absolute inset-0 opacity-30" style="background:radial-gradient(circle at 30% 20%,rgba(255,224,136,0.35),transparent 55%)"></div>
+        <p class="text-[10px] uppercase tracking-[0.2em] text-primary/90 relative z-[1]">💰 Wallet Balance</p>
+        <p class="text-3xl font-bold text-gradient-gold relative z-[1] mt-1">₹<span id="profWalletBal">0</span></p>
+        <p class="text-[11px] text-on-surface-variant mt-1 relative z-[1]">Orders me use kar sakte ho</p>
+        <div class="mt-3 flex gap-2 relative z-[1]">
+          <input id="profWalletCode" class="flex-1 bg-surface border border-outline-variant rounded-lg px-2 py-1.5 text-on-surface text-xs" placeholder="Wallet code" maxlength="12"/>
+          <button type="button" id="profWalletRedeemBtn" class="px-3 py-1.5 rounded-lg bg-gradient-gold text-on-primary text-xs font-semibold">Redeem</button>
+        </div>
+        <p id="profWalletMsg" class="text-[11px] mt-1 relative z-[1] hidden"></p>
+      </div>
+
+      <!-- Wallet history -->
+      <div>
+        <p class="text-[10px] uppercase tracking-[0.15em] text-primary/90 mb-2 font-label-md">Wallet History</p>
+        <div id="profWalletHist" class="space-y-1.5 max-h-36 overflow-y-auto text-xs">
+          <p class="opacity-70">No transactions yet</p>
+        </div>
+      </div>
+
+      <!-- Coupons sticker style -->
+      <div>
+        <p class="text-[10px] uppercase tracking-[0.15em] text-primary/90 mb-2 font-label-md">Available Coupons → Wallet</p>
+        <div id="profHistory" class="space-y-2 max-h-48 overflow-y-auto">
+          <p class="text-xs opacity-70">No coupons yet</p>
+        </div>
+      </div>
+
+      <!-- Spins -->
+      <div class="rounded-xl border border-primary/30 p-3 text-center" style="background:linear-gradient(145deg,#241c0e,#16120b)">
+        <p class="text-[10px] uppercase tracking-wider text-on-surface-variant">Your Spins</p>
+        <p class="text-3xl font-bold text-gradient-gold" id="profSpins">0</p>
+        <a href="/book-now" class="inline-block mt-1 text-primary text-xs underline">Spin Wheel →</a>
+      </div>
+
+      <!-- Tokens + actions -->
+      <div class="grid grid-cols-2 gap-2">
+        <div class="rounded-xl bg-surface p-3 border border-primary/20 text-center">
+          <p class="text-[10px] uppercase tracking-wider text-on-surface-variant">AD Tokens</p>
+          <p class="text-xl font-bold text-primary" id="profAdTokens">0</p>
+        </div>
+        <div class="rounded-xl bg-surface p-3 border border-primary/20 text-center">
+          <p class="text-[10px] uppercase tracking-wider text-on-surface-variant">Free Spin</p>
+          <p class="text-sm font-bold text-primary" id="profFreeSpin">—</p>
+        </div>
+      </div>
+      <p class="text-[11px] text-on-surface-variant text-center">10 AD Tokens = 1 Spin</p>
+      <button type="button" id="profExchangeBtn" class="w-full border border-primary/40 text-primary font-label-md text-label-md py-2.5 rounded-lg hover:bg-primary/10 transition-all">
+        Exchange 10 Tokens → 1 Spin
+      </button>
+      <button type="button" id="profClaimBtn" class="w-full bg-gradient-gold text-on-primary font-label-md text-label-md py-2.5 rounded-lg shadow-[0_0_15px_rgba(212,175,55,0.4)]">
+        Claim Daily AD Token
+      </button>
+      <p id="profTokenMsg" class="text-xs text-center hidden"></p>
+      <button type="button" id="profLogoutBtn" class="text-error text-sm py-2">Logout</button>
+    </div>
+  </aside>
+
+  <style>
+    .coupon-sticker {
+      position: relative;
+      border-radius: 12px;
+      padding: 12px 14px;
+      background: linear-gradient(135deg, #3d2e0a 0%, #1a140c 50%, #2a1f0c 100%);
+      border: 1px dashed rgba(232, 185, 35, 0.65);
+      box-shadow: 0 0 18px rgba(212, 175, 55, 0.25), inset 0 0 20px rgba(212, 175, 55, 0.06);
+      overflow: hidden;
+    }
+    .coupon-sticker::before {
+      content: "";
+      position: absolute;
+      inset: -40% -20%;
+      background: linear-gradient(105deg, transparent 40%, rgba(255, 230, 150, 0.18) 50%, transparent 60%);
+      animation: couponShine 2.8s linear infinite;
+      pointer-events: none;
+    }
+    @keyframes couponShine {
+      0% { transform: translateX(-30%); }
+      100% { transform: translateX(30%); }
+    }
+    .coupon-sticker .code {
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      color: #F3DE9A;
+      font-size: 0.95rem;
+      text-shadow: 0 0 12px rgba(232, 185, 35, 0.45);
+    }
+    .coupon-apply {
+      margin-top: 8px;
+      width: 100%;
+      border: none;
+      border-radius: 8px;
+      padding: 8px;
+      font-weight: 700;
+      font-size: 12px;
+      cursor: pointer;
+      background: linear-gradient(90deg, #e8b923, #f3de9a, #c9a227);
+      color: #1a1205;
+    }
+    .coupon-apply:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+  </style>
+
+  <div class="fixed inset-0 bg-background/80 backdrop-blur-sm z-[55] hidden opacity-0 transition-opacity duration-300" id="navOverlay" aria-hidden="true"></div>
+
+  <main class="flex-1 pt-32 pb-24 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto w-full flex flex-col gap-16 md:gap-24">
+
+    <!-- Hero Section -->
+    <section class="relative w-screen left-1/2 -translate-x-1/2 min-h-[614px] flex items-center justify-center -mt-10 overflow-hidden shadow-2xl" id="portfolio">
+      <!-- Side-visible background slideshow (admin: Hero Side Background) -->
+      <div class="absolute inset-0 z-0 bg-background" id="heroSideBg">
+        <div class="bg-slide active" style="background-image:url('https://images.unsplash.com/photo-1519741497674-611481863552?w=1600&q=80')"></div>
+        <div class="absolute inset-0 pointer-events-none"
+             style="background: linear-gradient(105deg, rgba(22,19,11,.92) 0%, rgba(22,19,11,.55) 42%, rgba(22,19,11,.25) 70%, rgba(22,19,11,.45) 100%);"></div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-12 items-center w-full max-w-container-max px-margin-mobile md:px-margin-desktop mx-auto z-10 py-16">
+        <div class="flex flex-col z-10 relative min-h-[220px] md:min-h-[280px] justify-center">
+          <!-- Sparkle text cycle: type → hold → zoom-out → next -->
+          <div class="hero-type-wrap max-w-xl">
+            <h2 id="heroTypeLine" class="hero-type-line sparkle-text text-3xl sm:text-4xl md:text-5xl font-headline-lg" aria-live="polite"></h2>
+          </div>
+        </div>
+        <a href="/frames" class="hero-frame-container relative w-full h-[400px] md:h-[500px] flex items-center justify-center group cursor-pointer" title="Photo Frames — Book Now">
+          <div class="hero-frame relative w-64 h-80 md:w-80 md:h-96 glass-panel rounded-xl flex items-center justify-center p-2 jewel-glow group-hover:shadow-[0_0_40px_rgba(212,175,55,0.45)] transition-shadow">
+            <div class="w-full h-full rounded-lg overflow-hidden border border-primary/20 relative">
+              <div id="heroFramePhoto" class="bg-cover bg-center w-full h-full absolute inset-0 transition-opacity duration-700" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCYW4rqkG-Y71cDaGgRL2wFRqrO2XltrHYZfyPiH-Bk_eFNA9eoK-5XMN9yGCdC4KBiAmvzrkoQkpq-2oFPstgDjMZFUBR6ZeAjLvhXEXvD3VnRLO94f1WZwnJY6emwPMqMf5ETIPk39jQH77M57qvHoDOufk9JSsU2nzap4l4a9L3A7KyrUj74h0Nx-PyKjxevsmizfapfDGpkET_fvUf4QVxRpUDlhNkbhB7RcRci6cjRi-Cz3XFP7A");' role="img" aria-label="Photo frame preview"></div>
+              <div class="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent pointer-events-none"></div>
+              <div class="absolute bottom-3 left-0 right-0 text-center z-10">
+                <span class="inline-block px-3 py-1 rounded-full bg-primary/90 text-on-primary text-[11px] font-label-md tracking-wider">Photo Frame · Book Now</span>
+              </div>
+            </div>
+          </div>
+          <div class="absolute top-10 right-10 w-24 h-24 rounded-full bg-primary/20 blur-3xl -z-10"></div>
+          <div class="absolute bottom-10 left-10 w-32 h-32 rounded-full bg-tertiary/20 blur-3xl -z-10"></div>
+        </a>
+      </div>
+    </section>
+
+    <!-- Offer Carousel -->
+    <section class="w-full overflow-hidden relative rounded-2xl glass-panel p-1 mt-4" id="gift-shop" aria-label="Current deals">
+      <div class="absolute top-4 left-6 z-10">
+        <span class="bg-error text-on-error font-label-md text-[10px] px-2 py-1 rounded-full uppercase tracking-wider shadow-lg">Current Deals</span>
+      </div>
+      <div class="flex w-[200%] carousel-track">
+        <div class="flex w-1/2">
+          <div class="w-1/3 p-2">
+            <div class="w-full h-48 md:h-64 rounded-xl overflow-hidden relative group">
+              <div class="bg-cover bg-center w-full h-full absolute inset-0 group-hover:scale-105 transition-transform duration-700" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAMenb6Bl18cd5_-nIswYnIxE9WuQ_RUWhuCz1ZbxWB-AQoHNBlMBIFkPL7f8hE0uGoNQQkSGrhxJ08lwxQaCO9KTpK33B_jMJT8ehWROCE9C67ECkjZPpdHmOXxwN52qnpFDEhJAarwt6u-tbZp2xsoYnd3zUn1H0buUqa5-dFdIfa4GL-UFdenIpLBCyXwvzcRIOKVP6v4lK2eOje9Wmy91SFgYazHXfCmtqd3faJVEBYSN3rGiMViw");'></div>
+              <div class="absolute inset-0 bg-gradient-to-t from-background/90 via-background/20 to-transparent flex flex-col justify-end p-4">
+                <h3 class="font-title-lg text-title-lg text-primary">Wedding Combo</h3>
+                <p class="text-on-surface-variant font-body-md text-sm">30% Off Premium Frames</p>
+              </div>
+            </div>
+          </div>
+          <div class="w-1/3 p-2">
+            <div class="w-full h-48 md:h-64 rounded-xl overflow-hidden relative group">
+              <div class="bg-cover bg-center w-full h-full absolute inset-0 group-hover:scale-105 transition-transform duration-700" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCqpyCaFnPVA8_nBzuJvq8u0irGC3wVsdKIoIcAx3RgQ5HY5zMaRio2ZMb9EeCW4ljFJ8AYVJ2dn1PWgtYkpxe87GsojGJXRnsnvFFVcKPBH3P5RzDbv_cOkHTAdBW4iaInVIAqMnL32AAsT5IsHCsTfFMZIWICQdAGvdZJybC4neSt7Gw3WgIMwe499-CufdWGV7BbdNiEL4TbxRZBI1EXtvesqw4taj8dGy6QOwscsr5YMyFFHiWjUw");'></div>
+              <div class="absolute inset-0 bg-gradient-to-t from-background/90 via-background/20 to-transparent flex flex-col justify-end p-4">
+                <h3 class="font-title-lg text-title-lg text-primary">Custom Gifts</h3>
+                <p class="text-on-surface-variant font-body-md text-sm">Buy 1 Get 1 Engraving</p>
+              </div>
+            </div>
+          </div>
+          <div class="w-1/3 p-2">
+            <div class="w-full h-48 md:h-64 rounded-xl overflow-hidden relative group">
+              <div class="bg-cover bg-center w-full h-full absolute inset-0 group-hover:scale-105 transition-transform duration-700" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDSzhMnCV4xmGPPJ8EU3vokygFbyzYoJ4VAndJmnvHww7Xo0IDclVckPUD2PH-GxQK57vFft3x0AAFNhXUrIT-eVY-KeKhA_uVc0jrt2vwgz3W63ooalLzoAamxo4KdebYrbQyJVCP5JRteIHt_El_BwsPDog5gObX6FajQBcGYotaRjGKet7HMYjpPRQIh0J_Em91sXIH5TGdmpnxWVd6AngRmzAmDkh4CfOrsKlMzgiP0EsoekPUEVw");'></div>
+              <div class="absolute inset-0 bg-gradient-to-t from-background/90 via-background/20 to-transparent flex flex-col justify-end p-4">
+                <h3 class="font-title-lg text-title-lg text-primary">Birthday Shoots</h3>
+                <p class="text-on-surface-variant font-body-md text-sm">Free Drone Coverage</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="flex w-1/2">
+          <div class="w-1/3 p-2">
+            <div class="w-full h-48 md:h-64 rounded-xl overflow-hidden relative group">
+              <div class="bg-cover bg-center w-full h-full absolute inset-0 group-hover:scale-105 transition-transform duration-700" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAiqpMvcpR09vLGub6tEWulpmFHfpF3AxlSILuyqSEzEsd2io1y3H4O2Rrs74BvPEDnIg65xx6OqaQ_pZKfsmishEesxFYJdNop9gggC3v0C_rwUnBcRK0BLcU1EDH9SWZREYHYXlHcmk0rV4AS5kI9PGb6rOhB3B4_MwS0nWfwWuWJ8XJZzprruHqdt3vOd4f8EvIjmsoaceUOXH1G6GTrCoLnHWJv3xPnTR4kABPtUY-q0s-oCvU8JQ");'></div>
+              <div class="absolute inset-0 bg-gradient-to-t from-background/90 via-background/20 to-transparent flex flex-col justify-end p-4">
+                <h3 class="font-title-lg text-title-lg text-primary">Wedding Combo</h3>
+                <p class="text-on-surface-variant font-body-md text-sm">30% Off Premium Frames</p>
+              </div>
+            </div>
+          </div>
+          <div class="w-1/3 p-2">
+            <div class="w-full h-48 md:h-64 rounded-xl overflow-hidden relative group">
+              <div class="bg-cover bg-center w-full h-full absolute inset-0 group-hover:scale-105 transition-transform duration-700" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuB3d5RYdV5_A9IPNBPt7Sbie0Lz1qbs2QMjqrfuaT3a_1ZVreTkcE-ZY4g2Qmb62x8OEXrGQHXSf-oPk5qekjkBY40S6iFFlT0cPglECLNCZGTx7a3GpbWWrwJ7neQiG7gjoh8L7z8ahe8hpxt7pbWU-ddWdJ6txTP8_cL6Wla2dkEHK-cIdrlPWonnzMYiC6s4R4b8iaCIHvlHCOfMRfgPzS0xH3PZiS7otnPT6v6c6cL_Eydp86kPZw");'></div>
+              <div class="absolute inset-0 bg-gradient-to-t from-background/90 via-background/20 to-transparent flex flex-col justify-end p-4">
+                <h3 class="font-title-lg text-title-lg text-primary">Custom Gifts</h3>
+                <p class="text-on-surface-variant font-body-md text-sm">Buy 1 Get 1 Engraving</p>
+              </div>
+            </div>
+          </div>
+          <div class="w-1/3 p-2">
+            <div class="w-full h-48 md:h-64 rounded-xl overflow-hidden relative group">
+              <div class="bg-cover bg-center w-full h-full absolute inset-0 group-hover:scale-105 transition-transform duration-700" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBFmOE0NNyBy7Yfu7ihK4m4JDF5jG2H4WRAMFC-Mw-AzCitCaCwBmJKDM5prAbXGSTxHK05ln11dBsbI8i7XphFdUK-trMZTiNfbYNpIev79hBzEc_6qA-XI7JGYJnFeRAVhUOlzg4DfHfPVx8CpNk44pHXLSu-777P9yHts4TYj2qWjVqBHA9zlbv1vCTtmcd3P8z82eBpO-hTGRIjimQTYiNgYQCaXBDvVIt85EqsdDAs083t81SbIQ");'></div>
+              <div class="absolute inset-0 bg-gradient-to-t from-background/90 via-background/20 to-transparent flex flex-col justify-end p-4">
+                <h3 class="font-title-lg text-title-lg text-primary">Birthday Shoots</h3>
+                <p class="text-on-surface-variant font-body-md text-sm">Free Drone Coverage</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Photo Frames → full frames shop -->
+    <section class="flex flex-col gap-6" id="photo-frames-cta">
+      <div class="flex items-center justify-between flex-wrap gap-3">
+        <h2 class="font-headline-md text-headline-md text-on-surface">Custom Photo Frames</h2>
+        <a class="text-primary font-label-md text-label-md hover:underline decoration-primary underline-offset-4" href="/frames">View all sizes →</a>
+      </div>
+      <a href="/frames" class="glass-panel jewel-glow rounded-2xl overflow-hidden grid grid-cols-1 md:grid-cols-2 group transition-all duration-500 hover:-translate-y-1 no-underline">
+        <div class="h-56 md:h-64 overflow-hidden relative">
+          <div class="bg-cover bg-center w-full h-full absolute inset-0 group-hover:scale-105 transition-transform duration-700" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCYW4rqkG-Y71cDaGgRL2wFRqrO2XltrHYZfyPiH-Bk_eFNA9eoK-5XMN9yGCdC4KBiAmvzrkoQkpq-2oFPstgDjMZFUBR6ZeAjLvhXEXvD3VnRLO94f1WZwnJY6emwPMqMf5ETIPk39jQH77M57qvHoDOufk9JSsU2nzap4l4a9L3A7KyrUj74h0Nx-PyKjxevsmizfapfDGpkET_fvUf4QVxRpUDlhNkbhB7RcRci6cjRi-Cz3XFP7A");'></div>
+          <div class="absolute inset-0 bg-gradient-to-r from-transparent to-background/40 md:to-background/80"></div>
+        </div>
+        <div class="p-8 md:p-10 flex flex-col justify-center gap-3">
+          <span class="text-primary font-label-md text-label-md uppercase tracking-widest text-xs">Raksha Bandhan · Gifting</span>
+          <h3 class="font-headline-md text-headline-md text-on-surface leading-tight">Photo Frame</h3>
+          <p class="text-on-surface-variant font-body-md text-sm md:text-body-md">Museum-quality frames, 3D preview, custom sizes — upload photo and order online.</p>
+          <span class="mt-2 inline-flex items-center gap-2 bg-gradient-gold text-on-primary font-label-md text-label-md px-6 py-3 rounded-lg w-fit shadow-[0_0_20px_rgba(212,175,55,0.35)] group-hover:shadow-[0_0_30px_rgba(212,175,55,0.55)] transition-shadow">
+            Book Now
+            <span class="material-symbols-outlined text-sm transition-transform group-hover:translate-x-1">arrow_forward</span>
+          </span>
+        </div>
+      </a>
+    </section>
+
+    <!-- Booking Cards -->
+    <section class="flex flex-col gap-8" id="bookings">
+      <div class="flex items-center justify-between">
+        <h2 class="font-headline-md text-headline-md text-on-surface">Book Your Session</h2>
+        <a class="text-primary font-label-md text-label-md hover:underline decoration-primary underline-offset-4" href="/book?service=wedding">View All Packages</a>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+        <a href="/book?service=wedding" class="glass-panel jewel-glow rounded-2xl overflow-hidden flex flex-col h-full group transition-all duration-500 hover:-translate-y-2 no-underline text-inherit">
+          <div class="h-48 overflow-hidden">
+            <img alt="Wedding Book" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCYW4rqkG-Y71cDaGgRL2wFRqrO2XltrHYZfyPiH-Bk_eFNA9eoK-5XMN9yGCdC4KBiAmvzrkoQkpq-2oFPstgDjMZFUBR6ZeAjLvhXEXvD3VnRLO94f1WZwnJY6emwPMqMf5ETIPk39jQH77M57qvHoDOufk9JSsU2nzap4l4a9L3A7KyrUj74h0Nx-PyKjxevsmizfapfDGpkET_fvUf4QVxRpUDlhNkbhB7RcRci6cjRi-Cz3XFP7A" loading="lazy"/>
+          </div>
+          <div class="p-6 flex flex-col flex-1">
+            <h3 class="font-title-lg text-title-lg text-on-surface mb-2">Wedding Book</h3>
+            <p class="text-on-surface-variant font-body-md text-sm flex-1">Cinematic wedding storytelling.</p>
+            <div class="mt-4 flex items-center gap-2 text-primary font-label-md text-label-md">Book Now <span class="material-symbols-outlined text-sm transition-transform group-hover:translate-x-1">arrow_forward</span></div>
+          </div>
+        </a>
+        <a href="/book?service=birthday" class="glass-panel jewel-glow rounded-2xl overflow-hidden flex flex-col h-full group transition-all duration-500 hover:-translate-y-2 no-underline text-inherit">
+          <div class="h-48 overflow-hidden">
+            <img alt="Birthday Shoot" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDSzhMnCV4xmGPPJ8EU3vokygFbyzYoJ4VAndJmnvHww7Xo0IDclVckPUD2PH-GxQK57vFft3x0AAFNhXUrIT-eVY-KeKhA_uVc0jrt2vwgz3W63ooalLzoAamxo4KdebYrbQyJVCP5JRteIHt_El_BwsPDog5gObX6FajQBcGYotaRjGKet7HMYjpPRQIh0J_Em91sXIH5TGdmpnxWVd6AngRmzAmDkh4CfOrsKlMzgiP0EsoekPUEVw" loading="lazy"/>
+          </div>
+          <div class="p-6 flex flex-col flex-1">
+            <h3 class="font-title-lg text-title-lg text-on-surface mb-2">Birthday Shoot</h3>
+            <p class="text-on-surface-variant font-body-md text-sm flex-1">Vibrant celebration coverage.</p>
+            <div class="mt-4 flex items-center gap-2 text-primary font-label-md text-label-md">Book Now <span class="material-symbols-outlined text-sm transition-transform group-hover:translate-x-1">arrow_forward</span></div>
+          </div>
+        </a>
+        <a href="/book?service=event" class="glass-panel jewel-glow rounded-2xl overflow-hidden flex flex-col h-full group transition-all duration-500 hover:-translate-y-2 no-underline text-inherit">
+          <div class="h-48 overflow-hidden">
+            <img alt="Event Book" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAypE7IfZCrXdSabBic1c-_aLthda8S7F9KQEj0T8egxohy_szQi_WiqVYe3pQoKAW5fsIkgLy1f_YyX9yDMVvxx-NvffcYR7_Ao0WpP9zamOrHMi0hNUnrNFmIgDap7IQNrnxm_xC18_-gSciy7xhUMX5AU0fuLvZWREVFDJiSGbmzNDrOz8tN7k2vWyEWEe5-S9ygQxr0JEWjXlENSn8q2nqmUNvDrDFJuHlqanPdzepSCLjzuthkzg" loading="lazy"/>
+          </div>
+          <div class="p-6 flex flex-col flex-1">
+            <h3 class="font-title-lg text-title-lg text-on-surface mb-2">Event Book</h3>
+            <p class="text-on-surface-variant font-body-md text-sm flex-1">Professional event documentation.</p>
+            <div class="mt-4 flex items-center gap-2 text-primary font-label-md text-label-md">Book Now <span class="material-symbols-outlined text-sm transition-transform group-hover:translate-x-1">arrow_forward</span></div>
+          </div>
+        </a>
+        <a href="/book?service=baby" class="glass-panel jewel-glow rounded-2xl overflow-hidden flex flex-col h-full group transition-all duration-500 hover:-translate-y-2 no-underline text-inherit">
+          <div class="h-48 overflow-hidden">
+            <img alt="Baby Shower Book" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCR19KaxkUbrnbiQvag16onuOkS6ls3mKgb0_WZ13jMXe5I076lkCXxtcEoiwuQD14qpMTfyk-chB7BdP_ke03aq4bDrQoyk6PVpDPyEmRL6K0uDG5MvX1iUkfhOilcXvdUfqY0HwSM1DjUEHorH3KYOUc-mv_Y3_ya1MBfTqgQ_XxV7f7cNIqJtL7XWEP9uS6mlaaA_rjsfiFeESYpAo5Y_rboZololOcsEUNLMJc1ZJ1JFzlUFiIERg" loading="lazy"/>
+          </div>
+          <div class="p-6 flex flex-col flex-1">
+            <h3 class="font-title-lg text-title-lg text-on-surface mb-2">Baby Shower Book</h3>
+            <p class="text-on-surface-variant font-body-md text-sm flex-1">Capturing precious new beginnings.</p>
+            <div class="mt-4 flex items-center gap-2 text-primary font-label-md text-label-md">Book Now <span class="material-symbols-outlined text-sm transition-transform group-hover:translate-x-1">arrow_forward</span></div>
+          </div>
+        </a>
+        <a href="/book?service=studio" class="glass-panel jewel-glow rounded-2xl overflow-hidden flex flex-col h-full group transition-all duration-500 hover:-translate-y-2 no-underline text-inherit">
+          <div class="h-48 overflow-hidden">
+            <img alt="Studio Shoot" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBFmOE0NNyBy7Yfu7ihK4m4JDF5jG2H4WRAMFC-Mw-AzCitCaCwBmJKDM5prAbXGSTxHK05ln11dBsbI8i7XphFdUK-trMZTiNfbYNpIev79hBzEc_6qA-XI7JGYJnFeRAVhUOlzg4DfHfPVx8CpNk44pHXLSu-777P9yHts4TYj2qWjVqBHA9zlbv1vCTtmcd3P8z82eBpO-hTGRIjimQTYiNgYQCaXBDvVIt85EqsdDAs083t81SbIQ" loading="lazy"/>
+          </div>
+          <div class="p-6 flex flex-col flex-1">
+            <h3 class="font-title-lg text-title-lg text-on-surface mb-2">Studio Shoot</h3>
+            <p class="text-on-surface-variant font-body-md text-sm flex-1">High-end portrait photography.</p>
+            <div class="mt-4 flex items-center gap-2 text-primary font-label-md text-label-md">Book Now <span class="material-symbols-outlined text-sm transition-transform group-hover:translate-x-1">arrow_forward</span></div>
+          </div>
+        </a>
+        <a href="/book?service=pvt" class="glass-panel jewel-glow rounded-2xl overflow-hidden flex flex-col h-full group transition-all duration-500 hover:-translate-y-2 no-underline text-inherit">
+          <div class="h-48 overflow-hidden">
+            <img alt="PVT Photography" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA8GemgKAF2HCCb0Ca72D-xt0lbLWbYTNgX3i22laOpANyl0NKCA4y2yMac48gneN1OB1HCxfJqNPP34owV6mpt-Ie7hqqkjiepf--xW789WiyZZaDsqd2q64MIFGEgS5BAsUU9QrlicvR95fDOhy1zTstHSymJqJXjftZj9ag91lO2DAJag7HwUbMcv0JKfqXfP0z9NNQPUk24177oiVKjAlSmsO4yOEZQ3S23jokPQilyqliJHkdonA" loading="lazy"/>
+          </div>
+          <div class="p-6 flex flex-col flex-1">
+            <h3 class="font-title-lg text-title-lg text-on-surface mb-2">PVT Photography</h3>
+            <p class="text-on-surface-variant font-body-md text-sm flex-1">Exclusive private sessions.</p>
+            <div class="mt-4 flex items-center gap-2 text-primary font-label-md text-label-md">Book Now <span class="material-symbols-outlined text-sm transition-transform group-hover:translate-x-1">arrow_forward</span></div>
+          </div>
+        </a>
+        <a href="/book?service=reel" class="glass-panel jewel-glow rounded-2xl overflow-hidden flex flex-col h-full group transition-all duration-500 hover:-translate-y-2 no-underline text-inherit">
+          <div class="h-48 overflow-hidden">
+            <img alt="Reel Shoot" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB_NriZy5MvYjcuFo-l5Vtw-6O_B9pPiq1yiHqjCekjyAN35cA9_02BEE_yoK6cvFhsdebIekf7V07nc0A_1RBYgpjAhCo3sPHVlBbm50_RlYWd9U-DMf2CqxvdOTJsC51aTl2De4iSWD4ntUp3x4juR8OxTkQXVtl5Ex9UR0C36TkMm4tpAlUsGrNrPcNp3MK-PEZKqZ76m5YaTwb3eSe0uFTM_aGIh1WYdqctunhMrKGEitMn1TVGSA" loading="lazy"/>
+          </div>
+          <div class="p-6 flex flex-col flex-1">
+            <h3 class="font-title-lg text-title-lg text-on-surface mb-2">Reel Shoot</h3>
+            <p class="text-on-surface-variant font-body-md text-sm flex-1">Cinematic short-form video.</p>
+            <div class="mt-4 flex items-center gap-2 text-primary font-label-md text-label-md">Book Now <span class="material-symbols-outlined text-sm transition-transform group-hover:translate-x-1">arrow_forward</span></div>
+          </div>
+        </a>
+        <a href="/book?service=other" class="glass-panel jewel-glow rounded-2xl overflow-hidden flex flex-col h-full group transition-all duration-500 hover:-translate-y-2 no-underline text-inherit">
+          <div class="h-48 overflow-hidden">
+            <img alt="Other Services" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD-Y1zdf3ebTl-cNr0_GZXGQixaLxkW9mmV6AL9TaXi30YNG4edmiz1RdzG7J_imWJRBCxd1QDW2RdRhN6FYho_MExd45s8Ot2E_IwnSshWvIW0C0BpIKXJds7QBIvKCDLYct5dPUTr0SxGCLvG5AQKL7KDb5ZjZ5th7SbM_V_RLbg4j-brVf98VOfZHE2uuHrl2X9neZ-cJZajef7OZS6X2R8OkTi9sNcE3nmjrVQSOVotZF8BWxJU1w" loading="lazy"/>
+          </div>
+          <div class="p-6 flex flex-col flex-1">
+            <h3 class="font-title-lg text-title-lg text-on-surface mb-2">Other</h3>
+            <p class="text-on-surface-variant font-body-md text-sm flex-1">Custom photography requests.</p>
+            <div class="mt-4 flex items-center gap-2 text-primary font-label-md text-label-md">Explore <span class="material-symbols-outlined text-sm transition-transform group-hover:translate-x-1">arrow_forward</span></div>
+          </div>
+        </a>
+      </div>
+    </section>
+
+    <!-- Live Spin Roller + AD Token -->
+    <section class="glass-panel rounded-3xl p-8 md:p-12 relative overflow-hidden border-primary/20 shadow-[0_0_40px_rgba(212,175,55,0.05)]" id="galleries">
+      <div class="absolute -right-20 -top-20 w-64 h-64 bg-primary/10 rounded-full blur-3xl"></div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-12 relative z-10 items-center">
+        <div>
+          <span class="inline-block px-3 py-1 rounded-full bg-surface-variant text-primary font-label-md text-xs mb-4 border border-primary/20">Daily Rewards</span>
+          <h2 class="font-headline-md text-headline-md text-on-surface mb-4">Spin Wheel &amp; AD Tokens</h2>
+          <p class="text-on-surface-variant font-body-md text-body-md mb-4">Live roller auto-spin ho raha hai. Click karke full spin page kholo. Har din <b class="text-primary">1 AD Token</b> claim karo — <b class="text-primary">10 tokens = 1 spin</b>.</p>
+          <div class="flex flex-wrap gap-4 mb-6">
+            <div class="relative overflow-hidden rounded-2xl px-6 py-4 min-w-[140px] border border-primary/40 shadow-[0_0_24px_rgba(212,175,55,0.25)]" style="background:linear-gradient(145deg,#2a2210,#1a150c 60%,#241c0e)">
+              <div class="absolute -right-4 -top-4 w-16 h-16 rounded-full bg-primary/20 blur-xl"></div>
+              <p class="text-[10px] uppercase tracking-[0.2em] text-primary/90 font-label-md">Your Spins</p>
+              <p class="text-3xl font-bold text-gradient-gold mt-1" id="homeSpinCount">0</p>
+              <p class="text-[10px] text-on-surface-variant mt-1">Ready to play</p>
+            </div>
+            <div class="relative overflow-hidden rounded-2xl px-6 py-4 min-w-[140px] border border-primary/40 shadow-[0_0_24px_rgba(212,175,55,0.25)]" style="background:linear-gradient(145deg,#2a2210,#1a150c 60%,#241c0e)">
+              <div class="absolute -right-4 -top-4 w-16 h-16 rounded-full bg-primary/20 blur-xl"></div>
+              <p class="text-[10px] uppercase tracking-[0.2em] text-primary/90 font-label-md">AD Tokens</p>
+              <p class="text-3xl font-bold text-gradient-gold mt-1" id="homeTokenCount">0</p>
+              <p class="text-[10px] text-on-surface-variant mt-1">10 tokens = 1 spin</p>
+            </div>
+          </div>
+          <form class="flex flex-col sm:flex-row gap-4" id="spinCodeForm">
+            <div class="relative flex-1">
+              <input class="w-full bg-surface border-b-2 border-outline-variant focus:border-primary text-on-surface font-body-md px-4 py-3 rounded-t-md outline-none transition-colors placeholder:text-on-surface-variant/50 focus:bg-surface-variant/50" id="spinCode" placeholder="Spin code (optional)" type="text" autocomplete="off"/>
+            </div>
+            <button class="bg-surface-bright text-primary border border-primary/30 font-label-md text-label-md px-6 py-3 rounded-lg hover:bg-primary hover:text-on-primary transition-all whitespace-nowrap" type="submit">
+              Verify Code
+            </button>
+          </form>
+          <p class="mt-4 text-sm font-label-md hidden" id="codeResult" role="status"></p>
+        </div>
+        <div class="flex flex-col items-center gap-4">
+          <a href="/book-now" class="home-lw-link" title="Open real spin page" id="homeRealWheelLink">
+            <div class="home-lw-stage">
+              <div class="home-lw-pointer"></div>
+              <div class="home-lw-outer">
+                <div class="home-lw-rim"></div>
+                <div class="home-lw-wheel" id="homeLwWheel">
+                  <div class="home-lw-segments" id="homeLwSegments"></div>
+                </div>
+              </div>
+              <div class="home-lw-hub">📷</div>
+            </div>
+          </a>
+          <p class="text-primary font-label-md text-label-md tracking-wider">Spins left: <span id="homeSpinCount2">0</span></p>
+          <button type="button" id="homeClaimTokenBtn" class="btn-claim-token claimable font-label-md text-label-md px-8 py-3 rounded-full">
+            Claim AD Token
+          </button>
+          <p id="homeClaimMsg" class="text-xs text-on-surface-variant text-center max-w-xs"></p>
+          <p class="text-[11px] text-on-surface-variant">Click roller → full spin page</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="w-full mt-auto bg-surface-container-lowest border-t border-outline-variant py-12 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
+    <div class="flex flex-col gap-4 text-center md:text-left">
+      <span class="font-headline-md text-headline-md text-primary">Aditya Studio</span>
+      <p class="font-body-md text-body-md text-on-surface-variant">© 2026 Aditya Studio. All Rights Reserved.</p>
+    </div>
+    <nav class="flex flex-wrap justify-center gap-6" aria-label="Footer navigation">
+      <a class="font-body-md text-body-md text-on-surface-variant hover:text-primary transition-colors" href="#">Privacy Policy</a>
+      <a class="font-body-md text-body-md text-on-surface-variant hover:text-primary transition-colors" href="#">Terms of Service</a>
+      <a class="font-body-md text-body-md text-on-surface-variant hover:text-primary transition-colors" href="#">Careers</a>
+      <a class="font-body-md text-body-md text-on-surface-variant hover:text-primary transition-colors" href="#">Contact Us</a>
+    </nav>
+  </footer>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const SESSION_KEY = 'aditya_studio_session_v1';
+      const profileBtn = document.getElementById('profileBtn');
+      const sideNav = document.getElementById('sideNav');
+      const closeSideNav = document.getElementById('closeSideNav');
+      const navOverlay = document.getElementById('navOverlay');
+
+      function openNav() {
+        if (!sideNav || !navOverlay) return;
+        navOverlay.classList.remove('hidden');
+        requestAnimationFrame(() => {
+          navOverlay.classList.remove('opacity-0');
+          sideNav.classList.add('open');
+          sideNav.setAttribute('aria-hidden', 'false');
+          navOverlay.setAttribute('aria-hidden', 'false');
+        });
+        document.body.style.overflow = 'hidden';
+      }
+      function closeNav() {
+        if (!sideNav || !navOverlay) return;
+        sideNav.classList.remove('open');
+        navOverlay.classList.add('opacity-0');
+        sideNav.setAttribute('aria-hidden', 'true');
+        navOverlay.setAttribute('aria-hidden', 'true');
+        setTimeout(() => {
+          navOverlay.classList.add('hidden');
+          document.body.style.overflow = '';
+        }, 300);
+      }
+      /** Guest / failed session → open profile sidebar on login form */
+      function openLoginPanel(msg) {
+        const loginBox = document.getElementById('profileLoginBox');
+        const userBox = document.getElementById('profileUserBox');
+        if (loginBox) loginBox.classList.remove('hidden');
+        if (userBox) userBox.classList.add('hidden');
+        const tier = document.getElementById('profileTierLabel');
+        if (tier) tier.textContent = 'Login to claim AD Tokens';
+        openNav();
+        const claimMsg = document.getElementById('homeClaimMsg');
+        if (claimMsg) claimMsg.textContent = msg || 'Pehle mobile + PIN se login karo';
+        setTimeout(function () {
+          const mobile = document.getElementById('profMobile');
+          if (mobile) {
+            try { mobile.focus(); } catch (e) {}
+            try { mobile.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e2) {}
+          }
+        }, 350);
+      }
+      if (profileBtn) {
+        profileBtn.addEventListener('click', () => sideNav.classList.contains('open') ? closeNav() : openNav());
+      }
+      if (closeSideNav) closeSideNav.addEventListener('click', closeNav);
+      if (navOverlay) navOverlay.addEventListener('click', closeNav);
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && sideNav && sideNav.classList.contains('open')) closeNav();
+      });
+
+      function loadSession() {
+        try { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch (e) { return null; }
+      }
+      function saveSession(data) {
+        const prev = loadSession() || {};
+        localStorage.setItem(SESSION_KEY, JSON.stringify({ ...prev, ...data }));
+      }
+      function clearSession() { localStorage.removeItem(SESSION_KEY); }
+
+      let user = null;
+
+      function updateTokenUI() {
+        const tokens = user ? (user.adTokens || 0) : 0;
+        const spins = user ? (user.spinBalance || 0) : 0;
+        const canClaim = user ? !!user.canClaimAdToken : false;
+        document.getElementById('homeTokenCount').textContent = tokens;
+        document.getElementById('homeSpinCount').textContent = spins;
+        document.getElementById('homeSpinCount2').textContent = spins;
+        const claimBtn = document.getElementById('homeClaimTokenBtn');
+        const claimMsg = document.getElementById('homeClaimMsg');
+        if (!user) {
+          claimBtn.disabled = false;
+          claimBtn.classList.add('claimable');
+          claimBtn.textContent = 'Login & Claim AD Token';
+          claimMsg.textContent = 'Profile se login karke daily 1 AD Token claim karo';
+        } else if (canClaim) {
+          claimBtn.disabled = false;
+          claimBtn.classList.add('claimable');
+          claimBtn.textContent = 'Claim AD Token';
+          claimMsg.textContent = 'Aaj ka free AD Token ready hai — chamakta button dabao';
+        } else {
+          claimBtn.disabled = true;
+          claimBtn.classList.remove('claimable');
+          claimBtn.textContent = 'Claimed today';
+          claimMsg.textContent = 'Kal phir 1 AD Token milega. 10 tokens = 1 spin.';
+        }
+        // profile
+        if (user) {
+          document.getElementById('profileLoginBox').classList.add('hidden');
+          document.getElementById('profileUserBox').classList.remove('hidden');
+          document.getElementById('profName').textContent = user.name || 'Member';
+          document.getElementById('profMobileShow').textContent = user.mobile || '';
+          document.getElementById('profAdTokens').textContent = tokens;
+          document.getElementById('profSpins').textContent = spins;
+          const spend = Number(user.totalSpend) || 0;
+          let level = user.badge || 'Bronze';
+          if (!user.badge) {
+            if (spend >= 25000) level = 'Platinum';
+            else if (spend >= 10000) level = 'Gold';
+            else if (spend >= 3000) level = 'Silver';
+            else level = 'Bronze';
+          }
+          const levelIcon = { Bronze: '★', Silver: '◆', Gold: '♛', Platinum: '✦', Member: '★' };
+          document.getElementById('profLevelName').textContent = level + ' Member';
+          document.getElementById('profLevelIcon').textContent = levelIcon[level] || '★';
+          document.getElementById('profileTierLabel').textContent = level + ' · AD Wallet';
+          document.getElementById('profId').textContent = user.id || '—';
+          document.getElementById('profSpend').textContent = spend;
+          document.getElementById('profFreeSpin').textContent = user.freeSpinUsed ? 'Used' : 'Available';
+          const wBal = Number(user.walletBalance) || 0;
+          document.getElementById('profWalletBal').textContent = wBal;
+          const wHistBox = document.getElementById('profWalletHist');
+          const wHist = user.walletHistory || [];
+          if (wHist.length) {
+            wHistBox.innerHTML = wHist.slice(0, 15).map(function(w) {
+              const plus = w.type === 'credit';
+              const col = plus ? 'text-green-400' : 'text-red-300';
+              return '<div class="flex justify-between gap-2 border-b border-white/5 pb-1"><span class="' + col + '">' + (plus ? '+' : '−') + '₹' + w.amount + '</span><span class="text-on-surface-variant truncate">' + (w.reason || w.source || '') + '</span></div>';
+            }).join('');
+          } else {
+            wHistBox.innerHTML = '<p class="opacity-70">No transactions yet</p>';
+          }
+          const addr = [user.village, user.address].filter(Boolean).join(', ') || 'Not saved yet';
+          document.getElementById('profAddressLine').textContent = 'Address: ' + addr;
+          const hist = document.getElementById('profHistory');
+          const coupons = (user.history || []).filter(h => (h.prize || h.discount != null) && !['used','wallet_credited','accepted','deleted'].includes(h.couponStatus || 'active'));
+          if (coupons.length) {
+            hist.innerHTML = coupons.slice(0, 12).map((h, i) => {
+              const label = h.prize || ('₹' + h.discount + ' OFF');
+              const code = h.couponId || ('AD' + (h.discount != null ? h.discount : i));
+              const st = h.couponStatus || 'active';
+              const canApply = st === 'active' && (h.walletValue > 0 || Number(h.discount) > 0 || /₹\s*\d+/.test(String(h.prize || '')));
+              return '<div class="coupon-sticker">' +
+                '<div class="flex justify-between items-start gap-2"><span class="code">' + label + '</span><span class="text-[10px] text-primary/80 uppercase">' + st + '</span></div>' +
+                '<p class="text-[11px] text-on-surface-variant mt-1">Code: <b class="text-primary">' + code + '</b></p>' +
+                '<button type="button" class="coupon-apply" data-code="' + code + '" data-label="' + String(label).replace(/"/g, '') + '"' + (canApply ? '' : ' disabled') + '>' +
+                (canApply ? '💰 Wallet me daalo' : (st === 'active' ? 'Value nahi' : 'Used')) + '</button></div>';
+            }).join('');
+            hist.querySelectorAll('.coupon-apply').forEach(btn => {
+              btn.addEventListener('click', async function () {
+                if (btn.disabled) return;
+                const code = btn.getAttribute('data-code');
+                const s = loadSession();
+                if (!s || !s.mobile) { alert('Login required'); return; }
+                btn.disabled = true;
+                btn.textContent = '…';
+                try {
+                  const res = await fetch('/api/wallet/apply-coupon', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mobile: s.mobile, pin: s.pin, couponId: code })
+                  });
+                  const data = await res.json();
+                  if (data.ok) {
+                    user = { ...user, walletBalance: data.walletBalance, walletHistory: data.walletHistory, history: data.history || user.history };
+                    updateTokenUI();
+                    alert(data.message || 'Wallet me add ho gaya!');
+                  } else {
+                    btn.disabled = false;
+                    btn.textContent = '💰 Wallet me daalo';
+                    alert(data.message || 'Fail');
+                  }
+                } catch (e) {
+                  btn.disabled = false;
+                  btn.textContent = '💰 Wallet me daalo';
+                  alert('Network error');
+                }
+              });
+            });
+          } else {
+            hist.innerHTML = '<p class="text-xs opacity-70">No active coupons — spin to win!</p>';
+          }
+          const pClaim = document.getElementById('profClaimBtn');
+          pClaim.disabled = !canClaim;
+          pClaim.textContent = canClaim ? 'Claim Daily AD Token' : 'Already claimed today';
+          pClaim.classList.toggle('opacity-50', !canClaim);
+        } else {
+          document.getElementById('profileLoginBox').classList.remove('hidden');
+          document.getElementById('profileUserBox').classList.add('hidden');
+          document.getElementById('profileTierLabel').textContent = 'Login to claim AD Tokens';
+        }
+      }
+
+      async function restoreUser() {
+        const s = loadSession();
+        if (!s || !s.mobile || !s.pin) { user = null; updateTokenUI(); return; }
+        try {
+          const res = await fetch('/api/restore-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mobile: s.mobile, pin: s.pin })
+          });
+          const data = await res.json();
+          if (data.ok) {
+            user = data;
+            saveSession({ mobile: data.mobile, pin: s.pin, name: data.name, id: data.id });
+          } else user = null;
+        } catch (e) { user = null; }
+        updateTokenUI();
+      }
+
+      document.getElementById('profLoginBtn').addEventListener('click', async () => {
+        const mobile = document.getElementById('profMobile').value.trim();
+        const pin = document.getElementById('profPin').value.trim();
+        const err = document.getElementById('profLoginErr');
+        err.classList.add('hidden');
+        try {
+          const res = await fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mobile, pin })
+          });
+          const data = await res.json();
+          if (!data.ok) {
+            err.textContent = 'Login fail — mobile/PIN check karo';
+            err.classList.remove('hidden');
+            return;
+          }
+          user = data;
+          saveSession({ mobile, pin, name: data.name, id: data.id });
+          updateTokenUI();
+        } catch (e) {
+          err.textContent = 'Network error';
+          err.classList.remove('hidden');
+        }
+      });
+
+      document.getElementById('profLogoutBtn').addEventListener('click', () => {
+        clearSession();
+        user = null;
+        updateTokenUI();
+      });
+
+      async function claimToken() {
+        const s = loadSession();
+        // Guest OR session stale (UI says Login) → open login panel, don't call API
+        if (!user || !s || !s.mobile || !s.pin) {
+          openLoginPanel('Pehle mobile + PIN se login karo, phir AD Token claim hoga');
+          return;
+        }
+        try {
+          const res = await fetch('/api/claim-ad-token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mobile: s.mobile, pin: s.pin })
+          });
+          const data = await res.json();
+          if (data.ok) {
+            user = { ...(user || {}), ...data, mobile: s.mobile };
+            updateTokenUI();
+            const msg = document.getElementById('profTokenMsg');
+            if (msg) {
+              msg.textContent = data.message || 'Token claimed!';
+              msg.classList.remove('hidden');
+              msg.className = 'text-xs text-center text-primary';
+            }
+            const homeMsg = document.getElementById('homeClaimMsg');
+            if (homeMsg) homeMsg.textContent = data.message || 'Token claimed!';
+          } else {
+            // Auth fail / invalid session → force login UI
+            const errText = (data && data.message) ? String(data.message) : 'Claim fail';
+            if (/login|pin|invalid|not found|unauthorized|session/i.test(errText) || data.code === 'auth') {
+              clearSession();
+              user = null;
+              updateTokenUI();
+              openLoginPanel(errText + ' — dobara login karo');
+              return;
+            }
+            document.getElementById('homeClaimMsg').textContent = errText;
+            if (user) {
+              user.adTokens = data.adTokens ?? user.adTokens;
+              user.spinBalance = data.spinBalance ?? user.spinBalance;
+              user.canClaimAdToken = data.canClaimAdToken ?? false;
+              updateTokenUI();
+            }
+          }
+        } catch (e) {
+          document.getElementById('homeClaimMsg').textContent = 'Network error';
+        }
+      }
+
+      async function exchangeTokens() {
+        const s = loadSession();
+        if (!s) return;
+        try {
+          const res = await fetch('/api/exchange-ad-tokens', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mobile: s.mobile, pin: s.pin })
+          });
+          const data = await res.json();
+          const msg = document.getElementById('profTokenMsg');
+          msg.classList.remove('hidden');
+          if (data.ok) {
+            user = { ...(user || {}), ...data, mobile: s.mobile };
+            updateTokenUI();
+            msg.textContent = data.message;
+            msg.className = 'text-xs text-center text-primary';
+          } else {
+            msg.textContent = data.message || 'Exchange fail';
+            msg.className = 'text-xs text-center text-error';
+          }
+        } catch (e) {
+          document.getElementById('profTokenMsg').textContent = 'Network error';
+        }
+      }
+
+      document.getElementById('homeClaimTokenBtn')?.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        claimToken();
+      });
+      document.getElementById('profClaimBtn')?.addEventListener('click', claimToken);
+      document.getElementById('profExchangeBtn')?.addEventListener('click', exchangeTokens);
+
+      document.getElementById('profWalletRedeemBtn')?.addEventListener('click', async () => {
+        const s = loadSession();
+        const code = (document.getElementById('profWalletCode')?.value || '').trim().toUpperCase();
+        const msg = document.getElementById('profWalletMsg');
+        if (!s || !s.mobile) { openNav(); return; }
+        if (!code) { msg.textContent = 'Code daalo'; msg.classList.remove('hidden'); msg.className = 'text-[11px] mt-1 text-error'; return; }
+        try {
+          const res = await fetch('/api/wallet/redeem-code', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mobile: s.mobile, pin: s.pin, code })
+          });
+          const data = await res.json();
+          msg.classList.remove('hidden');
+          if (data.ok) {
+            user = { ...(user || {}), walletBalance: data.walletBalance, walletHistory: data.walletHistory };
+            updateTokenUI();
+            msg.textContent = data.message;
+            msg.className = 'text-[11px] mt-1 text-primary';
+            document.getElementById('profWalletCode').value = '';
+          } else {
+            msg.textContent = data.message || 'Fail';
+            msg.className = 'text-[11px] mt-1 text-error';
+          }
+        } catch (e) {
+          msg.textContent = 'Network error';
+          msg.className = 'text-[11px] mt-1 text-error';
+          msg.classList.remove('hidden');
+        }
+      });
+
+      const spinForm = document.getElementById('spinCodeForm');
+      const spinInput = document.getElementById('spinCode');
+      const resultMsg = document.getElementById('codeResult');
+      spinForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const code = spinInput.value.trim().toUpperCase();
+        resultMsg.classList.remove('hidden', 'text-error', 'text-primary');
+        if (code === 'GOLD24' || code === 'DIAMOND') {
+          resultMsg.textContent = '✓ Code accepted! Full wheel page pe use karo.';
+          resultMsg.classList.add('text-primary');
+        } else if (!code) {
+          resultMsg.textContent = 'Code enter karo ya roller pe click karo.';
+          resultMsg.classList.add('text-error');
+        } else {
+          resultMsg.textContent = 'Code wheel page (/book-now) pe verify hoga.';
+          resultMsg.classList.add('text-primary');
+        }
+      });
+
+      restoreUser();
+
+      // Hero SECTION side background slideshow (admin: 4–6 photos + duration)
+      (async function initHeroSideBg() {
+        const box = document.getElementById('heroSideBg');
+        if (!box) return;
+        let urls = [];
+        let durationMs = 5000;
+        try {
+          const res = await fetch('/api/settings');
+          const data = await res.json();
+          const st = data.settings || {};
+          urls = (st.heroSideBgPhotos || []).map(p => (typeof p === 'string' ? p : p.url)).filter(Boolean).slice(0, 6);
+          durationMs = Math.max(2000, Math.min(20000, (Number(st.heroSideBgDurationSec) || 5) * 1000));
+        } catch (e) {}
+        if (!urls.length) return; // keep default single slide
+        // rebuild slides
+        const veil = box.querySelector('div[style*="linear-gradient"]');
+        box.querySelectorAll('.bg-slide').forEach(el => el.remove());
+        urls.forEach((u, i) => {
+          const d = document.createElement('div');
+          d.className = 'bg-slide' + (i === 0 ? ' active' : '');
+          d.style.backgroundImage = 'url("' + String(u).replace(/"/g, '\\"') + '")';
+          box.insertBefore(d, veil || null);
+        });
+        if (urls.length < 2) return;
+        let idx = 0;
+        const slides = () => [...box.querySelectorAll('.bg-slide')];
+        setInterval(() => {
+          const list = slides();
+          if (!list.length) return;
+          list[idx].classList.remove('active');
+          idx = (idx + 1) % list.length;
+          // reflow for zoom restart
+          list[idx].style.transition = 'none';
+          list[idx].style.transform = 'scale(1.06)';
+          void list[idx].offsetWidth;
+          list[idx].style.transition = '';
+          list[idx].classList.add('active');
+        }, durationMs);
+      })();
+
+      // Home page floating 3D frame photos (admin: max 5, every 5s) — NOT frames shop
+      (async function initHeroFramePhotos() {
+        const el = document.getElementById('heroFramePhoto');
+        if (!el) return;
+        let urls = [];
+        try {
+          const res = await fetch('/api/settings');
+          const data = await res.json();
+          const list = (data.settings && data.settings.homeHeroFramePhotos) || [];
+          urls = list.map(p => (typeof p === 'string' ? p : p.url)).filter(Boolean).slice(0, 5);
+        } catch (e) {}
+        if (!urls.length) return;
+        let idx = 0;
+        el.style.backgroundImage = 'url("' + urls[0].replace(/"/g, '\\"') + '")';
+        if (urls.length < 2) return;
+        setInterval(() => {
+          idx = (idx + 1) % urls.length;
+          el.style.opacity = '0';
+          setTimeout(() => {
+            el.style.backgroundImage = 'url("' + urls[idx].replace(/"/g, '\\"') + '")';
+            el.style.opacity = '1';
+          }, 400);
+        }, 5000);
+      })();
+
+      // Hero sparkle text: typing → hold → zoom-out → cycle (same style you liked)
+      (async function initHeroIntro() {
+        const line = document.getElementById('heroTypeLine');
+        if (!line) return;
+        let phrases = [
+          'Aditya Studio me aapka swagat hai',
+          'Premium Photography'
+        ];
+        let holdSec = 4;
+        try {
+          const res = await fetch('/api/settings');
+          const data = await res.json();
+          const hi = data && data.settings && data.settings.heroIntro;
+          if (hi) {
+            if (hi.welcomeText) phrases[0] = String(hi.welcomeText);
+            if (hi.eyebrow) phrases[1] = String(hi.eyebrow);
+            if (hi.welcomeDurationSec) holdSec = Math.max(2, Number(hi.welcomeDurationSec) || 4);
+          }
+        } catch (e) {}
+
+        const typeSpeed = 52;
+        function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+        async function typeText(full) {
+          line.classList.remove('zoom-out');
+          line.classList.add('show');
+          for (let i = 1; i <= full.length; i++) {
+            line.textContent = full.slice(0, i);
+            const cur = document.createElement('span');
+            cur.className = 'hero-cursor';
+            line.appendChild(cur);
+            await sleep(typeSpeed);
+          }
+          line.textContent = full;
+        }
+
+        async function zoomOutClear() {
+          line.classList.add('zoom-out');
+          line.classList.remove('show');
+          await sleep(700);
+          line.textContent = '';
+          line.classList.remove('zoom-out');
+        }
+
+        let idx = 0;
+        while (true) {
+          await typeText(phrases[idx % phrases.length]);
+          await sleep(holdSec * 1000);
+          await zoomOutClear();
+          await sleep(300);
+          idx++;
+        }
+      })();
+
+      // Free-spin roller (same as welcome free spin on /book-now)
+      const HOME_LW_PRIZES = [
+        { val: "₹50", sub: "DISCOUNT" },
+        { val: "₹20", sub: "DISCOUNT" },
+        { val: "₹10", sub: "DISCOUNT" },
+        { val: "₹30", sub: "DISCOUNT" },
+        { val: "Good", sub: "LUCK" },
+        { val: "₹100", sub: "DISCOUNT" },
+        { val: "₹500", sub: "DISCOUNT" },
+        { val: "₹1000", sub: "DISCOUNT" },
+        { val: "Photo", sub: "FRAME" }
+      ];
+      const HOME_LW_COLORS = ['#1B9C3A','#1E5AA8','#7B2CBF','#C47A1A','#5B2C6F','#D4A017','#E8B923','#C41E3A','#2E86AB'];
+      const HOME_LW_SEG = 360 / HOME_LW_PRIZES.length;
+      const HOME_LW_OFFSET = -HOME_LW_SEG / 2;
+      (function buildHomeWheel() {
+        const segs = document.getElementById('homeLwSegments');
+        const wheel = document.getElementById('homeLwWheel');
+        if (!segs || !wheel) return;
+        const stops = HOME_LW_PRIZES.map((p, i) =>
+          HOME_LW_COLORS[i % HOME_LW_COLORS.length] + ' ' + (i * HOME_LW_SEG) + 'deg ' + ((i + 1) * HOME_LW_SEG) + 'deg'
+        );
+        segs.style.background = 'conic-gradient(from ' + HOME_LW_OFFSET + 'deg, ' + stops.join(',') + ')';
+        segs.innerHTML = '';
+        HOME_LW_PRIZES.forEach((p, i) => {
+          const label = document.createElement('div');
+          label.className = 'home-lw-label' + (i > 2 && i < 7 ? ' flip' : '');
+          const mid = i * HOME_LW_SEG + HOME_LW_SEG / 2 + HOME_LW_OFFSET;
+          label.style.transform = 'rotate(' + mid + 'deg)';
+          label.innerHTML = '<div class="home-lw-label-inner"><span class="home-lw-val">' + p.val + '</span><span class="home-lw-sub">' + p.sub + '</span></div>';
+          segs.appendChild(label);
+        });
+        let rot = 0;
+        function tick() {
+          rot += 0.35; // slow continuous
+          wheel.style.transform = 'rotate(' + rot + 'deg)';
+          requestAnimationFrame(tick);
+        }
+        requestAnimationFrame(tick);
+      })();
+    });
+  </script>
+
+<script>
+/* Backup: force book card navigation if something blocks <a> */
+document.addEventListener('DOMContentLoaded', function () {
+  document.querySelectorAll('#bookings a[href*="service="]').forEach(function (a) {
+    a.style.cursor = 'pointer';
+    a.addEventListener('click', function (e) {
+      // allow normal navigation; if prevented elsewhere, force it
+      var href = a.getAttribute('href');
+      if (href) {
+        // small delay only if default was prevented
+        setTimeout(function () {
+          if (location.pathname + location.search !== href && !a.dataset.navigated) {
+            a.dataset.navigated = '1';
+          }
+        }, 0);
+      }
+    }, true);
+  });
+  console.log('[Aditya] Book cards linked:', document.querySelectorAll('#bookings a[href*="service="]').length);
+});
+</script>
+
+</body>
+</html>

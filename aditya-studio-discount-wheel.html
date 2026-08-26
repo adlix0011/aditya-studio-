@@ -1094,6 +1094,12 @@
 <div class="filmstrip top"></div>
 <div class="filmstrip bottom"></div>
 
+<!-- Top Home bar — har page se home -->
+<div style="position:fixed;top:14px;left:0;right:0;z-index:100;display:flex;justify-content:space-between;align-items:center;padding:0 16px;pointer-events:none;">
+  <a href="/" style="pointer-events:auto;text-decoration:none;color:#F3DE9A;font-family:Poppins,sans-serif;font-weight:700;font-size:14px;letter-spacing:0.4px;padding:8px 14px;border-radius:999px;background:rgba(15,12,9,0.75);border:1px solid rgba(212,175,55,0.4);backdrop-filter:blur(8px);">🏠 Home</a>
+  <a href="/frames" style="pointer-events:auto;text-decoration:none;color:#F3DE9A;font-family:Poppins,sans-serif;font-weight:600;font-size:13px;padding:8px 12px;border-radius:999px;background:rgba(15,12,9,0.75);border:1px solid rgba(212,175,55,0.35);backdrop-filter:blur(8px);">Frames</a>
+</div>
+
 <div class="deco-float" style="top:10%; left:6%;">🪙</div>
 <div class="deco-float d2" style="top:18%; right:8%;">💎</div>
 <div class="deco-float d3" style="bottom:20%; left:10%;">🪙</div>
@@ -1124,20 +1130,25 @@
         <div class="lw-hint">स्पिन करें और इनाम जीतें</div>
       </div>
     </div>
+    <a href="/#sizes" style="display:inline-block;margin-top:22px;text-decoration:none;">
+      <div style="padding:12px 20px;border-radius:14px;background:linear-gradient(135deg,rgba(110,27,38,0.5),rgba(212,175,55,0.2));border:1px solid rgba(212,175,55,0.45);color:#F3DE9A;font-family:Poppins,sans-serif;font-weight:700;font-size:14px;">
+        🎀 रक्षाबंधन स्पेशल — Photo Frames देखें / Order करें →
+      </div>
+    </a>
   </div>
 
   <div class="card" id="authCard" style="display:none;">
     <h2>अपना अकाउंट खोलें</h2>
-    <div class="sub">पहली बार → नया अकाउंट | स्पिन से पहले WhatsApp OTP से mobile verify</div>
+    <div class="sub">पहली बार → नाम, मोबाइल, PIN से अकाउंट | OTP बाद में profile से optional</div>
 
-    <div class="tabs">
-      <button class="tab-btn active" id="tabRegister">नया कस्टमर</button>
-      <button class="tab-btn" id="tabLogin">पुराना कस्टमर</button>
-    </div>
+    <!-- Ek time pe sirf ek: Register YA Login -->
+    <button type="button" class="tab-btn active" id="tabRegister" style="display:none">नया</button>
+    <button type="button" class="tab-btn" id="tabLogin" style="display:none">पुराना</button>
 
     <div class="auth-error" id="authError"></div>
 
     <form id="registerForm" class="auth-form active" novalidate>
+      <div style="text-align:center;margin-bottom:12px;font-weight:700;color:#F3DE9A;font-size:15px;">✨ नया अकाउंट — Register</div>
       <div class="field" id="rf-name">
         <label>नाम (Name)</label>
         <input type="text" id="rName" placeholder="अपना पूरा नाम लिखें">
@@ -1148,27 +1159,20 @@
         <input type="tel" id="rMobile" placeholder="10 अंकों का मोबाइल नंबर" maxlength="10" autocomplete="username">
         <div class="err">सही 10 अंकों का मोबाइल नंबर डालें</div>
       </div>
-      <div class="field" id="rf-village">
-        <label>गांव / पता (Village / Address)</label>
-        <input type="text" id="rVillage" placeholder="गांव या पता लिखें">
-        <div class="err">कृपया गांव / पता लिखें</div>
+      <div class="field" id="rf-pin">
+        <label>4-अंकों का PIN बनाएं</label>
+        <input type="password" inputmode="numeric" id="rPin" placeholder="जैसे: 1234" maxlength="4" autocomplete="new-password">
+        <div class="err">4 अंकों का PIN डालें</div>
       </div>
-      <div class="two-col">
-        <div class="field" id="rf-pin">
-          <label>4-अंकों का PIN बनाएं</label>
-          <input type="password" inputmode="numeric" id="rPin" placeholder="जैसे: 1234" maxlength="4" autocomplete="new-password" inputmode="numeric">
-          <div class="err">4 अंकों का PIN डालें</div>
-        </div>
-        <div class="field" id="rf-pin2">
-          <label>PIN दोबारा डालें</label>
-          <input type="password" inputmode="numeric" id="rPin2" placeholder="फिर से PIN" maxlength="4" autocomplete="new-password" inputmode="numeric">
-          <div class="err">PIN मेल नहीं खा रहा</div>
-        </div>
-      </div>
-      <button type="submit" class="btn">अकाउंट बनाएं →</button>
+      <button type="submit" class="btn">अकाउंट बनाएं → फ्री स्पिन पाएं</button>
+      <p style="text-align:center;margin-top:14px;font-size:13px;color:var(--muted);">
+        पहले से अकाउंट है?
+        <button type="button" id="gotoOldCustomerBtn" style="background:none;border:none;color:#E8B923;font-weight:700;cursor:pointer;text-decoration:underline;font-size:13px;">Sign In</button>
+      </p>
     </form>
 
     <form id="loginForm" class="auth-form" novalidate>
+      <div style="text-align:center;margin-bottom:12px;font-weight:700;color:#F3DE9A;font-size:15px;">🔐 Sign In</div>
       <div class="field" id="lf-mobile">
         <label>मोबाइल नंबर (Mobile No.)</label>
         <input type="tel" id="lMobile" placeholder="10 अंकों का मोबाइल नंबर" maxlength="10" autocomplete="username">
@@ -1180,6 +1184,10 @@
         <div class="err">PIN डालें</div>
       </div>
       <button type="submit" class="btn">लॉगिन करें →</button>
+      <p style="text-align:center;margin-top:14px;font-size:13px;color:var(--muted);">
+        नया कस्टमर?
+        <button type="button" id="gotoNewCustomerBtn" style="background:none;border:none;color:#E8B923;font-weight:700;cursor:pointer;text-decoration:underline;font-size:13px;">Register</button>
+      </p>
     </form>
 
     <div style="text-align:center; margin-top:10px;">
@@ -1216,6 +1224,14 @@
       <button type="button" class="notif-btn" id="notifBtn" aria-label="Notifications">🔔<span class="notif-dot" id="notifDot"></span></button>
     </div>
     <div style="text-align:right;margin:-6px 0 8px;"><button class="logout-link" id="logoutBtn">लॉगआउट</button></div>
+
+    <div id="walletBar" style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 14px;padding:12px 14px;border-radius:14px;border:1px solid rgba(212,175,55,0.4);background:linear-gradient(145deg,#2a2210,#16120b);box-shadow:0 0 20px rgba(212,175,55,0.2)">
+      <div>
+        <div style="font-size:11px;letter-spacing:1px;color:var(--gold-dim);text-transform:uppercase">💰 Wallet</div>
+        <div style="font-family:'Poppins',sans-serif;font-weight:800;font-size:22px;color:var(--gold-light)">₹<span id="dashWalletBal">0</span></div>
+      </div>
+      <button type="button" id="dashWalletBtn" style="background:linear-gradient(180deg,var(--gold-light),var(--gold));color:#1a1305;border:none;border-radius:10px;padding:10px 14px;font-family:'Poppins',sans-serif;font-weight:700;font-size:12px;cursor:pointer">Coupon → Wallet</button>
+    </div>
 
     <div class="notif-panel" id="notifPanel">
       <div id="notifList"><div class="notif-item">कोई नई सूचना नहीं</div></div>
@@ -1286,10 +1302,22 @@
       <button type="button" id="btnHomeFreeSpin">🎡 अभी स्पिन करें</button>
     </div>
 
+    <!-- Raksha Bandhan Photo Frames promo -->
+    <a href="/#sizes" style="display:block;text-decoration:none;margin:14px 0 6px;">
+      <div style="border-radius:16px;padding:16px;background:linear-gradient(135deg,rgba(110,27,38,0.45),rgba(212,175,55,0.15));border:1px solid rgba(212,175,55,0.4);box-shadow:0 8px 24px rgba(0,0,0,0.35);">
+        <div style="font-family:Poppins,sans-serif;font-size:11px;letter-spacing:2px;color:#F3DE9A;opacity:0.85;margin-bottom:4px;">🎀 रक्षाबंधन स्पेशल</div>
+        <div style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:700;color:#F3DE9A;line-height:1.2;">Photo Frames ऑर्डर करें</div>
+        <div style="font-size:13px;color:#B7A480;margin-top:6px;line-height:1.4;">15 साइज़ · कई डिज़ाइन · घर बैठे ऑर्डर · Show More →</div>
+      </div>
+    </a>
+
     <div class="home-quick">
       <button type="button" class="home-action-btn primary" id="btnOpenCode">
         <span class="ico">🎫</span> स्पिन कोड डालें / नया स्पिन
       </button>
+      <a href="/#sizes" class="home-action-btn" style="text-decoration:none;">
+        <span class="ico">🖼️</span> Photo Frames देखें / Order करें
+      </a>
       <button type="button" class="home-action-btn" id="btnContactWA">
         <span class="ico">💬</span> स्टूडियो WhatsApp (9755503929)
       </button>
@@ -1412,7 +1440,11 @@
       <span>₹10</span><span>₹20</span><span>₹30</span><span>₹50</span>
       <span>₹100</span><span>₹500</span><span>₹1000</span><span>🖼️ Frame</span>
     </div>
-    <button type="button" class="claim-spin-btn" id="claimFreeSpinBtn">🎡 स्पिन क्लेम करें</button>
+    <button type="button" class="claim-spin-btn" id="claimFreeSpinBtn">🎡 अभी स्पिन करें</button>
+    <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;justify-content:center">
+      <button type="button" class="btn-secondary" id="freeSkipBtn" style="flex:1;min-width:120px">Skip — बाद में</button>
+      <a href="/" class="btn-secondary" id="freeHomeBtn" style="flex:1;min-width:120px;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center">🏠 Home</a>
+    </div>
   </div>
 
   <!-- Free welcome roller (first-time only) -->
@@ -1449,6 +1481,10 @@
       </div>
       <button class="fw-spin-btn" id="freeSpinBtn">SPIN</button>
       <div class="fw-spins-left">⚡ <span id="freeSpinsLeft">1</span> Free Spin</div>
+      <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;justify-content:center">
+        <button type="button" class="btn-secondary" id="freeWheelSkipBtn" style="flex:1;min-width:120px">Skip</button>
+        <a href="/" class="btn-secondary" style="flex:1;min-width:120px;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center">🏠 Home</a>
+      </div>
     </div>
   </div>
 
@@ -1750,6 +1786,8 @@ function enterDashboard(){
         if(pv) pv.textContent = currentAccount.village || '—';
         if(pver) pver.textContent = currentAccount.mobileVerified ? '✅ Verified' : '⏳ Pending';
         if(pf) pf.textContent = currentAccount.freeSpinUsed ? 'Used' : 'Available';
+        var wb = document.getElementById('dashWalletBal');
+        if(wb) wb.textContent = String(currentAccount.walletBalance != null ? currentAccount.walletBalance : 0);
       }
       renderHistory();
       if(typeof refreshHomeAvatar === 'function') refreshHomeAvatar();
@@ -1762,6 +1800,58 @@ function enterDashboard(){
     }
   } catch(e){ console.error('enterDashboard', e); }
 }
+
+async function applyCouponToWallet(couponId){
+  if(!currentAccount || !currentAccount.mobile){ alert('पहले लॉगिन करें'); return; }
+  try{
+    const res = await fetch(API_BASE + '/api/wallet/apply-coupon', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ mobile: currentAccount.mobile, pin: currentAccount._pin || '', couponId: couponId })
+    });
+    const out = await res.json();
+    if(!out.ok){ alert(out.message || 'Fail'); return; }
+    currentAccount.walletBalance = out.walletBalance;
+    currentAccount.walletHistory = out.walletHistory || currentAccount.walletHistory;
+    if(out.history) currentAccount.history = out.history;
+    var wb = document.getElementById('dashWalletBal');
+    if(wb) wb.textContent = String(out.walletBalance || 0);
+    if(typeof renderHistory === 'function') renderHistory();
+    alert(out.message || 'Wallet me add!');
+  }catch(e){ alert('Server error'); }
+}
+
+(function wireWalletBtn(){
+  var btn = document.getElementById('dashWalletBtn');
+  if(!btn) return;
+  btn.addEventListener('click', function(){
+    if(!currentAccount){ alert('पहले लॉगिन करें'); return; }
+    var list = (currentAccount.history || []).filter(function(h){
+      var st = h.couponStatus || 'active';
+      if(st !== 'active') return false;
+      var v = Number(h.discount) || Number(h.walletValue) || 0;
+      if(!v && h.prize){ var m = String(h.prize).match(/₹\s*(\d+)/); if(m) v = Number(m[1]); }
+      return v > 0;
+    });
+    if(!list.length){
+      var code = prompt('Wallet code daalein (admin se mila ho):');
+      if(!code) return;
+      fetch(API_BASE + '/api/wallet/redeem-code', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ mobile: currentAccount.mobile, pin: currentAccount._pin || '', code: code.trim().toUpperCase() })
+      }).then(function(r){ return r.json(); }).then(function(out){
+        if(!out.ok){ alert(out.message || 'Fail'); return; }
+        currentAccount.walletBalance = out.walletBalance;
+        currentAccount.walletHistory = out.walletHistory;
+        var wb = document.getElementById('dashWalletBal');
+        if(wb) wb.textContent = String(out.walletBalance || 0);
+        alert(out.message);
+      }).catch(function(){ alert('Network error'); });
+      return;
+    }
+    // Apply first active coupon with value
+    applyCouponToWallet(list[0].couponId || list[0].entryId);
+  });
+})();
 
 function renderHistory(){
   const box = document.getElementById('historyBox');
@@ -1800,7 +1890,9 @@ async function tryRestoreSession() {
       history: Array.isArray(s.history) ? s.history : [],
       _pin: s.pin,
       mobileVerified: !!s.mobileVerified,
-      freeSpinUsed: !!s.freeSpinUsed
+      freeSpinUsed: !!s.freeSpinUsed,
+      walletBalance: 0,
+      walletHistory: []
     }, extra || {});
     // server history preferred if provided in extra
     enterDashboard();
@@ -1859,6 +1951,14 @@ tabLogin.addEventListener('click', ()=>{
   loginForm.classList.add('active'); registerForm.classList.remove('active');
   setAuthError('');
 });
+const gotoOldCustomerBtn = document.getElementById('gotoOldCustomerBtn');
+if (gotoOldCustomerBtn) {
+  gotoOldCustomerBtn.addEventListener('click', () => { tabLogin.click(); });
+}
+const gotoNewCustomerBtn = document.getElementById('gotoNewCustomerBtn');
+if (gotoNewCustomerBtn) {
+  gotoNewCustomerBtn.addEventListener('click', () => { tabRegister.click(); });
+}
 
 registerForm.addEventListener('submit', async (e)=>{
   e.preventDefault();
@@ -1866,36 +1966,37 @@ registerForm.addEventListener('submit', async (e)=>{
   let ok = true;
   const name = document.getElementById('rName').value.trim();
   const mobile = document.getElementById('rMobile').value.trim();
-  const village = document.getElementById('rVillage').value.trim();
   const pin = document.getElementById('rPin').value.trim();
-  const pin2 = document.getElementById('rPin2').value.trim();
   showFieldError('rf-name', name.length < 2); if(name.length < 2) ok = false;
   const mobileOk = /^[6-9]\d{9}$/.test(mobile);
   showFieldError('rf-mobile', !mobileOk); if(!mobileOk) ok = false;
-  showFieldError('rf-village', village.length < 2); if(village.length < 2) ok = false;
   const pinOk = /^\d{4}$/.test(pin);
   showFieldError('rf-pin', !pinOk); if(!pinOk) ok = false;
-  showFieldError('rf-pin2', pin !== pin2 || !pinOk); if(pin !== pin2) ok = false;
   if(!ok) return;
   const btn = registerForm.querySelector('button[type="submit"]');
   btn.disabled = true; btn.textContent = 'बन रहा है...';
   try{
     const res = await fetch(API_BASE + '/api/register', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ name, mobile, village, pin })
+      body: JSON.stringify({ name, mobile, pin })
     });
     const out = await res.json();
-    btn.disabled = false; btn.textContent = 'अकाउंट बनाएं →';
+    btn.disabled = false; btn.textContent = 'अकाउंट बनाएं → फ्री स्पिन पाएं';
     if(!out.ok){
       if(out.error === 'exists') setAuthError('ये नंबर पहले से रजिस्टर है — पुराना कस्टमर से लॉगिन करें');
       else setAuthError('अकाउंट नहीं बन पाया, दोबारा कोशिश करें');
       return;
     }
-    currentAccount = { id: out.id, name, mobile, village, history: [], _pin: pin, freeSpinUsed: false, mobileVerified: false };
+    currentAccount = {
+      id: out.id, name: out.name || name, mobile, village: out.village || '',
+      history: out.history || [], _pin: pin, freeSpinUsed: !!out.freeSpinUsed,
+      mobileVerified: !!out.mobileVerified, spinBalance: out.spinBalance || 1,
+      adTokens: out.adTokens || 0, badge: out.badge || null, totalSpend: out.totalSpend || 0
+    };
     saveSession(currentAccount, pin);
     showFreeSpinOffer();
   }catch(err){
-    btn.disabled = false; btn.textContent = 'अकाउंट बनाएं →';
+    btn.disabled = false; btn.textContent = 'अकाउंट बनाएं → फ्री स्पिन पाएं';
     setAuthError('सर्वर से जुड़ नहीं पाया');
   }
 });
@@ -2026,17 +2127,39 @@ function showFreeSpinOffer(){
     document.body.classList.remove('step-code','step-wheel');
     const msg = document.getElementById('freeOfferMsg');
     if(msg && currentAccount){
-      msg.innerHTML = (currentAccount.name || 'Customer') + ', आपको <b>1 फ्री स्पिन</b> मिला है!';
+      msg.innerHTML = (currentAccount.name || 'Customer') + ', आपको <b>1 फ्री स्पिन</b> मिल गया! 🎉';
     }
     freeSpinOffer.style.display = 'block';
-    setTimeout(function(){ freeSpinOffer.scrollIntoView({behavior:'smooth', block:'start'}); }, 100);
-    try{ if(typeof startConfetti === 'function') startConfetti(); }catch(e){}
+    setTimeout(function(){ freeSpinOffer.scrollIntoView({behavior:'smooth', block:'start'}); }, 80);
+    // Strong celebrate
+    try{ if(typeof startConfetti === 'function'){ startConfetti(); setTimeout(startConfetti, 400); setTimeout(startConfetti, 900); } }catch(e){}
     try{ if(typeof playFwWin === 'function') playFwWin(); }catch(e){}
+    try{
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      [523,659,784,1046].forEach(function(f,i){
+        const o = ctx.createOscillator(); const g = ctx.createGain();
+        o.type = 'triangle'; o.frequency.value = f;
+        g.gain.setValueAtTime(0.0001, ctx.currentTime + i*0.12);
+        g.gain.exponentialRampToValueAtTime(0.15, ctx.currentTime + i*0.12 + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + i*0.12 + 0.25);
+        o.connect(g); g.connect(ctx.destination);
+        o.start(ctx.currentTime + i*0.12); o.stop(ctx.currentTime + i*0.12 + 0.28);
+      });
+    }catch(e){}
   } catch(e) {
     console.error('showFreeSpinOffer', e);
     enterDashboard();
   }
 }
+
+document.getElementById('freeSkipBtn') && document.getElementById('freeSkipBtn').addEventListener('click', function(){
+  if(freeSpinOffer) freeSpinOffer.style.display = 'none';
+  enterDashboard();
+});
+document.getElementById('freeWheelSkipBtn') && document.getElementById('freeWheelSkipBtn').addEventListener('click', function(){
+  if(freeWheelSection) freeWheelSection.style.display = 'none';
+  enterDashboard();
+});
 
 if(claimFreeSpinBtn){
   claimFreeSpinBtn.addEventListener('click', async ()=>{
@@ -2048,9 +2171,9 @@ if(claimFreeSpinBtn){
     const left = document.getElementById('freeSpinsLeft');
     if(left) left.textContent = '1';
     freeWheelSection.style.display = 'block';
+    // Welcome free spin — no OTP
+    showSpinVerifyUI(false);
     freeWheelSection.scrollIntoView({behavior:'smooth', block:'start'});
-    const verified = await isMobileVerified();
-    showSpinVerifyUI(!verified);
   });
 }
 
@@ -2107,9 +2230,12 @@ async function autoRequestSpinOtp(){
 function showSpinVerifyUI(show){
   const box = document.getElementById('spinVerifyBox');
   if(!box) return;
-  box.style.display = show ? 'block' : 'none';
-  if(freeSpinBtn) freeSpinBtn.style.display = show ? 'none' : 'inline-block';
-  if(show){
+  // Force hide OTP on free welcome spin — verify only from profile later
+  box.style.display = 'none';
+  if(freeSpinBtn) freeSpinBtn.style.display = 'inline-block';
+  // OTP request only if explicitly needed elsewhere (not free spin)
+  if(show === 'force-profile'){
+    box.style.display = 'block';
     const inp = document.getElementById('spinOtpInput');
     if(inp){ inp.value = ''; setTimeout(()=>inp.focus(), 200); }
     autoRequestSpinOtp();
@@ -2167,11 +2293,8 @@ if(verifySpinOtpBtn){
 if(freeSpinBtn){
   freeSpinBtn.addEventListener('click', async ()=>{
     if(freeHasSpun) return;
-    const verified = await isMobileVerified();
-    if(!verified){
-      showSpinVerifyUI(true);
-      return;
-    }
+    // Welcome free spin — OTP skip (direct spin after register)
+    showSpinVerifyUI(false);
     freeSpinBtn.disabled = true;
     freeSpinBtn.textContent = 'Assigning...';
 
@@ -2187,7 +2310,6 @@ if(freeSpinBtn){
         freeSpinBtn.disabled = false;
         freeSpinBtn.textContent = 'SPIN';
         if(out.error === 'already-used'){ freeHasSpun = true; alert('Free spin pehle use ho chuki hai'); }
-        else if(out.error === 'not-verified'){ showSpinVerifyUI(true); }
         else alert('Prize assign nahi hua — dubara try karein');
         return;
       }
@@ -3426,8 +3548,8 @@ async function goToFreeSpin(){
     freeWheelSection.style.display = 'block';
     freeWheelSection.scrollIntoView({ behavior:'smooth', block:'start' });
   }
-  var verified = await isMobileVerified();
-  if(typeof showSpinVerifyUI === 'function') showSpinVerifyUI(!verified);
+  // Free spin — no OTP at register / spin time
+  if(typeof showSpinVerifyUI === 'function') showSpinVerifyUI(false);
 }
 function showSpinNudge(){
   if(!hasFreeSpinLeft()) return;
