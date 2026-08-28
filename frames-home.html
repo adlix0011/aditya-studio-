@@ -184,6 +184,8 @@ tailwind.config = {
     overflow: hidden;
   }
   .user-image-container img { background: transparent; }
+  .pd-frame-preview { background: #0a0a0a; }
+  #pd-main-preview { min-height: 280px; }
 
   .gallery-shadow { box-shadow: inset 0 0 0 1px rgba(218, 179, 106, 0.2); }
   .sidebar-scroll::-webkit-scrollbar { width: 6px; }
@@ -528,8 +530,8 @@ tailwind.config = {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/postprocessing/UnrealBloomPass.js"></script>
 
 <!-- Product Detail Modal -->
-<div id="product-modal" class="fixed inset-0 z-[65] hidden items-center justify-center p-4 modal-backdrop">
-  <div class="bg-surface-container-high w-full max-w-2xl rounded-xl border border-outline-variant shadow-2xl max-h-[92vh] overflow-y-auto">
+<div id="product-modal" class="fixed inset-0 z-[65] hidden items-start justify-center modal-backdrop overflow-y-auto">
+  <div class="bg-surface-container-high w-full max-w-4xl min-h-screen sm:min-h-0 sm:my-6 sm:rounded-xl border border-outline-variant shadow-2xl overflow-y-auto">
     <div class="p-4 border-b border-outline-variant flex justify-between items-center sticky top-0 bg-surface-container-high z-10">
       <h3 class="font-headline-sm text-headline-sm text-primary" id="pd-title">Frame Detail</h3>
       <button id="close-product-modal" class="text-on-surface-variant hover:text-primary">
@@ -539,7 +541,7 @@ tailwind.config = {
     <div class="p-5 space-y-5">
       <!-- Main preview + 3 angle samples -->
       <div>
-        <div id="pd-main-preview" class="w-full h-56 sm:h-64 bg-background rounded-lg gallery-border flex items-center justify-center overflow-hidden mb-3"></div>
+        <div id="pd-main-preview" class="w-full h-72 sm:h-96 bg-background rounded-lg gallery-border flex items-center justify-center overflow-hidden mb-3"></div>
         <p class="font-label-caps text-label-caps text-on-surface-variant mb-2 tracking-widest">FRAME ANGLES</p>
         <div class="grid grid-cols-3 gap-2" id="pd-samples">
           <!-- 3 angle thumbs -->
@@ -1143,19 +1145,31 @@ function renderPdSamples() {
 
   function previewHtml(src, angle) {
     const frameImg = (selectedFrame && selectedFrame.image) || "";
-    const tf = angle === 1 ? "transform:perspective(400px) rotateY(-18deg)" : angle === 2 ? "transform:scale(1.15)" : "";
-    const photoGlass = src
-      ? `<div class="glass-photo-wrap" style="${tf}"><img src="${src}" alt=""/><div class="glass-shine"></div></div>`
-      : `<div class="frame-glass-center w-full h-full flex items-center justify-center"><span style="color:rgba(60,70,90,0.5);font-size:12px;font-weight:500;text-align:center;line-height:1.35">Upload<br/>Your Photo</span></div>`;
-    let content;
-    if (frameImg && src) {
-      content = `<div class="frame-shell" style="${tf}"><img class="frame-border-img" src="${frameImg}" alt=""/><div class="frame-center">${photoGlass}</div></div>`;
-    } else if (frameImg && !src) {
-      content = `<img src="${frameImg}" class="w-full h-full object-contain" alt="" style="display:block;${tf}"/>`;
-    } else {
-      content = photoGlass;
+    const photo = src || userPhotoDataUrl || "";
+    // Large clear composite: frame bottom, photo center top, glass shine
+    if (frameImg && photo) {
+      return `<div class="pd-frame-preview" style="width:100%;height:100%;position:relative;display:flex;align-items:center;justify-content:center;">
+        <img src="${frameImg}" alt="frame" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;z-index:0;"/>
+        <div style="position:relative;z-index:2;width:70%;height:70%;overflow:hidden;">
+          <div class="glass-photo-wrap" style="width:100%;height:100%;">
+            <img src="${photo}" alt="photo" style="width:100%;height:100%;object-fit:cover;display:block;"/>
+            <div class="glass-shine"></div>
+          </div>
+        </div>
+      </div>`;
     }
-    return `<div class="h-full w-full flex items-center justify-center overflow-hidden" style="aspect-ratio:${aspect}; max-height:90%; background:transparent;">${content}</div>`;
+    if (frameImg) {
+      return `<img src="${frameImg}" alt="frame" style="max-width:100%;max-height:100%;object-fit:contain;display:block;"/>`;
+    }
+    if (photo) {
+      return `<div class="glass-photo-wrap" style="width:100%;height:100%;max-height:100%;">
+        <img src="${photo}" alt="photo" style="width:100%;height:100%;object-fit:cover;display:block;"/>
+        <div class="glass-shine"></div>
+      </div>`;
+    }
+    return `<div class="frame-glass-center" style="width:80%;height:80%;display:flex;align-items:center;justify-content:center;">
+      <span style="color:rgba(60,70,90,0.5);font-size:13px;text-align:center;line-height:1.4">Upload<br/>Your Photo</span>
+    </div>`;
   }
 
   document.getElementById("pd-main-preview").innerHTML = previewHtml(samples[activeSample] || samples[0], activeSample);
