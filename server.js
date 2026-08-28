@@ -2504,8 +2504,16 @@ label.muted{display:block;font-size:12px;margin-bottom:2px}
 <label class="muted">Frame Type name<input class="inp" id="frTitle" placeholder="Golden Border / Wooden Classic"></label>
 <label class="muted">Price ₹<input class="inp" id="frPrice" type="number" min="0" placeholder="500" style="max-width:140px"></label>
 <label class="muted">Discount %<input class="inp" id="frDisc" type="number" min="0" max="90" placeholder="10" style="max-width:140px"></label>
-<label class="muted">Frame Type photo<input type="file" id="frFile" accept="image/*" class="field-file"></label>
+<input type="hidden" id="frId" value="">
+<label class="muted">Frame Type photo
+<input type="file" id="frFile" accept="image/*" class="field-file">
+<span id="frPhotoStatus" class="muted" style="display:block;margin-top:4px;font-size:11px">Nayi photo choose karo (optional on edit)</span>
+<img id="frPhotoPreview" alt="" style="display:none;margin-top:8px;width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid rgba(212,175,55,.4);background:#111"/>
+</label>
+<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
 <button class="gen-btn" type="button" onclick="adminSaveFrame()">💾 Save Frame Type</button>
+<button type="button" id="frCancelEdit" onclick="adminCancelEditFrame()" style="display:none;padding:9px 14px;background:#2a2418;color:#B7A480;border:1px solid rgba(212,175,55,.35);border-radius:8px;cursor:pointer">Cancel edit</button>
+</div>
 </div>
 <div id="adminFramesList" class="muted">Loading frames…</div>
 </section>
@@ -3137,12 +3145,29 @@ async function adminUploadBookImage(key) {
 
 /* ---- Photo Frames admin ---- */
 var _frImageData = '';
+var _frKeepExistingImage = false;
+var _adminFramesCache = [];
 var frFileEl = document.getElementById('frFile');
+
+function setFrPhotoPreview(src) {
+  var prev = document.getElementById('frPhotoPreview');
+  var st = document.getElementById('frPhotoStatus');
+  if (prev) {
+    if (src) { prev.src = src; prev.style.display = 'block'; }
+    else { prev.removeAttribute('src'); prev.style.display = 'none'; }
+  }
+  if (st) {
+    if (src) st.textContent = 'Photo ready ✅';
+    else st.textContent = 'Nayi photo choose karo (optional on edit)';
+  }
+}
+
 if (frFileEl) frFileEl.addEventListener('change', async function(e) {
   var f = e.target.files && e.target.files[0];
-  if (!f) { _frImageData = ''; return; }
-  // Allow up to 8MB original — we compress before upload
-  if (f.size > 8e6) { alert('Image 8MB se chhoti rakho'); e.target.value=''; _frImageData=''; return; }
+  if (!f) { return; }
+  if (f.size > 8e6) { alert('Image 8MB se chhoti rakho'); e.target.value=''; return; }
+  var st = document.getElementById('frPhotoStatus');
+  if (st) st.textContent = 'Compressing…';
   try {
     if (typeof compressImageFile === 'function') {
       _frImageData = await compressImageFile(f, 1200, 0.82);
@@ -3154,36 +3179,87 @@ if (frFileEl) frFileEl.addEventListener('change', async function(e) {
         r.readAsDataURL(f);
       });
     }
-    // Cap compressed size ~3MB base64
     if (_frImageData && _frImageData.length > 3.5e6) {
-      alert('Compress ke baad bhi image badi hai. Chhoti / lower quality photo try karo.');
+      alert('Compress ke baad bhi image badi hai. Chhoti photo try karo.');
       _frImageData = '';
       e.target.value = '';
+      setFrPhotoPreview('');
+      return;
     }
+    _frKeepExistingImage = false;
+    setFrPhotoPreview(_frImageData);
   } catch (err) {
     alert('Image read fail');
     _frImageData = '';
     e.target.value = '';
+    setFrPhotoPreview('');
   }
 });
 
+function adminCancelEditFrame() {
+  var idEl = document.getElementById('frId'); if (idEl) idEl.value = '';
+  var tEl = document.getElementById('frTitle'); if (tEl) tEl.value = '';
+  var pEl = document.getElementById('frPrice'); if (pEl) pEl.value = '';
+  var dEl = document.getElementById('frDisc'); if (dEl) dEl.value = '';
+  if (frFileEl) frFileEl.value = '';
+  _frImageData = '';
+  _frKeepExistingImage = false;
+  setFrPhotoPreview('');
+  var cancel = document.getElementById('frCancelEdit');
+  if (cancel) cancel.style.display = 'none';
+  var btn = document.querySelector('button[onclick="adminSaveFrame()"]');
+  if (btn) btn.textContent = '💾 Save Frame Type';
+}
+
+function adminEditFrame(id) {
+  var f = (_adminFramesCache || []).find(function(x) { return String(x.id) === String(id); });
+  if (!f) return alert('Frame nahi mila — list refresh karke try karo');
+  var idEl = document.getElementById('frId'); if (idEl) idEl.value = f.id || '';
+  var sizeEl = document.getElementById('frSize'); if (sizeEl && f.size) sizeEl.value = f.size;
+  var tEl = document.getElementById('frTitle'); if (tEl) tEl.value = f.title || '';
+  var pEl = document.getElementById('frPrice'); if (pEl) pEl.value = f.price != null ? f.price : '';
+  var dEl = document.getElementById('frDisc'); if (dEl) dEl.value = f.discountPercent != null ? f.discountPercent : '';
+  if (frFileEl) frFileEl.value = '';
+  _frImageData = '';
+  var existing = f.imageData || f.imageUrl || '';
+  _frKeepExistingImage = !!existing;
+  setFrPhotoPreview(existing || '');
+  var st = document.getElementById('frPhotoStatus');
+  if (st) st.textContent = existing ? 'Purani photo rahegi — badalne ke liye nayi choose karo' : 'Abhi photo nahi — nayi choose karo';
+  var cancel = document.getElementById('frCancelEdit');
+  if (cancel) cancel.style.display = 'inline-block';
+  var btn = document.querySelector('button[onclick="adminSaveFrame()"]');
+  if (btn) btn.textContent = '💾 Update Frame Type';
+  var sec = document.getElementById('sec-frames');
+  if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 async function adminSaveFrame() {
+  var id = (document.getElementById('frId') || {}).value || '';
   var size = (document.getElementById('frSize') || {}).value || '';
   var title = (document.getElementById('frTitle') || {}).value || '';
   var price = Number((document.getElementById('frPrice') || {}).value || 0);
   var disc = Number((document.getElementById('frDisc') || {}).value || 0);
   if (!size) return alert('Size choose karo');
   if (!title) return alert('Frame Type name likho (jaise Golden border)');
-  // If user selected file but compress still running / empty
   var fileInput = document.getElementById('frFile');
   if (fileInput && fileInput.files && fileInput.files[0] && !_frImageData) {
     return alert('Photo abhi process ho rahi hai — 1-2 sec wait karke Save dobara dabao');
   }
+  var payload = {
+    id: id || undefined,
+    size: size,
+    title: title,
+    price: price,
+    discountPercent: disc,
+    imageData: _frImageData || '',
+    active: true
+  };
   try {
     var res = await fetch('/admin/frame-save', {
       method: 'POST', credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ size: size, title: title, price: price, discountPercent: disc, imageData: _frImageData || '', active: true })
+      body: JSON.stringify(payload)
     });
     var data = {};
     try { data = await res.json(); } catch (_) {}
@@ -3191,12 +3267,9 @@ async function adminSaveFrame() {
       var msg = (data && (data.message || data.error)) || ('HTTP ' + res.status);
       return alert('Save fail: ' + msg);
     }
-    alert('Frame saved ✅' + (data.frame && data.frame.hasImage ? ' (photo ke saath)' : ' (bina photo — edit karke photo add kar sakte ho)'));
-    _frImageData = '';
-    if (frFileEl) frFileEl.value = '';
-    var tEl = document.getElementById('frTitle'); if (tEl) tEl.value = '';
-    var pEl = document.getElementById('frPrice'); if (pEl) pEl.value = '';
-    var dEl = document.getElementById('frDisc'); if (dEl) dEl.value = '';
+    var hasImg = data.frame && data.frame.hasImage;
+    alert((id ? 'Frame updated ✅' : 'Frame saved ✅') + (hasImg ? ' (photo ke saath)' : ' (bina photo)'));
+    adminCancelEditFrame();
     loadAdminFrames();
   } catch (e) { alert('Network error: ' + (e && e.message ? e.message : 'check connection')); }
 }
@@ -3208,6 +3281,7 @@ async function adminDeleteFrame(id) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id: id })
   });
+  if ((document.getElementById('frId') || {}).value === id) adminCancelEditFrame();
   loadAdminFrames();
 }
 
@@ -3255,16 +3329,21 @@ async function loadAdminFrames() {
     var frames = data.frames || [];
     var orders = data.orders || [];
     if (fBox) {
+      _adminFramesCache = frames;
       if (!frames.length) fBox.innerHTML = '<div class="muted">Abhi koi frame nahi — upar se add karo</div>';
       else fBox.innerHTML = frames.map(function(f) {
         var img = f.imageData || f.imageUrl || '';
         var fp = Math.round((Number(f.price)||0) * (1 - (Number(f.discountPercent)||0)/100));
+        var hasImg = !!img;
         return '<div class="msg-card" style="display:flex;gap:10px;align-items:flex-start;margin-top:8px">'
-          + (img ? '<img src="'+img+'" style="width:56px;height:56px;object-fit:cover;border-radius:8px;background:#111">' : '<div style="width:56px;height:56px;background:#222;border-radius:8px"></div>')
+          + (hasImg ? '<img src="'+img+'" style="width:56px;height:56px;object-fit:cover;border-radius:8px;background:#111">' : '<div style="width:56px;height:56px;background:#222;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#666">No photo</div>')
           + '<div class="msg-text" style="flex:1"><b>'+esc(f.title||'')+'</b> · '+esc(f.size)
           + '<br>₹'+fp+(f.discountPercent?(' <span class="muted">('+f.discountPercent+'% off, MRP ₹'+f.price+')</span>'):'')
-          + '<br><span class="muted">'+(f.active===false?'Inactive':'Active')+' · '+esc(f.id)+'</span></div>'
-          + '<div class="msg-actions"><button type="button" style="padding:6px 10px;background:#5a1a1a;color:#fca5a5;border:1px solid #7f1d1d;border-radius:6px;cursor:pointer" onclick="adminDeleteFrame(\\''+esc(f.id)+'\\')">🗑</button></div></div>';
+          + '<br><span class="muted">'+(f.active===false?'Inactive':'Active')+' · '+esc(f.id)+(hasImg?'':' · <span style="color:#e08a8a">photo missing</span>')+'</span></div>'
+          + '<div class="msg-actions" style="display:flex;flex-direction:column;gap:6px">'
+          + '<button type="button" style="padding:6px 10px;background:#2a2418;color:#F3DE9A;border:1px solid rgba(212,175,55,.4);border-radius:6px;cursor:pointer" onclick="adminEditFrame(\''+esc(f.id)+'\')">✏️ Edit</button>'
+          + '<button type="button" style="padding:6px 10px;background:#5a1a1a;color:#fca5a5;border:1px solid #7f1d1d;border-radius:6px;cursor:pointer" onclick="adminDeleteFrame(\''+esc(f.id)+'\')">🗑</button>'
+          + '</div></div>';
       }).join('');
     }
     if (oBox) {
