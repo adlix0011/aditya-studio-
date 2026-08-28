@@ -1725,17 +1725,18 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === 'POST' && urlPath === '/admin/frame-save') {
     try {
-      const body = await readBody(req);
+      // Base64 images need larger body (up to ~5MB)
+      const body = await readBody(req, 6e6);
       const frames = loadFrames();
       const id = String(body.id || '').trim() || ('FR-' + Date.now().toString(36));
       const size = String(body.size || '').trim();
       const title = String(body.title || '').trim() || size + ' Frame';
       const price = Number(body.price) || 0;
-      const discountPercent = Math.min(90, Math.max(0, Number(body.discountPercent) || 0));
+      const discountPercent = Math.min(90, Math.max(0, Number(body.discountPercent != null ? body.discountPercent : body.discount) || 0));
       const active = body.active !== false && body.active !== 'false';
-      const imageData = String(body.imageData || '').slice(0, 2.5e6); // ~2.5MB cap
+      const imageData = String(body.imageData || '').slice(0, 4e6); // ~4MB base64 cap
       const imageUrl = String(body.imageUrl || '').trim();
-      if (!size) return sendJSON(res, 400, { ok: false, error: 'size-required' });
+      if (!size) return sendJSON(res, 400, { ok: false, error: 'size-required', message: 'Size required' });
       const idx = frames.findIndex(f => f.id === id);
       const row = {
         id, size, title, price, discountPercent, active,
@@ -1746,10 +1747,12 @@ const server = http.createServer(async (req, res) => {
       };
       if (idx >= 0) frames[idx] = row; else frames.unshift(row);
       saveFrames(frames);
-      return sendJSON(res, 200, { ok: true, frame: { id: row.id, size: row.size, title: row.title, price: row.price, discountPercent: row.discountPercent, active: row.active } });
+      console.log('[frame-save]', row.id, row.size, row.title, 'img', (row.imageData || '').length, 'bytes');
+      return sendJSON(res, 200, { ok: true, frame: { id: row.id, size: row.size, title: row.title, price: row.price, discountPercent: row.discountPercent, active: row.active, hasImage: !!(row.imageData || row.imageUrl) } });
     } catch (e) {
       console.error('frame-save', e);
-      return sendJSON(res, 500, { ok: false, error: 'server-error' });
+      const msg = (e && e.message === 'too large') ? 'Image too large — 2MB se chhoti photo choose karo' : 'server-error';
+      return sendJSON(res, 500, { ok: false, error: msg, message: msg });
     }
   }
 
@@ -3135,13 +3138,33 @@ async function adminUploadBookImage(key) {
 /* ---- Photo Frames admin ---- */
 var _frImageData = '';
 var frFileEl = document.getElementById('frFile');
-if (frFileEl) frFileEl.addEventListener('change', function(e) {
+if (frFileEl) frFileEl.addEventListener('change', async function(e) {
   var f = e.target.files && e.target.files[0];
   if (!f) { _frImageData = ''; return; }
-  if (f.size > 1.8e6) { alert('Image 1.8MB se chhoti rakho'); e.target.value=''; _frImageData=''; return; }
-  var r = new FileReader();
-  r.onload = function() { _frImageData = r.result || ''; };
-  r.readAsDataURL(f);
+  // Allow up to 8MB original — we compress before upload
+  if (f.size > 8e6) { alert('Image 8MB se chhoti rakho'); e.target.value=''; _frImageData=''; return; }
+  try {
+    if (typeof compressImageFile === 'function') {
+      _frImageData = await compressImageFile(f, 1200, 0.82);
+    } else {
+      _frImageData = await new Promise(function(resolve, reject) {
+        var r = new FileReader();
+        r.onload = function() { resolve(r.result || ''); };
+        r.onerror = reject;
+        r.readAsDataURL(f);
+      });
+    }
+    // Cap compressed size ~3MB base64
+    if (_frImageData && _frImageData.length > 3.5e6) {
+      alert('Compress ke baad bhi image badi hai. Chhoti / lower quality photo try karo.');
+      _frImageData = '';
+      e.target.value = '';
+    }
+  } catch (err) {
+    alert('Image read fail');
+    _frImageData = '';
+    e.target.value = '';
+  }
 });
 
 async function adminSaveFrame() {
@@ -3150,20 +3173,32 @@ async function adminSaveFrame() {
   var price = Number((document.getElementById('frPrice') || {}).value || 0);
   var disc = Number((document.getElementById('frDisc') || {}).value || 0);
   if (!size) return alert('Size choose karo');
-  if (!_frImageData && !title) { /* allow without image on edit */ }
+  if (!title) return alert('Frame Type name likho (jaise Golden border)');
+  // If user selected file but compress still running / empty
+  var fileInput = document.getElementById('frFile');
+  if (fileInput && fileInput.files && fileInput.files[0] && !_frImageData) {
+    return alert('Photo abhi process ho rahi hai — 1-2 sec wait karke Save dobara dabao');
+  }
   try {
     var res = await fetch('/admin/frame-save', {
       method: 'POST', credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ size: size, title: title, price: price, discountPercent: disc, imageData: _frImageData, active: true })
+      body: JSON.stringify({ size: size, title: title, price: price, discountPercent: disc, imageData: _frImageData || '', active: true })
     });
-    var data = await res.json();
-    if (!data.ok) return alert('Save fail');
-    alert('Frame saved ✅');
+    var data = {};
+    try { data = await res.json(); } catch (_) {}
+    if (!res.ok || !data.ok) {
+      var msg = (data && (data.message || data.error)) || ('HTTP ' + res.status);
+      return alert('Save fail: ' + msg);
+    }
+    alert('Frame saved ✅' + (data.frame && data.frame.hasImage ? ' (photo ke saath)' : ' (bina photo — edit karke photo add kar sakte ho)'));
     _frImageData = '';
     if (frFileEl) frFileEl.value = '';
+    var tEl = document.getElementById('frTitle'); if (tEl) tEl.value = '';
+    var pEl = document.getElementById('frPrice'); if (pEl) pEl.value = '';
+    var dEl = document.getElementById('frDisc'); if (dEl) dEl.value = '';
     loadAdminFrames();
-  } catch (e) { alert('Network error'); }
+  } catch (e) { alert('Network error: ' + (e && e.message ? e.message : 'check connection')); }
 }
 
 async function adminDeleteFrame(id) {
