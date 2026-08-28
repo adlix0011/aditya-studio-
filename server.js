@@ -2277,6 +2277,24 @@ const server = http.createServer(async (req, res) => {
     const newToday = accounts.filter(a => a.createdAt && new Date(a.createdAt).toDateString() === today).length;
     const verifiedCount = accounts.filter(a => a.mobileVerified).length;
     const freeUsed = accounts.filter(a => a.freeSpinUsed).length;
+    const frameOrdersAdmin = loadFrameOrders();
+    const ordTotal = frameOrdersAdmin.length;
+    const ordNew = frameOrdersAdmin.filter(o => {
+      if (!o.createdAt) return false;
+      try { return new Date(o.createdAt).toDateString() === today; } catch (e) { return false; }
+    }).length;
+    const ordPending = frameOrdersAdmin.filter(o => {
+      const st = String(o.status || 'processing').toLowerCase();
+      return st === 'processing' || st === 'pending';
+    }).length;
+    const ordConfirmed = frameOrdersAdmin.filter(o => {
+      const st = String(o.status || '').toLowerCase();
+      return st === 'confirmed' || st === 'ready' || st === 'delivered';
+    }).length;
+    const ordPayPending = frameOrdersAdmin.filter(o => {
+      const pay = String(o.paymentStatus || 'unpaid').toLowerCase();
+      return pay === 'unpaid' || pay === 'paid_claimed' || pay === 'partial_wallet';
+    }).length;
 
     const otpCards = pendingOtps.map(r => {
       const msg = encodeURIComponent('Namaste ' + (r.name || '') + '!\nAditya Studio Spin OTP: *' + r.otp + '*\n— Aditya Studio');
@@ -2456,7 +2474,8 @@ label.muted{display:block;font-size:12px;margin-bottom:2px}
   <div class="brand">Aditya Studio</div>
   <div class="brand-sub">Admin Dashboard</div>
   <a class="nav-link" href="#sec-overview">📊 Overview</a>
-  <a class="nav-link" href="#sec-orders">📦 Frame Orders</a>
+  <a class="nav-link" href="#sec-order-stats">📦 Orders Summary</a>
+  <a class="nav-link" href="#sec-orders">📋 Order List</a>
   <a class="nav-link" href="#sec-frames">🖼️ Frame Types</a>
   <a class="nav-link" href="#sec-banner">🎬 Home Banner</a>
   <a class="nav-link" href="#sec-hero">✨ Hero Text + BG Photos</a>
@@ -2492,6 +2511,19 @@ label.muted{display:block;font-size:12px;margin-bottom:2px}
 <span style="color:#D4AF37;font-weight:700" id="filterLabel">Filter:</span>
 <button type="button" class="gen-btn" style="padding:6px 12px;font-size:12px" onclick="filterPanel('all')">Show all</button>
 </div>
+</section>
+
+<section class="panel" id="sec-order-stats">
+<h2>📦 Frame Orders Summary</h2>
+<p class="sub">Orders ka live status — New red me, Confirmed green me.</p>
+<div class="cards">
+<div class="card" title="Total orders"><div class="n" id="cntOrdTotal">${ordTotal}</div><div class="l">Total Orders</div></div>
+<div class="card" title="Aaj naye orders" style="border-color:rgba(239,68,68,0.45)"><div class="n" id="cntOrdNew" style="color:#f87171">${ordNew}</div><div class="l" style="color:#f87171">New Today</div></div>
+<div class="card" title="Pending / processing" style="border-color:rgba(251,146,60,0.4)"><div class="n" id="cntOrdPending" style="color:#fb923c">${ordPending}</div><div class="l">Pending</div></div>
+<div class="card" title="Confirmed / ready / delivered" style="border-color:rgba(74,222,128,0.4)"><div class="n" id="cntOrdConfirmed" style="color:#4ade80">${ordConfirmed}</div><div class="l" style="color:#4ade80">Confirmed</div></div>
+<div class="card" title="Payment pending"><div class="n" id="cntOrdPayPend" style="color:#fbbf24">${ordPayPending}</div><div class="l">Pay Pending</div></div>
+</div>
+<p class="muted" style="margin-top:8px"><a href="#sec-orders" style="color:#D4AF37">↓ Neeche full order list</a></p>
 </section>
 
 <section class="panel" id="sec-orders">
@@ -3341,6 +3373,31 @@ async function loadAdminFrames() {
     }
     var frames = data.frames || [];
     var orders = data.orders || [];
+    // Order summary cards update
+    (function(){
+      var total = orders.length;
+      var todayStr = new Date().toDateString();
+      var nNew = 0, nPend = 0, nConf = 0, nPay = 0;
+      orders.forEach(function(o){
+        try { if (o.createdAt && new Date(o.createdAt).toDateString() === todayStr) nNew++; } catch(e){}
+        var st = String(o.status || 'processing').toLowerCase();
+        if (st === 'processing' || st === 'pending') nPend++;
+        if (st === 'confirmed' || st === 'ready' || st === 'delivered') nConf++;
+        var pay = String(o.paymentStatus || 'unpaid').toLowerCase();
+        if (pay === 'unpaid' || pay === 'paid_claimed' || pay === 'partial_wallet') nPay++;
+      });
+      function setN(id, v, color) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.textContent = v;
+        if (color) el.style.color = color;
+      }
+      setN('cntOrdTotal', total);
+      setN('cntOrdNew', nNew, '#f87171');
+      setN('cntOrdPending', nPend, '#fb923c');
+      setN('cntOrdConfirmed', nConf, '#4ade80');
+      setN('cntOrdPayPend', nPay, '#fbbf24');
+    })();
     if (fBox) {
       _adminFramesCache = frames;
       if (!frames.length) fBox.innerHTML = '<div class="muted">Abhi koi frame nahi — upar se add karo</div>';
