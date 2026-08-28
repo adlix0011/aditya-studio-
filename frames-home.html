@@ -742,11 +742,30 @@ tailwind.config = {
           <button id="paid-claim-btn" type="button" class="w-full py-2 border border-secondary text-secondary hover:bg-secondary hover:text-on-secondary transition-colors font-label-caps text-label-caps rounded-DEFAULT">
             Maine Pay Kar Diya
           </button>
+
+          <div id="utr-ss-box" class="hidden space-y-3 text-left pt-2 border-t border-outline-variant">
+            <p class="font-label-caps text-label-caps text-secondary tracking-widest text-center">PAYMENT PROOF</p>
+            <label class="block text-sm text-on-surface-variant">UTR / UPI Transaction ID
+              <input id="pay-utr" type="text" maxlength="30" placeholder="12-digit UTR ya UPI Ref No." class="mt-1 w-full bg-surface border border-outline-variant rounded-DEFAULT px-3 py-2 text-on-surface"/>
+            </label>
+            <label class="block text-sm text-on-surface-variant">Payment Screenshot
+              <input id="pay-ss" type="file" accept="image/*" class="mt-1 w-full text-sm text-on-surface-variant"/>
+            </label>
+            <p id="pay-ss-status" class="text-sm hidden" style="color:#4ade80">✓ Successfully uploaded</p>
+            <div id="pay-ss-preview" class="hidden"><img alt="SS" class="max-h-28 mx-auto rounded border border-outline-variant"/></div>
+          </div>
         </div>
 
         <button id="submit-order-btn" type="button" class="hidden w-full py-3 bg-primary-container text-on-primary-container font-body-lg text-body-lg rounded-DEFAULT hover:bg-inverse-primary transition-colors gallery-shadow">
           Submit Order
         </button>
+
+        <div id="order-success-box" class="hidden space-y-2 p-4 rounded-DEFAULT border text-center" style="border-color:#4ade80;background:rgba(22,101,52,0.25)">
+          <p class="font-headline-sm" style="color:#4ade80">✓ Order Placed Successfully</p>
+          <p class="text-on-surface text-sm">Order No: <b id="ok-order-id">—</b></p>
+          <p class="text-on-surface text-sm">Track No: <b id="ok-track-id">—</b></p>
+          <p class="text-on-surface-variant text-xs">Profile → My Orders se status / delivery time check kar sakte ho</p>
+        </div>
       </div>
 
       <div id="order-error" class="text-error text-sm hidden"></div>
@@ -1449,12 +1468,48 @@ document.getElementById("pay-order-btn").addEventListener("click", () => {
   document.getElementById("qr-pay-box").scrollIntoView({ behavior: "smooth", block: "nearest" });
 });
 
+let payScreenshotData = "";
 document.getElementById("paid-claim-btn").addEventListener("click", () => {
   paymentClaimed = true;
+  const btn = document.getElementById("paid-claim-btn");
+  btn.textContent = "✓ Payment claimed";
+  btn.disabled = true;
+  btn.className = "w-full py-2 font-label-caps text-label-caps rounded-DEFAULT transition-colors";
+  btn.style.background = "#166534";
+  btn.style.color = "#bbf7d0";
+  btn.style.border = "1px solid #4ade80";
+  document.getElementById("utr-ss-box").classList.remove("hidden");
   document.getElementById("submit-order-btn").classList.remove("hidden");
-  document.getElementById("paid-claim-btn").textContent = "✓ Payment claimed";
-  document.getElementById("paid-claim-btn").disabled = true;
-  document.getElementById("order-flow-hint").textContent = "Ab Submit Order dabao. Order Processing mein jayega — admin payment confirm karega.";
+  document.getElementById("order-flow-hint").textContent = "UTR + screenshot dalo, phir Submit Order dabao.";
+});
+
+document.getElementById("pay-ss").addEventListener("change", async function(e) {
+  const f = e.target.files && e.target.files[0];
+  const st = document.getElementById("pay-ss-status");
+  const prev = document.getElementById("pay-ss-preview");
+  payScreenshotData = "";
+  if (!f) { st.classList.add("hidden"); prev.classList.add("hidden"); return; }
+  if (f.size > 4e6) { alert("Screenshot 4MB se chhoti rakho"); e.target.value = ""; return; }
+  try {
+    if (typeof compressImageFile === "function") {
+      payScreenshotData = await compressImageFile(f, 1200, 0.82);
+    } else {
+      payScreenshotData = await new Promise(function(resolve, reject) {
+        const r = new FileReader();
+        r.onload = function() { resolve(r.result); };
+        r.onerror = reject;
+        r.readAsDataURL(f);
+      });
+    }
+    st.classList.remove("hidden");
+    st.style.color = "#4ade80";
+    st.textContent = "✓ Successfully uploaded";
+    prev.classList.remove("hidden");
+    prev.querySelector("img").src = payScreenshotData;
+  } catch (err) {
+    alert("Screenshot upload fail");
+    payScreenshotData = "";
+  }
 });
 
 document.getElementById("submit-order-btn").addEventListener("click", async () => {
@@ -1465,10 +1520,22 @@ document.getElementById("submit-order-btn").addEventListener("click", async () =
     document.getElementById("order-error").classList.remove("hidden");
     return;
   }
+  const utr = String((document.getElementById("pay-utr") || {}).value || "").trim();
+  if (utr.length < 6) {
+    document.getElementById("order-error").textContent = "UTR / UPI transaction ID likho (kam se kam 6 character).";
+    document.getElementById("order-error").classList.remove("hidden");
+    return;
+  }
+  if (!payScreenshotData) {
+    document.getElementById("order-error").textContent = "Payment screenshot upload karo.";
+    document.getElementById("order-error").classList.remove("hidden");
+    return;
+  }
 
   const btn = document.getElementById("submit-order-btn");
   btn.disabled = true;
   btn.textContent = "Submitting…";
+  document.getElementById("order-error").classList.add("hidden");
 
   try {
     const dims = displayDims(selectedFrame.size);
@@ -1483,7 +1550,7 @@ document.getElementById("submit-order-btn").addEventListener("click", async () =
         ? ("Photo crop: zoom " + Math.round((photoZoom || 1) * 100) + "% · pan " +
            Math.round((photoPanX || 0.5) * 100) + "%x " + Math.round((photoPanY || 0.5) * 100) + "%y")
         : "",
-      "Payment claimed by customer"
+      "Payment claimed · UTR: " + utr
     ].filter(Boolean).join(" | ");
 
     const useWallet = !!(framesUser && Number(framesUser.walletBalance) > 0);
@@ -1501,21 +1568,36 @@ document.getElementById("submit-order-btn").addEventListener("click", async () =
         pincode: form.pincode,
         note: fullNote,
         paymentClaimed: true,
+        utr: utr,
+        paymentScreenshot: payScreenshotData,
         useWallet
       })
     });
     const data = await res.json();
     if (!res.ok || !data.ok) throw new Error(data.message || data.error || "Order fail");
 
-    closeOrderModal();
-    let toastMsg = "Order #" + (data.orderId || "—") + " · ₹" + (data.finalAmount || "");
-    if (data.walletPaid) toastMsg += " · Wallet −₹" + data.walletPaid;
-    if (data.amountDue > 0) toastMsg += " · Due ₹" + data.amountDue;
-    else if (data.walletPaid) toastMsg += " · Paid via wallet";
-    else toastMsg += " · Admin payment confirm karega";
-    showToast(toastMsg, 5000);
+    // Success box in modal
+    const okBox = document.getElementById("order-success-box");
+    if (okBox) {
+      okBox.classList.remove("hidden");
+      document.getElementById("ok-order-id").textContent = data.orderId || "—";
+      document.getElementById("ok-track-id").textContent = data.trackingNumber || data.orderId || "—";
+    }
+    document.getElementById("submit-order-btn").classList.add("hidden");
+    document.getElementById("pay-order-btn").classList.add("hidden");
+    document.getElementById("qr-pay-box").classList.add("hidden");
+
+    let toastMsg = "Order #" + (data.orderId || "—") + " · Track " + (data.trackingNumber || data.orderId || "—");
+    showToast(toastMsg, 6000);
     if (data.walletPaid) restoreFramesUser();
-    document.getElementById("profile-mobile").value = form.mobile;
+    const pm = document.getElementById("profile-mobile");
+    if (pm) pm.value = form.mobile;
+    // Save last order for profile
+    try {
+      localStorage.setItem("aditya_last_order", JSON.stringify({
+        orderId: data.orderId, trackingNumber: data.trackingNumber, mobile: form.mobile, at: Date.now()
+      }));
+    } catch (e) {}
   } catch (e) {
     document.getElementById("order-error").textContent = e.message || "Order place nahi ho paya.";
     document.getElementById("order-error").classList.remove("hidden");
@@ -2164,17 +2246,16 @@ document.getElementById("load-orders-btn").addEventListener("click", async () =>
     }
     box.innerHTML = orders.map(o => `
       <div class="p-3 bg-surface-container rounded-DEFAULT gallery-border space-y-1">
-        <div class="flex justify-between">
-          <span class="text-on-surface font-medium">#${o.orderId || "—"} · ${o.size || ""}</span>
+        <div class="flex justify-between gap-2 flex-wrap">
+          <span class="text-on-surface font-medium">Order #${o.orderId || "—"}</span>
           <span class="text-secondary">${formatPrice(o.finalAmount != null ? o.finalAmount : o.price)}</span>
         </div>
-        <div class="text-xs">${o.frameTitle || ""}</div>
+        <div class="text-xs text-on-surface">Track No: <b>${o.trackingNumber || o.orderId || "—"}</b></div>
+        <div class="text-xs">${o.frameTitle || ""} · ${o.size || ""}</div>
         <div class="text-xs">Status: <span class="text-secondary uppercase">${o.status || "processing"}</span></div>
-        <div class="text-xs">Payment: <span class="text-secondary uppercase">${o.paymentStatus || "unpaid"}</span></div>
-        ${o.paymentStatus === "confirmed" && o.deliveryDate ? `<div class="text-xs text-secondary">Delivery: ${o.deliveryDate}${o.deliveryTime ? " · " + o.deliveryTime : ""}</div>` : ""}
-        ${o.paymentStatus === "confirmed" && !o.deliveryDate ? `<div class="text-xs text-secondary">Payment confirmed — delivery date jald update hogi</div>` : ""}
-        ${o.paymentStatus === "paid_claimed" ? `<div class="text-xs text-on-surface-variant">Payment claim — admin confirm pending</div>` : ""}
-        ${o.adminNote ? `<div class="text-xs text-on-surface-variant">${o.adminNote}</div>` : ""}
+        <div class="text-xs">Payment: <span class="text-secondary uppercase">${o.paymentStatus || "unpaid"}</span>${o.utr ? " · UTR: " + o.utr : ""}</div>
+        ${o.deliveryDate ? `<div class="text-xs" style="color:#4ade80">Delivery: ${o.deliveryDate}${o.deliveryTime ? " · " + o.deliveryTime : ""}</div>` : `<div class="text-xs text-on-surface-variant">Delivery date: admin update karega</div>`}
+        ${o.adminNote ? `<div class="text-xs text-on-surface-variant">Note: ${o.adminNote}</div>` : ""}
         <div class="text-xs text-on-surface-variant">${o.createdAt ? new Date(o.createdAt).toLocaleString("en-IN") : ""}</div>
       </div>
     `).join("");
@@ -2544,3 +2625,5 @@ function bootThree() {
 }
 bootThree();
 </script>
+</body>
+</html>
