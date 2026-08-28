@@ -42,6 +42,7 @@ const EDIT_REQUESTS_FILE = path.join(DATA_DIR, 'edit-requests.json');
 const INDEX_HTML_FILE = path.join(__dirname, 'index.html');
 const BOOK_NOW_HTML_FILE = path.join(__dirname, 'aditya-studio-discount-wheel.html');
 const FRAMES_HTML_FILE = path.join(__dirname, 'frames-home.html'); // 3D frames shop + order
+const FRAME_DETAIL_HTML_FILE = path.join(__dirname, 'frame-detail.html');
 const BOOK_SERVICE_HTML_FILE = path.join(__dirname, 'book-service-sample.html');
 const HTML_FILE = BOOK_NOW_HTML_FILE; // legacy alias
 console.log('[boot] Using data dir:', DATA_DIR);
@@ -878,6 +879,15 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && (urlPath === '/photo-frames.html' || urlPath === '/photo-frames' || urlPath === '/frames')) {
     fs.readFile(FRAMES_HTML_FILE, (err, data) => {
       if (err) { res.writeHead(404); return res.end('Photo Frames page missing'); }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(data);
+    });
+    return;
+  }
+
+  if (req.method === 'GET' && (urlPath === '/frame-detail.html' || urlPath === '/frame-detail')) {
+    fs.readFile(FRAME_DETAIL_HTML_FILE, (err, data) => {
+      if (err) { res.writeHead(404); return res.end('Frame detail page missing'); }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(data);
     });
