@@ -924,7 +924,7 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === 'POST' && urlPath === '/api/frame-order') {
     try {
-      const body = await readBody(req);
+      const body = await readBody(req, 6e6);
       const name = String(body.name || '').trim();
       const mobile = String(body.mobile || '').trim();
       const village = String(body.village || '').trim();
@@ -950,6 +950,8 @@ const server = http.createServer(async (req, res) => {
       const orderId = nextFrameOrderId(orders);
       const paymentClaimed = body.paymentClaimed === true || body.paymentClaimed === 'true';
       const useWallet = body.useWallet === true || body.useWallet === 'true';
+      const utr = String(body.utr || '').trim().slice(0, 40);
+      const paymentScreenshot = String(body.paymentScreenshot || '').slice(0, 3e6);
       let walletPaid = 0;
       let paymentStatus = paymentClaimed ? 'paid_claimed' : 'unpaid';
       // Wallet pay (partial or full)
@@ -980,14 +982,17 @@ const server = http.createServer(async (req, res) => {
           }
         }
       }
+      const trackingNumber = 'TRK-' + orderId.replace(/^FO-/, '');
       const order = {
-        orderId, frameId: frame.id, frameTitle: frame.title || '', size: frame.size,
+        orderId, trackingNumber, frameId: frame.id, frameTitle: frame.title || '', size: frame.size,
         price, discountPercent: disc, finalAmount: finalAmount + walletPaid,
         amountDue: finalAmount,
         walletPaid,
         name, mobile, village, address, pincode, district, state, note,
         status: 'processing',
         paymentStatus,
+        utr: utr || '',
+        paymentScreenshot: paymentScreenshot || '',
         deliveryDate: '', deliveryTime: '', adminNote: '',
         createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
       };
@@ -1009,7 +1014,7 @@ const server = http.createServer(async (req, res) => {
       saveNotifs(notifs.slice(0, 50));
       console.log('Frame order:', orderId, mobile, frame.size, 'total', order.finalAmount, 'wallet', walletPaid, 'due', finalAmount, paymentStatus);
       return sendJSON(res, 200, {
-        ok: true, orderId,
+        ok: true, orderId, trackingNumber: order.trackingNumber,
         finalAmount: order.finalAmount,
         amountDue: finalAmount,
         walletPaid,
@@ -3438,6 +3443,9 @@ async function loadAdminFrames() {
           + (o.pincode ? ' · PIN: '+esc(o.pincode) : '')
           + (o.note ? '<br>📝 '+esc(o.note) : '')
           + '<br>💳 Payment: <b>'+esc(o.paymentStatus||'unpaid')+'</b>'
+          + (o.trackingNumber ? '<br>🔖 Track: <b>'+esc(o.trackingNumber)+'</b>' : '')
+          + (o.utr ? '<br>UTR: <b>'+esc(o.utr)+'</b>' : '')
+          + (o.paymentScreenshot ? '<br><a href="'+esc(o.paymentScreenshot)+'" target="_blank" style="color:#D4AF37">📷 Payment screenshot dekhо</a>' : '')
           + '<br><span class="muted">'+esc(fmt(o.createdAt))+'</span></div>'
           + '<div style="display:grid;gap:6px;margin-top:8px;max-width:420px">'
           + '<label class="muted">Status <select class="inp" id="st-'+esc(o.orderId)+'" style="width:100%;max-width:200px">'
