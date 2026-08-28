@@ -200,25 +200,24 @@ function framePrice(f) {
 function buildPreview(frameImg, photoUrl) {
   const orient = qs("orient") || "vertical";
   const portrait = orient !== "horizontal";
+  const ratio = portrait ? "2 / 3" : "3 / 2";
   if (frameImg && photoUrl) {
-    // wrap = frame image size only (inline-block) so photo % stays inside frame
-    const imgStyle = portrait
-      ? "display:block;max-height:min(65vh,520px);width:auto;max-width:100%;"
-      : "display:block;max-width:100%;height:auto;max-height:min(65vh,520px);";
-    return `<div class="fp-wrap" style="position:relative;display:inline-block;max-width:100%;line-height:0;margin:0 auto;">
-      <img class="fp-frame" src="${frameImg}" alt="frame" style="${imgStyle}"/>
-      <div class="fp-photo" style="position:absolute;left:12%;right:12%;top:13%;bottom:13%;overflow:hidden;">
+    return `<div style="position:relative;width:100%;max-width:420px;margin:0 auto;aspect-ratio:${ratio};">
+      <img src="${frameImg}" alt="frame" style="position:absolute;inset:0;width:100%;height:100%;object-fit:fill;z-index:1;"/>
+      <div style="position:absolute;left:10%;right:10%;top:10%;bottom:10%;overflow:hidden;z-index:2;">
         <img src="${photoUrl}" alt="photo" style="width:100%;height:100%;object-fit:cover;display:block;"/>
         <div class="glass-shine"></div>
       </div>
     </div>`;
   }
   if (frameImg) {
-    return `<img src="${frameImg}" alt="frame" style="max-width:100%;max-height:min(65vh,520px);object-fit:contain;display:block;margin:0 auto;"/>`;
+    return `<div style="position:relative;width:100%;max-width:420px;margin:0 auto;aspect-ratio:${ratio};">
+      <img src="${frameImg}" alt="frame" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;"/>
+    </div>`;
   }
   if (photoUrl) {
-    return `<div style="position:relative;max-width:100%;">
-      <img src="${photoUrl}" alt="photo" style="max-width:100%;max-height:min(65vh,520px);object-fit:contain;display:block;margin:0 auto;"/>
+    return `<div style="position:relative;width:100%;max-width:420px;margin:0 auto;aspect-ratio:${ratio};overflow:hidden;">
+      <img src="${photoUrl}" alt="photo" style="width:100%;height:100%;object-fit:cover;"/>
       <div class="glass-shine"></div>
     </div>`;
   }
