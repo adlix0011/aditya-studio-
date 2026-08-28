@@ -1,1 +1,2412 @@
-PLACEHOLDER_FRAMES
+<!DOCTYPE html>
+<html class="dark" lang="hi">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Aditya Studio — Luxury Custom Photo Frames</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<script>
+tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        "on-tertiary": "#353025",
+        "secondary": "#e9c176",
+        "surface-container-highest": "#353535",
+        "on-secondary": "#412d00",
+        "on-background": "#e5e2e1",
+        "surface-variant": "#353535",
+        "outline": "#9b8e87",
+        "surface": "#131313",
+        "primary-fixed-dim": "#dec1af",
+        "on-tertiary-fixed-variant": "#4c463a",
+        "secondary-container": "#604403",
+        "primary-fixed": "#fbddca",
+        "on-secondary-fixed": "#261900",
+        "on-error": "#690005",
+        "on-surface-variant": "#d2c4bc",
+        "outline-variant": "#4f453f",
+        "on-primary-fixed": "#28180d",
+        "on-tertiary-fixed": "#1f1b11",
+        "tertiary": "#cfc5b6",
+        "surface-container-lowest": "#0e0e0e",
+        "inverse-primary": "#705a4c",
+        "on-secondary-fixed-variant": "#5d4201",
+        "on-error-container": "#ffdad6",
+        "on-surface": "#e5e2e1",
+        "error-container": "#93000a",
+        "surface-container-high": "#2a2a2a",
+        "primary": "#dec1af",
+        "on-tertiary-container": "#9d9587",
+        "surface-container": "#20201f",
+        "inverse-surface": "#e5e2e1",
+        "error": "#ffb4ab",
+        "on-primary-fixed-variant": "#574335",
+        "background": "#131313",
+        "surface-container-low": "#1c1b1b",
+        "surface-dim": "#131313",
+        "primary-container": "#3d2b1f",
+        "tertiary-fixed": "#ebe1d1",
+        "on-primary-container": "#ac9181",
+        "tertiary-container": "#332e23",
+        "on-primary": "#3f2c20",
+        "inverse-on-surface": "#313030",
+        "surface-tint": "#dec1af",
+        "secondary-fixed": "#ffdea5",
+        "secondary-fixed-dim": "#e9c176",
+        "surface-bright": "#393939",
+        "on-secondary-container": "#dab36a",
+        "tertiary-fixed-dim": "#cfc5b6"
+      },
+      borderRadius: { DEFAULT: "0.125rem", lg: "0.25rem", xl: "0.5rem", full: "0.75rem" },
+      spacing: {
+        "margin-mobile": "16px",
+        gutter: "24px",
+        unit: "8px",
+        "container-max": "1280px",
+        "margin-desktop": "64px"
+      },
+      fontFamily: {
+        "body-md": ["Manrope"],
+        "display-lg": ["EB Garamond"],
+        "headline-md": ["EB Garamond"],
+        "label-caps": ["Manrope"],
+        "headline-sm": ["EB Garamond"],
+        "display-lg-mobile": ["EB Garamond"],
+        "body-lg": ["Manrope"]
+      },
+      fontSize: {
+        "body-md": ["16px", { lineHeight: "24px", fontWeight: "400" }],
+        "display-lg": ["48px", { lineHeight: "56px", letterSpacing: "-0.01em", fontWeight: "500" }],
+        "headline-md": ["32px", { lineHeight: "40px", fontWeight: "500" }],
+        "label-caps": ["12px", { lineHeight: "16px", letterSpacing: "0.1em", fontWeight: "700" }],
+        "headline-sm": ["24px", { lineHeight: "32px", fontWeight: "500" }],
+        "display-lg-mobile": ["32px", { lineHeight: "40px", fontWeight: "500" }],
+        "body-lg": ["18px", { lineHeight: "28px", fontWeight: "400" }]
+      },
+      animation: {
+        "gradient-x": "gradient-x 15s ease infinite",
+        "fade-in": "fadeIn 0.5s ease-out forwards"
+      },
+      keyframes: {
+        "gradient-x": {
+          "0%, 100%": { "background-size": "200% 200%", "background-position": "left center" },
+          "50%": { "background-size": "200% 200%", "background-position": "right center" }
+        },
+        fadeIn: {
+          "0%": { opacity: "0", transform: "translateY(10px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" }
+        }
+      }
+    }
+  }
+};
+</script>
+<style>
+  body { background-color: #131313; color: #e5e2e1; }
+  .gallery-border { border: 1px solid #4f453f; }
+  .gallery-shadow { box-shadow: inset 0 0 0 1px rgba(218, 179, 106, 0.2); }
+  .sidebar-scroll::-webkit-scrollbar { width: 6px; }
+  .sidebar-scroll::-webkit-scrollbar-track { background: #1c1b1b; }
+  .sidebar-scroll::-webkit-scrollbar-thumb { background: #4f453f; border-radius: 4px; }
+  .bg-mesh-gradient {
+    background: linear-gradient(-45deg, #2d1b13, #1f2a33, #332130, #3d2b1f);
+    background-size: 400% 400%;
+    animation: gradient-x 15s ease infinite;
+  }
+  .animated-frame { opacity: 0; }
+  .animated-frame.animate { animation: fadeIn 0.6s ease-out forwards; }
+  .price-strike { text-decoration: line-through; opacity: 0.6; font-size: 0.85em; }
+  .modal-backdrop { background: rgba(0,0,0,0.75); backdrop-filter: blur(4px); }
+  .banner-slide {
+    position: absolute; inset: 0;
+    background-size: cover; background-position: center;
+    opacity: 0; transform: scale(1.06);
+    transition: opacity 1.1s ease, transform 6s ease;
+  }
+  .banner-slide.active {
+    opacity: 1; transform: scale(1);
+    z-index: 1;
+  }
+  .banner-dot {
+    width: 8px; height: 8px; border-radius: 9999px;
+    background: rgba(233,193,118,0.35);
+    border: none; padding: 0; cursor: pointer;
+    transition: all 0.3s;
+  }
+  .banner-dot.active {
+    background: #e9c176; width: 22px;
+  }
+  .btn-claim-offer {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    padding: 1rem 2.25rem;
+    border-radius: 9999px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #1a1208;
+    background: linear-gradient(135deg, #fff6d4 0%, #f3de9a 25%, #d4af37 55%, #c9a227 75%, #f0d78c 100%);
+    background-size: 200% 200%;
+    box-shadow:
+      0 0 0 1px rgba(255, 236, 180, 0.45),
+      0 0 28px rgba(212, 175, 55, 0.45),
+      0 8px 24px rgba(0, 0, 0, 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.55);
+    animation: claim-shine 3.5s ease-in-out infinite;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    overflow: hidden;
+  }
+  .btn-claim-offer::before {
+    content: "";
+    position: absolute;
+    top: 0; left: -60%;
+    width: 45%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent);
+    transform: skewX(-20deg);
+    animation: claim-sweep 2.8s ease-in-out infinite;
+  }
+  .btn-claim-offer:hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow:
+      0 0 0 1px rgba(255, 236, 180, 0.65),
+      0 0 40px rgba(212, 175, 55, 0.65),
+      0 12px 28px rgba(0, 0, 0, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  }
+  @keyframes claim-shine {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+  @keyframes claim-sweep {
+    0% { left: -60%; }
+    55%, 100% { left: 120%; }
+  }
+</style>
+</head>
+<body class="font-body-md text-body-md relative overflow-x-hidden">
+
+<!-- TopNavBar -->
+<nav class="bg-surface text-primary font-body-md text-body-md sticky top-0 z-50 border-b border-outline-variant">
+  <div class="flex justify-between items-center w-full h-20 max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop">
+    <a href="/" class="text-headline-md font-headline-md text-primary no-underline">Aditya Studio</a>
+    <div class="hidden md:flex items-center space-x-gutter">
+      <a class="text-primary font-semibold transition-colors duration-300" href="/">Home</a>
+      <a class="text-on-surface-variant hover:text-primary transition-colors duration-300" href="#sizes">Sizes</a>
+      <a class="text-on-surface-variant hover:text-primary transition-colors duration-300" href="#upload">Upload</a>
+      <a class="text-on-surface-variant hover:text-primary transition-colors duration-300" href="/book-now">Studio</a>
+    </div>
+    <div class="flex items-center space-x-unit">
+      <!-- BOOK NOW → latest home frames -->
+      <a href="#sizes" class="hidden sm:inline-flex items-center gap-2 px-4 py-2 bg-secondary text-on-secondary font-label-caps text-label-caps rounded-DEFAULT hover:bg-secondary-fixed transition-colors gallery-shadow">
+        <span class="material-symbols-outlined text-sm">photo_frame</span>
+        BOOK NOW
+      </a>
+      <button aria-label="Account" class="p-2 hover:text-primary transition-colors duration-300 rounded-full border border-outline-variant ml-2 overflow-hidden w-10 h-10 flex items-center justify-center bg-surface-container" id="account-toggle">
+        <span class="material-symbols-outlined text-on-surface-variant" id="header-avatar-icon">person</span>
+      </button>
+    </div>
+  </div>
+</nav>
+
+<!-- Account Sidebar -->
+<div class="fixed inset-y-0 right-0 w-full md:w-96 bg-surface-container-highest z-[60] transform translate-x-full transition-transform duration-500 ease-in-out border-l border-outline-variant shadow-2xl flex flex-col" id="account-sidebar">
+  <div class="p-gutter border-b border-outline-variant flex justify-between items-center bg-surface">
+    <h2 class="font-headline-sm text-headline-sm text-primary">My Account</h2>
+    <button class="text-on-surface-variant hover:text-primary transition-colors" id="close-sidebar">
+      <span class="material-symbols-outlined">close</span>
+    </button>
+  </div>
+  <div class="flex-1 overflow-y-auto sidebar-scroll p-gutter space-y-gutter">
+    <div class="flex flex-col items-center space-y-unit">
+      <div class="w-20 h-20 rounded-full border-2 border-primary flex items-center justify-center bg-surface-container">
+        <span class="material-symbols-outlined text-4xl text-primary">person</span>
+      </div>
+      <div class="text-center">
+        <h3 class="font-body-lg text-body-lg text-on-surface" id="sidebar-name">Guest</h3>
+        <p class="text-on-surface-variant font-label-caps text-label-caps">Customer</p>
+      </div>
+    </div>
+    <div class="space-y-unit" id="framesLoginBox">
+      <div>
+        <label class="block font-label-caps text-label-caps text-on-surface-variant mb-1">Mobile</label>
+        <input id="profile-mobile" class="w-full bg-transparent border-b border-outline-variant focus:border-primary focus:ring-0 px-0 py-2 text-on-surface" placeholder="10-digit mobile" type="tel" maxlength="10"/>
+      </div>
+      <div>
+        <label class="block font-label-caps text-label-caps text-on-surface-variant mb-1">PIN</label>
+        <input id="profile-pin" class="w-full bg-transparent border-b border-outline-variant focus:border-primary focus:ring-0 px-0 py-2 text-on-surface" placeholder="4-digit PIN" type="password" maxlength="4"/>
+      </div>
+      <button id="frames-login-btn" class="w-full py-2 bg-secondary text-on-secondary font-label-caps text-label-caps rounded-DEFAULT">Login</button>
+      <p id="frames-login-err" class="text-error text-xs hidden"></p>
+      <p class="text-xs text-on-surface-variant">Naya account? <a href="/book-now" class="text-secondary underline">Register</a></p>
+    </div>
+    <div id="framesUserBox" class="hidden space-y-unit">
+      <div class="rounded-xl border border-secondary/40 p-4 text-center" style="background:linear-gradient(145deg,#2a2210,#16120b);box-shadow:0 0 20px rgba(212,175,55,0.2)">
+        <p class="text-[10px] uppercase tracking-wider text-secondary">💰 Wallet</p>
+        <p class="text-2xl font-bold text-secondary">₹<span id="framesWalletBal">0</span></p>
+      </div>
+      <div>
+        <p class="text-[10px] uppercase tracking-wider text-secondary mb-1">Wallet History</p>
+        <div id="framesWalletHist" class="space-y-1 max-h-28 overflow-y-auto text-xs text-on-surface-variant">
+          <p class="opacity-70">No transactions</p>
+        </div>
+      </div>
+      <div>
+        <p class="text-[10px] uppercase tracking-wider text-secondary mb-1">Coupons → Wallet</p>
+        <div id="framesCoupons" class="space-y-2 max-h-36 overflow-y-auto text-xs"></div>
+      </div>
+      <button id="load-orders-btn" class="w-full py-2 border border-secondary text-secondary hover:bg-secondary hover:text-on-secondary transition-colors font-label-caps text-label-caps rounded-DEFAULT">
+        Load My Orders
+      </button>
+      <button id="frames-logout-btn" class="w-full py-2 text-error text-sm">Logout</button>
+    </div>
+    <div class="border-t border-outline-variant pt-gutter">
+      <h4 class="font-headline-sm text-on-surface mb-unit">🔔 Notifications</h4>
+      <div id="framesNotifList" class="space-y-2 text-sm text-on-surface-variant max-h-40 overflow-y-auto">
+        <div class="p-3 bg-surface-container rounded-DEFAULT gallery-border text-xs">Loading…</div>
+      </div>
+    </div>
+    <div class="border-t border-outline-variant pt-gutter">
+      <h4 class="font-headline-sm text-on-surface mb-unit">Order History</h4>
+      <div id="order-history" class="space-y-3 text-sm text-on-surface-variant">
+        <div class="p-4 bg-surface-container rounded-DEFAULT gallery-border">Login karke orders dekho.</div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="fixed inset-0 bg-black/60 z-[55] hidden opacity-0 transition-opacity duration-300" id="sidebar-backdrop"></div>
+
+<!-- Main Content -->
+<main class="w-full">
+  <!-- Animated Home Banner (admin se customize) -->
+  <section id="home-banner" class="relative w-full h-[42vh] min-h-[260px] max-h-[480px] overflow-hidden bg-surface-container-lowest">
+    <div id="banner-slides" class="absolute inset-0">
+      <!-- slides injected by JS -->
+    </div>
+    <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/25 to-black/40 pointer-events-none z-[1]"></div>
+    <div class="absolute inset-0 z-[2] flex flex-col items-center justify-center text-center px-4">
+      <h1 id="banner-title" class="font-display-lg-mobile md:font-display-lg text-display-lg-mobile md:text-display-lg text-secondary drop-shadow-lg transition-opacity duration-500">
+        Aditya Studio
+      </h1>
+      <p id="banner-sub" class="font-body-lg text-body-lg text-on-surface max-w-2xl mx-auto mt-2 drop-shadow-md transition-opacity duration-500">
+        Museum-quality photo frames
+      </p>
+      <a href="#sizes" class="mt-5 inline-flex items-center gap-2 px-5 py-2.5 bg-secondary/90 text-on-secondary font-label-caps text-label-caps rounded-DEFAULT hover:bg-secondary transition-colors">
+        <span class="material-symbols-outlined text-sm">photo_frame</span>
+        BOOK NOW — Order Frames
+      </a>
+    </div>
+    <div class="absolute bottom-4 left-1/2 -translate-x-1/2 z-[3] flex gap-2" id="banner-dots"></div>
+    <button type="button" id="banner-prev" class="absolute left-3 top-1/2 -translate-y-1/2 z-[3] w-10 h-10 rounded-full bg-black/40 text-secondary border border-outline-variant flex items-center justify-center hover:bg-black/60" aria-label="Previous">
+      <span class="material-symbols-outlined">chevron_left</span>
+    </button>
+    <button type="button" id="banner-next" class="absolute right-3 top-1/2 -translate-y-1/2 z-[3] w-10 h-10 rounded-full bg-black/40 text-secondary border border-outline-variant flex items-center justify-center hover:bg-black/60" aria-label="Next">
+      <span class="material-symbols-outlined">chevron_right</span>
+    </button>
+  </section>
+
+  <!-- Photo Upload (banner ke niche) -->
+  <section id="upload" class="w-full py-12 px-margin-mobile md:px-margin-desktop bg-surface">
+    <div class="max-w-3xl mx-auto">
+      <div class="bg-surface-container-low p-gutter rounded-xl border border-secondary/30 shadow-2xl text-center">
+        <h2 class="font-headline-md text-headline-md text-primary mb-2">Your Masterpiece</h2>
+        <p class="text-sm text-on-surface-variant mb-6">Photo upload karo → frame preview dekho → order karo</p>
+        <div class="border-2 border-dashed border-secondary/50 rounded-lg p-10 text-center hover:border-secondary hover:bg-secondary/10 transition-all cursor-pointer bg-surface/50 group" id="main-upload-trigger">
+          <span class="material-symbols-outlined text-5xl text-secondary/80 group-hover:text-secondary mb-3 transition-colors">cloud_upload</span>
+          <p class="font-headline-sm text-headline-sm text-on-surface group-hover:text-secondary transition-colors mb-2">Upload Your Photo</p>
+          <p class="text-sm text-on-surface-variant mt-1">High resolution JPEG or PNG recommended</p>
+          <input accept="image/*" class="hidden" id="main-upload" type="file"/>
+        </div>
+
+        <!-- Orientation selector -->
+        <div id="orientation-box" class="mt-6 hidden">
+          <p class="font-label-caps text-label-caps text-on-surface-variant mb-3 text-center tracking-widest">FRAME ORIENTATION</p>
+          <div class="flex flex-col sm:flex-row gap-3 justify-center">
+            <button type="button" id="orient-vertical" class="orient-btn flex-1 flex items-center justify-center gap-3 px-5 py-4 rounded-DEFAULT border-2 border-secondary bg-secondary/15 text-secondary transition-all">
+              <span class="material-symbols-outlined text-3xl">crop_portrait</span>
+              <span class="text-left">
+                <span class="block font-headline-sm text-headline-sm leading-tight">Vertical</span>
+                <span class="block text-xs opacity-80">Portrait · खड़ा फ्रेम</span>
+              </span>
+            </button>
+            <button type="button" id="orient-horizontal" class="orient-btn flex-1 flex items-center justify-center gap-3 px-5 py-4 rounded-DEFAULT border-2 border-outline-variant text-on-surface-variant hover:border-secondary hover:text-secondary transition-all">
+              <span class="material-symbols-outlined text-3xl">crop_landscape</span>
+              <span class="text-left">
+                <span class="block font-headline-sm text-headline-sm leading-tight">Horizontal</span>
+                <span class="block text-xs opacity-80">Landscape · लेटा फ्रेम</span>
+              </span>
+            </button>
+          </div>
+          <p id="orient-hint" class="text-center text-sm text-on-surface-variant mt-3">Vertical select hai — neeche portrait frames dikhenge</p>
+        </div>
+
+        <!-- Photo crop / zoom / position (customer adjust) -->
+        <div id="photo-adjust-box" class="mt-6 hidden text-left">
+          <p class="font-label-caps text-label-caps text-on-surface-variant mb-3 text-center tracking-widest">PHOTO IN FRAME</p>
+          <p class="text-center text-sm text-on-surface-variant mb-4">Zoom / drag karke decide karo frame mein photo ka kitna hissa dikhe</p>
+          <div class="flex flex-col sm:flex-row gap-4 items-stretch">
+            <div class="flex-1 flex flex-col items-center">
+              <div id="crop-stage" class="relative w-full max-w-[280px] mx-auto overflow-hidden rounded-lg border-2 border-secondary/60 bg-black/40 cursor-grab active:cursor-grabbing select-none touch-none"
+                   style="aspect-ratio: 3 / 4; box-shadow: inset 0 0 0 1px rgba(212,175,55,0.25);">
+                <img id="crop-img" alt="Adjust photo" draggable="false"
+                     class="absolute max-w-none pointer-events-none will-change-transform origin-center"
+                     style="left:50%; top:50%; transform: translate(-50%, -50%) scale(1);"/>
+                <div class="absolute inset-0 pointer-events-none border border-secondary/40 rounded-lg" style="box-shadow: inset 0 0 0 2px rgba(212,175,55,0.35);"></div>
+                <div class="absolute bottom-2 left-1/2 -translate-x-1/2 z-10 px-2 py-0.5 rounded-full bg-black/60 text-[10px] text-secondary border border-secondary/30 pointer-events-none whitespace-nowrap">Drag to move</div>
+              </div>
+              <p class="text-[11px] text-on-surface-variant mt-2 text-center">Yeh window = frame ke andar dikhne wala hissa</p>
+            </div>
+            <div class="flex-1 flex flex-col justify-center gap-4 min-w-0">
+              <div>
+                <div class="flex justify-between items-center mb-1">
+                  <label class="font-label-caps text-label-caps text-on-surface-variant tracking-wider text-xs" for="photo-zoom">Zoom</label>
+                  <span id="photo-zoom-val" class="text-xs text-secondary font-medium">100%</span>
+                </div>
+                <input id="photo-zoom" type="range" min="100" max="300" step="1" value="100"
+                       class="w-full accent-secondary h-2 rounded-full cursor-pointer"/>
+                <div class="flex justify-between text-[10px] text-on-surface-variant mt-1">
+                  <span>Fit (zyada photo)</span>
+                  <span>Close-up</span>
+                </div>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <button type="button" id="photo-fit-btn" class="flex-1 min-w-[100px] px-3 py-2 rounded-DEFAULT border border-outline-variant text-on-surface-variant text-xs hover:border-secondary hover:text-secondary transition-all">Fit</button>
+                <button type="button" id="photo-fill-btn" class="flex-1 min-w-[100px] px-3 py-2 rounded-DEFAULT border border-secondary/50 bg-secondary/10 text-secondary text-xs hover:bg-secondary/20 transition-all">Fill frame</button>
+                <button type="button" id="photo-reset-btn" class="flex-1 min-w-[100px] px-3 py-2 rounded-DEFAULT border border-outline-variant text-on-surface-variant text-xs hover:border-secondary hover:text-secondary transition-all">Reset</button>
+              </div>
+              <p class="text-xs text-on-surface-variant leading-relaxed">
+                <span class="text-secondary">Tip:</span> Zoom badhao → face / subject bada dikhega.
+                Drag se left-right / up-down shift karo. 3D preview turant update hoga.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3D Viewer + Frame Sizes -->
+  <section id="sizes" class="max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-margin-desktop">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-margin-desktop items-start mb-margin-desktop">
+      <!-- 3D Frame Viewer — same luxury style as home hero frame -->
+      <div class="lg:col-span-4 sticky top-24" id="viewer-card">
+        <div class="relative h-[420px] sm:h-[500px] flex items-center justify-center rounded-2xl border border-secondary/30 bg-surface-container/80 backdrop-blur-md overflow-hidden gallery-shadow"
+             style="box-shadow:0 0 40px rgba(212,175,55,0.18), inset 0 0 0 1px rgba(212,175,55,0.12)">
+          <div class="absolute top-3 left-3 z-20 px-2.5 py-1 rounded-md bg-black/55 border border-secondary/30 text-[10px] font-label-caps text-secondary tracking-wider">ADITYA STUDIO</div>
+          <div class="absolute top-3 right-3 z-20 px-2.5 py-1 rounded-full bg-black/60 border border-secondary/40 text-[11px] font-label-caps text-on-surface flex items-center gap-1">
+            <span class="material-symbols-outlined text-sm text-secondary">view_in_ar</span> 3D
+          </div>
+          <div id="threejs-container" class="w-full h-full cursor-grab active:cursor-grabbing"></div>
+          <div class="absolute bottom-3 left-3 z-20 text-[11px] text-on-surface-variant bg-black/45 px-2 py-1 rounded-md pointer-events-none border border-outline-variant/40" id="viewer-mount-hint">Rotate to back for mounting</div>
+          <div class="absolute bottom-3 right-3 z-20 bg-black/55 backdrop-blur-md px-3 py-1.5 rounded-full border border-secondary/30 flex items-center space-x-1.5 pointer-events-none">
+            <span class="material-symbols-outlined text-secondary text-sm">360</span>
+            <span class="font-label-caps text-label-caps text-on-surface text-[11px]" id="viewer-hint">Auto 360° · Drag</span>
+          </div>
+          <!-- gold glow accents (home-style) -->
+          <div class="absolute top-8 right-8 w-20 h-20 rounded-full bg-secondary/15 blur-3xl pointer-events-none"></div>
+          <div class="absolute bottom-10 left-8 w-24 h-24 rounded-full bg-primary/10 blur-3xl pointer-events-none"></div>
+        </div>
+      </div>
+      <!-- Size filter + Editing Request -->
+      <div class="lg:col-span-8 flex flex-col space-y-gutter">
+        <div class="border-b border-outline-variant pb-4">
+          <h3 class="font-headline-md text-primary">Select Frame Size</h3>
+          <p class="text-on-surface-variant text-sm mt-1">Size sequence chhoti se badi · orientation ke hisaab se preview</p>
+        </div>
+        <div class="flex gap-2 flex-wrap" id="size-filter"></div>
+        <p class="text-on-surface-variant text-sm">Neeche samples size order mein hain. Lamba size bhi card ke andar balanced dikhega.</p>
+
+        <!-- Editing Request CTA (khali jagah) -->
+        <div class="mt-4 p-5 rounded-xl border border-secondary/40 bg-surface-container gallery-shadow flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
+          <div>
+            <h4 class="font-headline-sm text-primary">Photo Editing Request</h4>
+            <p class="text-sm text-on-surface-variant mt-1">Photo edit chahiye? Max 10 photos · har photo max 15 MB</p>
+          </div>
+          <button type="button" id="open-edit-request" class="shrink-0 px-6 py-3 bg-secondary text-on-secondary font-label-caps text-label-caps rounded-DEFAULT hover:bg-secondary-fixed transition-colors gallery-shadow">
+            Editing Request
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6" id="frames-grid">
+      <div class="col-span-full text-center text-on-surface-variant py-12">Loading frames…</div>
+    </div>
+  </section>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/shaders/FXAAShader.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/postprocessing/UnrealBloomPass.js"></script>
+
+<!-- Product Detail Modal -->
+<div id="product-modal" class="fixed inset-0 z-[65] hidden items-center justify-center p-4 modal-backdrop">
+  <div class="bg-surface-container-high w-full max-w-2xl rounded-xl border border-outline-variant shadow-2xl max-h-[92vh] overflow-y-auto">
+    <div class="p-4 border-b border-outline-variant flex justify-between items-center sticky top-0 bg-surface-container-high z-10">
+      <h3 class="font-headline-sm text-headline-sm text-primary" id="pd-title">Frame Detail</h3>
+      <button id="close-product-modal" class="text-on-surface-variant hover:text-primary">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="p-5 space-y-5">
+      <!-- Main preview + 3 angle samples -->
+      <div>
+        <div id="pd-main-preview" class="w-full h-56 sm:h-64 bg-background rounded-lg gallery-border flex items-center justify-center overflow-hidden mb-3"></div>
+        <p class="font-label-caps text-label-caps text-on-surface-variant mb-2 tracking-widest">FRAME ANGLES</p>
+        <div class="grid grid-cols-3 gap-2" id="pd-samples">
+          <!-- 3 angle thumbs -->
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 text-secondary">
+        <span class="material-symbols-outlined text-sm" style="font-variation-settings:'FILL' 1">star</span>
+        <span id="pd-rating" class="font-bold text-on-surface">4.5</span>
+        <span id="pd-reviews" class="text-on-surface-variant text-sm"></span>
+      </div>
+
+      <div id="pd-price-line" class="text-secondary text-2xl font-bold"></div>
+      <p id="pd-desc" class="text-sm text-on-surface-variant leading-relaxed"></p>
+
+      <!-- Photo quality -->
+      <div>
+        <p class="font-label-caps text-label-caps text-on-surface-variant mb-2 tracking-widest">PHOTO QUALITY</p>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2" id="pd-quality">
+          <button type="button" data-quality="normal" data-extra="0" class="quality-btn border-2 border-secondary bg-secondary/15 text-secondary rounded-DEFAULT p-3 text-left transition-all">
+            <span class="block font-headline-sm text-sm">1. Normal</span>
+            <span class="block text-xs opacity-80">Standard print · +₹0</span>
+          </button>
+          <button type="button" data-quality="lamination" data-extra="80" class="quality-btn border-2 border-outline-variant text-on-surface-variant rounded-DEFAULT p-3 text-left hover:border-secondary transition-all">
+            <span class="block font-headline-sm text-sm">2. Lamination</span>
+            <span class="block text-xs opacity-80">Gloss protect · +₹80</span>
+          </button>
+          <button type="button" data-quality="ntr" data-extra="150" class="quality-btn border-2 border-outline-variant text-on-surface-variant rounded-DEFAULT p-3 text-left hover:border-secondary transition-all">
+            <span class="block font-headline-sm text-sm">3. NTR Print</span>
+            <span class="block text-xs opacity-80">Premium NTR · +₹150</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Frame type (admin se same size ke designs + photo) -->
+      <div>
+        <p class="font-label-caps text-label-caps text-on-surface-variant mb-2 tracking-widest">FRAME TYPE</p>
+        <div class="grid grid-cols-3 sm:grid-cols-4 gap-2" id="pd-types"></div>
+        <p id="pd-type-label" class="text-sm text-on-surface-variant mt-2"></p>
+      </div>
+
+      <!-- Frame colour -->
+      <div>
+        <p class="font-label-caps text-label-caps text-on-surface-variant mb-2 tracking-widest">FRAME COLOUR</p>
+        <div class="flex flex-wrap gap-3" id="pd-colours">
+          <!-- filled by JS / admin defaults -->
+        </div>
+        <p id="pd-colour-label" class="text-sm text-on-surface-variant mt-2"></p>
+      </div>
+
+      <button id="pd-order-btn" type="button" class="w-full py-4 bg-secondary text-on-secondary font-body-lg text-body-lg rounded-DEFAULT hover:bg-secondary-fixed transition-colors gallery-shadow">
+        Continue to Order
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Editing Request Modal -->
+<div id="edit-request-modal" class="fixed inset-0 z-[72] hidden items-center justify-center p-4 modal-backdrop">
+  <div class="bg-surface-container-high w-full max-w-lg rounded-xl border border-outline-variant shadow-2xl max-h-[92vh] overflow-y-auto">
+    <div class="p-4 border-b border-outline-variant flex justify-between items-center sticky top-0 bg-surface-container-high z-10">
+      <h3 class="font-headline-sm text-headline-sm text-primary">Editing Request</h3>
+      <button id="close-edit-request" class="text-on-surface-variant hover:text-primary" type="button">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="p-5 space-y-4">
+      <p class="text-sm text-on-surface-variant">Max <b class="text-secondary">10 photos</b> · har photo max <b class="text-secondary">15 MB</b></p>
+      <div>
+        <label class="block font-label-caps text-label-caps text-on-surface-variant mb-1">Name *</label>
+        <input id="er-name" type="text" class="w-full bg-surface border border-outline-variant focus:border-primary focus:ring-0 px-3 py-2 text-on-surface rounded-DEFAULT" placeholder="Apna naam"/>
+      </div>
+      <div>
+        <label class="block font-label-caps text-label-caps text-on-surface-variant mb-1">Mobile *</label>
+        <input id="er-mobile" type="tel" maxlength="10" class="w-full bg-surface border border-outline-variant focus:border-primary focus:ring-0 px-3 py-2 text-on-surface rounded-DEFAULT" placeholder="10 digit mobile"/>
+      </div>
+      <div>
+        <label class="block font-label-caps text-label-caps text-on-surface-variant mb-1">Editing note (optional)</label>
+        <textarea id="er-note" rows="2" class="w-full bg-surface border border-outline-variant focus:border-primary focus:ring-0 px-3 py-2 text-on-surface rounded-DEFAULT resize-none" placeholder="Kya edit chahiye? (background, colour, retouch...)"></textarea>
+      </div>
+      <div>
+        <label class="block font-label-caps text-label-caps text-on-surface-variant mb-2">Photos</label>
+        <button type="button" id="er-pick-btn" class="w-full py-8 border-2 border-dashed border-secondary/50 rounded-lg text-center hover:border-secondary hover:bg-secondary/10 transition-all">
+          <span class="material-symbols-outlined text-4xl text-secondary mb-1">add_photo_alternate</span>
+          <p class="font-headline-sm text-on-surface text-sm">Click to upload photos</p>
+          <p class="text-xs text-on-surface-variant mt-1" id="er-count-label">0 / 10 selected</p>
+        </button>
+        <input type="file" id="er-file-input" accept="image/*" multiple class="hidden"/>
+        <div id="er-preview-grid" class="grid grid-cols-3 sm:grid-cols-5 gap-2 mt-3"></div>
+      </div>
+      <div id="er-error" class="text-error text-sm hidden"></div>
+      <button type="button" id="er-submit-btn" class="w-full py-3 bg-secondary text-on-secondary font-body-lg text-body-lg rounded-DEFAULT hover:bg-secondary-fixed transition-colors gallery-shadow">
+        Submit Editing Request
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Order Modal -->
+<div id="order-modal" class="fixed inset-0 z-[70] hidden items-center justify-center p-4 modal-backdrop">
+  <div class="bg-surface-container-high w-full max-w-lg rounded-xl border border-outline-variant shadow-2xl max-h-[90vh] overflow-y-auto">
+    <div class="p-6 border-b border-outline-variant flex justify-between items-center sticky top-0 bg-surface-container-high z-10">
+      <h3 class="font-headline-sm text-headline-sm text-primary">Place Order</h3>
+      <button id="close-order-modal" class="text-on-surface-variant hover:text-primary">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="p-6 space-y-4">
+      <div id="order-frame-preview" class="bg-surface-container p-4 rounded-DEFAULT gallery-border text-center">
+        <!-- filled by JS -->
+      </div>
+      <div>
+        <label class="block font-label-caps text-label-caps text-on-surface-variant mb-1">Name *</label>
+        <input id="order-name" type="text" required class="w-full bg-surface border border-outline-variant focus:border-primary focus:ring-0 px-3 py-2 text-on-surface rounded-DEFAULT" placeholder="Apna naam"/>
+      </div>
+      <div>
+        <label class="block font-label-caps text-label-caps text-on-surface-variant mb-1">Mobile *</label>
+        <input id="order-mobile" type="tel" required maxlength="10" class="w-full bg-surface border border-outline-variant focus:border-primary focus:ring-0 px-3 py-2 text-on-surface rounded-DEFAULT" placeholder="10 digit number"/>
+      </div>
+      <div>
+        <label class="block font-label-caps text-label-caps text-on-surface-variant mb-1">Village / Area *</label>
+        <input id="order-village" type="text" required class="w-full bg-surface border border-outline-variant focus:border-primary focus:ring-0 px-3 py-2 text-on-surface rounded-DEFAULT" placeholder="गाँव / मोहल्ला"/>
+      </div>
+      <div>
+        <label class="block font-label-caps text-label-caps text-on-surface-variant mb-1">Full Address *</label>
+        <textarea id="order-address" required rows="2" class="w-full bg-surface border border-outline-variant focus:border-primary focus:ring-0 px-3 py-2 text-on-surface rounded-DEFAULT resize-none" placeholder="घर का पता / Landmark"></textarea>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block font-label-caps text-label-caps text-on-surface-variant mb-1">District *</label>
+          <input id="order-district" type="text" required class="w-full bg-surface border border-outline-variant focus:border-primary focus:ring-0 px-3 py-2 text-on-surface rounded-DEFAULT" placeholder="जिला"/>
+        </div>
+        <div>
+          <label class="block font-label-caps text-label-caps text-on-surface-variant mb-1">State *</label>
+          <input id="order-state" type="text" required class="w-full bg-surface border border-outline-variant focus:border-primary focus:ring-0 px-3 py-2 text-on-surface rounded-DEFAULT" placeholder="राज्य"/>
+        </div>
+      </div>
+      <div>
+        <label class="block font-label-caps text-label-caps text-on-surface-variant mb-1">Pincode *</label>
+        <input id="order-pincode" type="tel" required maxlength="6" class="w-full bg-surface border border-outline-variant focus:border-primary focus:ring-0 px-3 py-2 text-on-surface rounded-DEFAULT" placeholder="6 digit pincode"/>
+      </div>
+      <div>
+        <label class="block font-label-caps text-label-caps text-on-surface-variant mb-1">Notes (optional)</label>
+        <input id="order-notes" type="text" class="w-full bg-surface border border-outline-variant focus:border-primary focus:ring-0 px-3 py-2 text-on-surface rounded-DEFAULT" placeholder="Koi special request"/>
+      </div>
+
+      <button id="save-address-btn" type="button" class="w-full py-3 border-2 border-secondary text-secondary hover:bg-secondary hover:text-on-secondary transition-colors font-body-lg text-body-lg rounded-DEFAULT">
+        Save Address & Continue
+      </button>
+      <p id="saved-address-badge" class="hidden text-center text-xs text-secondary">✓ Address saved — agli baar auto-fill hoga</p>
+
+      <!-- Price + Pay (sirf address save ke baad) -->
+      <div id="payment-section" class="hidden space-y-4">
+        <div id="order-price-box" class="bg-surface-container p-4 rounded-DEFAULT gallery-border space-y-2">
+          <div class="flex justify-between text-sm"><span class="text-on-surface-variant">Frame price</span><span id="op-mrp" class="text-on-surface">—</span></div>
+          <div class="flex justify-between text-sm"><span class="text-on-surface-variant">Discount</span><span id="op-disc" class="text-secondary">—</span></div>
+          <div class="border-t border-outline-variant pt-2 flex justify-between items-center">
+            <span class="font-label-caps text-label-caps text-on-surface">Total payable</span>
+            <span id="op-total" class="text-secondary text-2xl font-bold">—</span>
+          </div>
+        </div>
+
+        <button id="pay-order-btn" type="button" class="w-full py-3 bg-secondary text-on-secondary font-body-lg text-body-lg rounded-DEFAULT hover:bg-secondary-fixed transition-colors gallery-shadow">
+          Pay Total Amount
+        </button>
+
+        <div id="qr-pay-box" class="hidden space-y-3 text-center p-4 bg-surface rounded-DEFAULT border border-secondary/40">
+          <p class="font-label-caps text-label-caps text-secondary tracking-widest">SCAN TO PAY</p>
+          <div class="mx-auto w-48 h-48 bg-white rounded-lg flex items-center justify-center p-2">
+            <img id="pay-qr-img" alt="Payment QR" class="w-full h-full object-contain"
+              src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=adityastudio@upi&pn=Aditya%20Studio&cu=INR"/>
+          </div>
+          <p class="text-sm text-on-surface-variant">UPI / Scanner se pay karein</p>
+          <p class="text-secondary font-bold text-lg" id="qr-amount-label">₹0</p>
+          <button id="paid-claim-btn" type="button" class="w-full py-2 border border-secondary text-secondary hover:bg-secondary hover:text-on-secondary transition-colors font-label-caps text-label-caps rounded-DEFAULT">
+            Maine Pay Kar Diya
+          </button>
+        </div>
+
+        <button id="submit-order-btn" type="button" class="hidden w-full py-3 bg-primary-container text-on-primary-container font-body-lg text-body-lg rounded-DEFAULT hover:bg-inverse-primary transition-colors gallery-shadow">
+          Submit Order
+        </button>
+      </div>
+
+      <div id="order-error" class="text-error text-sm hidden"></div>
+      <p id="order-flow-hint" class="text-xs text-on-surface-variant text-center">Pehle address save karo → phir total payment dikhega</p>
+    </div>
+  </div>
+</div>
+
+<!-- Success Toast -->
+<div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[80] hidden px-6 py-3 bg-secondary text-on-secondary rounded-DEFAULT shadow-lg font-label-caps text-label-caps"></div>
+
+<!-- Claim offer → Old home / Studio page -->
+<section id="more-old-home" class="w-full py-16 px-margin-mobile md:px-margin-desktop border-t border-outline-variant bg-surface-container-low">
+  <div class="max-w-container-max mx-auto text-center">
+    <p class="font-label-caps text-label-caps text-secondary tracking-[0.25em] mb-2">LIMITED OFFER</p>
+    <h3 class="font-headline-md text-primary mb-2">Spin · Discount · Studio Booking</h3>
+    <p class="text-on-surface-variant text-sm max-w-xl mx-auto mb-8">Apna offer claim karo — discount wheel, studio booking aur exclusive deals.</p>
+    <a href="/book-now" class="btn-claim-offer font-label-caps text-label-caps">
+      <span class="material-symbols-outlined text-base" style="font-variation-settings:'FILL' 1">loyalty</span>
+      Claim Your Offer
+    </a>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="bg-surface-container-lowest text-on-surface font-body-md text-body-md border-t border-outline-variant relative z-40">
+  <div class="flex flex-col md:flex-row justify-between items-start w-full py-12 max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop space-y-8 md:space-y-0">
+    <div class="flex flex-col space-y-4">
+      <div class="text-headline-sm font-headline-sm text-primary">Aditya Studio</div>
+      <p class="text-sm text-on-surface-variant max-w-xs">Curating memories with artisanal precision and museum-grade materials.</p>
+      <div class="pt-4 border-t border-outline-variant inline-block mt-4">
+        <div class="flex items-center space-x-2 text-on-surface-variant">
+          <span class="material-symbols-outlined">qr_code_scanner</span>
+          <span class="text-sm font-label-caps tracking-widest">QR payments accepted</span>
+        </div>
+      </div>
+    </div>
+    <div class="flex flex-col space-y-2">
+      <a class="text-on-surface-variant hover:text-secondary transition-colors" href="/book-now">Old Home / Studio</a>
+      <a class="text-on-surface-variant hover:text-secondary transition-colors" href="#sizes">Frame Sizes</a>
+      <a class="text-on-surface-variant hover:text-secondary transition-colors" href="/admin">Admin</a>
+    </div>
+  </div>
+  <div class="border-t border-outline-variant w-full">
+    <div class="max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-4 flex justify-between items-center text-xs text-on-surface-variant">
+      <span>© 2026 Aditya Studio. All Rights Reserved.</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+// ========== State ==========
+let allFrames = [];
+let selectedFrame = null;
+let userPhotoDataUrl = null;
+let orientation = "vertical"; // vertical | horizontal
+// Photo crop inside frame: zoom 1–3, pan 0–1 (0.5 = center)
+let photoZoom = 1;
+let photoPanX = 0.5;
+let photoPanY = 0.5;
+let photoNaturalW = 0;
+let photoNaturalH = 0;
+let photoAdjustBound = false;
+let sizeFilterExpanded = false; // size chips hide by default; ALL click pe show
+const FRAME_COLORS = [
+  "#8b5a2b","#b87333","#9e5f3c","#a0522d","#8a3324","#cd7f32",
+  "#b8860b","#daa520","#d2691e","#b22222","#8b4513","#a0522d",
+  "#cd853f","#d2b48c","#deb887"
+];
+
+function parseSize(sizeStr) {
+  const parts = String(sizeStr || "").toLowerCase().split("x").map(n => parseFloat(n));
+  const a = parts[0] || 1;
+  const b = parts[1] || 1;
+  // Stored as short x long in catalog; orientation decides display
+  const short = Math.min(a, b);
+  const long = Math.max(a, b);
+  return { a, b, short, long };
+}
+
+function displayDims(sizeStr) {
+  const { short, long } = parseSize(sizeStr);
+  if (orientation === "horizontal") return { w: long, h: short, label: long + "x" + short };
+  return { w: short, h: long, label: short + "x" + long };
+}
+
+function setOrientation(next) {
+  orientation = next === "horizontal" ? "horizontal" : "vertical";
+  const vBtn = document.getElementById("orient-vertical");
+  const hBtn = document.getElementById("orient-horizontal");
+  const hint = document.getElementById("orient-hint");
+  if (orientation === "vertical") {
+    vBtn.className = "orient-btn flex-1 flex items-center justify-center gap-3 px-5 py-4 rounded-DEFAULT border-2 border-secondary bg-secondary/15 text-secondary transition-all";
+    hBtn.className = "orient-btn flex-1 flex items-center justify-center gap-3 px-5 py-4 rounded-DEFAULT border-2 border-outline-variant text-on-surface-variant hover:border-secondary hover:text-secondary transition-all";
+    hint.textContent = "Vertical select hai — neeche portrait (खड़े) frames dikhenge";
+  } else {
+    hBtn.className = "orient-btn flex-1 flex items-center justify-center gap-3 px-5 py-4 rounded-DEFAULT border-2 border-secondary bg-secondary/15 text-secondary transition-all";
+    vBtn.className = "orient-btn flex-1 flex items-center justify-center gap-3 px-5 py-4 rounded-DEFAULT border-2 border-outline-variant text-on-surface-variant hover:border-secondary hover:text-secondary transition-all";
+    hint.textContent = "Horizontal select hai — neeche landscape (लेटे) frames dikhenge";
+  }
+  const activeChip = document.querySelector("#size-filter .size-chip.border-secondary");
+  const filterSize = activeChip && activeChip.dataset.size !== "all" ? activeChip.dataset.size : null;
+  renderFrames(filterSize);
+}
+
+// ========== Helpers ==========
+function formatPrice(n) {
+  if (n == null || isNaN(n)) return "—";
+  return "₹" + Number(n).toLocaleString("en-IN");
+}
+function showToast(msg, ms = 3500) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.remove("hidden");
+  setTimeout(() => t.classList.add("hidden"), ms);
+}
+
+// ========== Load frames from API ==========
+async function loadFrames() {
+  const grid = document.getElementById("frames-grid");
+  try {
+    const res = await fetch("/api/frames");
+    const data = await res.json();
+    const list = Array.isArray(data) ? data : (data.frames || []);
+    allFrames = list.filter(f => f.active !== false).map(f => ({
+      ...f,
+      discount: Number(f.discountPercent) || 0,
+      image: f.imageData || f.imageUrl || ""
+    }));
+  } catch (e) {
+    allFrames = [];
+  }
+
+  // Never show demo / seeded frames — only real admin uploads
+  allFrames = allFrames.filter(f => {
+    const id = String(f.id || "");
+    if (id.startsWith("demo-")) return false;
+    if (f.demo === true) return false;
+    return true;
+  });
+
+  sizeFilterExpanded = false;
+  renderSizeFilter();
+  renderFrames();
+}
+
+function renderSizeFilter() {
+  const sizes = [...new Set(allFrames.map(f => f.size).filter(Boolean))]
+    .sort((a, b) => sizeArea(a) - sizeArea(b));
+  const el = document.getElementById("size-filter");
+  if (!el) return;
+
+  if (!sizes.length) {
+    el.innerHTML = "";
+    el.classList.add("hidden");
+    return;
+  }
+  el.classList.remove("hidden");
+
+  const sizeBtns = sizes.map(s =>
+    `<button data-size="${s}" class="size-chip size-only px-3 py-1 rounded-full border border-outline-variant text-on-surface-variant text-xs font-label-caps hover:border-secondary hover:text-secondary transition-colors${sizeFilterExpanded ? "" : " hidden"}">${s}</button>`
+  ).join("");
+
+  el.innerHTML =
+    `<button data-size="all" class="size-chip px-3 py-1 rounded-full border border-secondary text-secondary text-xs font-label-caps bg-secondary/10">ALL</button>` +
+    sizeBtns;
+
+  el.querySelectorAll(".size-chip").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const size = btn.dataset.size;
+
+      if (size === "all") {
+        sizeFilterExpanded = !sizeFilterExpanded;
+        el.querySelectorAll(".size-only").forEach(b => {
+          b.classList.toggle("hidden", !sizeFilterExpanded);
+        });
+        el.querySelectorAll(".size-chip").forEach(b => {
+          b.classList.remove("border-secondary", "text-secondary", "bg-secondary/10");
+          b.classList.add("border-outline-variant", "text-on-surface-variant");
+        });
+        btn.classList.add("border-secondary", "text-secondary", "bg-secondary/10");
+        btn.classList.remove("border-outline-variant", "text-on-surface-variant");
+        renderFrames(null);
+        return;
+      }
+
+      el.querySelectorAll(".size-chip").forEach(b => {
+        b.classList.remove("border-secondary", "text-secondary", "bg-secondary/10");
+        b.classList.add("border-outline-variant", "text-on-surface-variant");
+      });
+      btn.classList.add("border-secondary", "text-secondary", "bg-secondary/10");
+      btn.classList.remove("border-outline-variant", "text-on-surface-variant");
+      renderFrames(size);
+    });
+  });
+}
+
+function sizeArea(sizeStr) {
+  const { short, long } = parseSize(sizeStr);
+  return short * long;
+}
+
+function frameRating(frame) {
+  // Stable pseudo-rating from size string
+  const s = String(frame.size || "8x12");
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h + s.charCodeAt(i) * (i + 3)) % 40;
+  const rating = (4.3 + (h % 6) * 0.1).toFixed(1);
+  const reviews = 40 + (h * 7) % 160;
+  return { rating, reviews };
+}
+
+function renderFrames(filterSize = null) {
+  const grid = document.getElementById("frames-grid");
+  let list = allFrames.slice();
+  if (filterSize) list = list.filter(f => f.size === filterSize);
+
+  // Ek size = ek product card; types detail ke andar
+  // Prefer frame jisme real image ho (admin upload)
+  const bySize = {};
+  list.forEach(f => {
+    const prev = bySize[f.size];
+    if (!prev) {
+      bySize[f.size] = f;
+      return;
+    }
+    const prevHas = !!(prev.image || prev.imageData || prev.imageUrl);
+    const curHas = !!(f.image || f.imageData || f.imageUrl);
+    if (!prevHas && curHas) bySize[f.size] = f;
+  });
+  list = Object.values(bySize);
+  list.sort((a, b) => sizeArea(a.size) - sizeArea(b.size));
+
+  if (!list.length) {
+    grid.innerHTML = `<div class="col-span-full text-center text-on-surface-variant py-12">
+      ${allFrames.length ? "Is size ke frames abhi available nahi." : "Abhi koi frame available nahi hai. Admin se frames upload hone ke baad yahan dikhenge."}
+    </div>`;
+    return;
+  }
+
+  const orientLabel = orientation === "horizontal" ? "Horizontal" : "Vertical";
+
+  grid.innerHTML = list.map((frame, index) => {
+    const size = frame.size || "—";
+    const dims = displayDims(size);
+    const aspect = dims.w / dims.h;
+    const color = FRAME_COLORS[index % FRAME_COLORS.length];
+    const borderPx = Math.min(16, 8 + Math.floor((dims.w || 12) / 3));
+    const price = Number(frame.price) || 0;
+    const discount = Number(frame.discount) || 0;
+    const finalPrice = discount > 0 ? Math.round(price * (1 - discount / 100)) : price;
+    const { rating, reviews } = frameRating(frame);
+    // User photo (if uploaded) takes priority for preview; else admin frame sample image
+    const cardSrc = userPhotoDataUrl || frame.image || "";
+    const imgHtml = cardSrc
+      ? `<img src="${cardSrc}" class="w-full h-full object-cover" alt="${dims.label}"/>`
+      : `<span class="material-symbols-outlined text-outline-variant opacity-50 text-3xl">image</span>`;
+
+    // Product card — NO Order Now; click opens detail
+    return `
+    <div class="product-card bg-surface-container rounded-DEFAULT gallery-border gallery-shadow flex flex-col group hover:bg-surface-container-highest transition-colors relative overflow-hidden animated-frame cursor-pointer" style="animation-delay:${index * 0.04}s" data-id="${frame.id}">
+      <div class="w-full h-52 sm:h-56 bg-background flex items-center justify-center relative overflow-hidden">
+        <div class="relative flex items-center justify-center" style="height:88%; width:88%;">
+          <div class="h-full bg-surface flex items-center justify-center user-image-container overflow-hidden shadow-md" style="aspect-ratio:${aspect}; border:${borderPx}px solid ${color}; max-height:100%; max-width:100%;">
+            ${imgHtml}
+          </div>
+        </div>
+        ${discount > 0 ? `<span class="absolute top-2 left-2 bg-secondary text-on-secondary text-[10px] font-label-caps px-2 py-1 rounded-full">${discount}% OFF</span>` : ""}
+      </div>
+      <div class="p-4 flex flex-col gap-1">
+        <div class="flex items-center gap-1 text-secondary text-sm">
+          <span class="material-symbols-outlined text-sm" style="font-variation-settings:'FILL' 1">star</span>
+          <span class="font-bold text-on-surface">${rating}</span>
+          <span class="text-on-surface-variant text-xs">· ${reviews}</span>
+        </div>
+        <p class="font-label-caps text-label-caps text-on-surface-variant tracking-wider">ADITYA STUDIO</p>
+        <h4 class="font-headline-sm text-on-surface leading-tight">${dims.label} Frame <span class="text-xs text-on-surface-variant">(${orientLabel})</span></h4>
+        <div class="mt-1 flex items-baseline gap-2 flex-wrap">
+          <span class="text-secondary text-xl font-bold">${formatPrice(finalPrice)}</span>
+          ${discount > 0 ? `<span class="price-strike text-on-surface-variant text-sm">${formatPrice(price)}</span>` : ""}
+          ${discount > 0 ? `<span class="text-secondary text-xs font-label-caps">(${discount}% OFF)</span>` : ""}
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+
+  requestAnimationFrame(() => {
+    document.querySelectorAll(".animated-frame").forEach(el => {
+      el.classList.add("animate");
+      el.style.opacity = "1";
+    });
+  });
+
+  grid.querySelectorAll(".product-card").forEach(card => {
+    card.addEventListener("click", () => {
+      const id = card.dataset.id;
+      selectedFrame = allFrames.find(f => String(f.id) === String(id));
+      openProductDetail();
+    });
+  });
+}
+
+// ========== Product Detail ==========
+const DEFAULT_COLOURS = [
+  { id: "walnut", name: "Walnut", hex: "#5c4033" },
+  { id: "oak", name: "Light Oak", hex: "#d2b48c" },
+  { id: "black", name: "Black", hex: "#1a1a1a" },
+  { id: "gold", name: "Gold", hex: "#c9a227" },
+  { id: "white", name: "White", hex: "#f5f0e8" }
+];
+let selectedQuality = { id: "normal", extra: 0, label: "Normal" };
+let selectedColour = DEFAULT_COLOURS[0];
+let activeSample = 0;
+
+function getFrameColours(frame) {
+  // Admin later: frame.colours = [{name,hex},...]
+  if (frame && Array.isArray(frame.colours) && frame.colours.length) return frame.colours;
+  return DEFAULT_COLOURS;
+}
+
+function getFrameSamples(frame) {
+  // Admin later: frame.samples = [url,url,url] for 3 angles
+  if (frame && Array.isArray(frame.samples) && frame.samples.length) return frame.samples;
+  const base = frame.image || userPhotoDataUrl || "";
+  return [base, base, base]; // same image until admin uploads 3 angles
+}
+
+// Same size ke saare admin frames = frame types (har ek apni photo)
+function getFrameTypesForSize(size) {
+  const list = allFrames.filter(f => f.size === size && f.active !== false);
+  if (list.length) return list;
+  return selectedFrame ? [selectedFrame] : [];
+}
+
+function openProductDetail() {
+  if (!selectedFrame) return;
+  selectedQuality = { id: "normal", extra: 0, label: "Normal" };
+  selectedColour = getFrameColours(selectedFrame)[0];
+  activeSample = 0;
+
+  const dims = displayDims(selectedFrame.size);
+  const { price, discount, finalPrice } = frameFinalPrice(selectedFrame);
+  const { rating, reviews } = frameRating(selectedFrame);
+
+  document.getElementById("pd-title").textContent = dims.label + " · " + (selectedFrame.title || "Frame");
+  document.getElementById("pd-rating").textContent = rating;
+  document.getElementById("pd-reviews").textContent = "· " + reviews + " reviews";
+  document.getElementById("pd-price-line").innerHTML =
+    formatPrice(finalPrice) +
+    (discount > 0 ? ` <span class="price-strike text-base text-on-surface-variant">${formatPrice(price)}</span> <span class="text-sm">(${discount}% OFF)</span>` : "");
+  document.getElementById("pd-desc").textContent =
+    (selectedFrame.title || dims.label + " Frame") +
+    " — museum-quality moulding, precision cut glass, acid-free backing. Size " + dims.label +
+    ". Frame type, photo quality aur colour choose karke order karein.";
+
+  renderPdTypes();
+  renderPdSamples();
+  renderPdColours();
+  // reset quality buttons
+  document.querySelectorAll(".quality-btn").forEach(btn => {
+    const active = btn.dataset.quality === "normal";
+    btn.className = active
+      ? "quality-btn border-2 border-secondary bg-secondary/15 text-secondary rounded-DEFAULT p-3 text-left transition-all"
+      : "quality-btn border-2 border-outline-variant text-on-surface-variant rounded-DEFAULT p-3 text-left hover:border-secondary transition-all";
+  });
+
+  document.getElementById("product-modal").classList.remove("hidden");
+  document.getElementById("product-modal").classList.add("flex");
+  document.body.style.overflow = "hidden";
+}
+
+function renderPdTypes() {
+  const el = document.getElementById("pd-types");
+  if (!el || !selectedFrame) return;
+  const types = getFrameTypesForSize(selectedFrame.size);
+  el.innerHTML = types.map(t => {
+    const img = t.image || "";
+    const active = String(t.id) === String(selectedFrame.id);
+    const thumb = img
+      ? `<img src="${img}" class="w-full h-16 object-cover rounded-sm" alt=""/>`
+      : `<div class="w-full h-16 bg-surface flex items-center justify-center"><span class="material-symbols-outlined text-outline-variant">image</span></div>`;
+    return `
+      <button type="button" class="pd-type-btn text-left rounded-DEFAULT border-2 p-1.5 transition-all ${active ? "border-secondary bg-secondary/10" : "border-outline-variant hover:border-secondary"}" data-id="${t.id}">
+        ${thumb}
+        <span class="block text-[11px] mt-1 text-on-surface truncate font-label-caps">${t.title || t.size}</span>
+      </button>`;
+  }).join("");
+  document.getElementById("pd-type-label").textContent =
+    "Selected: " + (selectedFrame.title || selectedFrame.size) +
+    (types.length < 2 ? " · Admin se is size ke aur types add karo" : "");
+  el.querySelectorAll(".pd-type-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const f = allFrames.find(x => String(x.id) === String(btn.dataset.id));
+      if (!f) return;
+      selectedFrame = f;
+      activeSample = 0;
+      // refresh price / title / samples for this type
+      const dims = displayDims(selectedFrame.size);
+      const { price, discount, finalPrice } = frameFinalPrice(selectedFrame);
+      document.getElementById("pd-title").textContent = dims.label + " · " + (selectedFrame.title || "Frame");
+      document.getElementById("pd-price-line").innerHTML =
+        formatPrice(finalPrice + (Number(selectedQuality.extra) || 0)) +
+        (discount > 0 ? ` <span class="price-strike text-base text-on-surface-variant">${formatPrice(price)}</span>` : "");
+      renderPdTypes();
+      renderPdSamples();
+    });
+  });
+}
+
+function renderPdSamples() {
+  const samples = getFrameSamples(selectedFrame);
+  const dims = displayDims(selectedFrame.size);
+  const aspect = dims.w / dims.h;
+  const hex = selectedColour.hex || "#5c4033";
+  const box = document.getElementById("pd-samples");
+  const labels = ["Front", "Side", "Corner"];
+
+  function previewHtml(src, angle) {
+    const img = src
+      ? `<img src="${src}" class="w-full h-full object-cover" style="${angle === 1 ? "transform:perspective(400px) rotateY(-18deg)" : angle === 2 ? "transform:scale(1.15)" : ""}" alt=""/>`
+      : `<span class="material-symbols-outlined text-outline-variant">image</span>`;
+    return `<div class="h-full w-full bg-surface flex items-center justify-center overflow-hidden" style="aspect-ratio:${aspect}; border:10px solid ${hex}; max-height:90%;">${img}</div>`;
+  }
+
+  document.getElementById("pd-main-preview").innerHTML = previewHtml(samples[activeSample] || samples[0], activeSample);
+  box.innerHTML = samples.slice(0, 3).map((src, i) => `
+    <button type="button" class="pd-sample-thumb p-1 rounded-DEFAULT border-2 ${i === activeSample ? "border-secondary" : "border-outline-variant"} bg-background h-20 flex items-center justify-center overflow-hidden" data-i="${i}">
+      ${previewHtml(src, i)}
+    </button>
+    <span class="sr-only">${labels[i] || "Angle " + (i + 1)}</span>
+  `).join("");
+  // labels under
+  box.innerHTML = samples.slice(0, 3).map((src, i) => `
+    <div class="text-center">
+      <button type="button" class="pd-sample-thumb w-full p-1 rounded-DEFAULT border-2 ${i === activeSample ? "border-secondary" : "border-outline-variant"} bg-background h-20 flex items-center justify-center overflow-hidden" data-i="${i}">
+        ${previewHtml(src, i)}
+      </button>
+      <span class="text-[10px] text-on-surface-variant font-label-caps mt-1 block">${labels[i]}</span>
+    </div>
+  `).join("");
+
+  box.querySelectorAll(".pd-sample-thumb").forEach(btn => {
+    btn.addEventListener("click", () => {
+      activeSample = Number(btn.dataset.i) || 0;
+      renderPdSamples();
+    });
+  });
+}
+
+function renderPdColours() {
+  const colours = getFrameColours(selectedFrame);
+  const el = document.getElementById("pd-colours");
+  el.innerHTML = colours.map(c => `
+    <button type="button" class="colour-swatch w-11 h-11 rounded-full border-2 p-0.5 transition-all ${selectedColour.id === c.id || selectedColour.hex === c.hex ? "border-secondary ring-2 ring-secondary/40" : "border-outline-variant"}" data-id="${c.id}" data-hex="${c.hex}" data-name="${c.name}" title="${c.name}" style="background:${c.hex}"></button>
+  `).join("");
+  document.getElementById("pd-colour-label").textContent = "Selected: " + (selectedColour.name || "");
+  el.querySelectorAll(".colour-swatch").forEach(btn => {
+    btn.addEventListener("click", () => {
+      selectedColour = { id: btn.dataset.id, name: btn.dataset.name, hex: btn.dataset.hex };
+      renderPdColours();
+      renderPdSamples();
+    });
+  });
+}
+
+document.getElementById("close-product-modal").addEventListener("click", () => {
+  document.getElementById("product-modal").classList.add("hidden");
+  document.getElementById("product-modal").classList.remove("flex");
+  document.body.style.overflow = "";
+});
+document.getElementById("product-modal").addEventListener("click", (e) => {
+  if (e.target.id === "product-modal") {
+    document.getElementById("product-modal").classList.add("hidden");
+    document.getElementById("product-modal").classList.remove("flex");
+    document.body.style.overflow = "";
+  }
+});
+document.getElementById("pd-quality").addEventListener("click", (e) => {
+  const btn = e.target.closest(".quality-btn");
+  if (!btn) return;
+  selectedQuality = {
+    id: btn.dataset.quality,
+    extra: Number(btn.dataset.extra) || 0,
+    label: btn.querySelector(".font-headline-sm")?.textContent?.replace(/^\d+\.\s*/, "") || btn.dataset.quality
+  };
+  document.querySelectorAll(".quality-btn").forEach(b => {
+    const active = b === btn;
+    b.className = active
+      ? "quality-btn border-2 border-secondary bg-secondary/15 text-secondary rounded-DEFAULT p-3 text-left transition-all"
+      : "quality-btn border-2 border-outline-variant text-on-surface-variant rounded-DEFAULT p-3 text-left hover:border-secondary transition-all";
+  });
+  // live total with quality extra
+  if (selectedFrame) {
+    const { finalPrice } = frameFinalPrice(selectedFrame);
+    document.getElementById("pd-price-line").innerHTML =
+      formatPrice(finalPrice + selectedQuality.extra) +
+      (selectedQuality.extra ? ` <span class="text-sm text-on-surface-variant">incl. ${selectedQuality.label}</span>` : "");
+  }
+});
+document.getElementById("pd-order-btn").addEventListener("click", () => {
+  document.getElementById("product-modal").classList.add("hidden");
+  document.getElementById("product-modal").classList.remove("flex");
+  openOrderModal();
+});
+
+// ========== Order Modal ==========
+let paymentClaimed = false;
+
+function frameFinalPrice(frame) {
+  const price = Number(frame.price) || 0;
+  const discount = Number(frame.discount != null ? frame.discount : frame.discountPercent) || 0;
+  const finalPrice = discount > 0 ? Math.round(price * (1 - discount / 100)) : price;
+  return { price, discount, finalPrice };
+}
+
+const ADDR_KEY = "aditya_studio_saved_address";
+
+function loadSavedAddress() {
+  try {
+    return JSON.parse(localStorage.getItem(ADDR_KEY) || "null");
+  } catch (e) { return null; }
+}
+
+function saveAddressToStorage(form) {
+  localStorage.setItem(ADDR_KEY, JSON.stringify({
+    name: form.name,
+    mobile: form.mobile,
+    village: form.village,
+    address: form.address,
+    district: form.district,
+    state: form.state,
+    pincode: form.pincode
+  }));
+}
+
+function fillAddressForm(data) {
+  if (!data) return;
+  if (data.name) document.getElementById("order-name").value = data.name;
+  if (data.mobile) document.getElementById("order-mobile").value = data.mobile;
+  if (data.village) document.getElementById("order-village").value = data.village;
+  if (data.address) document.getElementById("order-address").value = data.address;
+  if (data.district) document.getElementById("order-district").value = data.district;
+  if (data.state) document.getElementById("order-state").value = data.state;
+  if (data.pincode) document.getElementById("order-pincode").value = data.pincode;
+}
+
+function showPaymentSection() {
+  const { price, discount, finalPrice } = frameFinalPrice(selectedFrame);
+  const extra = Number(selectedQuality.extra) || 0;
+  const total = finalPrice + extra;
+  const dims = displayDims(selectedFrame.size);
+  document.getElementById("op-mrp").textContent = formatPrice(price) + (extra ? " + " + formatPrice(extra) + " (" + selectedQuality.label + ")" : "");
+  document.getElementById("op-disc").textContent = discount > 0 ? (discount + "% OFF (−" + formatPrice(price - finalPrice) + ")") : "No discount";
+  document.getElementById("op-total").textContent = formatPrice(total);
+  document.getElementById("qr-amount-label").textContent = formatPrice(total);
+  const qrImg = document.getElementById("pay-qr-img");
+  if (qrImg) {
+    qrImg.src = "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=" +
+      encodeURIComponent("upi://pay?pa=adityastudio@upi&pn=Aditya Studio&am=" + total + "&cu=INR&tn=Frame " + dims.label);
+  }
+  document.getElementById("payment-section").classList.remove("hidden");
+  document.getElementById("qr-pay-box").classList.add("hidden");
+  document.getElementById("submit-order-btn").classList.add("hidden");
+  document.getElementById("pay-order-btn").classList.remove("hidden");
+  document.getElementById("paid-claim-btn").disabled = false;
+  document.getElementById("paid-claim-btn").textContent = "Maine Pay Kar Diya";
+  document.getElementById("saved-address-badge").classList.remove("hidden");
+  document.getElementById("order-flow-hint").textContent = "Ab Pay Total Amount dabao → QR scan → Submit";
+  paymentClaimed = false;
+}
+
+function openOrderModal() {
+  if (!selectedFrame) return;
+  paymentClaimed = false;
+  const dims = displayDims(selectedFrame.size);
+  const orientLabel = orientation === "horizontal" ? "Horizontal (Landscape)" : "Vertical (Portrait)";
+  document.getElementById("order-frame-preview").innerHTML = `
+    <p class="font-headline-sm text-on-surface">${dims.label} — ${selectedFrame.title || "Frame"}</p>
+    <p class="text-sm text-on-surface-variant mt-1">${orientLabel}</p>
+    <p class="text-sm text-on-surface-variant mt-1">Quality: ${selectedQuality.label || "Normal"} · Colour: ${selectedColour.name || "—"}</p>
+  `;
+  // Prefill saved address
+  const saved = loadSavedAddress();
+  fillAddressForm(saved);
+
+  document.getElementById("payment-section").classList.add("hidden");
+  document.getElementById("qr-pay-box").classList.add("hidden");
+  document.getElementById("submit-order-btn").classList.add("hidden");
+  document.getElementById("order-error").classList.add("hidden");
+  document.getElementById("saved-address-badge").classList.add("hidden");
+  document.getElementById("save-address-btn").classList.remove("hidden");
+  document.getElementById("order-flow-hint").textContent = "Pehle address save karo → phir total payment dikhega";
+
+  // Agar pehle se address save hai to seedha payment section dikhao
+  if (saved && saved.name && saved.mobile && saved.address && saved.pincode) {
+    showPaymentSection();
+    document.getElementById("save-address-btn").textContent = "Update Address";
+  } else {
+    document.getElementById("save-address-btn").textContent = "Save Address & Continue";
+  }
+
+  document.getElementById("order-modal").classList.remove("hidden");
+  document.getElementById("order-modal").classList.add("flex");
+  document.body.style.overflow = "hidden";
+}
+
+function closeOrderModal() {
+  document.getElementById("order-modal").classList.add("hidden");
+  document.getElementById("order-modal").classList.remove("flex");
+  document.body.style.overflow = "";
+  selectedFrame = null;
+  paymentClaimed = false;
+}
+
+function validateOrderForm() {
+  const name = document.getElementById("order-name").value.trim();
+  const mobile = document.getElementById("order-mobile").value.trim();
+  const village = document.getElementById("order-village").value.trim();
+  const address = document.getElementById("order-address").value.trim();
+  const district = document.getElementById("order-district").value.trim();
+  const state = document.getElementById("order-state").value.trim();
+  const pincode = document.getElementById("order-pincode").value.trim();
+  const errEl = document.getElementById("order-error");
+  if (!name || !mobile || !village || !address || !district || !state || !pincode) {
+    errEl.textContent = "Name, Mobile, Village, Address, District, State aur Pincode zaroori hain.";
+    errEl.classList.remove("hidden");
+    return null;
+  }
+  if (!/^[6-9]\d{9}$/.test(mobile)) {
+    errEl.textContent = "Mobile number 10 digits ka hona chahiye (6-9 se start).";
+    errEl.classList.remove("hidden");
+    return null;
+  }
+  if (!/^\d{6}$/.test(pincode)) {
+    errEl.textContent = "Pincode 6 digit hona chahiye.";
+    errEl.classList.remove("hidden");
+    return null;
+  }
+  if (!selectedFrame) {
+    errEl.textContent = "Frame select nahi hua.";
+    errEl.classList.remove("hidden");
+    return null;
+  }
+  errEl.classList.add("hidden");
+  return {
+    name, mobile, village, address, district, state, pincode,
+    notes: document.getElementById("order-notes").value.trim()
+  };
+}
+
+document.getElementById("close-order-modal").addEventListener("click", closeOrderModal);
+document.getElementById("order-modal").addEventListener("click", (e) => {
+  if (e.target.id === "order-modal") closeOrderModal();
+});
+
+document.getElementById("save-address-btn").addEventListener("click", () => {
+  const form = validateOrderForm();
+  if (!form) return;
+  saveAddressToStorage(form);
+  showPaymentSection();
+  document.getElementById("save-address-btn").textContent = "Update Address";
+  showToast("Address saved ✓");
+  document.getElementById("payment-section").scrollIntoView({ behavior: "smooth", block: "nearest" });
+});
+
+document.getElementById("pay-order-btn").addEventListener("click", () => {
+  if (!validateOrderForm()) return;
+  document.getElementById("qr-pay-box").classList.remove("hidden");
+  document.getElementById("pay-order-btn").classList.add("hidden");
+  document.getElementById("order-flow-hint").textContent = "QR scan karke pay karo, phir “Maine Pay Kar Diya” dabao.";
+  document.getElementById("qr-pay-box").scrollIntoView({ behavior: "smooth", block: "nearest" });
+});
+
+document.getElementById("paid-claim-btn").addEventListener("click", () => {
+  paymentClaimed = true;
+  document.getElementById("submit-order-btn").classList.remove("hidden");
+  document.getElementById("paid-claim-btn").textContent = "✓ Payment claimed";
+  document.getElementById("paid-claim-btn").disabled = true;
+  document.getElementById("order-flow-hint").textContent = "Ab Submit Order dabao. Order Processing mein jayega — admin payment confirm karega.";
+});
+
+document.getElementById("submit-order-btn").addEventListener("click", async () => {
+  const form = validateOrderForm();
+  if (!form) return;
+  if (!paymentClaimed) {
+    document.getElementById("order-error").textContent = "Pehle Pay karke QR se payment claim karo.";
+    document.getElementById("order-error").classList.remove("hidden");
+    return;
+  }
+
+  const btn = document.getElementById("submit-order-btn");
+  btn.disabled = true;
+  btn.textContent = "Submitting…";
+
+  try {
+    const dims = displayDims(selectedFrame.size);
+    const orientLabel = orientation === "horizontal" ? "Horizontal" : "Vertical";
+    const fullNote = [
+      form.notes,
+      "Orientation: " + orientLabel,
+      "Display size: " + dims.label,
+      "Quality: " + (selectedQuality.label || "Normal"),
+      "Colour: " + (selectedColour.name || "—"),
+      userPhotoDataUrl
+        ? ("Photo crop: zoom " + Math.round((photoZoom || 1) * 100) + "% · pan " +
+           Math.round((photoPanX || 0.5) * 100) + "%x " + Math.round((photoPanY || 0.5) * 100) + "%y")
+        : "",
+      "Payment claimed by customer"
+    ].filter(Boolean).join(" | ");
+
+    const useWallet = !!(framesUser && Number(framesUser.walletBalance) > 0);
+    const res = await fetch("/api/frame-order", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        frameId: selectedFrame.id,
+        name: form.name,
+        mobile: form.mobile,
+        village: form.village,
+        address: form.address,
+        district: form.district,
+        state: form.state,
+        pincode: form.pincode,
+        note: fullNote,
+        paymentClaimed: true,
+        useWallet
+      })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.message || data.error || "Order fail");
+
+    closeOrderModal();
+    let toastMsg = "Order #" + (data.orderId || "—") + " · ₹" + (data.finalAmount || "");
+    if (data.walletPaid) toastMsg += " · Wallet −₹" + data.walletPaid;
+    if (data.amountDue > 0) toastMsg += " · Due ₹" + data.amountDue;
+    else if (data.walletPaid) toastMsg += " · Paid via wallet";
+    else toastMsg += " · Admin payment confirm karega";
+    showToast(toastMsg, 5000);
+    if (data.walletPaid) restoreFramesUser();
+    document.getElementById("profile-mobile").value = form.mobile;
+  } catch (e) {
+    document.getElementById("order-error").textContent = e.message || "Order place nahi ho paya.";
+    document.getElementById("order-error").classList.remove("hidden");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Submit Order";
+  }
+});
+
+// ========== 3D Frame Viewer (Three.js) — hollow gold rim + clear photo + 360° ==========
+let three = {
+  renderer: null, scene: null, camera: null, group: null,
+  photoMesh: null, animId: null,
+  isDragging: false, prevX: 0, prevY: 0, autoRotate: true,
+  rotY: 0.25, rotX: 0.08
+};
+
+function disposeObject3D(obj) {
+  if (!obj) return;
+  obj.traverse(function (child) {
+    if (child.geometry) child.geometry.dispose();
+    if (child.material) {
+      if (Array.isArray(child.material)) child.material.forEach(function (m) {
+        if (m.map) m.map.dispose();
+        m.dispose();
+      });
+      else {
+        if (child.material.map) child.material.map.dispose();
+        child.material.dispose();
+      }
+    }
+  });
+}
+
+function goldMaterial() {
+  return new THREE.MeshStandardMaterial({
+    color: 0xd4af37,
+    metalness: 0.9,
+    roughness: 0.22,
+    emissive: 0x3a2a08,
+    emissiveIntensity: 0.18
+  });
+}
+
+/** Hollow picture frame: 4 rim bars + photo plane (never covered by solid box) */
+function buildFrameMeshes(fw, fh) {
+  const depth = 0.14;
+  const border = 0.12;
+  const g = new THREE.Group();
+  const gold = goldMaterial();
+
+  const outerW = fw + border * 2;
+  const outerH = fh + border * 2;
+
+  // Top rim
+  const top = new THREE.Mesh(new THREE.BoxGeometry(outerW, border, depth), gold);
+  top.position.y = fh / 2 + border / 2;
+  g.add(top);
+  // Bottom rim
+  const bot = new THREE.Mesh(new THREE.BoxGeometry(outerW, border, depth), gold.clone());
+  bot.position.y = -(fh / 2 + border / 2);
+  g.add(bot);
+  // Left rim
+  const left = new THREE.Mesh(new THREE.BoxGeometry(border, fh, depth), gold.clone());
+  left.position.x = -(fw / 2 + border / 2);
+  g.add(left);
+  // Right rim
+  const right = new THREE.Mesh(new THREE.BoxGeometry(border, fh, depth), gold.clone());
+  right.position.x = fw / 2 + border / 2;
+  g.add(right);
+
+  // Thin inner gold lip (front face of rim)
+  const lip = 0.03;
+  const frontLipMat = new THREE.MeshStandardMaterial({
+    color: 0xf0d060, metalness: 0.85, roughness: 0.2, emissive: 0x4a3808, emissiveIntensity: 0.25
+  });
+  const lipTop = new THREE.Mesh(new THREE.BoxGeometry(fw + 0.02, lip, 0.02), frontLipMat);
+  lipTop.position.set(0, fh / 2 - lip / 2, depth / 2 + 0.005);
+  g.add(lipTop);
+  const lipBot = new THREE.Mesh(new THREE.BoxGeometry(fw + 0.02, lip, 0.02), frontLipMat.clone());
+  lipBot.position.set(0, -(fh / 2 - lip / 2), depth / 2 + 0.005);
+  g.add(lipBot);
+
+  // Photo plane — front, full size of opening
+  const photoGeo = new THREE.PlaneGeometry(fw, fh);
+  const photoMat = new THREE.MeshBasicMaterial({
+    color: 0x3a3530,
+    side: THREE.DoubleSide
+  });
+  const photoMesh = new THREE.Mesh(photoGeo, photoMat);
+  photoMesh.position.z = depth / 2 - 0.02;
+  g.add(photoMesh);
+
+  // Backing board (visible from behind)
+  const backGeo = new THREE.PlaneGeometry(outerW * 0.98, outerH * 0.98);
+  const backMat = new THREE.MeshStandardMaterial({
+    color: 0x1f1810, side: THREE.DoubleSide, roughness: 0.85, metalness: 0.15
+  });
+  const backMesh = new THREE.Mesh(backGeo, backMat);
+  backMesh.position.z = -depth / 2;
+  g.add(backMesh);
+
+  // Center stand on back
+  const standGeo = new THREE.BoxGeometry(0.1, fh * 0.5, 0.05);
+  const stand = new THREE.Mesh(standGeo, new THREE.MeshStandardMaterial({ color: 0x3a3020, roughness: 0.7 }));
+  stand.position.set(0, -fh * 0.08, -depth / 2 - 0.04);
+  g.add(stand);
+
+  return { group: g, photoMesh: photoMesh, depth: depth, border: border, fw: fw, fh: fh };
+}
+
+function initThreeViewer() {
+  const container = document.getElementById("threejs-container");
+  if (!container || typeof THREE === "undefined") return;
+
+  const width = Math.max(container.clientWidth || 320, 200);
+  const height = Math.max(container.clientHeight || 420, 280);
+
+  if (three.animId) cancelAnimationFrame(three.animId);
+  if (three.renderer) {
+    try { three.renderer.dispose(); } catch (e) {}
+  }
+  container.innerHTML = "";
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(32, width / height, 0.1, 100);
+  camera.position.set(0, 0.05, 4.2);
+
+  const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: "high-performance" });
+  renderer.setSize(width, height, false);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setClearColor(0x0e0c0a, 1);
+  if (renderer.outputEncoding !== undefined) renderer.outputEncoding = THREE.sRGBEncoding;
+  if (renderer.outputColorSpace !== undefined) renderer.outputColorSpace = THREE.SRGBColorSpace;
+  container.appendChild(renderer.domElement);
+  renderer.domElement.style.width = "100%";
+  renderer.domElement.style.height = "100%";
+  renderer.domElement.style.display = "block";
+  renderer.domElement.style.touchAction = "none";
+
+  // Lights
+  scene.add(new THREE.AmbientLight(0xfff8e8, 0.9));
+  const key = new THREE.DirectionalLight(0xffffff, 0.95);
+  key.position.set(2.5, 4, 5);
+  scene.add(key);
+  const fill = new THREE.DirectionalLight(0xe9c176, 0.45);
+  fill.position.set(-3, 1, 2);
+  scene.add(fill);
+  const backL = new THREE.DirectionalLight(0xffe8a0, 0.3);
+  backL.position.set(0, 1, -4);
+  scene.add(backL);
+
+  // Soft floor shadow
+  const shadowGeo = new THREE.CircleGeometry(1.4, 48);
+  const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.4 });
+  const shadowMesh = new THREE.Mesh(shadowGeo, shadowMat);
+  shadowMesh.rotation.x = -Math.PI / 2;
+  shadowMesh.position.y = -1.7;
+  scene.add(shadowMesh);
+
+  three = {
+    renderer: renderer, scene: scene, camera: camera, group: null, photoMesh: null,
+    animId: null, isDragging: false, prevX: 0, prevY: 0,
+    autoRotate: true, rotY: 0.4, rotX: 0.1, container: container
+  };
+
+  updateThreeFrameSize();
+
+  function animate() {
+    three.animId = requestAnimationFrame(animate);
+    if (three.group) {
+      if (three.autoRotate && !three.isDragging) {
+        three.rotY += 0.0035; // slow continuous 360°
+      }
+      three.group.rotation.y = three.rotY;
+      three.group.rotation.x = three.rotX + (three.autoRotate && !three.isDragging ? Math.sin(Date.now() * 0.0003) * 0.03 : 0);
+    }
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  const el = renderer.domElement;
+  function onDown(e) {
+    three.isDragging = true;
+    three.autoRotate = false;
+    const p = e.touches ? e.touches[0] : e;
+    three.prevX = p.clientX;
+    three.prevY = p.clientY;
+    const h = document.getElementById("viewer-hint");
+    if (h) h.textContent = "Release → auto 360°";
+  }
+  function onMove(e) {
+    if (!three.isDragging) return;
+    const p = e.touches ? e.touches[0] : e;
+    const dx = p.clientX - three.prevX;
+    const dy = p.clientY - three.prevY;
+    three.rotY += dx * 0.012;
+    three.rotX += dy * 0.01;
+    three.rotX = Math.max(-0.9, Math.min(0.9, three.rotX));
+    three.prevX = p.clientX;
+    three.prevY = p.clientY;
+  }
+  function onUp() {
+    if (!three.isDragging) return;
+    three.isDragging = false;
+    setTimeout(function () { three.autoRotate = true; }, 1200);
+    const h = document.getElementById("viewer-hint");
+    if (h) h.textContent = userPhotoDataUrl ? "Drag · Auto 360°" : "Upload photo · Auto 360°";
+  }
+  el.addEventListener("mousedown", onDown);
+  el.addEventListener("touchstart", onDown, { passive: true });
+  window.addEventListener("mousemove", onMove);
+  window.addEventListener("touchmove", onMove, { passive: true });
+  window.addEventListener("mouseup", onUp);
+  window.addEventListener("touchend", onUp);
+
+  window.addEventListener("resize", function () {
+    if (!three.renderer || !three.container) return;
+    const w = three.container.clientWidth;
+    const h = three.container.clientHeight;
+    if (w < 10 || h < 10) return;
+    three.renderer.setSize(w, h, false);
+    three.camera.aspect = w / h;
+    three.camera.updateProjectionMatrix();
+  });
+}
+
+/**
+ * Fit image into plane like CSS object-fit: cover, with optional zoom + pan.
+ * zoom >= 1 (1 = cover/fill), panX/panY in 0..1 (0.5 = center).
+ * Three.js UV origin is bottom-left — panY inverted for natural top-drag.
+ */
+function textureCover(tex, planeW, planeH, imgW, imgH, zoom, panX, panY) {
+  const z = Math.max(1, Math.min(Number(zoom) || 1, 4));
+  const px = panX == null ? 0.5 : Math.max(0, Math.min(1, panX));
+  const py = panY == null ? 0.5 : Math.max(0, Math.min(1, panY));
+  const planeAspect = planeW / planeH;
+  const imgAspect = (imgW && imgH) ? (imgW / imgH) : planeAspect;
+  let rx, ry;
+  if (imgAspect > planeAspect) {
+    // image wider — crop sides at zoom 1
+    ry = 1 / z;
+    rx = (planeAspect / imgAspect) / z;
+  } else {
+    rx = 1 / z;
+    ry = (imgAspect / planeAspect) / z;
+  }
+  const maxOx = Math.max(0, 1 - rx);
+  const maxOy = Math.max(0, 1 - ry);
+  const ox = maxOx * px;
+  // invert Y so dragging photo up shows upper part of image
+  const oy = maxOy * (1 - py);
+  tex.center.set(0, 0);
+  tex.repeat.set(rx, ry);
+  tex.offset.set(ox, oy);
+  tex.needsUpdate = true;
+}
+
+function makeSharpTexture(dataUrl, planeW, planeH, onReady) {
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.onload = function () {
+    try {
+      const tex = new THREE.Texture(img);
+      tex.needsUpdate = true;
+      tex.generateMipmaps = true;
+      tex.minFilter = THREE.LinearMipmapLinearFilter;
+      tex.magFilter = THREE.LinearFilter;
+      tex.wrapS = THREE.ClampToEdgeWrapping;
+      tex.wrapT = THREE.ClampToEdgeWrapping;
+      if (three.renderer && three.renderer.capabilities) {
+        tex.anisotropy = three.renderer.capabilities.getMaxAnisotropy() || 4;
+      }
+      if (tex.encoding !== undefined) tex.encoding = THREE.sRGBEncoding;
+      if (tex.colorSpace !== undefined) tex.colorSpace = THREE.SRGBColorSpace;
+      textureCover(
+        tex, planeW, planeH,
+        img.naturalWidth || img.width, img.naturalHeight || img.height,
+        photoZoom, photoPanX, photoPanY
+      );
+      onReady(tex);
+    } catch (err) {
+      console.error("texture error", err);
+    }
+  };
+  img.onerror = function () { console.error("image load fail"); };
+  img.src = dataUrl;
+}
+
+function updateThreeFrameSize() {
+  if (!three.scene) return;
+  // Slightly smaller frame so full rim + photo fit cleanly in viewer
+  let fw = 1.55, fh = 2.1;
+  if (typeof orientation !== "undefined" && orientation === "horizontal") {
+    fw = 2.2; fh = 1.5;
+  }
+
+  if (three.group) {
+    three.scene.remove(three.group);
+    disposeObject3D(three.group);
+  }
+
+  const built = buildFrameMeshes(fw, fh);
+  three.group = built.group;
+  three.photoMesh = built.photoMesh;
+  three.group.rotation.y = three.rotY;
+  three.group.rotation.x = three.rotX;
+  three.scene.add(three.group);
+
+  if (three.camera) {
+    const maxDim = Math.max(fw, fh) + 0.5;
+    three.camera.position.set(0, 0.02, Math.max(4.2, maxDim * 1.85));
+    three.camera.lookAt(0, 0, 0);
+  }
+
+  const src = userPhotoDataUrl || null;
+  if (src) {
+    makeSharpTexture(src, fw, fh, function (tex) {
+      if (!three.photoMesh) return;
+      if (three.photoMesh.material) {
+        if (three.photoMesh.material.map) three.photoMesh.material.map.dispose();
+        three.photoMesh.material.dispose();
+      }
+      three.photoMesh.material = new THREE.MeshBasicMaterial({
+        map: tex,
+        side: THREE.DoubleSide
+      });
+    });
+  } else {
+    // Placeholder gradient so gray slab never shows
+    const c = document.createElement("canvas");
+    c.width = 512; c.height = 640;
+    const ctx = c.getContext("2d");
+    const gr = ctx.createLinearGradient(0, 0, 512, 640);
+    gr.addColorStop(0, "#2a2218");
+    gr.addColorStop(0.5, "#3d3428");
+    gr.addColorStop(1, "#1a1510");
+    ctx.fillStyle = gr;
+    ctx.fillRect(0, 0, 512, 640);
+    ctx.fillStyle = "rgba(212,175,55,0.85)";
+    ctx.font = "600 28px Georgia, serif";
+    ctx.textAlign = "center";
+    ctx.fillText("Aditya Studio", 256, 300);
+    ctx.font = "400 18px sans-serif";
+    ctx.fillStyle = "rgba(234,225,212,0.7)";
+    ctx.fillText("Upload your photo", 256, 340);
+    const tex = new THREE.CanvasTexture(c);
+    tex.needsUpdate = true;
+    if (three.photoMesh) {
+      if (three.photoMesh.material.map) three.photoMesh.material.map.dispose();
+      three.photoMesh.material.dispose();
+      three.photoMesh.material = new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide });
+    }
+  }
+}
+
+function applyPhotoToThree() {
+  updateThreeFrameSize();
+  const hint = document.getElementById("viewer-hint");
+  if (hint) hint.textContent = userPhotoDataUrl ? "Drag · Auto 360°" : "Upload photo · Auto 360°";
+  updateCropPreview();
+  sync2dPhotoPreviews();
+}
+
+function getFrameAspect() {
+  // Match 3D plane proportions used in updateThreeFrameSize
+  if (orientation === "horizontal") return 2.2 / 1.5;
+  return 1.55 / 2.1;
+}
+
+function updateCropStageAspect() {
+  const stage = document.getElementById("crop-stage");
+  if (!stage) return;
+  stage.style.aspectRatio = orientation === "horizontal" ? "4 / 3" : "3 / 4";
+}
+
+/** CSS crop preview — same math idea as textureCover */
+function updateCropPreview() {
+  const stage = document.getElementById("crop-stage");
+  const imgEl = document.getElementById("crop-img");
+  if (!stage || !imgEl || !userPhotoDataUrl) return;
+  imgEl.src = userPhotoDataUrl;
+
+  const sw = stage.clientWidth || 280;
+  const sh = stage.clientHeight || (orientation === "horizontal" ? 210 : 373);
+  if (sw < 8 || sh < 8) return;
+  const imgW = photoNaturalW || imgEl.naturalWidth || 1;
+  const imgH = photoNaturalH || imgEl.naturalHeight || 1;
+  const planeAspect = sw / sh;
+  const imgAspect = imgW / imgH;
+  const z = Math.max(1, Math.min(photoZoom || 1, 4));
+
+  // Cover size at zoom 1, then multiply by zoom
+  let baseW, baseH;
+  if (imgAspect > planeAspect) {
+    baseH = sh;
+    baseW = sh * imgAspect;
+  } else {
+    baseW = sw;
+    baseH = sw / imgAspect;
+  }
+  const dispW = baseW * z;
+  const dispH = baseH * z;
+
+  // pan 0..1 → offset so center of visible region matches pan
+  const maxShiftX = Math.max(0, (dispW - sw) / 2);
+  const maxShiftY = Math.max(0, (dispH - sh) / 2);
+  // pan 0.5 = center; 0 = show left/top (image shifted right/down)
+  const shiftX = maxShiftX * (1 - 2 * photoPanX);
+  const shiftY = maxShiftY * (1 - 2 * photoPanY);
+
+  imgEl.style.width = dispW + "px";
+  imgEl.style.height = dispH + "px";
+  imgEl.style.left = "50%";
+  imgEl.style.top = "50%";
+  imgEl.style.transform = "translate(calc(-50% + " + shiftX + "px), calc(-50% + " + shiftY + "px))";
+}
+
+function sync2dPhotoPreviews() {
+  if (!userPhotoDataUrl) return;
+  const z = Math.max(1, photoZoom || 1);
+  const posX = (photoPanX * 100).toFixed(1) + "%";
+  const posY = (photoPanY * 100).toFixed(1) + "%";
+  document.querySelectorAll(".user-image-container").forEach(function (container) {
+    container.innerHTML =
+      '<img src="' + userPhotoDataUrl + '" class="w-full h-full" alt="Your photo" style="' +
+      "object-fit:cover;object-position:" + posX + " " + posY + ";" +
+      "transform:scale(" + z + ");transform-origin:" + posX + " " + posY + ";" +
+      '"/>';
+  });
+}
+
+function setPhotoZoom(z, skipThree) {
+  photoZoom = Math.max(1, Math.min(Number(z) || 1, 3));
+  const slider = document.getElementById("photo-zoom");
+  const label = document.getElementById("photo-zoom-val");
+  if (slider) slider.value = String(Math.round(photoZoom * 100));
+  if (label) label.textContent = Math.round(photoZoom * 100) + "%";
+  updateCropPreview();
+  sync2dPhotoPreviews();
+  if (!skipThree) applyPhotoToThree();
+}
+
+function resetPhotoAdjust() {
+  photoZoom = 1;
+  photoPanX = 0.5;
+  photoPanY = 0.5;
+  setPhotoZoom(1, true);
+  applyPhotoToThree();
+}
+
+function showPhotoAdjustUI() {
+  const box = document.getElementById("photo-adjust-box");
+  if (box) box.classList.remove("hidden");
+  updateCropStageAspect();
+  // Wait a frame so stage has size
+  requestAnimationFrame(function () {
+    updateCropPreview();
+    requestAnimationFrame(updateCropPreview);
+  });
+  bindPhotoAdjustOnce();
+}
+
+function bindPhotoAdjustOnce() {
+  if (photoAdjustBound) return;
+  photoAdjustBound = true;
+
+  const slider = document.getElementById("photo-zoom");
+  if (slider) {
+    slider.addEventListener("input", function () {
+      setPhotoZoom((Number(slider.value) || 100) / 100, false);
+    });
+  }
+  const fitBtn = document.getElementById("photo-fit-btn");
+  if (fitBtn) fitBtn.addEventListener("click", function () {
+    photoPanX = 0.5; photoPanY = 0.5;
+    setPhotoZoom(1, false);
+  });
+  const fillBtn = document.getElementById("photo-fill-btn");
+  if (fillBtn) fillBtn.addEventListener("click", function () {
+    // Slight zoom so subject fills more of frame
+    photoPanX = 0.5; photoPanY = 0.5;
+    setPhotoZoom(1.35, false);
+  });
+  const resetBtn = document.getElementById("photo-reset-btn");
+  if (resetBtn) resetBtn.addEventListener("click", resetPhotoAdjust);
+
+  const stage = document.getElementById("crop-stage");
+  if (!stage) return;
+
+  let dragging = false;
+  let lastX = 0, lastY = 0;
+
+  function onDown(clientX, clientY) {
+    dragging = true;
+    lastX = clientX;
+    lastY = clientY;
+    stage.classList.add("cursor-grabbing");
+  }
+  function onMove(clientX, clientY) {
+    if (!dragging) return;
+    const sw = stage.clientWidth || 1;
+    const sh = stage.clientHeight || 1;
+    const dx = clientX - lastX;
+    const dy = clientY - lastY;
+    lastX = clientX;
+    lastY = clientY;
+    // Drag photo with finger: move image same direction → inverse pan
+    const sens = 0.55 / Math.max(1, photoZoom);
+    photoPanX = Math.max(0, Math.min(1, photoPanX - (dx / sw) * sens));
+    photoPanY = Math.max(0, Math.min(1, photoPanY - (dy / sh) * sens));
+    updateCropPreview();
+    sync2dPhotoPreviews();
+    // Throttle 3D rebuild slightly via rAF flag
+    if (!onMove._raf) {
+      onMove._raf = requestAnimationFrame(function () {
+        onMove._raf = null;
+        applyPhotoToThree();
+      });
+    }
+  }
+  function onUp() {
+    if (!dragging) return;
+    dragging = false;
+    stage.classList.remove("cursor-grabbing");
+    applyPhotoToThree();
+  }
+
+  stage.addEventListener("mousedown", function (e) {
+    e.preventDefault();
+    onDown(e.clientX, e.clientY);
+  });
+  window.addEventListener("mousemove", function (e) {
+    if (dragging) onMove(e.clientX, e.clientY);
+  });
+  window.addEventListener("mouseup", onUp);
+
+  stage.addEventListener("touchstart", function (e) {
+    if (!e.touches || !e.touches[0]) return;
+    onDown(e.touches[0].clientX, e.touches[0].clientY);
+  }, { passive: true });
+  stage.addEventListener("touchmove", function (e) {
+    if (!dragging || !e.touches || !e.touches[0]) return;
+    e.preventDefault();
+    onMove(e.touches[0].clientX, e.touches[0].clientY);
+  }, { passive: false });
+  stage.addEventListener("touchend", onUp);
+  stage.addEventListener("touchcancel", onUp);
+}
+
+// ========== Photo Upload ==========
+const mainUploadTrigger = document.getElementById("main-upload-trigger");
+const mainUploadInput = document.getElementById("main-upload");
+mainUploadTrigger.addEventListener("click", () => mainUploadInput.click());
+mainUploadInput.addEventListener("change", (e) => {
+  if (!e.target.files || !e.target.files[0]) return;
+  const file = e.target.files[0];
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    userPhotoDataUrl = ev.target.result;
+    photoZoom = 1;
+    photoPanX = 0.5;
+    photoPanY = 0.5;
+
+    const img = new Image();
+    img.onload = () => {
+      photoNaturalW = img.naturalWidth || img.width;
+      photoNaturalH = img.naturalHeight || img.height;
+      const detected = photoNaturalW >= photoNaturalH ? "horizontal" : "vertical";
+      setOrientation(detected);
+      document.getElementById("orientation-box").classList.remove("hidden");
+      showPhotoAdjustUI();
+      setPhotoZoom(1, true);
+      applyPhotoToThree();
+    };
+    img.src = userPhotoDataUrl;
+
+    mainUploadTrigger.innerHTML = `
+      <span class="material-symbols-outlined text-5xl text-secondary mb-3">check_circle</span>
+      <p class="font-headline-sm text-headline-sm text-primary mb-2">Photo Uploaded</p>
+      <p class="text-sm text-on-surface-variant mt-1">Neeche zoom / drag se frame mein photo adjust karo</p>
+    `;
+    mainUploadTrigger.classList.add("border-secondary", "bg-secondary-container/20");
+    document.getElementById("orientation-box").classList.remove("hidden");
+  };
+  reader.readAsDataURL(file);
+});
+
+// Orientation buttons
+document.getElementById("orient-vertical").addEventListener("click", () => {
+  setOrientation("vertical");
+  updateCropStageAspect();
+  applyPhotoToThree();
+});
+document.getElementById("orient-horizontal").addEventListener("click", () => {
+  setOrientation("horizontal");
+  updateCropStageAspect();
+  applyPhotoToThree();
+});
+
+// ========== Sidebar ==========
+const accountToggle = document.getElementById("account-toggle");
+const accountSidebar = document.getElementById("account-sidebar");
+const closeSidebar = document.getElementById("close-sidebar");
+const sidebarBackdrop = document.getElementById("sidebar-backdrop");
+
+function toggleSidebar() {
+  const isClosed = accountSidebar.classList.contains("translate-x-full");
+  if (isClosed) {
+    accountSidebar.classList.remove("translate-x-full");
+    sidebarBackdrop.classList.remove("hidden");
+    setTimeout(() => sidebarBackdrop.classList.remove("opacity-0"), 10);
+    document.body.style.overflow = "hidden";
+  } else {
+    accountSidebar.classList.add("translate-x-full");
+    sidebarBackdrop.classList.add("opacity-0");
+    setTimeout(() => sidebarBackdrop.classList.add("hidden"), 300);
+    document.body.style.overflow = "";
+  }
+}
+accountToggle.addEventListener("click", toggleSidebar);
+closeSidebar.addEventListener("click", toggleSidebar);
+sidebarBackdrop.addEventListener("click", toggleSidebar);
+
+// Load customer orders
+document.getElementById("load-orders-btn").addEventListener("click", async () => {
+  const mobile = document.getElementById("profile-mobile").value.trim();
+  const box = document.getElementById("order-history");
+  if (!/^\d{10}$/.test(mobile)) {
+    box.innerHTML = `<div class="p-4 bg-surface-container rounded-DEFAULT gallery-border text-error">Valid 10-digit mobile daalo.</div>`;
+    return;
+  }
+  box.innerHTML = `<div class="p-4 bg-surface-container rounded-DEFAULT gallery-border">Loading…</div>`;
+  try {
+    const res = await fetch("/api/my-frame-orders?mobile=" + encodeURIComponent(mobile));
+    const data = await res.json();
+    const orders = Array.isArray(data) ? data : (data.orders || []);
+    if (!orders.length) {
+      box.innerHTML = `<div class="p-4 bg-surface-container rounded-DEFAULT gallery-border">Is number pe koi order nahi mila.</div>`;
+      return;
+    }
+    box.innerHTML = orders.map(o => `
+      <div class="p-3 bg-surface-container rounded-DEFAULT gallery-border space-y-1">
+        <div class="flex justify-between">
+          <span class="text-on-surface font-medium">#${o.orderId || "—"} · ${o.size || ""}</span>
+          <span class="text-secondary">${formatPrice(o.finalAmount != null ? o.finalAmount : o.price)}</span>
+        </div>
+        <div class="text-xs">${o.frameTitle || ""}</div>
+        <div class="text-xs">Status: <span class="text-secondary uppercase">${o.status || "processing"}</span></div>
+        <div class="text-xs">Payment: <span class="text-secondary uppercase">${o.paymentStatus || "unpaid"}</span></div>
+        ${o.paymentStatus === "confirmed" && o.deliveryDate ? `<div class="text-xs text-secondary">Delivery: ${o.deliveryDate}${o.deliveryTime ? " · " + o.deliveryTime : ""}</div>` : ""}
+        ${o.paymentStatus === "confirmed" && !o.deliveryDate ? `<div class="text-xs text-secondary">Payment confirmed — delivery date jald update hogi</div>` : ""}
+        ${o.paymentStatus === "paid_claimed" ? `<div class="text-xs text-on-surface-variant">Payment claim — admin confirm pending</div>` : ""}
+        ${o.adminNote ? `<div class="text-xs text-on-surface-variant">${o.adminNote}</div>` : ""}
+        <div class="text-xs text-on-surface-variant">${o.createdAt ? new Date(o.createdAt).toLocaleString("en-IN") : ""}</div>
+      </div>
+    `).join("");
+  } catch (e) {
+    box.innerHTML = `<div class="p-4 bg-surface-container rounded-DEFAULT gallery-border text-error">Load fail. Server check karo.</div>`;
+  }
+});
+
+// ========== Editing Request (max 10 photos × 15MB) ==========
+const ER_MAX_FILES = 10;
+const ER_MAX_BYTES = 15 * 1024 * 1024; // 15 MB
+let erFiles = []; // { file, previewUrl }
+
+function openEditRequestModal() {
+  document.getElementById("edit-request-modal").classList.remove("hidden");
+  document.getElementById("edit-request-modal").classList.add("flex");
+  document.body.style.overflow = "hidden";
+  document.getElementById("er-error").classList.add("hidden");
+  // prefill from saved address if any
+  try {
+    const s = JSON.parse(localStorage.getItem("aditya_studio_saved_address") || "null");
+    if (s) {
+      if (s.name) document.getElementById("er-name").value = s.name;
+      if (s.mobile) document.getElementById("er-mobile").value = s.mobile;
+    }
+  } catch (e) {}
+}
+function closeEditRequestModal() {
+  document.getElementById("edit-request-modal").classList.add("hidden");
+  document.getElementById("edit-request-modal").classList.remove("flex");
+  document.body.style.overflow = "";
+}
+function renderErPreviews() {
+  const grid = document.getElementById("er-preview-grid");
+  document.getElementById("er-count-label").textContent = erFiles.length + " / " + ER_MAX_FILES + " selected";
+  grid.innerHTML = erFiles.map((item, i) => `
+    <div class="relative aspect-square rounded-DEFAULT overflow-hidden border border-outline-variant bg-surface">
+      <img src="${item.previewUrl}" class="w-full h-full object-cover" alt=""/>
+      <button type="button" data-i="${i}" class="er-remove absolute top-0.5 right-0.5 w-6 h-6 rounded-full bg-black/70 text-white text-xs flex items-center justify-center">×</button>
+    </div>
+  `).join("");
+  grid.querySelectorAll(".er-remove").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const i = Number(btn.dataset.i);
+      URL.revokeObjectURL(erFiles[i].previewUrl);
+      erFiles.splice(i, 1);
+      renderErPreviews();
+    });
+  });
+}
+function compressImage(file, maxSide = 2000, quality = 0.85) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      let w = img.width, h = img.height;
+      if (w > maxSide || h > maxSide) {
+        if (w > h) { h = Math.round(h * maxSide / w); w = maxSide; }
+        else { w = Math.round(w * maxSide / h); h = maxSide; }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Image load fail")); };
+    img.src = url;
+  });
+}
+
+document.getElementById("open-edit-request")?.addEventListener("click", openEditRequestModal);
+document.getElementById("close-edit-request")?.addEventListener("click", closeEditRequestModal);
+document.getElementById("edit-request-modal")?.addEventListener("click", (e) => {
+  if (e.target.id === "edit-request-modal") closeEditRequestModal();
+});
+document.getElementById("er-pick-btn")?.addEventListener("click", () => document.getElementById("er-file-input").click());
+document.getElementById("er-file-input")?.addEventListener("change", (e) => {
+  const errEl = document.getElementById("er-error");
+  errEl.classList.add("hidden");
+  const files = Array.from(e.target.files || []);
+  e.target.value = "";
+  for (const f of files) {
+    if (erFiles.length >= ER_MAX_FILES) {
+      errEl.textContent = "Maximum 10 photos allowed.";
+      errEl.classList.remove("hidden");
+      break;
+    }
+    if (!f.type.startsWith("image/")) {
+      errEl.textContent = f.name + " image nahi hai.";
+      errEl.classList.remove("hidden");
+      continue;
+    }
+    if (f.size > ER_MAX_BYTES) {
+      errEl.textContent = f.name + " 15 MB se badi hai.";
+      errEl.classList.remove("hidden");
+      continue;
+    }
+    erFiles.push({ file: f, previewUrl: URL.createObjectURL(f) });
+  }
+  renderErPreviews();
+});
+document.getElementById("er-submit-btn")?.addEventListener("click", async () => {
+  const name = document.getElementById("er-name").value.trim();
+  const mobile = document.getElementById("er-mobile").value.trim();
+  const note = document.getElementById("er-note").value.trim();
+  const errEl = document.getElementById("er-error");
+  const btn = document.getElementById("er-submit-btn");
+  if (!name || !/^[6-9]\d{9}$/.test(mobile)) {
+    errEl.textContent = "Name aur valid 10-digit mobile zaroori hai.";
+    errEl.classList.remove("hidden");
+    return;
+  }
+  if (!erFiles.length) {
+    errEl.textContent = "Kam se kam 1 photo upload karo.";
+    errEl.classList.remove("hidden");
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = "Uploading…";
+  try {
+    const photos = [];
+    for (const item of erFiles) {
+      const dataUrl = await compressImage(item.file);
+      photos.push({ name: item.file.name, dataUrl });
+    }
+    const res = await fetch("/api/edit-request", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, mobile, note, photos })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.message || data.error || "Submit fail");
+    erFiles.forEach(i => URL.revokeObjectURL(i.previewUrl));
+    erFiles = [];
+    renderErPreviews();
+    closeEditRequestModal();
+    showToast("Editing request sent! ID: " + (data.requestId || "—"), 4000);
+  } catch (e) {
+    errEl.textContent = e.message || "Submit fail. Dobara try karo.";
+    errEl.classList.remove("hidden");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Submit Editing Request";
+  }
+});
+
+// ========== Home Banner Carousel (admin: Offer / Home banner photos) ==========
+const DEFAULT_BANNERS = [
+  { url: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=1400&q=80", title: "Aditya Studio", sub: "Museum-quality photo frames" },
+  { url: "https://images.unsplash.com/photo-1519741497674-611481863552?w=1400&q=80", title: "Raksha Bandhan Special", sub: "Apni yaadein frame karo" },
+  { url: "https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=1400&q=80", title: "The Artisan Collection", sub: "Custom sizes · Premium finish" }
+];
+let bannerList = DEFAULT_BANNERS.slice();
+let bannerIndex = 0;
+let bannerTimer = null;
+
+function renderBanner() {
+  const slides = document.getElementById("banner-slides");
+  const dots = document.getElementById("banner-dots");
+  if (!slides || !dots) return;
+  slides.innerHTML = bannerList.map((b, i) =>
+    `<div class="banner-slide${i === bannerIndex ? " active" : ""}" style="background-image:url('${(b.url || "").replace(/'/g, "%27")}')"></div>`
+  ).join("");
+  dots.innerHTML = bannerList.map((_, i) =>
+    `<button type="button" class="banner-dot${i === bannerIndex ? " active" : ""}" data-i="${i}" aria-label="Slide ${i + 1}"></button>`
+  ).join("");
+  const cur = bannerList[bannerIndex] || {};
+  const tEl = document.getElementById("banner-title");
+  const sEl = document.getElementById("banner-sub");
+  if (tEl) tEl.textContent = cur.title || "Aditya Studio";
+  if (sEl) sEl.textContent = cur.sub || "";
+  dots.querySelectorAll(".banner-dot").forEach(btn => {
+    btn.addEventListener("click", () => {
+      bannerIndex = Number(btn.dataset.i) || 0;
+      renderBanner();
+      restartBannerTimer();
+    });
+  });
+}
+
+function nextBanner(dir) {
+  if (!bannerList.length) return;
+  bannerIndex = (bannerIndex + (dir || 1) + bannerList.length) % bannerList.length;
+  renderBanner();
+}
+
+function restartBannerTimer() {
+  if (bannerTimer) clearInterval(bannerTimer);
+  bannerTimer = setInterval(() => nextBanner(1), 4500);
+}
+
+async function loadHomeBanner() {
+  try {
+    const res = await fetch("/api/settings");
+    const data = await res.json();
+    const imgs = (data.settings && data.settings.offerImages) || [];
+    if (imgs.length) {
+      bannerList = imgs.map(o => ({
+        url: o.url || o,
+        title: o.title || "Aditya Studio",
+        sub: o.sub || ""
+      })).filter(b => b.url);
+    }
+  } catch (e) {}
+  if (!bannerList.length) bannerList = DEFAULT_BANNERS.slice();
+  bannerIndex = 0;
+  renderBanner();
+  restartBannerTimer();
+}
+
+document.getElementById("banner-prev")?.addEventListener("click", () => { nextBanner(-1); restartBannerTimer(); });
+document.getElementById("banner-next")?.addEventListener("click", () => { nextBanner(1); restartBannerTimer(); });
+
+// ========== Wallet + session (same as home) ==========
+const FR_SESSION = "aditya_studio_session_v1";
+let framesUser = null;
+function frLoadSession() {
+  try { return JSON.parse(localStorage.getItem(FR_SESSION) || "null"); } catch (e) { return null; }
+}
+function frSaveSession(d) {
+  const prev = frLoadSession() || {};
+  localStorage.setItem(FR_SESSION, JSON.stringify({ ...prev, ...d }));
+}
+function frClearSession() { localStorage.removeItem(FR_SESSION); }
+
+function updateFramesWalletUI() {
+  const loginBox = document.getElementById("framesLoginBox");
+  const userBox = document.getElementById("framesUserBox");
+  const nameEl = document.getElementById("sidebar-name");
+  if (!framesUser) {
+    if (loginBox) loginBox.classList.remove("hidden");
+    if (userBox) userBox.classList.add("hidden");
+    if (nameEl) nameEl.textContent = "Guest";
+    return;
+  }
+  if (loginBox) loginBox.classList.add("hidden");
+  if (userBox) userBox.classList.remove("hidden");
+  if (nameEl) nameEl.textContent = framesUser.name || "Member";
+  const bal = document.getElementById("framesWalletBal");
+  if (bal) bal.textContent = String(framesUser.walletBalance || 0);
+  const hist = document.getElementById("framesWalletHist");
+  if (hist) {
+    const list = framesUser.walletHistory || [];
+    hist.innerHTML = list.length
+      ? list.slice(0, 12).map(w => {
+          const plus = w.type === "credit";
+          return `<div class="flex justify-between gap-2"><span class="${plus ? "text-green-400" : "text-red-300"}">${plus ? "+" : "−"}₹${w.amount}</span><span class="truncate opacity-80">${w.reason || ""}</span></div>`;
+        }).join("")
+      : '<p class="opacity-70">No transactions</p>';
+  }
+  const coup = document.getElementById("framesCoupons");
+  if (coup) {
+    const active = (framesUser.history || []).filter(h => (h.couponStatus || "active") === "active" && (h.walletValue > 0 || Number(h.discount) > 0 || /₹\s*\d+/.test(String(h.prize || ""))));
+    if (!active.length) {
+      coup.innerHTML = '<p class="opacity-70">No active coupons</p>';
+    } else {
+      coup.innerHTML = active.slice(0, 8).map(h => {
+        const id = h.couponId || h.entryId;
+        const label = h.prize || ("₹" + h.discount);
+        return `<div class="p-2 rounded border border-secondary/30 flex justify-between items-center gap-2"><span>${label}</span><button type="button" data-cid="${id}" class="fr-apply-coupon px-2 py-1 text-[10px] rounded bg-secondary text-on-secondary">→ Wallet</button></div>`;
+      }).join("");
+      coup.querySelectorAll(".fr-apply-coupon").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const s = frLoadSession();
+          if (!s) return;
+          try {
+            const res = await fetch("/api/wallet/apply-coupon", {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ mobile: s.mobile, pin: s.pin, couponId: btn.dataset.cid })
+            });
+            const data = await res.json();
+            if (data.ok) {
+              framesUser = { ...framesUser, walletBalance: data.walletBalance, walletHistory: data.walletHistory, history: data.history || framesUser.history };
+              updateFramesWalletUI();
+              alert(data.message);
+            } else alert(data.message || "Fail");
+          } catch (e) { alert("Network error"); }
+        });
+      });
+    }
+  }
+  // prefill order mobile
+  const pm = document.getElementById("profile-mobile");
+  if (pm && framesUser.mobile) pm.value = framesUser.mobile;
+}
+
+async function restoreFramesUser() {
+  const s = frLoadSession();
+  if (!s || !s.mobile || !s.pin) { framesUser = null; updateFramesWalletUI(); return; }
+  try {
+    const res = await fetch("/api/restore-session", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mobile: s.mobile, pin: s.pin })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      framesUser = data;
+      frSaveSession({ mobile: data.mobile, pin: s.pin, name: data.name, id: data.id });
+    } else framesUser = null;
+  } catch (e) { framesUser = null; }
+  updateFramesWalletUI();
+}
+
+document.getElementById("frames-login-btn")?.addEventListener("click", async () => {
+  const mobile = (document.getElementById("profile-mobile") || {}).value || "";
+  const pin = (document.getElementById("profile-pin") || {}).value || "";
+  const err = document.getElementById("frames-login-err");
+  if (err) { err.classList.add("hidden"); }
+  try {
+    const res = await fetch("/api/login", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mobile: mobile.trim(), pin: pin.trim() })
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      if (err) { err.textContent = "Login fail"; err.classList.remove("hidden"); }
+      return;
+    }
+    framesUser = data;
+    frSaveSession({ mobile: data.mobile, pin: pin.trim(), name: data.name, id: data.id });
+    updateFramesWalletUI();
+  } catch (e) {
+    if (err) { err.textContent = "Network error"; err.classList.remove("hidden"); }
+  }
+});
+document.getElementById("frames-logout-btn")?.addEventListener("click", () => {
+  frClearSession();
+  framesUser = null;
+  updateFramesWalletUI();
+});
+
+async function loadFramesNotifs() {
+  const box = document.getElementById("framesNotifList");
+  if (!box) return;
+  try {
+    const res = await fetch("/api/notifications");
+    const data = await res.json();
+    const items = (data.items || data.notifications || []).slice(0, 15);
+    if (!items.length) {
+      box.innerHTML = '<div class="p-3 bg-surface-container rounded-DEFAULT gallery-border text-xs">No notifications</div>';
+      return;
+    }
+    box.innerHTML = items.map(n => `
+      <div class="p-3 bg-surface-container rounded-DEFAULT gallery-border">
+        <div class="text-secondary text-xs font-medium">${n.title || "Notice"}</div>
+        <div class="text-xs mt-0.5">${n.body || ""}</div>
+      </div>`).join("");
+  } catch (e) {
+    box.innerHTML = '<div class="p-3 text-xs opacity-70">Could not load</div>';
+  }
+}
+
+// ========== Init ==========
+// NOTE: Admin 3D photos only change HOME page floating frame — not this frames shop viewer.
+// Yahan 3D me sirf user ki uploaded photo dikhegi.
+loadHomeBanner();
+loadFrames();
+restoreFramesUser();
+loadFramesNotifs();
+function bootThree() {
+  if (typeof THREE !== "undefined") {
+    initThreeViewer();
+  } else {
+    setTimeout(bootThree, 80);
+  }
+}
+bootThree();
+</script>
+</body>
+</html>
