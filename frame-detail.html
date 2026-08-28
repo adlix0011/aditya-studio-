@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="hi" class="dark">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover"/>
+  <title>Frame Detail · Aditya Studio</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet"/>
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            background: "#131313",
+            surface: "#1c1b1b",
+            "surface-container": "#201f1f",
+            "surface-container-high": "#2a2929",
+            "on-surface": "#e5e2e1",
+            "on-surface-variant": "#b7b0a8",
+            outline: "#4f453f",
+            "outline-variant": "#3d3530",
+            primary: "#f3de9a",
+            secondary: "#e9c176",
+            "on-secondary": "#241804",
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    body { background: #131313; color: #e5e2e1; margin: 0; }
+    .glass-shine {
+      position: absolute; inset: 0; pointer-events: none; z-index: 3;
+      background:
+        linear-gradient(90deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.18) 10%, transparent 20%),
+        linear-gradient(270deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.12) 8%, transparent 18%);
+    }
+    .fp-wrap { position: relative; line-height: 0; max-width: 100%; }
+    .fp-frame { display: block; max-width: 100%; height: auto; object-fit: contain; }
+    .fp-photo {
+      position: absolute; overflow: hidden;
+      left: 12%; right: 12%; top: 14%; bottom: 14%;
+    }
+    .fp-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .type-card.active { border-color: #e9c176; box-shadow: 0 0 0 1px #e9c176; }
+    .quality-btn.active { border-color: #e9c176; background: rgba(233,193,118,0.12); color: #e9c176; }
+    .swatch.active { outline: 2px solid #e9c176; outline-offset: 2px; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- Top bar -->
+  <header class="sticky top-0 z-40 bg-[#1c1b1b]/95 backdrop-blur border-b border-[#3d3530] px-4 py-3 flex items-center gap-3">
+    <a href="/frames" class="flex items-center justify-center w-10 h-10 rounded-full hover:bg-[#2a2929] text-[#b7b0a8]">
+      <span class="material-symbols-outlined">arrow_back</span>
+    </a>
+    <div class="flex-1 min-w-0">
+      <h1 id="page-title" class="text-base sm:text-lg font-semibold text-[#f3de9a] truncate">Frame</h1>
+      <p id="page-sub" class="text-xs text-[#b7b0a8] truncate"></p>
+    </div>
+  </header>
+
+  <main class="flex-1 w-full max-w-6xl mx-auto px-4 py-4 sm:py-8">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10">
+
+      <!-- LEFT: Preview -->
+      <div class="space-y-4">
+        <div id="preview-box" class="w-full bg-[#0a0a0a] rounded-xl border border-[#3d3530] flex items-center justify-center p-3 sm:p-6 min-h-[280px] sm:min-h-[420px]">
+          <p class="text-[#b7b0a8] text-sm">Loading…</p>
+        </div>
+        <p class="text-center text-xs text-[#b7b0a8]">Seedha front view · Photo frame ke andar</p>
+      </div>
+
+      <!-- RIGHT: Options -->
+      <div class="space-y-6 pb-28 lg:pb-8">
+        <div>
+          <div class="flex items-center gap-2 text-[#e9c176] text-sm mb-1">
+            <span class="material-symbols-outlined text-base" style="font-variation-settings:'FILL' 1">star</span>
+            <span id="rating">4.5</span>
+            <span class="text-[#b7b0a8]" id="reviews">· 100 reviews</span>
+          </div>
+          <div id="price-line" class="text-2xl font-bold text-[#e9c176]">—</div>
+          <p id="desc" class="text-sm text-[#b7b0a8] mt-2 leading-relaxed"></p>
+        </div>
+
+        <!-- Photo upload on this page -->
+        <div>
+          <p class="text-xs uppercase tracking-widest text-[#b7b0a8] mb-2">Your Photo</p>
+          <div class="flex flex-wrap gap-2 items-center">
+            <label class="cursor-pointer px-4 py-2.5 rounded-lg border border-[#e9c176] text-[#e9c176] text-sm font-medium hover:bg-[#e9c176]/10">
+              <input type="file" id="photo-input" accept="image/*" class="hidden"/>
+              📷 Photo choose / change
+            </label>
+            <button type="button" id="clear-photo" class="hidden text-xs text-[#b7b0a8] underline">Remove photo</button>
+          </div>
+        </div>
+
+        <!-- Quality -->
+        <div>
+          <p class="text-xs uppercase tracking-widest text-[#b7b0a8] mb-2">Photo Quality</p>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2" id="quality-box">
+            <button type="button" class="quality-btn active border-2 border-[#3d3530] rounded-lg p-3 text-left text-sm" data-id="normal" data-extra="0">
+              <span class="block font-semibold">1. Normal</span>
+              <span class="text-xs opacity-70">+₹0</span>
+            </button>
+            <button type="button" class="quality-btn border-2 border-[#3d3530] rounded-lg p-3 text-left text-sm text-[#b7b0a8]" data-id="lamination" data-extra="80">
+              <span class="block font-semibold">2. Lamination</span>
+              <span class="text-xs opacity-70">+₹80</span>
+            </button>
+            <button type="button" class="quality-btn border-2 border-[#3d3530] rounded-lg p-3 text-left text-sm text-[#b7b0a8]" data-id="ntr" data-extra="150">
+              <span class="block font-semibold">3. NTR Print</span>
+              <span class="text-xs opacity-70">+₹150</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Frame types (same size) -->
+        <div>
+          <p class="text-xs uppercase tracking-widest text-[#b7b0a8] mb-2">Frame Type</p>
+          <div id="types-box" class="grid grid-cols-3 sm:grid-cols-4 gap-2"></div>
+          <p id="type-label" class="text-sm text-[#b7b0a8] mt-2"></p>
+        </div>
+
+        <!-- Colours -->
+        <div>
+          <p class="text-xs uppercase tracking-widest text-[#b7b0a8] mb-2">Frame Colour</p>
+          <div id="colours-box" class="flex flex-wrap gap-3"></div>
+          <p id="colour-label" class="text-sm text-[#b7b0a8] mt-2"></p>
+        </div>
+
+        <!-- Desktop order btn -->
+        <button id="order-btn" type="button" class="hidden lg:block w-full py-4 bg-[#e9c176] text-[#241804] font-semibold rounded-lg hover:brightness-105">
+          Continue to Order
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- Mobile sticky order bar -->
+  <div class="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-[#1c1b1b] border-t border-[#3d3530] p-3 safe-bottom">
+    <div class="flex items-center gap-3 max-w-6xl mx-auto">
+      <div class="flex-1 min-w-0">
+        <p class="text-xs text-[#b7b0a8]">Total</p>
+        <p id="mobile-price" class="text-lg font-bold text-[#e9c176]">—</p>
+      </div>
+      <button id="order-btn-m" type="button" class="px-6 py-3 bg-[#e9c176] text-[#241804] font-semibold rounded-lg">
+        Continue to Order
+      </button>
+    </div>
+  </div>
+
+<script>
+const PHOTO_KEY = "as_user_photo";
+let allFrames = [];
+let selected = null;
+let userPhoto = null;
+let qualityExtra = 0;
+let selectedColour = { id: "gold", name: "Gold", hex: "#c9a227" };
+
+const DEFAULT_COLOURS = [
+  { id: "gold", name: "Gold", hex: "#c9a227" },
+  { id: "brown", name: "Brown", hex: "#5c4033" },
+  { id: "black", name: "Black", hex: "#1a1a1a" },
+  { id: "white", name: "White", hex: "#f5f5f5" },
+  { id: "silver", name: "Silver", hex: "#c0c0c0" },
+  { id: "red", name: "Red", hex: "#8b1a1a" },
+];
+
+function qs(name) {
+  return new URLSearchParams(location.search).get(name);
+}
+
+function formatPrice(n) {
+  return "₹" + Math.round(Number(n) || 0);
+}
+
+function parseSize(s) {
+  const m = String(s || "").match(/(\d+)\s*[x×]\s*(\d+)/i);
+  if (!m) return { short: 8, long: 12 };
+  let a = Number(m[1]), b = Number(m[2]);
+  return { short: Math.min(a, b), long: Math.max(a, b) };
+}
+
+function displayDims(sizeStr) {
+  const { short, long } = parseSize(sizeStr);
+  // Prefer orientation from URL or default vertical (portrait) for 8x12 style
+  const orient = qs("orient") || "vertical";
+  if (orient === "horizontal") return { w: long, h: short, label: long + "x" + short };
+  return { w: short, h: long, label: short + "x" + long };
+}
+
+function framePrice(f) {
+  const price = Number(f.price) || 0;
+  const discount = Number(f.discount) || 0;
+  const finalPrice = discount > 0 ? Math.round(price * (1 - discount / 100)) : price;
+  return { price, discount, finalPrice };
+}
+
+function buildPreview(frameImg, photoUrl) {
+  if (frameImg && photoUrl) {
+    return `<div class="fp-wrap" style="max-height:min(65vh,520px);margin:0 auto;">
+      <img class="fp-frame" src="${frameImg}" alt="frame" style="max-height:min(65vh,520px);"/>
+      <div class="fp-photo">
+        <img src="${photoUrl}" alt="photo"/>
+        <div class="glass-shine"></div>
+      </div>
+    </div>`;
+  }
+  if (frameImg) {
+    return `<img src="${frameImg}" alt="frame" style="max-width:100%;max-height:min(65vh,520px);object-fit:contain;display:block;margin:0 auto;"/>`;
+  }
+  if (photoUrl) {
+    return `<div style="position:relative;max-width:100%;max-height:min(65vh,520px);">
+      <img src="${photoUrl}" alt="photo" style="max-width:100%;max-height:min(65vh,520px);object-fit:contain;display:block;margin:0 auto;"/>
+      <div class="glass-shine"></div>
+    </div>`;
+  }
+  return `<div style="padding:48px;text-align:center;color:#b7b0a8;">Photo upload karein</div>`;
+}
+
+function updatePreview() {
+  const box = document.getElementById("preview-box");
+  if (!box || !selected) return;
+  box.innerHTML = buildPreview(selected.image || "", userPhoto || "");
+}
+
+function updatePrice() {
+  if (!selected) return;
+  const { price, discount, finalPrice } = framePrice(selected);
+  const total = finalPrice + qualityExtra;
+  const html = formatPrice(total) +
+    (discount > 0 ? ` <span class="text-base text-[#b7b0a8] line-through font-normal">${formatPrice(price)}</span> <span class="text-sm font-normal">(${discount}% OFF)</span>` : "");
+  document.getElementById("price-line").innerHTML = html;
+  document.getElementById("mobile-price").textContent = formatPrice(total);
+}
+
+function renderTypes() {
+  const box = document.getElementById("types-box");
+  if (!box || !selected) return;
+  const types = allFrames.filter(f => f.size === selected.size);
+  box.innerHTML = types.map(t => {
+    const active = String(t.id) === String(selected.id);
+    const img = t.image
+      ? `<img src="${t.image}" class="w-full h-20 object-contain bg-black rounded" alt=""/>`
+      : `<div class="w-full h-20 bg-[#2a2929] rounded flex items-center justify-center text-[#b7b0a8] text-xs">No img</div>`;
+    return `<button type="button" class="type-card border-2 ${active ? "active border-[#e9c176]" : "border-[#3d3530]"} rounded-lg p-1.5 text-left" data-id="${t.id}">
+      ${img}
+      <span class="block text-[10px] mt-1 truncate text-center ${active ? "text-[#e9c176]" : "text-[#b7b0a8]"}">${t.title || t.size}</span>
+    </button>`;
+  }).join("");
+  document.getElementById("type-label").textContent = "Selected: " + (selected.title || selected.size);
+  box.querySelectorAll(".type-card").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const f = allFrames.find(x => String(x.id) === String(btn.dataset.id));
+      if (!f) return;
+      selected = f;
+      history.replaceState(null, "", "?id=" + encodeURIComponent(f.id) + (qs("orient") ? "&orient=" + qs("orient") : ""));
+      renderAll();
+    });
+  });
+}
+
+function renderColours() {
+  const box = document.getElementById("colours-box");
+  box.innerHTML = DEFAULT_COLOURS.map(c => {
+    const active = selectedColour.id === c.id;
+    return `<button type="button" class="swatch w-10 h-10 rounded-full border-2 border-[#3d3530] ${active ? "active" : ""}" data-id="${c.id}" data-name="${c.name}" data-hex="${c.hex}" style="background:${c.hex}" title="${c.name}"></button>`;
+  }).join("");
+  document.getElementById("colour-label").textContent = "Selected: " + selectedColour.name;
+  box.querySelectorAll(".swatch").forEach(btn => {
+    btn.addEventListener("click", () => {
+      selectedColour = { id: btn.dataset.id, name: btn.dataset.name, hex: btn.dataset.hex };
+      renderColours();
+    });
+  });
+}
+
+function renderAll() {
+  if (!selected) return;
+  const dims = displayDims(selected.size);
+  const { price, discount, finalPrice } = framePrice(selected);
+  document.getElementById("page-title").textContent = dims.label + " · " + (selected.title || "Frame");
+  document.getElementById("page-sub").textContent = selected.title || "";
+  document.getElementById("desc").textContent =
+    (selected.title || "Frame") + " — museum-quality moulding, precision cut glass. Size " + dims.label + ".";
+  document.title = (selected.title || "Frame") + " · Aditya Studio";
+  updatePrice();
+  updatePreview();
+  renderTypes();
+  renderColours();
+}
+
+async function load() {
+  const id = qs("id");
+  try {
+    const res = await fetch("/api/frames");
+    const data = await res.json();
+    const list = (data.frames || data || []);
+    allFrames = (Array.isArray(list) ? list : []).filter(f => f.active !== false).map(f => ({
+      ...f,
+      discount: Number(f.discountPercent) || 0,
+      image: f.imageData || f.imageUrl || ""
+    }));
+  } catch (e) {
+    document.getElementById("preview-box").innerHTML = "<p class='text-red-400 p-4'>Frames load nahi hue</p>";
+    return;
+  }
+
+  selected = allFrames.find(f => String(f.id) === String(id)) || allFrames[0];
+  if (!selected) {
+    document.getElementById("preview-box").innerHTML = "<p class='text-[#b7b0a8] p-4'>Frame nahi mila. <a href='/frames' class='text-[#e9c176] underline'>Back</a></p>";
+    return;
+  }
+
+  // Photo from session (frames page se) or local
+  try {
+    userPhoto = sessionStorage.getItem(PHOTO_KEY) || localStorage.getItem(PHOTO_KEY) || null;
+  } catch (e) {}
+
+  renderAll();
+}
+
+// Photo input
+document.getElementById("photo-input").addEventListener("change", (e) => {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    userPhoto = ev.target.result;
+    try {
+      sessionStorage.setItem(PHOTO_KEY, userPhoto);
+      // localStorage may fail for large images — ignore
+      try { localStorage.setItem(PHOTO_KEY, userPhoto); } catch (_) {}
+    } catch (_) {}
+    document.getElementById("clear-photo").classList.remove("hidden");
+    updatePreview();
+  };
+  reader.readAsDataURL(file);
+});
+
+document.getElementById("clear-photo").addEventListener("click", () => {
+  userPhoto = null;
+  try { sessionStorage.removeItem(PHOTO_KEY); localStorage.removeItem(PHOTO_KEY); } catch (_) {}
+  document.getElementById("clear-photo").classList.add("hidden");
+  updatePreview();
+});
+
+// Quality
+document.querySelectorAll(".quality-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".quality-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    qualityExtra = Number(btn.dataset.extra) || 0;
+    updatePrice();
+  });
+});
+
+function goOrder() {
+  if (!selected) return;
+  // Reuse frames page order flow via query — or redirect with state
+  const params = new URLSearchParams({
+    order: "1",
+    id: selected.id,
+    quality: qualityExtra,
+    colour: selectedColour.id || ""
+  });
+  // Store selection and go back to frames order, or open order on same site
+  try {
+    sessionStorage.setItem("as_order_frame", JSON.stringify({
+      id: selected.id,
+      title: selected.title,
+      size: selected.size,
+      price: framePrice(selected).finalPrice + qualityExtra,
+      colour: selectedColour,
+      qualityExtra
+    }));
+  } catch (_) {}
+  // For now open frames with hash to order — simplest: location to frames and trigger
+  window.location.href = "/frames?orderFrame=" + encodeURIComponent(selected.id);
+}
+
+document.getElementById("order-btn").addEventListener("click", goOrder);
+document.getElementById("order-btn-m").addEventListener("click", goOrder);
+
+if (sessionStorage.getItem(PHOTO_KEY) || localStorage.getItem(PHOTO_KEY)) {
+  document.getElementById("clear-photo").classList.remove("hidden");
+}
+
+load();
+</script>
+</body>
+</html>
