@@ -3325,26 +3325,38 @@ async function loadAdminFrames() {
   try {
     var res = await fetch('/admin/frames-json', { credentials: 'same-origin', cache: 'no-store' });
     var data = await res.json();
-    if (!data.ok) return;
+    if (!data.ok) {
+      if (fBox) fBox.innerHTML = '<div class="muted">Frames load fail (API). Login / password check karo.</div>';
+      return;
+    }
     var frames = data.frames || [];
     var orders = data.orders || [];
     if (fBox) {
       _adminFramesCache = frames;
       if (!frames.length) fBox.innerHTML = '<div class="muted">Abhi koi frame nahi — upar se add karo</div>';
-      else fBox.innerHTML = frames.map(function(f) {
-        var img = f.imageData || f.imageUrl || '';
-        var fp = Math.round((Number(f.price)||0) * (1 - (Number(f.discountPercent)||0)/100));
-        var hasImg = !!img;
-        return '<div class="msg-card" style="display:flex;gap:10px;align-items:flex-start;margin-top:8px">'
-          + (hasImg ? '<img src="'+img+'" style="width:56px;height:56px;object-fit:cover;border-radius:8px;background:#111">' : '<div style="width:56px;height:56px;background:#222;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#666">No photo</div>')
-          + '<div class="msg-text" style="flex:1"><b>'+esc(f.title||'')+'</b> · '+esc(f.size)
-          + '<br>₹'+fp+(f.discountPercent?(' <span class="muted">('+f.discountPercent+'% off, MRP ₹'+f.price+')</span>'):'')
-          + '<br><span class="muted">'+(f.active===false?'Inactive':'Active')+' · '+esc(f.id)+(hasImg?'':' · <span style="color:#e08a8a">photo missing</span>')+'</span></div>'
-          + '<div class="msg-actions" style="display:flex;flex-direction:column;gap:6px">'
-          + '<button type="button" style="padding:6px 10px;background:#2a2418;color:#F3DE9A;border:1px solid rgba(212,175,55,.4);border-radius:6px;cursor:pointer" onclick="adminEditFrame(\''+esc(f.id)+'\')">✏️ Edit</button>'
-          + '<button type="button" style="padding:6px 10px;background:#5a1a1a;color:#fca5a5;border:1px solid #7f1d1d;border-radius:6px;cursor:pointer" onclick="adminDeleteFrame(\''+esc(f.id)+'\')">🗑</button>'
-          + '</div></div>';
-      }).join('');
+      else {
+        fBox.innerHTML = frames.map(function(f) {
+          var img = f.imageData || f.imageUrl || '';
+          var fp = Math.round((Number(f.price)||0) * (1 - (Number(f.discountPercent)||0)/100));
+          var hasImg = !!img;
+          var fid = esc(f.id);
+          return '<div class="msg-card" style="display:flex;gap:10px;align-items:flex-start;margin-top:8px">'
+            + (hasImg ? '<img src="'+img+'" style="width:56px;height:56px;object-fit:cover;border-radius:8px;background:#111">' : '<div style="width:56px;height:56px;background:#222;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#666">No photo</div>')
+            + '<div class="msg-text" style="flex:1"><b>'+esc(f.title||'')+'</b> · '+esc(f.size)
+            + '<br>₹'+fp+(f.discountPercent?(' <span class="muted">('+f.discountPercent+'% off, MRP ₹'+f.price+')</span>'):'')
+            + '<br><span class="muted">'+(f.active===false?'Inactive':'Active')+' · '+fid+(hasImg?'':' · <span style="color:#e08a8a">photo missing</span>')+'</span></div>'
+            + '<div class="msg-actions" style="display:flex;flex-direction:column;gap:6px">'
+            + '<button type="button" class="fr-edit-btn" data-id="'+fid+'" style="padding:6px 10px;background:#2a2418;color:#F3DE9A;border:1px solid rgba(212,175,55,.4);border-radius:6px;cursor:pointer">Edit</button>'
+            + '<button type="button" class="fr-del-btn" data-id="'+fid+'" style="padding:6px 10px;background:#5a1a1a;color:#fca5a5;border:1px solid #7f1d1d;border-radius:6px;cursor:pointer">Del</button>'
+            + '</div></div>';
+        }).join('');
+        fBox.querySelectorAll('.fr-edit-btn').forEach(function(btn) {
+          btn.addEventListener('click', function() { adminEditFrame(btn.getAttribute('data-id')); });
+        });
+        fBox.querySelectorAll('.fr-del-btn').forEach(function(btn) {
+          btn.addEventListener('click', function() { adminDeleteFrame(btn.getAttribute('data-id')); });
+        });
+      }
     }
     if (oBox) {
       if (!orders.length) oBox.innerHTML = '<div class="muted">Abhi koi frame order nahi</div>';
@@ -3384,7 +3396,7 @@ async function loadAdminFrames() {
       }).join('');
     }
   } catch (e) {
-    if (fBox) fBox.innerHTML = '<div class="muted">Load fail</div>';
+    if (fBox) fBox.innerHTML = '<div class="muted">Load fail: ' + (e && e.message ? e.message : 'network') + ' — page refresh karke try karo</div>';
   }
 }
 loadAdminFrames();
