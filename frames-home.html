@@ -862,21 +862,12 @@ function renderFrames(filterSize = null) {
   let list = allFrames.slice();
   if (filterSize) list = list.filter(f => f.size === filterSize);
 
-  // Ek size = ek product card; types detail ke andar
-  // Prefer frame jisme real image ho (admin upload)
-  const bySize = {};
-  list.forEach(f => {
-    const prev = bySize[f.size];
-    if (!prev) {
-      bySize[f.size] = f;
-      return;
-    }
-    const prevHas = !!(prev.image || prev.imageData || prev.imageUrl);
-    const curHas = !!(f.image || f.imageData || f.imageUrl);
-    if (!prevHas && curHas) bySize[f.size] = f;
+  // Har uploaded frame = alag product card (same size ke multiple types bhi alag dikhenge)
+  list.sort((a, b) => {
+    const d = sizeArea(a.size) - sizeArea(b.size);
+    if (d !== 0) return d;
+    return String(a.title || "").localeCompare(String(b.title || ""));
   });
-  list = Object.values(bySize);
-  list.sort((a, b) => sizeArea(a.size) - sizeArea(b.size));
 
   if (!list.length) {
     grid.innerHTML = `<div class="col-span-full text-center text-on-surface-variant py-12">
@@ -921,7 +912,7 @@ function renderFrames(filterSize = null) {
           <span class="text-on-surface-variant text-xs">· ${reviews}</span>
         </div>
         <p class="font-label-caps text-label-caps text-on-surface-variant tracking-wider">ADITYA STUDIO</p>
-        <h4 class="font-headline-sm text-on-surface leading-tight">${dims.label} Frame <span class="text-xs text-on-surface-variant">(${orientLabel})</span></h4>
+        <h4 class="font-headline-sm text-on-surface leading-tight">${frame.title ? frame.title : (dims.label + " Frame")} <span class="text-xs text-on-surface-variant">(${dims.label} · ${orientLabel})</span></h4>
         <div class="mt-1 flex items-baseline gap-2 flex-wrap">
           <span class="text-secondary text-xl font-bold">${formatPrice(finalPrice)}</span>
           ${discount > 0 ? `<span class="price-strike text-on-surface-variant text-sm">${formatPrice(price)}</span>` : ""}
