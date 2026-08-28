@@ -892,6 +892,22 @@ async function loadFrames() {
   sizeFilterExpanded = false;
   renderSizeFilter();
   renderFrames();
+
+  // From frame-detail "Continue to Order"
+  try {
+    const params = new URLSearchParams(location.search);
+    const oid = params.get("orderFrame");
+    if (oid) {
+      selectedFrame = allFrames.find(f => String(f.id) === String(oid)) || null;
+      if (selectedFrame) {
+        setTimeout(function () {
+          if (typeof openOrderModal === "function") openOrderModal();
+          else if (typeof openProductDetail === "function") openProductDetail();
+        }, 400);
+      }
+      history.replaceState(null, "", "/frames");
+    }
+  } catch (e) {}
 }
 
 function renderSizeFilter() {
@@ -961,45 +977,39 @@ function frameRating(frame) {
 }
 
 
-/** Frame + photo composite — pura frame dikhe, photo andar */
+/** Frame + photo — same aspect box so photo ALWAYS inside frame */
 function buildFramePreview(frameImg, photoUrl, opts) {
   opts = opts || {};
-  const insetX = opts.insetX != null ? opts.insetX : (opts.inset != null ? opts.inset : 12);
-  const insetY = opts.insetY != null ? opts.insetY : (opts.inset != null ? opts.inset : 14);
+  const insetX = opts.insetX != null ? opts.insetX : 11;
+  const insetY = opts.insetY != null ? opts.insetY : 11;
   const showGlass = opts.glass !== false;
-  const fill = !!opts.fill; // card: fill box; detail: natural size
+  const portrait = opts.portrait !== false;
+  // Fixed ratio box (8x12 vertical ≈ 2/3, horizontal ≈ 3/2)
+  const ratio = portrait ? "2 / 3" : "3 / 2";
+  const shine = showGlass ? '<div class="glass-shine"></div>' : '';
+
   if (frameImg && photoUrl) {
-    const shine = showGlass ? '<div class="glass-shine"></div>' : '';
-    const wrapStyle = fill
-      ? "position:relative;width:100%;height:100%;line-height:0;"
-      : "position:relative;display:inline-block;max-width:100%;max-height:100%;line-height:0;";
-    const imgStyle = fill
-      ? "display:block;width:100%;height:100%;object-fit:contain;"
-      : "display:block;max-width:100%;max-height:65vh;width:auto;height:auto;object-fit:contain;";
-    return `<div class="fp-wrap" style="${wrapStyle}">
-      <img class="fp-frame" src="${frameImg}" alt="frame" style="${imgStyle}"/>
-      <div class="fp-photo" style="position:absolute;left:${insetX}%;right:${insetX}%;top:${insetY}%;bottom:${insetY}%;overflow:hidden;">
-        <div class="glass-photo-wrap" style="width:100%;height:100%;">
-          <img src="${photoUrl}" alt="photo" style="width:100%;height:100%;object-fit:cover;display:block;"/>
-          ${shine}
-        </div>
+    return `<div class="fp-box" style="position:relative;height:100%;max-width:100%;aspect-ratio:${ratio};margin:0 auto;">
+      <img src="${frameImg}" alt="frame" style="position:absolute;inset:0;width:100%;height:100%;object-fit:fill;display:block;z-index:1;"/>
+      <div style="position:absolute;left:${insetX}%;right:${insetX}%;top:${insetY}%;bottom:${insetY}%;overflow:hidden;z-index:2;">
+        <img src="${photoUrl}" alt="photo" style="width:100%;height:100%;object-fit:cover;display:block;"/>
+        ${shine}
       </div>
     </div>`;
   }
   if (frameImg) {
-    const imgStyle = fill
-      ? "display:block;width:100%;height:100%;object-fit:contain;margin:0 auto;"
-      : "display:block;max-width:100%;max-height:65vh;width:auto;height:auto;object-fit:contain;margin:0 auto;";
-    return `<img src="${frameImg}" alt="frame" style="${imgStyle}"/>`;
-  }
-  if (photoUrl) {
-    return `<div class="glass-photo-wrap" style="width:100%;height:100%;">
-      <img src="${photoUrl}" alt="photo" style="width:100%;height:100%;object-fit:cover;display:block;"/>
-      <div class="glass-shine"></div>
+    return `<div class="fp-box" style="position:relative;height:100%;max-width:100%;aspect-ratio:${ratio};margin:0 auto;">
+      <img src="${frameImg}" alt="frame" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block;"/>
     </div>`;
   }
-  return `<div class="frame-glass-center" style="width:80%;height:80%;margin:auto;display:flex;align-items:center;justify-content:center;">
-    <span style="color:rgba(60,70,90,0.5);font-size:13px;text-align:center;line-height:1.4">Upload<br/>Your Photo</span>
+  if (photoUrl) {
+    return `<div class="fp-box" style="position:relative;height:100%;max-width:100%;aspect-ratio:${ratio};margin:0 auto;overflow:hidden;">
+      <img src="${photoUrl}" alt="photo" style="width:100%;height:100%;object-fit:cover;display:block;"/>
+      ${shine}
+    </div>`;
+  }
+  return `<div style="height:100%;aspect-ratio:${ratio};margin:auto;display:flex;align-items:center;justify-content:center;background:linear-gradient(145deg,#f0f2f8,#d8dee8);">
+    <span style="color:rgba(60,70,90,0.5);font-size:12px;text-align:center;">Upload Your Photo</span>
   </div>`;
 }
 
@@ -1033,13 +1043,16 @@ function renderFrames(filterSize = null) {
     const finalPrice = discount > 0 ? Math.round(price * (1 - discount / 100)) : price;
     const { rating, reviews } = frameRating(frame);
     // Pura frame dikhe + photo andar (pehle jaisa clean look)
-    const innerHtml = buildFramePreview(frame.image || "", userPhotoDataUrl || "", { insetX: 13, insetY: 15, fill: true, glass: true });
+    const isPortrait = orientation !== "horizontal";
+    const innerHtml = buildFramePreview(frame.image || "", userPhotoDataUrl || "", {
+      insetX: 10, insetY: 10, portrait: isPortrait, glass: true
+    });
 
     // Product card — NO Order Now; click opens detail
     return `
     <div class="product-card bg-surface-container rounded-DEFAULT gallery-border gallery-shadow flex flex-col group hover:bg-surface-container-highest transition-colors relative overflow-hidden animated-frame cursor-pointer" style="animation-delay:${index * 0.04}s" data-id="${frame.id}">
-      <div class="w-full h-52 sm:h-56 bg-background flex items-center justify-center relative overflow-hidden p-2">
-        <div class="user-image-container w-full h-full flex items-center justify-center">
+      <div class="w-full h-56 sm:h-64 bg-background flex items-center justify-center relative overflow-hidden p-3">
+        <div class="user-image-container h-full max-w-full flex items-center justify-center">
           ${innerHtml}
         </div>
         ${discount > 0 ? `<span class="absolute top-2 left-2 bg-secondary text-on-secondary text-[10px] font-label-caps px-2 py-1 rounded-full z-10">${discount}% OFF</span>` : ""}
@@ -1202,7 +1215,9 @@ function renderPdSamples() {
   main.style.width = "100%";
   const frameImg = selectedFrame.image || "";
   const photo = userPhotoDataUrl || "";
-  main.innerHTML = buildFramePreview(frameImg, photo, { insetX: 12, insetY: 14, fill: false, glass: true });
+  main.innerHTML = buildFramePreview(frameImg, photo, {
+    insetX: 12, insetY: 13, portrait: orientation !== "horizontal", glass: true
+  });
   // samples hidden — only straight front view
   const box = document.getElementById("pd-samples");
   if (box) box.innerHTML = "";
