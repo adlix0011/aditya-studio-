@@ -960,17 +960,24 @@ function frameRating(frame) {
 }
 
 
-/** Frame + photo composite — photo always INSIDE frame image bounds */
+/** Frame + photo composite — pura frame dikhe, photo andar */
 function buildFramePreview(frameImg, photoUrl, opts) {
   opts = opts || {};
-  const inset = opts.inset != null ? opts.inset : 11; // % from each edge
+  const insetX = opts.insetX != null ? opts.insetX : (opts.inset != null ? opts.inset : 12);
+  const insetY = opts.insetY != null ? opts.insetY : (opts.inset != null ? opts.inset : 14);
   const showGlass = opts.glass !== false;
-  const maxH = opts.maxH || "100%";
+  const fill = !!opts.fill; // card: fill box; detail: natural size
   if (frameImg && photoUrl) {
     const shine = showGlass ? '<div class="glass-shine"></div>' : '';
-    return `<div class="fp-wrap" style="position:relative;display:inline-block;max-width:100%;max-height:${maxH};line-height:0;">
-      <img class="fp-frame" src="${frameImg}" alt="frame" style="display:block;max-width:100%;max-height:${maxH};width:auto;height:auto;object-fit:contain;"/>
-      <div class="fp-photo" style="position:absolute;left:${inset}%;right:${inset}%;top:${inset}%;bottom:${inset}%;overflow:hidden;">
+    const wrapStyle = fill
+      ? "position:relative;width:100%;height:100%;line-height:0;"
+      : "position:relative;display:inline-block;max-width:100%;max-height:100%;line-height:0;";
+    const imgStyle = fill
+      ? "display:block;width:100%;height:100%;object-fit:contain;"
+      : "display:block;max-width:100%;max-height:65vh;width:auto;height:auto;object-fit:contain;";
+    return `<div class="fp-wrap" style="${wrapStyle}">
+      <img class="fp-frame" src="${frameImg}" alt="frame" style="${imgStyle}"/>
+      <div class="fp-photo" style="position:absolute;left:${insetX}%;right:${insetX}%;top:${insetY}%;bottom:${insetY}%;overflow:hidden;">
         <div class="glass-photo-wrap" style="width:100%;height:100%;">
           <img src="${photoUrl}" alt="photo" style="width:100%;height:100%;object-fit:cover;display:block;"/>
           ${shine}
@@ -979,15 +986,18 @@ function buildFramePreview(frameImg, photoUrl, opts) {
     </div>`;
   }
   if (frameImg) {
-    return `<img src="${frameImg}" alt="frame" style="display:block;max-width:100%;max-height:${maxH};width:auto;height:auto;object-fit:contain;margin:0 auto;"/>`;
+    const imgStyle = fill
+      ? "display:block;width:100%;height:100%;object-fit:contain;margin:0 auto;"
+      : "display:block;max-width:100%;max-height:65vh;width:auto;height:auto;object-fit:contain;margin:0 auto;";
+    return `<img src="${frameImg}" alt="frame" style="${imgStyle}"/>`;
   }
   if (photoUrl) {
-    return `<div class="glass-photo-wrap" style="width:100%;height:100%;max-height:${maxH};">
+    return `<div class="glass-photo-wrap" style="width:100%;height:100%;">
       <img src="${photoUrl}" alt="photo" style="width:100%;height:100%;object-fit:cover;display:block;"/>
       <div class="glass-shine"></div>
     </div>`;
   }
-  return `<div class="frame-glass-center" style="width:min(90%,320px);height:min(70%,240px);margin:auto;display:flex;align-items:center;justify-content:center;">
+  return `<div class="frame-glass-center" style="width:80%;height:80%;margin:auto;display:flex;align-items:center;justify-content:center;">
     <span style="color:rgba(60,70,90,0.5);font-size:13px;text-align:center;line-height:1.4">Upload<br/>Your Photo</span>
   </div>`;
 }
@@ -1021,19 +1031,17 @@ function renderFrames(filterSize = null) {
     const discount = Number(frame.discount) || 0;
     const finalPrice = discount > 0 ? Math.round(price * (1 - discount / 100)) : price;
     const { rating, reviews } = frameRating(frame);
-    // Frame image ke ANDAR photo (relative inset) — overflow nahi
-    const innerHtml = buildFramePreview(frame.image || "", userPhotoDataUrl || "", { inset: 11, maxH: "100%" });
+    // Pura frame dikhe + photo andar (pehle jaisa clean look)
+    const innerHtml = buildFramePreview(frame.image || "", userPhotoDataUrl || "", { insetX: 13, insetY: 15, fill: true, glass: true });
 
     // Product card — NO Order Now; click opens detail
     return `
     <div class="product-card bg-surface-container rounded-DEFAULT gallery-border gallery-shadow flex flex-col group hover:bg-surface-container-highest transition-colors relative overflow-hidden animated-frame cursor-pointer" style="animation-delay:${index * 0.04}s" data-id="${frame.id}">
-      <div class="w-full h-52 sm:h-56 bg-background flex items-center justify-center relative overflow-hidden">
-        <div class="relative flex items-center justify-center" style="height:90%; width:90%; max-width:100%;">
-          <div class="h-full flex items-center justify-center user-image-container overflow-hidden" style="aspect-ratio:${aspect}; max-height:100%; max-width:100%; background:transparent;">
-            ${innerHtml}
-          </div>
+      <div class="w-full h-52 sm:h-56 bg-background flex items-center justify-center relative overflow-hidden p-2">
+        <div class="user-image-container w-full h-full flex items-center justify-center">
+          ${innerHtml}
         </div>
-        ${discount > 0 ? `<span class="absolute top-2 left-2 bg-secondary text-on-secondary text-[10px] font-label-caps px-2 py-1 rounded-full">${discount}% OFF</span>` : ""}
+        ${discount > 0 ? `<span class="absolute top-2 left-2 bg-secondary text-on-secondary text-[10px] font-label-caps px-2 py-1 rounded-full z-10">${discount}% OFF</span>` : ""}
       </div>
       <div class="p-4 flex flex-col gap-1">
         <div class="flex items-center gap-1 text-secondary text-sm">
@@ -1189,7 +1197,7 @@ function renderPdSamples() {
   main.style.width = "100%";
   const frameImg = selectedFrame.image || "";
   const photo = userPhotoDataUrl || "";
-  main.innerHTML = buildFramePreview(frameImg, photo, { inset: 10, maxH: "100%", glass: true });
+  main.innerHTML = buildFramePreview(frameImg, photo, { insetX: 12, insetY: 14, fill: false, glass: true });
   // samples hidden — only straight front view
   const box = document.getElementById("pd-samples");
   if (box) box.innerHTML = "";
