@@ -920,7 +920,8 @@ async function loadFrames() {
       selectedFrame = allFrames.find(f => String(f.id) === String(oid)) || null;
       if (selectedFrame) {
         setTimeout(function () {
-          if (typeof openOrderModal === "function") openOrderModal();
+          const btn = document.getElementById("pd-order-btn");
+          if (btn) btn.click();
           else if (typeof openProductDetail === "function") openProductDetail();
         }, 400);
       }
@@ -1291,9 +1292,24 @@ document.getElementById("pd-quality").addEventListener("click", (e) => {
   }
 });
 document.getElementById("pd-order-btn").addEventListener("click", () => {
-  document.getElementById("product-modal").classList.add("hidden");
-  document.getElementById("product-modal").classList.remove("flex");
-  openOrderModal();
+  if (!selectedFrame) return;
+  const dims = displayDims(selectedFrame.size);
+  const { price, discount, finalPrice } = frameFinalPrice(selectedFrame);
+  const ctx = {
+    frameId: selectedFrame.id,
+    title: selectedFrame.title || "",
+    size: selectedFrame.size || dims.label,
+    price: price,
+    discount: discount,
+    finalPrice: finalPrice,
+    qualityLabel: (selectedQuality && selectedQuality.label) || "Normal",
+    qualityExtra: (selectedQuality && selectedQuality.extra) || 0,
+    colourName: (selectedColour && selectedColour.name) || "",
+    orientation: orientation || "vertical"
+  };
+  try { sessionStorage.setItem("aditya_order_ctx", JSON.stringify(ctx)); } catch (e) {}
+  // Fast dedicated order page (no heavy modal)
+  window.location.href = "/place-order.html";
 });
 
 // ========== Order Modal ==========
