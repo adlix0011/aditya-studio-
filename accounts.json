@@ -1,26 +1,117 @@
 [
   {
     "id": "AS-0001",
-    "name": "anil",
+    "name": "as",
     "mobile": "9755503929",
-    "village": "siladehi",
-    "pinHash": "3a8e0a134a12cf1b189cb33215c399f1a7a975046b3a035f47ad6ca0a6f14f4a",
-    "createdAt": "2026-08-03T07:47:49.155Z",
+    "village": "",
+    "pin": "0000",
+    "createdAt": "2026-08-30T16:20:11.191Z",
+    "visitCount": 1,
+    "lastVisitAt": "2026-08-30T16:20:11.191Z",
+    "pinResetRequested": false,
+    "freeSpinUsed": true,
+    "mobileVerified": false,
     "history": [
       {
-        "entryId": "AS-0001-E1",
-        "amount": 100,
-        "tier": "₹50 – ₹500 वाले ग्राहकों के लिए",
-        "discount": 10,
-        "timestamp": "2026-08-03T07:48:08.503Z"
-      },
+        "entryId": "AS-0001-FREE",
+        "amount": 0,
+        "tier": "Free",
+        "discount": 20,
+        "prize": "₹20 डिस्काउंट",
+        "freeSpin": true,
+        "timestamp": "2026-08-30T16:20:23.307Z",
+        "couponId": "C-mtg0mv0q-ihq7",
+        "couponStatus": "active",
+        "expiresAt": "2026-09-29T16:20:23.306Z"
+      }
+    ],
+    "totalSpend": 0,
+    "adTokens": 0,
+    "spinBalance": 1,
+    "lastAdTokenClaim": "",
+    "walletBalance": 0,
+    "walletHistory": []
+  },
+  {
+    "id": "AS-0002",
+    "name": "As",
+    "mobile": "7024230041",
+    "village": "",
+    "pin": "0000",
+    "createdAt": "2026-08-31T17:33:02.887Z",
+    "visitCount": 1,
+    "lastVisitAt": "2026-08-31T17:33:02.887Z",
+    "pinResetRequested": false,
+    "freeSpinUsed": true,
+    "mobileVerified": false,
+    "history": [
       {
-        "entryId": "AS-0001-E2",
-        "amount": 500,
-        "tier": "₹50 – ₹500 वाले ग्राहकों के लिए",
-        "discount": 8,
-        "timestamp": "2026-08-03T07:51:54.251Z"
+        "entryId": "AS-0002-FREE",
+        "amount": 0,
+        "tier": "Free",
+        "discount": 10,
+        "prize": "₹10 डिस्काउंट",
+        "freeSpin": true,
+        "timestamp": "2026-08-31T17:33:10.874Z",
+        "couponId": "C-mthiobq2-5rp0",
+        "couponStatus": "wallet_credited",
+        "expiresAt": "2026-09-30T17:33:10.874Z",
+        "walletCreditedAt": "2026-09-01T18:12:00.388Z",
+        "walletCreditedAmount": 10
+      }
+    ],
+    "totalSpend": 0,
+    "adTokens": 1,
+    "spinBalance": 1,
+    "lastAdTokenClaim": "2026-09-01",
+    "walletBalance": 10,
+    "walletHistory": [
+      {
+        "id": "WH-mtizi3us-e43e",
+        "type": "credit",
+        "amount": 10,
+        "balanceAfter": 10,
+        "reason": "Coupon → Wallet: ₹10 डिस्काउंट",
+        "source": "coupon",
+        "ref": "C-mthiobq2-5rp0",
+        "couponId": "C-mthiobq2-5rp0",
+        "orderId": null,
+        "byAdmin": false,
+        "timestamp": "2026-09-01T18:12:00.388Z"
       }
     ]
+  },
+  {
+    "id": "AS-0003",
+    "name": "Anil",
+    "mobile": "7024230042",
+    "village": "",
+    "pin": "0000",
+    "createdAt": "2026-09-01T15:55:40.052Z",
+    "visitCount": 1,
+    "lastVisitAt": "2026-09-01T15:55:40.052Z",
+    "pinResetRequested": false,
+    "freeSpinUsed": true,
+    "mobileVerified": false,
+    "history": [
+      {
+        "entryId": "AS-0003-FREE",
+        "amount": 0,
+        "tier": "Free",
+        "discount": 20,
+        "prize": "₹20 डिस्काउंट",
+        "freeSpin": true,
+        "timestamp": "2026-09-01T15:55:52.343Z",
+        "couponId": "C-mtiun1cn-4ryl",
+        "couponStatus": "active",
+        "expiresAt": "2026-10-01T15:55:52.343Z"
+      }
+    ],
+    "totalSpend": 0,
+    "adTokens": 0,
+    "spinBalance": 1,
+    "lastAdTokenClaim": "",
+    "walletBalance": 0,
+    "walletHistory": []
   }
 ]

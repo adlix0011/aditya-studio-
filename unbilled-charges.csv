@@ -1,0 +1,4 @@
+invoice_date,charge_type,name,charge,rate,usage,cost
+2026-August,Services,aditya-studio-,Free,$0.0000/hr,651.48,$0.00
+2026-August,Services,aditya-studio-,Outgoing Bandwidth,—,8.56 GB,—
+2026-August,Services,aditya-studio-,Private Link,—,0 GB,—
