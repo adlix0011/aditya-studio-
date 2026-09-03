@@ -4,7 +4,62 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover"/>
   <title>Frame Detail · Aditya Studio</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.tailwindcss.com">
+let qualityOptionsList = [
+  { id: "normal", label: "Normal", sub: "", extra: 0 },
+  { id: "lamination", label: "Lamination", sub: "", extra: 80 },
+  { id: "ntr", label: "NTR Print", sub: "", extra: 150 }
+];
+function renderFdQuality() {
+  const box = document.getElementById("quality-box");
+  if (!box) return;
+  const list = qualityOptionsList.length ? qualityOptionsList : [{ id:"normal", label:"Normal", extra:0 }];
+  box.innerHTML = list.map(function(q, i) {
+    const active = (typeof qualityExtra !== "undefined" && Number(qualityExtra) === Number(q.extra) && i === list.findIndex(x => Number(x.extra)===Number(qualityExtra))) || (i===0 && !(qualityExtra>0));
+    const activeCls = "quality-btn active border-2 border-[#3d3530] rounded-lg p-3 text-left text-sm";
+    const idleCls = "quality-btn border-2 border-[#3d3530] rounded-lg p-3 text-left text-sm text-[#b7b0a8]";
+    const isActive = (window._selQualityId ? window._selQualityId === q.id : i === 0);
+    return '<button type="button" class="'+(isActive?activeCls:idleCls)+'" data-id="'+q.id+'" data-extra="'+q.extra+'" data-label="'+String(q.label).replace(/"/g,"&quot;")+">'
+      + '<span class="block font-semibold">'+(i+1)+'. '+q.label+'</span>'
+      + '<span class="text-xs opacity-70">+₹'+q.extra+'</span></button>';
+  }).join("");
+  box.querySelectorAll(".quality-btn").forEach(function(btn) {
+    btn.addEventListener("click", function() {
+      window._selQualityId = btn.dataset.id;
+      if (typeof qualityExtra !== "undefined") qualityExtra = Number(btn.dataset.extra) || 0;
+      renderFdQuality();
+      // trigger existing price update if any
+      try {
+        const ev = new Event("click");
+        // update total display
+        if (typeof updateTotal === "function") updateTotal();
+      } catch(e) {}
+      // mimic old handler price update
+      const totalEl = document.getElementById("total-price") || document.getElementById("price-total");
+      if (typeof finalPrice !== "undefined" && totalEl) {
+        totalEl.textContent = "₹" + (Math.round(finalPrice) + (Number(qualityExtra)||0));
+      }
+    });
+  });
+}
+async function loadFdQuality() {
+  try {
+    const res = await fetch("/api/settings");
+    const data = await res.json();
+    const list = (data.settings && data.settings.qualityOptions) || [];
+    if (list.length) {
+      qualityOptionsList = list.map(q => ({
+        id: q.id || "q", label: q.label || "Quality", sub: q.sub || "", extra: Number(q.extra)||0
+      }));
+      window._selQualityId = qualityOptionsList[0].id;
+      if (typeof qualityExtra !== "undefined") qualityExtra = qualityOptionsList[0].extra;
+    }
+  } catch(e) {}
+  renderFdQuality();
+}
+loadFdQuality();
+
+</script>
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet"/>
   <script>
     tailwind.config = {
@@ -40,12 +95,68 @@
     .fp-frame { display: block; max-width: 100%; height: auto; object-fit: contain; }
     .fp-photo {
       position: absolute; overflow: hidden;
-      left: 12%; right: 12%; top: 14%; bottom: 14%;
+      left: 14%; right: 14%; top: 15%; bottom: 15%;
     }
     .fp-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .type-card.active { border-color: #e9c176; box-shadow: 0 0 0 1px #e9c176; }
     .quality-btn.active { border-color: #e9c176; background: rgba(233,193,118,0.12); color: #e9c176; }
     .swatch.active { outline: 2px solid #e9c176; outline-offset: 2px; }
+  
+    /* Mobile frame + photo fix — frame always visible, photo fits inside */
+    @media (max-width: 768px) {
+      #preview-box {
+        min-height: 320px !important;
+        padding: 10px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+      }
+      #preview-box .fp-box,
+      #preview-box > div {
+        width: 100% !important;
+        max-width: 100% !important;
+        height: auto !important;
+        min-height: 280px !important;
+      }
+      #preview-box .fp-frame,
+      #preview-box img.fp-frame,
+      #preview-box img {
+        display: block !important;
+        max-width: 100% !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+      }
+      #preview-box .fp-photo {
+        z-index: 2 !important;
+      }
+    }
+    /* Colorful buttons */
+    label[for], label.cursor-pointer {
+      background: linear-gradient(135deg, #f2ca50, #d4af37) !important;
+      color: #1a1200 !important;
+      font-weight: 700 !important;
+      border: none !important;
+      box-shadow: 0 4px 12px rgba(212,175,55,0.3);
+    }
+    #order-btn, #order-btn-m {
+      background: linear-gradient(135deg, #22c55e, #16a34a) !important;
+      color: #fff !important;
+      font-weight: 700 !important;
+      border: none !important;
+      box-shadow: 0 4px 14px rgba(34,197,94,0.35);
+    }
+    #order-btn:hover, #order-btn-m:hover { filter: brightness(1.08); }
+    .quality-btn.active {
+      background: linear-gradient(135deg, rgba(242,202,80,0.3), rgba(212,175,55,0.15)) !important;
+      border-color: #f2ca50 !important;
+      color: #f2ca50 !important;
+    }
+    .swatch.active {
+      outline: 3px solid #f2ca50 !important;
+      outline-offset: 3px !important;
+      box-shadow: 0 0 10px rgba(242,202,80,0.5);
+    }
+
   </style>
 </head>
 <body class="min-h-screen flex flex-col">
@@ -100,18 +211,7 @@
         <div>
           <p class="text-xs uppercase tracking-widest text-[#b7b0a8] mb-2">Photo Quality</p>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-2" id="quality-box">
-            <button type="button" class="quality-btn active border-2 border-[#3d3530] rounded-lg p-3 text-left text-sm" data-id="normal" data-extra="0">
-              <span class="block font-semibold">1. Normal</span>
-              <span class="text-xs opacity-70">+₹0</span>
-            </button>
-            <button type="button" class="quality-btn border-2 border-[#3d3530] rounded-lg p-3 text-left text-sm text-[#b7b0a8]" data-id="lamination" data-extra="80">
-              <span class="block font-semibold">2. Lamination</span>
-              <span class="text-xs opacity-70">+₹80</span>
-            </button>
-            <button type="button" class="quality-btn border-2 border-[#3d3530] rounded-lg p-3 text-left text-sm text-[#b7b0a8]" data-id="ntr" data-extra="150">
-              <span class="block font-semibold">3. NTR Print</span>
-              <span class="text-xs opacity-70">+₹150</span>
-            </button>
+            <!-- quality options from API -->
           </div>
         </div>
 
@@ -130,7 +230,7 @@
         </div>
 
         <!-- Desktop order btn -->
-        <button id="order-btn" type="button" class="hidden lg:block w-full py-4 bg-[#e9c176] text-[#241804] font-semibold rounded-lg hover:brightness-105">
+        <button id="order-btn" type="button" disabled class="hidden lg:block w-full py-4 bg-[#e9c176] text-[#241804] font-semibold rounded-lg hover:brightness-105 disabled:opacity-50 disabled:cursor-not-allowed">
           Continue to Order
         </button>
       </div>
@@ -144,7 +244,7 @@
         <p class="text-xs text-[#b7b0a8]">Total</p>
         <p id="mobile-price" class="text-lg font-bold text-[#e9c176]">—</p>
       </div>
-      <button id="order-btn-m" type="button" class="px-6 py-3 bg-[#e9c176] text-[#241804] font-semibold rounded-lg">
+      <button id="order-btn-m" type="button" disabled class="px-6 py-3 bg-[#e9c176] text-[#241804] font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed">
         Continue to Order
       </button>
     </div>
@@ -201,27 +301,31 @@ function buildPreview(frameImg, photoUrl) {
   const orient = qs("orient") || "vertical";
   const portrait = orient !== "horizontal";
   const ratio = portrait ? "2 / 3" : "3 / 2";
+  // Mobile-safe: width + aspect-ratio only (no height:100% — collapses on mobile)
+  const box = `position:relative;width:100%;max-width:420px;margin:0 auto;aspect-ratio:${ratio};background:#0a0a0a;overflow:hidden;`;
+  // Photo inset tuned so photo sits inside frame border (~14–15%)
+  const insetX = 14, insetY = 15;
   if (frameImg && photoUrl) {
-    return `<div style="position:relative;width:100%;max-width:420px;margin:0 auto;aspect-ratio:${ratio};">
-      <img src="${frameImg}" alt="frame" style="position:absolute;inset:0;width:100%;height:100%;object-fit:fill;z-index:1;"/>
-      <div style="position:absolute;left:10%;right:10%;top:10%;bottom:10%;overflow:hidden;z-index:2;">
+    return `<div class="fp-box" style="${box}">
+      <img class="fp-frame" src="${frameImg}" alt="frame" style="position:absolute;inset:0;width:100%;height:100%;object-fit:fill;z-index:1;display:block;" onerror="this.style.display='none'"/>
+      <div class="fp-photo" style="position:absolute;left:${insetX}%;right:${insetX}%;top:${insetY}%;bottom:${insetY}%;overflow:hidden;z-index:2;">
         <img src="${photoUrl}" alt="photo" style="width:100%;height:100%;object-fit:cover;display:block;"/>
         <div class="glass-shine"></div>
       </div>
     </div>`;
   }
   if (frameImg) {
-    return `<div style="position:relative;width:100%;max-width:420px;margin:0 auto;aspect-ratio:${ratio};">
-      <img src="${frameImg}" alt="frame" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;"/>
+    return `<div class="fp-box" style="${box}">
+      <img class="fp-frame" src="${frameImg}" alt="frame" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block;" onerror="this.style.display='none'"/>
     </div>`;
   }
   if (photoUrl) {
-    return `<div style="position:relative;width:100%;max-width:420px;margin:0 auto;aspect-ratio:${ratio};overflow:hidden;">
-      <img src="${photoUrl}" alt="photo" style="width:100%;height:100%;object-fit:cover;"/>
+    return `<div class="fp-box" style="${box}">
+      <img src="${photoUrl}" alt="photo" style="width:100%;height:100%;object-fit:cover;display:block;"/>
       <div class="glass-shine"></div>
     </div>`;
   }
-  return `<div style="padding:48px;text-align:center;color:#b7b0a8;">Photo upload karein</div>`;
+  return `<div style="${box}display:flex;align-items:center;justify-content:center;"><span style="color:#b7b0a8;font-size:13px;padding:16px;text-align:center;">Pehle frame dikhega · phir photo upload karein</span></div>`;
 }
 
 function updatePreview() {
@@ -308,7 +412,7 @@ async function load() {
       image: f.imageData || f.imageUrl || ""
     }));
   } catch (e) {
-    document.getElementById("preview-box").innerHTML = "<p class='text-red-400 p-4'>Frames load nahi hue</p>";
+    document.getElementById("preview-box").innerHTML = "<p class='text-red-400 p-4'>Frames load nahi hue. <a href='javascript:location.reload()' class='text-[#e9c176] underline'>Dobara try karein</a></p>";
     return;
   }
 
@@ -317,6 +421,12 @@ async function load() {
     document.getElementById("preview-box").innerHTML = "<p class='text-[#b7b0a8] p-4'>Frame nahi mila. <a href='/frames' class='text-[#e9c176] underline'>Back</a></p>";
     return;
   }
+
+  // Frame loaded successfully — now safe to allow ordering
+  const obtn = document.getElementById("order-btn");
+  const obtnM = document.getElementById("order-btn-m");
+  if (obtn) obtn.disabled = false;
+  if (obtnM) obtnM.disabled = false;
 
   // Photo from session (frames page se) or local
   try {
@@ -362,27 +472,66 @@ document.querySelectorAll(".quality-btn").forEach(btn => {
 });
 
 function goOrder() {
-  if (!selected) return;
-  // Reuse frames page order flow via query — or redirect with state
-  const params = new URLSearchParams({
-    order: "1",
+  if (!selected) {
+    alert("Frame abhi load ho raha hai, thoda ruko aur dobara try karo. Agar problem bani rahe to page refresh karein.");
+    return;
+  }
+  const { price, discount, finalPrice } = framePrice(selected);
+  const total = finalPrice + qualityExtra;
+  const qualityLabel = (document.querySelector(".quality-btn.active")?.dataset?.label)
+    || (document.querySelector(".quality-btn.active")?.dataset?.id)
+    || (window._selQualityId) || "Normal";
+  const ctx = {
+    frameId: selected.id,
     id: selected.id,
-    quality: qualityExtra,
-    colour: selectedColour.id || ""
-  });
-  // Store selection and go back to frames order, or open order on same site
+    frameName: selected.title || selected.size || "Frame",
+    title: selected.title || "",
+    name: selected.title || "",
+    size: selected.size || "",
+    price: finalPrice,
+    mrp: price,
+    discount: discount,
+    finalPrice: finalPrice,
+    qualityExtra: qualityExtra,
+    quality: qualityLabel,
+    qualityLabel: qualityLabel,
+    qualityName: qualityLabel,
+    colourName: (selectedColour && selectedColour.name) || "Gold",
+    colourId: (selectedColour && selectedColour.id) || "gold",
+    colourHex: (selectedColour && selectedColour.hex) || "#c9a227",
+    orientation: qs("orient") || "vertical",
+    total: total
+  };
   try {
-    sessionStorage.setItem("as_order_frame", JSON.stringify({
-      id: selected.id,
-      title: selected.title,
-      size: selected.size,
-      price: framePrice(selected).finalPrice + qualityExtra,
-      colour: selectedColour,
-      qualityExtra
-    }));
+    const raw = JSON.stringify(ctx);
+    sessionStorage.setItem("aditya_order_ctx", raw);
+    localStorage.setItem("aditya_order_ctx", raw);
+    if (userPhoto) {
+      try { sessionStorage.setItem("as_user_photo", userPhoto); } catch (_) {}
+    }
   } catch (_) {}
-  // For now open frames with hash to order — simplest: location to frames and trigger
-  window.location.href = "/frames?orderFrame=" + encodeURIComponent(selected.id);
+
+  // STRICT login — sirf 10-digit mobile wali session
+  let loggedIn = false;
+  try {
+    const s = JSON.parse(localStorage.getItem("aditya_studio_session_v1") || "null");
+    const mob = s ? String(s.mobile || s.phone || "").replace(/\D/g, "") : "";
+    loggedIn = (mob.length === 10);
+  } catch (e) { loggedIn = false; }
+
+  if (!loggedIn) {
+    try {
+      localStorage.setItem("aditya_pending_order_flow", JSON.stringify({
+        at: Date.now(),
+        returnTo: "/place-order.html"
+      }));
+    } catch (e) {}
+    // clear any fake/partial session
+    try { localStorage.removeItem("aditya_studio_session_v1"); } catch (e) {}
+    window.location.href = "/book-now.html?next=" + encodeURIComponent("/place-order.html") + "&from=order";
+    return;
+  }
+  window.location.href = "/place-order.html";
 }
 
 document.getElementById("order-btn").addEventListener("click", goOrder);
