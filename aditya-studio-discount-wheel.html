@@ -2203,6 +2203,10 @@ registerForm.addEventListener('submit', async (e)=>{
       adTokens: out.adTokens || 0, badge: out.badge || null, totalSpend: out.totalSpend || 0
     };
     saveSession(currentAccount, out.sessionToken);
+
+    // Customer frame/order process se aaya ho to free spin dikhakar uska
+    // selected frame ya filled order flow break nahi karna hai.
+    if (continueToPendingOrder()) return;
     leaveAuthScreen();
     if (!currentAccount.freeSpinUsed) showFreeSpinOffer();
     else enterDashboard();
@@ -2252,6 +2256,10 @@ loginForm.addEventListener('submit', async (e)=>{
       totalSpend: out.totalSpend || 0
     };
     saveSession(currentAccount, out.sessionToken);
+
+    // Login ke baad sabse pehle wahi pending order/payment step kholna hai.
+    // Isse user ko Home par wapas jaakar frame dobara select nahi karna padega.
+    if (continueToPendingOrder()) return;
     const afterLogin = new URLSearchParams(location.search || '').get('next');
     if(afterLogin){
       leaveAuthScreen();
