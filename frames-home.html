@@ -379,10 +379,33 @@ tailwind.config = {
       display: block !important;
     }
     #threejs-container {
-      min-height: 260px !important;
-      height: 55vw !important;
-      max-height: 380px !important;
+      min-height: 220px !important;
+      height: 52vw !important;
+      max-height: 270px !important;
     }
+    /* Crop ka exact live result chhote preview mein dikhe; controls side mein rahein. */
+    #photo-adjust-box > .flex {
+      flex-direction: row !important;
+      gap: 12px !important;
+      align-items: flex-start !important;
+    }
+    #photo-adjust-box > .flex > div:first-child {
+      flex: 0 0 150px !important;
+      width: 150px !important;
+    }
+    #photo-adjust-box > .flex > div:last-child { flex: 1 1 auto !important; gap: 10px !important; }
+    #crop-stage { max-width: 150px !important; }
+    #photo-adjust-box p { font-size: .72rem !important; line-height: 1.35 !important; }
+    #photo-adjust-box .flex-wrap { gap: 5px !important; }
+    #photo-adjust-box .flex-wrap button { min-width: 0 !important; padding: 7px 4px !important; font-size: .68rem !important; }
+    /* Vertical/Horizontal cards ko ek compact row mein rakho. */
+    #orientation-box .flex { flex-direction: row !important; gap: 8px !important; }
+    #orientation-box .orient-btn { padding: 10px 5px !important; gap: 3px !important; flex-direction: column !important; }
+    #orientation-box .orient-btn .material-symbols-outlined { font-size: 26px !important; }
+    #orientation-box .orient-btn .text-left { text-align: center !important; }
+    #orientation-box .orient-btn .font-headline-sm { font-size: 1rem !important; }
+    #orientation-box .orient-btn .text-xs { font-size: .62rem !important; }
+    #orientation-box #orient-hint { font-size: .72rem !important; margin-top: 8px !important; }
     .user-image-container {
       display: flex !important;
       align-items: center !important;
@@ -539,34 +562,7 @@ tailwind.config = {
 
 <!-- Main Content -->
 <main class="w-full">
-  <!-- Animated Home Banner (admin se customize) -->
-  <section id="home-banner" class="relative w-full h-[42vh] min-h-[260px] max-h-[480px] overflow-hidden bg-surface-container-lowest">
-    <div id="banner-slides" class="absolute inset-0">
-      <!-- slides injected by JS -->
-    </div>
-    <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/25 to-black/40 pointer-events-none z-[1]"></div>
-    <div class="absolute inset-0 z-[2] flex flex-col items-center justify-center text-center px-4">
-      <h1 id="banner-title" class="font-display-lg-mobile md:font-display-lg text-display-lg-mobile md:text-display-lg text-secondary drop-shadow-lg transition-opacity duration-500">
-        Aditya Studio
-      </h1>
-      <p id="banner-sub" class="font-body-lg text-body-lg text-on-surface max-w-2xl mx-auto mt-2 drop-shadow-md transition-opacity duration-500">
-        Museum-quality photo frames
-      </p>
-      <a href="#sizes" class="mt-5 inline-flex items-center gap-2 px-5 py-2.5 bg-secondary/90 text-on-secondary font-label-caps text-label-caps rounded-DEFAULT hover:bg-secondary transition-colors">
-        <span class="material-symbols-outlined text-sm">photo_frame</span>
-        BOOK NOW — Order Frames
-      </a>
-    </div>
-    <div class="absolute bottom-4 left-1/2 -translate-x-1/2 z-[3] flex gap-2" id="banner-dots"></div>
-    <button type="button" id="banner-prev" class="absolute left-3 top-1/2 -translate-y-1/2 z-[3] w-10 h-10 rounded-full bg-black/40 text-secondary border border-outline-variant flex items-center justify-center hover:bg-black/60" aria-label="Previous">
-      <span class="material-symbols-outlined">chevron_left</span>
-    </button>
-    <button type="button" id="banner-next" class="absolute right-3 top-1/2 -translate-y-1/2 z-[3] w-10 h-10 rounded-full bg-black/40 text-secondary border border-outline-variant flex items-center justify-center hover:bg-black/60" aria-label="Next">
-      <span class="material-symbols-outlined">chevron_right</span>
-    </button>
-  </section>
-
-  <!-- Photo Upload (banner ke niche) -->
+  <!-- Photo Upload -->
   <section id="upload" class="w-full py-12 px-margin-mobile md:px-margin-desktop bg-surface">
     <div class="max-w-3xl mx-auto">
       <div class="bg-surface-container-low p-gutter rounded-xl border border-secondary/30 shadow-2xl text-center">
@@ -625,7 +621,7 @@ tailwind.config = {
                 <div class="absolute inset-0 pointer-events-none border border-secondary/40 rounded-lg" style="box-shadow: inset 0 0 0 2px rgba(212,175,55,0.35);"></div>
                 <div class="absolute bottom-2 left-1/2 -translate-x-1/2 z-10 px-2 py-0.5 rounded-full bg-black/60 text-[10px] text-secondary border border-secondary/30 pointer-events-none whitespace-nowrap">Drag to move</div>
               </div>
-              <p class="text-[11px] text-on-surface-variant mt-2 text-center">Yeh window = frame ke andar dikhne wala hissa</p>
+              <p class="text-[11px] text-on-surface-variant mt-2 text-center">Live frame preview — crop ke baad itna hissa dikhega</p>
             </div>
             <div class="flex-1 flex flex-col justify-center gap-4 min-w-0">
               <div>
@@ -678,25 +674,12 @@ tailwind.config = {
           <div class="absolute bottom-10 left-8 w-24 h-24 rounded-full bg-primary/10 blur-3xl pointer-events-none"></div>
         </div>
       </div>
-      <!-- Size filter + Editing Request -->
+      <!-- Frame choices + WhatsApp editing request -->
       <div id="frame-selection-panel" class="lg:col-span-8 flex flex-col space-y-gutter">
-        <div class="border-b border-outline-variant pb-4">
-          <h3 class="font-headline-md text-primary">Select Frame Size</h3>
-          <p class="text-on-surface-variant text-sm mt-1">Size sequence chhoti se badi · orientation ke hisaab se preview</p>
-        </div>
-        <div class="flex gap-2 flex-wrap" id="size-filter"></div>
-        <p class="text-on-surface-variant text-sm">Neeche samples size order mein hain. Lamba size bhi card ke andar balanced dikhega.</p>
-
-        <!-- Editing Request CTA (khali jagah) -->
-        <div class="mt-4 p-5 rounded-xl border border-secondary/40 bg-surface-container gallery-shadow flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
-          <div>
-            <h4 class="font-headline-sm text-primary">Photo Editing Request</h4>
-            <p class="text-sm text-on-surface-variant mt-1">Photo edit chahiye? Max 10 photos · har photo max 15 MB</p>
-          </div>
-          <button type="button" id="open-edit-request" class="shrink-0 px-6 py-3 bg-secondary text-on-secondary font-label-caps text-label-caps rounded-DEFAULT hover:bg-secondary-fixed transition-colors gallery-shadow">
-            Editing Request
-          </button>
-        </div>
+        <a href="https://wa.me/917024230041?text=Namaste%20Aditya%20Studio%2C%20mujhe%20photo%20editing%20request%20bhejni%20hai." target="_blank" rel="noopener" class="w-full inline-flex items-center justify-center gap-2 px-6 py-3 rounded-DEFAULT bg-[#25D366] text-white font-semibold shadow-lg hover:brightness-110 transition-all">
+          <span class="material-symbols-outlined">chat</span>
+          WhatsApp पर Photo Editing Request भेजें
+        </a>
       </div>
     </div>
 
@@ -989,6 +972,14 @@ let photoPanY = 0.5;
 let photoNaturalW = 0;
 let photoNaturalH = 0;
 let photoAdjustBound = false;
+try {
+  orientation = sessionStorage.getItem("as_photo_orientation") === "horizontal" ? "horizontal" : "vertical";
+  photoZoom = Math.max(1, Math.min(Number(sessionStorage.getItem("as_photo_zoom")) || 1, 3));
+  const savedPanX = Number(sessionStorage.getItem("as_photo_pan_x"));
+  const savedPanY = Number(sessionStorage.getItem("as_photo_pan_y"));
+  photoPanX = Number.isFinite(savedPanX) ? Math.max(0, Math.min(savedPanX, 1)) : 0.5;
+  photoPanY = Number.isFinite(savedPanY) ? Math.max(0, Math.min(savedPanY, 1)) : 0.5;
+} catch (e) {}
 let sizeFilterExpanded = false; // size chips hide by default; ALL click pe show
 const FRAME_COLORS = [
   "#8b5a2b","#b87333","#9e5f3c","#a0522d","#8a3324","#cd7f32",
@@ -2406,10 +2397,13 @@ mainUploadInput.addEventListener("change", (e) => {
       photoNaturalH = img.naturalHeight || img.height;
       const detected = photoNaturalW >= photoNaturalH ? "horizontal" : "vertical";
       setOrientation(detected);
-      showUploadedPhotoFlow();
-      setPhotoZoom(1, true);
-      applyPhotoToThree();
-      try { renderFrames(null); } catch (err) {}
+      try {
+        sessionStorage.setItem("as_photo_orientation", detected);
+        sessionStorage.setItem("as_photo_zoom", "1");
+        sessionStorage.setItem("as_photo_pan_x", "0.5");
+        sessionStorage.setItem("as_photo_pan_y", "0.5");
+      } catch (e) {}
+      location.href = "photo-adjust.html";
     };
     img.src = userPhotoDataUrl;
 

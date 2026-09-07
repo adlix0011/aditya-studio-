@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="hi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Photo Adjust · Aditya Studio</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body{background:#100d09;color:#f4eadc;font-family:Arial,sans-serif}.gold{color:#e5bd5b}.panel{background:#1b1610;border:1px solid rgba(229,189,91,.42);box-shadow:0 12px 35px rgba(0,0,0,.35)}
+    #crop-stage{width:min(100%,300px);aspect-ratio:3/4;position:relative;overflow:hidden;border:3px solid #e5bd5b;border-radius:14px;background:#050505;touch-action:none;box-shadow:0 0 22px rgba(229,189,91,.22)}
+    #crop-photo{position:absolute;left:50%;top:50%;max-width:none;user-select:none;pointer-events:none;transform:translate(-50%,-50%) scale(1);transform-origin:center}
+    .choice.active{border-color:#f4c95d;background:rgba(229,189,91,.18);color:#f4c95d}.choice{border:1px solid #655b50;background:#15110d;color:#ded1c2}
+    input[type=range]{accent-color:#e5bd5b}
+    @media(max-width:560px){#crop-stage{width:145px}.adjust-grid{grid-template-columns:145px minmax(0,1fr)!important;gap:12px!important}.action-row button{font-size:.72rem;padding:.55rem .25rem}.tip{font-size:.72rem}}
+  </style>
+</head>
+<body>
+  <header class="sticky top-0 z-10 bg-[#100d09] border-b border-[#5d4c2b] px-4 py-4 flex items-center justify-between">
+    <a href="/frames" class="text-sm gold">← वापस जाएँ</a><h1 class="text-lg font-bold gold">Aditya Studio</h1><span class="w-14"></span>
+  </header>
+  <main class="max-w-2xl mx-auto p-4 sm:p-6">
+    <section class="panel rounded-2xl p-4 sm:p-6">
+      <h2 class="text-xl sm:text-2xl font-bold gold text-center">अपनी Photo Adjust करें</h2>
+      <p class="text-center text-sm text-stone-300 mt-2">यह live preview है — frame में उतना ही हिस्सा दिखाई देगा।</p>
+      <div id="missing" class="hidden mt-6 text-center rounded-xl border border-red-500/50 bg-red-950/30 p-5 text-red-200">पहले Frames page से photo upload करें।</div>
+      <div id="editor" class="mt-5">
+        <div class="adjust-grid grid grid-cols-[minmax(145px,300px)_minmax(0,1fr)] gap-5 items-start">
+          <div class="flex flex-col items-center"><div id="crop-stage"><img id="crop-photo" alt="Live frame preview"><span class="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/70 border border-[#e5bd5b]/40 px-2 py-1 text-[10px] gold whitespace-nowrap">Drag to move</span></div><p class="tip text-xs text-stone-400 text-center mt-2">Live frame preview</p></div>
+          <div class="min-w-0 space-y-4">
+            <div><div class="flex justify-between text-sm mb-1"><label>Zoom</label><span id="zoom-value" class="gold">100%</span></div><input id="zoom" class="w-full" type="range" min="100" max="300" value="100"><div class="flex justify-between text-[11px] text-stone-400"><span>ज़्यादा photo</span><span>Close-up</span></div></div>
+            <div class="action-row grid grid-cols-3 gap-2"><button id="fit" class="choice rounded-lg">Fit</button><button id="fill" class="choice rounded-lg">Fill</button><button id="reset" class="choice rounded-lg">Reset</button></div>
+            <p class="tip text-stone-400 leading-relaxed">Zoom बढ़ाएँ या photo को drag करके सही हिस्सा frame में रखें।</p>
+          </div>
+        </div>
+        <div class="mt-6"><p class="text-center text-xs tracking-widest text-stone-400 mb-3">FRAME ORIENTATION</p><div class="grid grid-cols-2 gap-3"><button class="choice rounded-xl p-3 text-center" data-orientation="vertical">▯<span class="block font-semibold mt-1">Vertical</span><span class="block text-xs opacity-75">खड़ा frame</span></button><button class="choice rounded-xl p-3 text-center" data-orientation="horizontal">▭<span class="block font-semibold mt-1">Horizontal</span><span class="block text-xs opacity-75">लेटा frame</span></button></div></div>
+        <button id="done" class="mt-6 w-full rounded-xl bg-gradient-to-r from-yellow-600 to-yellow-400 py-3 font-bold text-[#211500]">Done — Frames देखें</button>
+      </div>
+    </section>
+  </main>
+  <script>
+    const photo=sessionStorage.getItem('as_user_photo'); const editor=document.getElementById('editor');
+    if(!photo){editor.classList.add('hidden');document.getElementById('missing').classList.remove('hidden')} else {
+      let orientation=sessionStorage.getItem('as_photo_orientation')==='horizontal'?'horizontal':'vertical';
+      let zoom=Number(sessionStorage.getItem('as_photo_zoom')); if(!Number.isFinite(zoom)||zoom<1)zoom=1;
+      let panX=Number(sessionStorage.getItem('as_photo_pan_x')); if(!Number.isFinite(panX))panX=.5;
+      let panY=Number(sessionStorage.getItem('as_photo_pan_y')); if(!Number.isFinite(panY))panY=.5;
+      const stage=document.getElementById('crop-stage'),img=document.getElementById('crop-photo'),slider=document.getElementById('zoom'); img.src=photo;
+      function draw(){stage.style.aspectRatio=orientation==='horizontal'?'4 / 3':'3 / 4'; const sw=stage.clientWidth||250,sh=stage.clientHeight||330; const iw=img.naturalWidth||1,ih=img.naturalHeight||1,ia=iw/ih,sa=sw/sh; let w,h;if(ia>sa){h=sh;w=h*ia}else{w=sw;h=w/ia}w*=zoom;h*=zoom;const x=Math.max(0,(w-sw)/2)*(1-2*panX),y=Math.max(0,(h-sh)/2)*(1-2*panY);img.style.width=w+'px';img.style.height=h+'px';img.style.transform='translate(calc(-50% + '+x+'px),calc(-50% + '+y+'px))';slider.value=Math.round(zoom*100);document.getElementById('zoom-value').textContent=Math.round(zoom*100)+'%';document.querySelectorAll('[data-orientation]').forEach(b=>b.classList.toggle('active',b.dataset.orientation===orientation))}
+      img.onload=draw; window.addEventListener('resize',draw); slider.addEventListener('input',()=>{zoom=Number(slider.value)/100;draw()});document.getElementById('fit').onclick=()=>{zoom=1;panX=.5;panY=.5;draw()};document.getElementById('fill').onclick=()=>{zoom=1.35;panX=.5;panY=.5;draw()};document.getElementById('reset').onclick=()=>{zoom=1;panX=.5;panY=.5;draw()};document.querySelectorAll('[data-orientation]').forEach(b=>b.onclick=()=>{orientation=b.dataset.orientation;draw()});
+      let drag=false,lastX=0,lastY=0;stage.addEventListener('pointerdown',e=>{drag=true;lastX=e.clientX;lastY=e.clientY;stage.setPointerCapture(e.pointerId)});stage.addEventListener('pointermove',e=>{if(!drag)return;panX=Math.max(0,Math.min(1,panX-(e.clientX-lastX)/(stage.clientWidth||1)*.55/zoom));panY=Math.max(0,Math.min(1,panY-(e.clientY-lastY)/(stage.clientHeight||1)*.55/zoom));lastX=e.clientX;lastY=e.clientY;draw()});stage.addEventListener('pointerup',()=>drag=false);stage.addEventListener('pointercancel',()=>drag=false);
+      document.getElementById('done').onclick=()=>{sessionStorage.setItem('as_photo_orientation',orientation);sessionStorage.setItem('as_photo_zoom',zoom);sessionStorage.setItem('as_photo_pan_x',panX);sessionStorage.setItem('as_photo_pan_y',panY);location.href='/frames'};
+    }
+  </script>
+</body>
+</html>
