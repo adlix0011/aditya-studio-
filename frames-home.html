@@ -579,6 +579,16 @@ tailwind.config = {
           <input accept="image/*" class="hidden" id="main-upload" type="file"/>
         </div>
 
+        <!-- Upload ke baad yahin live 3D preview aur controls aayenge -->
+        <div id="uploaded-photo-flow" class="hidden mt-5 text-left">
+          <div id="upload-3d-host"></div>
+          <button type="button" id="open-photo-adjust" class="mt-5 w-full flex items-center justify-center gap-2 px-5 py-3 rounded-DEFAULT border border-secondary/60 bg-secondary/15 text-secondary font-medium hover:bg-secondary/25 transition-all">
+            <span class="material-symbols-outlined">crop</span>
+            Photo Adjust करें
+          </button>
+          <div id="post-upload-controls"></div>
+        </div>
+
         <!-- Orientation selector -->
         <div id="orientation-box" class="mt-6 hidden">
           <p class="font-label-caps text-label-caps text-on-surface-variant mb-3 text-center tracking-widest">FRAME ORIENTATION</p>
@@ -669,7 +679,7 @@ tailwind.config = {
         </div>
       </div>
       <!-- Size filter + Editing Request -->
-      <div class="lg:col-span-8 flex flex-col space-y-gutter">
+      <div id="frame-selection-panel" class="lg:col-span-8 flex flex-col space-y-gutter">
         <div class="border-b border-outline-variant pb-4">
           <h3 class="font-headline-md text-primary">Select Frame Size</h3>
           <p class="text-on-surface-variant text-sm mt-1">Size sequence chhoti se badi · orientation ke hisaab se preview</p>
@@ -2245,6 +2255,40 @@ function showPhotoAdjustUI() {
   bindPhotoAdjustOnce();
 }
 
+// Upload complete hone par purana upload card hata kar usi jagah 3D preview dikhaye.
+// Crop/zoom panel tabhi khulega jab customer "Photo Adjust" button dabayega.
+function showUploadedPhotoFlow() {
+  const uploadTrigger = document.getElementById("main-upload-trigger");
+  const flow = document.getElementById("uploaded-photo-flow");
+  const viewerHost = document.getElementById("upload-3d-host");
+  const controlsHost = document.getElementById("post-upload-controls");
+  const viewer = document.getElementById("viewer-card");
+  const adjustBox = document.getElementById("photo-adjust-box");
+  const orientationBox = document.getElementById("orientation-box");
+  const selectionPanel = document.getElementById("frame-selection-panel");
+
+  if (uploadTrigger) uploadTrigger.classList.add("hidden");
+  if (flow) flow.classList.remove("hidden");
+  if (viewerHost && viewer) {
+    viewerHost.appendChild(viewer);
+    viewer.classList.remove("sticky", "top-24", "lg:col-span-4");
+  }
+  if (controlsHost && adjustBox) controlsHost.appendChild(adjustBox);
+  if (controlsHost && orientationBox) controlsHost.appendChild(orientationBox);
+  if (adjustBox) adjustBox.classList.add("hidden");
+  if (orientationBox) orientationBox.classList.add("hidden");
+  if (selectionPanel) {
+    selectionPanel.classList.remove("lg:col-span-8");
+    selectionPanel.classList.add("lg:col-span-12");
+  }
+
+  // Re-parent hone ke baad canvas ko nayi jagah ki exact size mile.
+  requestAnimationFrame(function () {
+    initThreeViewer();
+    applyPhotoToThree();
+  });
+}
+
 function bindPhotoAdjustOnce() {
   if (photoAdjustBound) return;
   photoAdjustBound = true;
@@ -2336,6 +2380,12 @@ function bindPhotoAdjustOnce() {
 const mainUploadTrigger = document.getElementById("main-upload-trigger");
 const mainUploadInput = document.getElementById("main-upload");
 mainUploadTrigger.addEventListener("click", () => mainUploadInput.click());
+document.getElementById("open-photo-adjust").addEventListener("click", function () {
+  showPhotoAdjustUI();
+  const orientationBox = document.getElementById("orientation-box");
+  if (orientationBox) orientationBox.classList.remove("hidden");
+  this.innerHTML = '<span class="material-symbols-outlined">edit</span> Photo Adjust जारी रखें';
+});
 mainUploadInput.addEventListener("change", (e) => {
   if (!e.target.files || !e.target.files[0]) return;
   const file = e.target.files[0];
@@ -2356,21 +2406,13 @@ mainUploadInput.addEventListener("change", (e) => {
       photoNaturalH = img.naturalHeight || img.height;
       const detected = photoNaturalW >= photoNaturalH ? "horizontal" : "vertical";
       setOrientation(detected);
-      document.getElementById("orientation-box").classList.remove("hidden");
-      showPhotoAdjustUI();
+      showUploadedPhotoFlow();
       setPhotoZoom(1, true);
       applyPhotoToThree();
       try { renderFrames(null); } catch (err) {}
     };
     img.src = userPhotoDataUrl;
 
-    mainUploadTrigger.innerHTML = `
-      <span class="material-symbols-outlined text-5xl text-secondary mb-3">check_circle</span>
-      <p class="font-headline-sm text-headline-sm text-primary mb-2">Photo Uploaded</p>
-      <p class="text-sm text-on-surface-variant mt-1">Neeche zoom / drag se frame mein photo adjust karo</p>
-    `;
-    mainUploadTrigger.classList.add("border-secondary", "bg-secondary-container/20");
-    document.getElementById("orientation-box").classList.remove("hidden");
   };
   reader.readAsDataURL(file);
 });
