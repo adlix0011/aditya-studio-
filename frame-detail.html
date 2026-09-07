@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html lang="hi" class="dark">
 <head>
+  <script>
+  window.alert=function(message){function show(){var old=document.getElementById('adityaPageAlert');if(old)old.remove();var text=String(message||''),bad=/(fail|error|wrong|network|nahi|नहीं|गलत|invalid|missing|expire|chhoti|required|check)/i.test(text),box=document.createElement('div');box.id='adityaPageAlert';box.style.cssText='position:fixed;left:16px;right:16px;top:18px;z-index:99999;max-width:520px;margin:auto;padding:13px 42px 13px 15px;border-radius:13px;font:600 14px Arial,sans-serif;line-height:1.45;color:'+(bad?'#fecaca':'#dcfce7')+';background:'+(bad?'#571b22':'#14532d')+';border:1px solid '+(bad?'#ef4444':'#4ade80')+';box-shadow:0 12px 30px rgba(0,0,0,.42)';box.innerHTML=(bad?'⚠️ ':'✅ ')+text+'<button style="position:absolute;right:10px;top:8px;border:0;background:transparent;color:inherit;font-size:22px">×</button>';box.querySelector('button').onclick=function(){box.remove()};document.body.appendChild(box);setTimeout(function(){box.remove()},5000)}if(document.body)show();else document.addEventListener('DOMContentLoaded',show,{once:true})};
+  </script>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover"/>
   <title>Frame Detail · Aditya Studio</title>
@@ -19,7 +22,7 @@ function renderFdQuality() {
     const activeCls = "quality-btn active border-2 border-[#3d3530] rounded-lg p-3 text-left text-sm";
     const idleCls = "quality-btn border-2 border-[#3d3530] rounded-lg p-3 text-left text-sm text-[#b7b0a8]";
     const isActive = (window._selQualityId ? window._selQualityId === q.id : i === 0);
-    return '<button type="button" class="'+(isActive?activeCls:idleCls)+'" data-id="'+q.id+'" data-extra="'+q.extra+'" data-label="'+String(q.label).replace(/"/g,"&quot;")+">'
+    return '<button type="button" class="'+(isActive?activeCls:idleCls)+'" data-id="'+q.id+'" data-extra="'+q.extra+'" data-label="'+String(q.label).replace(/"/g,"&quot;")+'">'
       + '<span class="block font-semibold">'+(i+1)+'. '+q.label+'</span>'
       + '<span class="text-xs opacity-70">+₹'+q.extra+'</span></button>';
   }).join("");
@@ -536,6 +539,13 @@ function goOrder() {
 
 document.getElementById("order-btn").addEventListener("click", goOrder);
 document.getElementById("order-btn-m").addEventListener("click", goOrder);
+
+// Doosre page/tab me logout hone par is selected-frame page se bhi bahar bhejo.
+window.addEventListener("storage", function(event) {
+  if (event.key === "aditya_studio_session_v1" && !event.newValue) {
+    window.location.replace("/");
+  }
+});
 
 if (sessionStorage.getItem(PHOTO_KEY) || localStorage.getItem(PHOTO_KEY)) {
   document.getElementById("clear-photo").classList.remove("hidden");

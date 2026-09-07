@@ -9,9 +9,20 @@ const path = require('path');
 const crypto = require('crypto');
 
 const PORT = process.env.PORT || 8000;
-const PIN_SALT = process.env.PIN_SALT || 'aditya-studio-local-salt';
-// Local default password — production pe env se set karo: ADMIN_PASSWORD
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'ADlix08';
+// PINs are hashed individually; this is only retained for legacy deployments.
+const PIN_SALT = process.env.PIN_SALT || '';
+// Never ship an admin password inside source code. run.bat asks for it locally.
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
+// SMS gateway secrets stay only in process environment, never in source/data files.
+const SMS_GATEWAY_URL = String(process.env.SMS_GATEWAY_URL || '').replace(/\/+$/, '');
+const SMS_GATEWAY_API_KEY = String(process.env.SMS_GATEWAY_API_KEY || '');
+const OTP_TTL_MS = 5 * 60 * 1000;
+const OTP_RESEND_COOLDOWN_MS = 60 * 1000;
+const OTP_MAX_ATTEMPTS = 5;
+const OTP_PEPPER = process.env.OTP_SECRET || SMS_GATEWAY_API_KEY || crypto.randomBytes(32).toString('hex');
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const sessions = new Map();
+const authAttempts = new Map();
 
 function resolveDataDir() {
   const preferred = process.env.DATA_DIR || __dirname;
@@ -39,12 +50,16 @@ const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
 const FRAMES_FILE = path.join(DATA_DIR, 'photo-frames.json');
 const FRAME_ORDERS_FILE = path.join(DATA_DIR, 'frame-orders.json');
 const EDIT_REQUESTS_FILE = path.join(DATA_DIR, 'edit-requests.json');
+const WALLET_TOPUPS_FILE = path.join(DATA_DIR, 'wallet-topups.json');
 const INDEX_HTML_FILE = path.join(__dirname, 'index.html');
 const BOOK_NOW_HTML_FILE = path.join(__dirname, 'aditya-studio-discount-wheel.html');
+const VERIFY_MOBILE_HTML_FILE = path.join(__dirname, 'verify-mobile.html');
 const FRAMES_HTML_FILE = path.join(__dirname, 'frames-home.html'); // 3D frames shop + order
 const PLACE_ORDER_HTML_FILE = path.join(__dirname, 'place-order.html');
 const FRAME_DETAIL_HTML_FILE = path.join(__dirname, 'frame-detail.html');
 const BOOK_SERVICE_HTML_FILE = path.join(__dirname, 'book-service-sample.html');
+const ADD_MONEY_HTML_FILE = path.join(__dirname, 'add-money.html');
+const PAYMENT_QR_FILE = path.join(__dirname, 'payment-qr.png');
 const HTML_FILE = BOOK_NOW_HTML_FILE; // legacy alias
 console.log('[boot] Using data dir:', DATA_DIR);
 
@@ -85,8 +100,8 @@ async function initMongo() {
     {
       name: 'ipv4+tls',
       opts: {
-        serverSelectionTimeoutMS: 25000,
-        connectTimeoutMS: 25000,
+        serverSelectionTimeoutMS: 5000,
+        connectTimeoutMS: 5000,
         tls: true,
         family: 4,
         retryWrites: true
@@ -95,16 +110,16 @@ async function initMongo() {
     {
       name: 'ipv4-default',
       opts: {
-        serverSelectionTimeoutMS: 25000,
-        connectTimeoutMS: 25000,
+        serverSelectionTimeoutMS: 5000,
+        connectTimeoutMS: 5000,
         family: 4
       }
     },
     {
       name: 'default',
       opts: {
-        serverSelectionTimeoutMS: 25000,
-        connectTimeoutMS: 25000
+        serverSelectionTimeoutMS: 5000,
+        connectTimeoutMS: 5000
       }
     }
   ];
@@ -159,6 +174,51 @@ function normalizeAccount(a) {
     pin: String(a.pin || '')
   };
 }
+
+function isPinHash(value) { return /^scrypt\$[a-f0-9]+\$[a-f0-9]+$/i.test(String(value || '')); }
+function hashPin(pin) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(String(pin), salt + PIN_SALT, 32).toString('hex');
+  return 'scrypt$' + salt + '$' + hash;
+}
+function verifyPin(acc, pin) {
+  const saved = String(acc && acc.pin || '');
+  if (!/^[0-9]{4}$/.test(String(pin || ''))) return false;
+  if (!isPinHash(saved)) {
+    const ok = crypto.timingSafeEqual(Buffer.from(saved.padEnd(4, '\0')), Buffer.from(String(pin).padEnd(4, '\0')));
+    if (ok) acc.pin = hashPin(pin); // migrate a legacy account at its next correct login
+    return ok;
+  }
+  const parts = saved.split('$');
+  const expected = Buffer.from(parts[2], 'hex');
+  const actual = crypto.scryptSync(String(pin), parts[1] + PIN_SALT, 32);
+  return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
+}
+function setPin(acc, pin) { acc.pin = hashPin(pin); }
+function issueSession(acc) {
+  const token = crypto.randomBytes(32).toString('base64url');
+  sessions.set(token, { mobile: String(acc.mobile), expiresAt: Date.now() + SESSION_TTL_MS });
+  return token;
+}
+function sessionAccount(req, body, accounts) {
+  const bearer = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  const token = String((body && body.sessionToken) || bearer || '');
+  const row = sessions.get(token);
+  if (!row || row.expiresAt < Date.now()) { if (row) sessions.delete(token); return null; }
+  return accounts.find(a => String(a.mobile) === row.mobile) || null;
+}
+function clientKey(req, mobile) { return String(req.socket.remoteAddress || 'unknown') + ':' + String(mobile || ''); }
+function rateLimited(req, mobile, limit, windowMs) {
+  const key = clientKey(req, mobile), now = Date.now();
+  const row = authAttempts.get(key);
+  return !!(row && row.count >= limit && now - row.startedAt < windowMs);
+}
+function recordAuthFailure(req, mobile) {
+  const key = clientKey(req, mobile), now = Date.now(), row = authAttempts.get(key);
+  if (!row || now - row.startedAt > 15 * 60 * 1000) authAttempts.set(key, { count: 1, startedAt: now });
+  else row.count++;
+}
+function clearAuthFailures(req, mobile) { authAttempts.delete(clientKey(req, mobile)); }
 
 async function mongoLoadAccounts() {
   const rows = await mongoDb.collection('accounts').find({}).project({ _id: 0 }).toArray();
@@ -307,7 +367,45 @@ function generateCode() {
   return code;
 }
 function generateOtp() {
-  return String(Math.floor(1000 + Math.random() * 9000));
+  return String(crypto.randomInt(100000, 1000000));
+}
+function hashOtp(otp) {
+  return crypto.createHash('sha256').update(OTP_PEPPER + ':' + String(otp)).digest('hex');
+}
+function otpMatches(row, otp) {
+  const expected = Buffer.from(String(row.otpHash || ''), 'hex');
+  const actual = Buffer.from(hashOtp(otp), 'hex');
+  return expected.length === actual.length && expected.length > 0 && crypto.timingSafeEqual(expected, actual);
+}
+async function sendOtpSms(mobile, otp, requestId) {
+  if (!SMS_GATEWAY_URL || !SMS_GATEWAY_API_KEY) {
+    const err = new Error('SMS gateway configured nahi hai');
+    err.code = 'sms-not-configured';
+    throw err;
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 12000);
+  try {
+    const response = await fetch(SMS_GATEWAY_URL + '/api/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-API-Key': SMS_GATEWAY_API_KEY },
+      body: JSON.stringify({
+        phone_number: '+91' + mobile,
+        message: 'Aditya Studio OTP: ' + otp + '. Yeh 5 minute tak valid hai. Kisi ke saath share na karein.',
+        request_id: requestId
+      }),
+      signal: controller.signal
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.ok === false || data.success === false) {
+      const err = new Error(data.error || data.message || ('SMS gateway HTTP ' + response.status));
+      err.code = 'sms-send-failed';
+      throw err;
+    }
+    return data;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 function loadOtpRequests() {
   if (_cache.otps) return _cache.otps.slice();
@@ -527,6 +625,12 @@ function saveNotifs(list) {
 }
 function defaultSettings() {
   return {
+    // Default payment details. The QR image is kept with the project so it works
+    // on localhost as well as after deployment.
+    upiId: 'BHARATPE.9J0B0S0Y6I253580@unitype',
+    upiQr: '/payment-qr.png',
+    // Add the studio's 10-digit WhatsApp number here when available.
+    helpWhatsapp: '',
     bookImages: {
       wedding: 'https://images.unsplash.com/photo-1519741497674-611481863552?w=400&q=80',
       birthday: 'https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=400&q=80',
@@ -539,6 +643,17 @@ function defaultSettings() {
       { url: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80', title: '🎡 स्पिन ऑफ़र चल रहा है!', sub: 'कोड डालो → व्हील → डिस्काउंट' },
       { url: 'https://images.unsplash.com/photo-1519741497674-611481863552?w=800&q=80', title: '📸 Book Your Day', sub: 'Wedding · Birthday · Event' }
     ],
+    // Current Deals carousel: admin enables this after saving custom cards.
+    homeDealsEnabled: false,
+    homeDealsDurationSec: 20,
+    // Colorful CTA button on the Register/Login landing page.
+    loginPromo: {
+      text: '🎀 रक्षाबंधन स्पेशल — Photo Frames देखें / Order करें →',
+      link: '/#sizes',
+      colorA: '#8E2A38',
+      colorB: '#D4AF37',
+      textColor: '#FFF4C8'
+    },
     // Home hero intro animation (sparkly text → then premium block)
     heroIntro: {
       welcomeText: 'Aditya Studio me aapka swagat hai',
@@ -557,7 +672,25 @@ function defaultSettings() {
     homeHeroFramePhotos: [],
     // Hero SECTION background slideshow (sides visible) — admin 4–6 photos + duration
     heroSideBgPhotos: [],
-    heroSideBgDurationSec: 5
+    heroSideBgDurationSec: 5,
+    fees: {
+      platformFee: 10,
+      deliveryFee: 40,
+      platformMode: 'always',
+      platformMinAmount: 0,
+      deliveryMode: 'always',
+      deliveryMinAmount: 0,
+      deliveryFreeAbove: 500
+    },
+    qualityOptions: [
+      { id: 'normal', label: 'Normal', sub: 'Standard print', extra: 0 },
+      { id: 'lamination', label: 'Lamination', sub: 'Gloss protect', extra: 80 },
+      { id: 'ntr', label: 'NTR Print', sub: 'Premium NTR', extra: 150 }
+    ],
+    adminUi: {
+      // section id -> false means hidden
+      hidden: {}
+    }
   };
 }
 function loadSettings() {
@@ -576,11 +709,26 @@ function loadSettings() {
     ...data,
     bookImages: { ...defaults.bookImages, ...(data.bookImages || {}) },
     offerImages: data.offerImages || defaults.offerImages,
+    homeDealsEnabled: data.homeDealsEnabled === true,
+    homeDealsDurationSec: Math.max(8, Math.min(60, Number(data.homeDealsDurationSec) || defaults.homeDealsDurationSec)),
+    loginPromo: { ...defaults.loginPromo, ...(data.loginPromo || {}) },
     heroIntro: { ...defaults.heroIntro, ...(data.heroIntro || {}) },
     frames3dPhotos: Array.isArray(data.frames3dPhotos) ? data.frames3dPhotos : defaults.frames3dPhotos,
     homeHeroFramePhotos: Array.isArray(data.homeHeroFramePhotos) ? data.homeHeroFramePhotos : defaults.homeHeroFramePhotos,
     heroSideBgPhotos: Array.isArray(data.heroSideBgPhotos) ? data.heroSideBgPhotos : defaults.heroSideBgPhotos,
-    heroSideBgDurationSec: Math.max(2, Math.min(20, Number(data.heroSideBgDurationSec) || defaults.heroSideBgDurationSec))
+    heroSideBgDurationSec: Math.max(2, Math.min(20, Number(data.heroSideBgDurationSec) || defaults.heroSideBgDurationSec)),
+    fees: { ...defaults.fees, ...(data.fees || {}) },
+    qualityOptions: Array.isArray(data.qualityOptions) && data.qualityOptions.length
+      ? data.qualityOptions.map((q, i) => ({
+          id: String(q.id || ('q' + i)).slice(0, 40),
+          label: String(q.label || 'Quality').slice(0, 60),
+          sub: String(q.sub || '').slice(0, 80),
+          extra: Math.max(0, Number(q.extra) || 0)
+        }))
+      : defaults.qualityOptions,
+    adminUi: {
+      hidden: Object.assign({}, (defaults.adminUi && defaults.adminUi.hidden) || {}, (data.adminUi && data.adminUi.hidden) || {})
+    },
   };
 }
 function saveSettings(obj) {
@@ -689,6 +837,13 @@ function saveEditRequests(list) {
 function nextEditRequestId(list) {
   return 'ER-' + String((list.length || 0) + 1).padStart(4, '0') + '-' + Date.now().toString(36).slice(-4).toUpperCase();
 }
+function loadWalletTopups() {
+  try { return fs.existsSync(WALLET_TOPUPS_FILE) ? (JSON.parse(fs.readFileSync(WALLET_TOPUPS_FILE, 'utf8')) || []) : []; }
+  catch (e) { return []; }
+}
+function saveWalletTopups(list) {
+  fs.writeFileSync(WALLET_TOPUPS_FILE, JSON.stringify(list || [], null, 2));
+}
 
 function nextCustomerId(accounts) {
   return 'AS-' + String(accounts.length + 1).padStart(4, '0');
@@ -711,6 +866,7 @@ function publicTokenFields(acc) {
 /* ===== Wallet helpers ===== */
 function ensureWallet(acc) {
   if (typeof acc.walletBalance !== 'number' || isNaN(acc.walletBalance)) acc.walletBalance = 0;
+  if (typeof acc.walletPendingBalance !== 'number' || isNaN(acc.walletPendingBalance)) acc.walletPendingBalance = 0;
   if (!Array.isArray(acc.walletHistory)) acc.walletHistory = [];
   return acc;
 }
@@ -768,6 +924,7 @@ function accountPublicPayload(acc) {
     totalSpend: acc.totalSpend || 0,
     freeSpinUsed: !!acc.freeSpinUsed,
     walletBalance: acc.walletBalance || 0,
+    walletPendingBalance: acc.walletPendingBalance || 0,
     walletHistory: (acc.walletHistory || []).slice(0, 30),
     ...publicTokenFields(acc)
   };
@@ -828,7 +985,9 @@ function isAdminAuthed(req) {
   if (!header.startsWith('Basic ')) return false;
   const decoded = Buffer.from(header.slice(6), 'base64').toString('utf8');
   const pass = decoded.split(':').slice(1).join(':');
-  return pass === ADMIN_PASSWORD;
+  const expected = Buffer.from(ADMIN_PASSWORD, 'utf8');
+  const provided = Buffer.from(pass, 'utf8');
+  return expected.length === provided.length && crypto.timingSafeEqual(expected, provided);
 }
 function requireAdminAuth(req, res) {
   res.writeHead(401, {
@@ -877,6 +1036,15 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === 'GET' && (urlPath === '/verify-mobile' || urlPath === '/verify-mobile.html')) {
+    fs.readFile(VERIFY_MOBILE_HTML_FILE, (err, data) => {
+      if (err) { res.writeHead(404); return res.end('Verify page missing'); }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(data);
+    });
+    return;
+  }
+
   if (req.method === 'GET' && (urlPath === '/photo-frames.html' || urlPath === '/photo-frames' || urlPath === '/frames')) {
     fs.readFile(FRAMES_HTML_FILE, (err, data) => {
       if (err) { res.writeHead(404); return res.end('Photo Frames page missing'); }
@@ -891,6 +1059,14 @@ const server = http.createServer(async (req, res) => {
       if (err) { res.writeHead(404); return res.end('Place order page missing'); }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(data);
+    });
+    return;
+  }
+
+  if (req.method === 'GET' && (urlPath === '/add-money' || urlPath === '/add-money.html')) {
+    fs.readFile(ADD_MONEY_HTML_FILE, (err, data) => {
+      if (err) { res.writeHead(404); return res.end('add-money.html missing'); }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(data);
     });
     return;
   }
@@ -914,6 +1090,15 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Studio payment QR supplied by the owner.
+  if (req.method === 'GET' && urlPath === '/payment-qr.png') {
+    return fs.readFile(PAYMENT_QR_FILE, (err, data) => {
+      if (err) { res.writeHead(404); return res.end('Payment QR missing'); }
+      res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=3600' });
+      res.end(data);
+    });
+  }
+
   // ---- Public APIs ----
   if (req.method === 'GET' && urlPath === '/api/settings') {
     return sendJSON(res, 200, { ok: true, settings: loadSettings() });
@@ -931,10 +1116,41 @@ const server = http.createServer(async (req, res) => {
     }));
     return sendJSON(res, 200, { ok: true, frames });
   }
+  if (req.method === 'GET' && urlPath === '/api/fees') {
+    const f = loadSettings().fees || {};
+    return sendJSON(res, 200, {
+      ok: true,
+      platformFee: f.platformFee, deliveryFee: f.deliveryFee,
+      platformMode: f.platformMode, deliveryMode: f.deliveryMode,
+      platformMin: f.platformMinAmount, deliveryMin: f.deliveryMinAmount,
+      deliveryFreeAbove: f.deliveryFreeAbove,
+      platform: f.platformFee, delivery: f.deliveryFee
+    });
+  }
 
-  if (req.method === 'POST' && urlPath === '/api/frame-order') {
+
+function computeOrderFees(subtotal, settingsFees) {
+  const f = Object.assign({
+    platformFee: 10, deliveryFee: 40,
+    platformMode: 'always', platformMinAmount: 0,
+    deliveryMode: 'always', deliveryMinAmount: 0, deliveryFreeAbove: 500
+  }, settingsFees || {});
+  const sub = Math.max(0, Number(subtotal) || 0);
+  let platform = Math.max(0, Number(f.platformFee) || 0);
+  let delivery = Math.max(0, Number(f.deliveryFee) || 0);
+  const pMode = String(f.platformMode || 'always');
+  const dMode = String(f.deliveryMode || 'always');
+  if (pMode === 'never') platform = 0;
+  else if (pMode === 'above_amount' && sub < (Number(f.platformMinAmount) || 0)) platform = 0;
+  if (dMode === 'never') delivery = 0;
+  else if (dMode === 'free_above' && sub >= (Number(f.deliveryFreeAbove) || 0)) delivery = 0;
+  else if (dMode === 'above_amount' && sub < (Number(f.deliveryMinAmount) || 0)) delivery = 0;
+  return { platformFee: platform, deliveryFee: delivery, rules: f };
+}
+
+  if (req.method === 'POST' && (urlPath === '/api/frame-order' || urlPath === '/api/orders')) {
     try {
-      const body = await readBody(req, 6e6);
+      const body = await readBody(req, 9e6);
       const name = String(body.name || '').trim();
       const mobile = String(body.mobile || '').trim();
       const village = String(body.village || '').trim();
@@ -947,47 +1163,90 @@ const server = http.createServer(async (req, res) => {
       if (!name || !/^[6-9]\d{9}$/.test(mobile) || address.length < 5) {
         return sendJSON(res, 400, { ok: false, error: 'invalid', message: 'Name, mobile, address zaroori hai' });
       }
+      const accounts = loadAccounts();
+      const account = sessionAccount(req, body, accounts);
+      if (!account || String(account.mobile) !== mobile) {
+        return sendJSON(res, 401, { ok: false, error: 'auth', message: 'Apne account se login karke order submit karein' });
+      }
       if (pincode && !/^\d{6}$/.test(pincode)) {
         return sendJSON(res, 400, { ok: false, error: 'invalid', message: 'Pincode 6 digit hona chahiye' });
       }
       const frames = loadFrames();
-      const frame = frames.find(f => f.id === frameId && f.active !== false);
-      if (!frame) return sendJSON(res, 404, { ok: false, error: 'frame-not-found', message: 'Frame nahi mila' });
+      let frame = frames.find(f => f.id === frameId && f.active !== false)
+        || frames.find(f => f.id === frameId);
+      if (!frame) {
+        const title = String(body.frameName || body.frameTitle || body.title || '').trim();
+        const size = String(body.size || '').trim();
+        if (!title && !size) {
+          return sendJSON(res, 404, { ok: false, error: 'frame-not-found', message: 'Frame nahi mila' });
+        }
+        frame = {
+          id: frameId || ('FR-custom-' + Date.now()),
+          title: title || 'Photo Frame',
+          size: size || '—',
+          price: Number(body.mrp || body.price || body.framePrice) || 0,
+          discountPercent: Number(body.discount) || 0,
+          active: true
+        };
+      }
       const price = Number(frame.price) || 0;
       const disc = Number(frame.discountPercent) || 0;
-      let finalAmount = Math.round(price * (1 - disc / 100));
+      const qualityExtra = Math.max(0, Number(body.qualityExtra) || 0);
+      const frameAfterDisc = Math.round(price * (1 - disc / 100));
+      const subtotal = frameAfterDisc + qualityExtra;
+      const feeCalc = computeOrderFees(subtotal, (loadSettings().fees || {}));
+      const platformFee = feeCalc.platformFee;
+      const deliveryFee = feeCalc.deliveryFee;
+      let finalAmount = subtotal + platformFee + deliveryFee;
       const orders = loadFrameOrders();
       const orderId = nextFrameOrderId(orders);
-      const paymentClaimed = body.paymentClaimed === true || body.paymentClaimed === 'true';
       const useWallet = body.useWallet === true || body.useWallet === 'true';
       const utr = String(body.utr || '').trim().slice(0, 40);
-      const paymentScreenshot = String(body.paymentScreenshot || '').slice(0, 3e6);
+      const paymentScreenshotRaw = String(body.paymentScreenshot || '');
+      const paymentScreenshot = paymentScreenshotRaw.slice(0, 3e6);
+      // UTR and screenshot are customer payment proof. They are not payment
+      // confirmation — only an admin can set paymentStatus to confirmed.
+      if (utr && !/^[A-Za-z0-9-]{6,40}$/.test(utr)) {
+        return sendJSON(res, 400, { ok: false, error: 'invalid-utr', message: 'UTR / transaction ID sahi format mein daalein' });
+      }
+      if (paymentScreenshot && !/^data:image\/(png|jpe?g|webp);base64,/i.test(paymentScreenshot)) {
+        return sendJSON(res, 400, { ok: false, error: 'invalid-screenshot', message: 'Sirf PNG, JPG ya WEBP payment screenshot upload karein' });
+      }
+      if (paymentScreenshotRaw.length > 3e6) {
+        return sendJSON(res, 400, { ok: false, error: 'screenshot-too-large', message: 'Payment screenshot 2 MB se chhota upload karein' });
+      }
+      if (!utr && !paymentScreenshot && !useWallet) {
+        return sendJSON(res, 400, { ok: false, error: 'payment-proof-required', message: 'Order submit karne se pehle UTR ya payment screenshot zaroori hai' });
+      }
+      const paymentClaimed = !!(utr || paymentScreenshot);
+      // Customer uploaded photo for the frame (base64) — admin can download
+      const customerPhotoRaw = String(body.customerPhoto || body.userPhoto || '');
+      if (customerPhotoRaw.length > 5e6 || (customerPhotoRaw && !/^data:image\/(png|jpe?g|webp);base64,/i.test(customerPhotoRaw))) {
+        return sendJSON(res, 400, { ok: false, error: 'invalid-photo', message: 'Customer photo PNG, JPG ya WEBP format mein 3 MB se chhoti honi chahiye' });
+      }
+      const customerPhoto = customerPhotoRaw;
       let walletPaid = 0;
       let paymentStatus = paymentClaimed ? 'paid_claimed' : 'unpaid';
       // Wallet pay (partial or full)
       if (useWallet) {
-        const accounts = loadAccounts();
-        const acc = accounts.find(a => String(a.mobile) === mobile);
-        if (acc) {
-          ensureWallet(acc);
-          const want = Math.min(acc.walletBalance, finalAmount);
-          if (want > 0) {
-            const txn = walletTxn(acc, 'debit', want, {
+        ensureWallet(account);
+        const want = Math.min(account.walletBalance, finalAmount);
+        if (want > 0) {
+          const txn = walletTxn(account, 'debit', want, {
               reason: 'Frame order ' + orderId + ' — ' + (frame.title || frame.size),
               source: 'frame_order',
               orderId,
               ref: orderId
             });
-            if (txn) {
-              walletPaid = want;
-              finalAmount = finalAmount - walletPaid;
-              saveAccounts(accounts);
-              if (finalAmount <= 0) {
-                finalAmount = 0;
-                paymentStatus = 'confirmed';
-              } else if (walletPaid > 0) {
-                paymentStatus = paymentClaimed ? 'paid_claimed' : 'partial_wallet';
-              }
+          if (txn) {
+            walletPaid = want;
+            finalAmount = finalAmount - walletPaid;
+            saveAccounts(accounts);
+            if (finalAmount <= 0) {
+              finalAmount = 0;
+              paymentStatus = 'confirmed';
+            } else if (walletPaid > 0) {
+              paymentStatus = paymentClaimed ? 'paid_claimed' : 'partial_wallet';
             }
           }
         }
@@ -995,14 +1254,22 @@ const server = http.createServer(async (req, res) => {
       const trackingNumber = 'TRK-' + orderId.replace(/^FO-/, '');
       const order = {
         orderId, trackingNumber, frameId: frame.id, frameTitle: frame.title || '', size: frame.size,
-        price, discountPercent: disc, finalAmount: finalAmount + walletPaid,
+        price, discountPercent: disc,
+        qualityExtra, qualityLabel: String(body.qualityLabel || '').slice(0, 40),
+        platformFee, deliveryFee,
+        colourName: String(body.colourName || '').slice(0, 40),
+        orientation: String(body.orientation || '').slice(0, 20),
+        finalAmount: finalAmount + walletPaid,
         amountDue: finalAmount,
         walletPaid,
         name, mobile, village, address, pincode, district, state, note,
         status: 'processing',
         paymentStatus,
+        paymentSubmittedAt: paymentClaimed ? new Date().toISOString() : '',
         utr: utr || '',
         paymentScreenshot: paymentScreenshot || '',
+        customerPhoto: customerPhoto || '',
+        adminAlert: true,
         deliveryDate: '', deliveryTime: '', adminNote: '',
         createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
       };
@@ -1037,12 +1304,13 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  if (req.method === 'GET' && urlPath === '/api/my-frame-orders') {
+  if (req.method === 'POST' && urlPath === '/api/my-frame-orders') {
     try {
-      const q = (req.url || '').split('?')[1] || '';
-      const params = new URLSearchParams(q);
-      const mobile = String(params.get('mobile') || '').trim();
+      const body = await readBody(req);
+      const mobile = String(body.mobile || '').trim();
       if (!/^[6-9]\d{9}$/.test(mobile)) return sendJSON(res, 400, { ok: false, error: 'invalid-mobile' });
+      const account = sessionAccount(req, body, loadAccounts());
+      if (!account || String(account.mobile) !== mobile) return sendJSON(res, 401, { ok: false, error: 'auth', message: 'Login required' });
       const orders = loadFrameOrders().filter(o => String(o.mobile) === mobile);
       return sendJSON(res, 200, { ok: true, orders });
     } catch (e) {
@@ -1105,41 +1373,36 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       const mobile = String(body.mobile || '').trim();
       if (!/^[6-9]\d{9}$/.test(mobile)) return sendJSON(res, 400, { ok: false, error: 'invalid-mobile' });
+      if (rateLimited(req, mobile + ':otp', 3, 15 * 60 * 1000)) return sendJSON(res, 429, { ok: false, error: 'too-many-attempts', message: 'OTP requests limit ho gaye. 15 minute baad try karein.' });
       const accounts = loadAccounts();
-      let acc = accounts.find(a => String(a.mobile) === mobile);
-      // Session se aaya data — account server pe nahi to soft create
-      if (!acc && body.name) {
-        acc = {
-          id: body.id || nextCustomerId(accounts),
-          name: String(body.name || '').trim(),
-          mobile,
-          village: String(body.village || '').trim(),
-          pin: String(body.pin || '0000'),
-          createdAt: new Date().toISOString(),
-          history: [],
-          mobileVerified: false,
-          freeSpinUsed: !!body.freeSpinUsed,
-          totalSpend: 0
-        };
-        accounts.push(acc);
-        saveAccounts(accounts);
-        console.log('OTP: soft account create', acc.id, mobile);
-      }
-      if (!acc) return sendJSON(res, 404, { ok: false, error: 'not-found', message: 'Account server pe nahi mila' });
+      const acc = sessionAccount(req, body, accounts);
+      if (!acc || String(acc.mobile) !== mobile) return sendJSON(res, 401, { ok: false, error: 'auth', message: 'Login required' });
       if (acc.mobileVerified) return sendJSON(res, 200, { ok: true, alreadyVerified: true });
       let list = loadOtpRequests();
-      let row = list.find(r => r.mobile === mobile && !r.verified);
-      if (!row) {
-        row = { mobile, name: acc.name || '', id: acc.id || '', otp: generateOtp(), createdAt: new Date().toISOString(), verified: false, purpose: 'spin' };
-        list.unshift(row);
-        list = list.slice(0, 100);
-        saveOtpRequests(list);
+      const now = Date.now();
+      // Expired/legacy plaintext OTPs are never valid and are removed.
+      list = list.filter(r => r.verified || (r.expiresAt && new Date(r.expiresAt).getTime() > now && r.otpHash));
+      const existing = list.find(r => r.mobile === mobile && !r.verified && r.purpose === 'mobile_verify');
+      if (existing && now - new Date(existing.createdAt || 0).getTime() < OTP_RESEND_COOLDOWN_MS) {
+        return sendJSON(res, 429, { ok: false, error: 'resend-too-soon', message: 'OTP dobara bhejne ke liye 1 minute rukhein.' });
       }
-      console.log('Spin OTP request:', mobile, 'otp=', row.otp);
-      return sendJSON(res, 200, { ok: true, alreadyVerified: false, otpHint: 'admin-panel' });
+      const otp = generateOtp();
+      const requestId = 'otp-' + mobile + '-' + now;
+      const sms = await sendOtpSms(mobile, otp, requestId);
+      if (existing) list = list.filter(r => r !== existing);
+      list.unshift({
+        mobile, name: acc.name || '', id: acc.id || '', otpHash: hashOtp(otp), requestId,
+        smsId: sms.sms_id || sms.id || '', createdAt: new Date().toISOString(),
+        expiresAt: new Date(now + OTP_TTL_MS).toISOString(), attempts: 0, verified: false, purpose: 'mobile_verify'
+      });
+      saveOtpRequests(list.slice(0, 100));
+      recordAuthFailure(req, mobile + ':otp');
+      console.log('SMS OTP sent for:', mobile, requestId);
+      return sendJSON(res, 200, { ok: true, alreadyVerified: false, expiresInSeconds: Math.floor(OTP_TTL_MS / 1000) });
     } catch (e) {
       console.error('request-spin-otp', e);
-      return sendJSON(res, 500, { ok: false, error: 'server-error', detail: String(e.message || e) });
+      const status = e && e.code === 'sms-not-configured' ? 503 : 502;
+      return sendJSON(res, status, { ok: false, error: e && e.code || 'sms-send-failed', message: e && e.message || 'OTP SMS nahi bhej paaye' });
     }
   }
 
@@ -1148,20 +1411,83 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       const mobile = String(body.mobile || '').trim();
       const otp = String(body.otp || '').trim();
+      if (!/^[0-9]{6}$/.test(otp)) return sendJSON(res, 400, { ok: false, error: 'invalid-otp' });
+      if (rateLimited(req, mobile + ':verify-otp', 5, 15 * 60 * 1000)) return sendJSON(res, 429, { ok: false, error: 'too-many-attempts', message: 'OTP attempts limit ho gaye. 15 minute baad try karein.' });
+      const accounts = loadAccounts();
+      const acc = sessionAccount(req, body, accounts);
+      if (!acc || String(acc.mobile) !== mobile) return sendJSON(res, 401, { ok: false, error: 'auth', message: 'Login required' });
       const list = loadOtpRequests();
-      const row = list.find(r => r.mobile === mobile && !r.verified);
+      const row = list.find(r => r.mobile === mobile && !r.verified && r.purpose === 'mobile_verify');
       if (!row) return sendJSON(res, 400, { ok: false, error: 'no-request' });
-      if (String(row.otp) !== String(otp)) return sendJSON(res, 401, { ok: false, error: 'wrong-otp' });
+      if (!row.expiresAt || new Date(row.expiresAt).getTime() <= Date.now()) {
+        row.expiredAt = new Date().toISOString(); saveOtpRequests(list);
+        return sendJSON(res, 410, { ok: false, error: 'otp-expired', message: 'OTP expire ho gaya. Naya OTP maangein.' });
+      }
+      row.attempts = Number(row.attempts || 0) + 1;
+      if (row.attempts > OTP_MAX_ATTEMPTS) { row.lockedAt = new Date().toISOString(); saveOtpRequests(list); return sendJSON(res, 429, { ok: false, error: 'too-many-attempts' }); }
+      if (!otpMatches(row, otp)) { saveOtpRequests(list); recordAuthFailure(req, mobile + ':verify-otp'); return sendJSON(res, 401, { ok: false, error: 'wrong-otp' }); }
+      clearAuthFailures(req, mobile + ':verify-otp');
       row.verified = true;
       row.verifiedAt = new Date().toISOString();
       saveOtpRequests(list);
-      const accounts = loadAccounts();
-      const acc = accounts.find(a => String(a.mobile) === mobile);
-      if (acc) { acc.mobileVerified = true; saveAccounts(accounts); }
+      acc.mobileVerified = true; saveAccounts(accounts);
       return sendJSON(res, 200, { ok: true });
     } catch (e) {
       return sendJSON(res, 500, { ok: false, error: 'server-error' });
     }
+  }
+
+  if (req.method === 'POST' && urlPath === '/api/request-pin-reset-otp') {
+    try {
+      const body = await readBody(req), mobile = String(body.mobile || '').trim();
+      if (!/^[6-9]\d{9}$/.test(mobile)) return sendJSON(res, 400, { ok: false, error: 'invalid-mobile' });
+      if (rateLimited(req, mobile + ':pin-reset-otp', 3, 15 * 60 * 1000)) return sendJSON(res, 429, { ok: false, error: 'too-many-attempts', message: 'बहुत बार OTP माँगा गया है। 15 मिनट बाद try करें।' });
+      const accounts = loadAccounts(), acc = accounts.find(a => String(a.mobile) === mobile);
+      if (!acc) return sendJSON(res, 404, { ok: false, error: 'not-found', message: 'यह mobile number register नहीं है।' });
+      let list = loadOtpRequests(), now = Date.now();
+      list = list.filter(r => r.verified || (r.expiresAt && new Date(r.expiresAt).getTime() > now && r.otpHash));
+      const existing = list.find(r => r.mobile === mobile && !r.verified && r.purpose === 'pin_reset');
+      if (existing && now - new Date(existing.createdAt || 0).getTime() < OTP_RESEND_COOLDOWN_MS) return sendJSON(res, 429, { ok: false, error: 'resend-too-soon', message: 'नया OTP माँगने से पहले 1 मिनट रुकें।' });
+      const otp = generateOtp(), requestId = 'pin-reset-' + mobile + '-' + now, sms = await sendOtpSms(mobile, otp, requestId);
+      if (existing) list = list.filter(r => r !== existing);
+      list.unshift({ mobile, name: acc.name || '', id: acc.id || '', otpHash: hashOtp(otp), requestId, smsId: sms.sms_id || sms.id || '', createdAt: new Date().toISOString(), expiresAt: new Date(now + OTP_TTL_MS).toISOString(), attempts: 0, verified: false, purpose: 'pin_reset' });
+      saveOtpRequests(list.slice(0, 100));
+      return sendJSON(res, 200, { ok: true, expiresInSeconds: Math.floor(OTP_TTL_MS / 1000) });
+    } catch (e) {
+      const status = e && e.code === 'sms-not-configured' ? 503 : 502;
+      return sendJSON(res, status, { ok: false, error: e && e.code || 'sms-send-failed', message: e && e.message || 'OTP नहीं भेज पाए।' });
+    }
+  }
+
+  if (req.method === 'POST' && urlPath === '/api/reset-pin-with-otp') {
+    try {
+      const body = await readBody(req), mobile = String(body.mobile || '').trim(), otp = String(body.otp || '').trim(), newPin = String(body.newPin || '').trim();
+      if (!/^[6-9]\d{9}$/.test(mobile) || !/^\d{6}$/.test(otp) || !/^\d{4}$/.test(newPin)) return sendJSON(res, 400, { ok: false, error: 'invalid' });
+      if (rateLimited(req, mobile + ':pin-reset-verify', 5, 15 * 60 * 1000)) return sendJSON(res, 429, { ok: false, error: 'too-many-attempts', message: 'बहुत गलत प्रयास हुए हैं। 15 मिनट बाद try करें।' });
+      const accounts = loadAccounts(), acc = accounts.find(a => String(a.mobile) === mobile), list = loadOtpRequests();
+      const row = list.find(r => r.mobile === mobile && !r.verified && r.purpose === 'pin_reset');
+      if (!acc) return sendJSON(res, 404, { ok: false, error: 'not-found' });
+      if (!row) return sendJSON(res, 400, { ok: false, error: 'no-request', message: 'पहले PIN reset OTP भेजें।' });
+      if (!row.expiresAt || new Date(row.expiresAt).getTime() <= Date.now()) return sendJSON(res, 410, { ok: false, error: 'otp-expired', message: 'OTP expire हो गया है।' });
+      row.attempts = Number(row.attempts || 0) + 1;
+      if (row.attempts > OTP_MAX_ATTEMPTS) { row.lockedAt = new Date().toISOString(); saveOtpRequests(list); return sendJSON(res, 429, { ok: false, error: 'too-many-attempts' }); }
+      if (!otpMatches(row, otp)) { saveOtpRequests(list); recordAuthFailure(req, mobile + ':pin-reset-verify'); return sendJSON(res, 401, { ok: false, error: 'wrong-otp', message: 'OTP गलत है।' }); }
+      row.verified = true; row.verifiedAt = new Date().toISOString(); setPin(acc, newPin); acc.pinResetRequested = false;
+      saveOtpRequests(list); saveAccounts(accounts); clearAuthFailures(req, mobile + ':pin-reset-verify');
+      return sendJSON(res, 200, { ok: true, message: 'नया PIN बन गया है। अब login करें।' });
+    } catch (e) { return sendJSON(res, 500, { ok: false, error: 'server-error' }); }
+  }
+
+  if (req.method === 'POST' && urlPath === '/api/change-pin-with-old-pin') {
+    try {
+      const body = await readBody(req), mobile = String(body.mobile || '').trim(), oldPin = String(body.oldPin || '').trim(), newPin = String(body.newPin || '').trim();
+      if (!/^[6-9]\d{9}$/.test(mobile) || !/^\d{4}$/.test(oldPin) || !/^\d{4}$/.test(newPin)) return sendJSON(res, 400, { ok: false, error: 'invalid' });
+      if (rateLimited(req, mobile + ':old-pin-change', 5, 15 * 60 * 1000)) return sendJSON(res, 429, { ok: false, error: 'too-many-attempts', message: 'बहुत गलत प्रयास हुए हैं। 15 मिनट बाद try करें।' });
+      const accounts = loadAccounts(), acc = accounts.find(a => String(a.mobile) === mobile);
+      if (!acc || !verifyPin(acc, oldPin)) { recordAuthFailure(req, mobile + ':old-pin-change'); return sendJSON(res, 401, { ok: false, error: 'wrong-pin', message: 'पुराना PIN गलत है।' }); }
+      setPin(acc, newPin); saveAccounts(accounts); clearAuthFailures(req, mobile + ':old-pin-change');
+      return sendJSON(res, 200, { ok: true, message: 'नया PIN बन गया है। अब login करें।' });
+    } catch (e) { return sendJSON(res, 500, { ok: false, error: 'server-error' }); }
   }
 
   if (req.method === 'POST' && urlPath === '/api/check-verified') {
@@ -1169,7 +1495,8 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       const mobile = String(body.mobile || '').trim();
       const accounts = loadAccounts();
-      const acc = accounts.find(a => String(a.mobile) === mobile);
+      const acc = sessionAccount(req, body, accounts);
+      if (!acc || String(acc.mobile) !== mobile) return sendJSON(res, 401, { ok: false, error: 'auth' });
       return sendJSON(res, 200, { ok: true, verified: !!(acc && acc.mobileVerified) });
     } catch (e) {
       return sendJSON(res, 400, { ok: false });
@@ -1187,14 +1514,14 @@ const server = http.createServer(async (req, res) => {
       const id = nextCustomerId(accounts);
       const acc = {
         id, name: String(body.name || '').trim(), mobile, village: String(body.village || '').trim(),
-        pin, createdAt: new Date().toISOString(), visitCount: 1, lastVisitAt: new Date().toISOString(),
+        pin: hashPin(pin), createdAt: new Date().toISOString(), visitCount: 1, lastVisitAt: new Date().toISOString(),
         pinResetRequested: false, freeSpinUsed: false, mobileVerified: false, history: [], totalSpend: 0,
         adTokens: 0, spinBalance: 1, lastAdTokenClaim: '',
         walletBalance: 0, walletHistory: []
       };
       accounts.push(acc);
       saveAccounts(accounts);
-      return sendJSON(res, 200, { ...accountPublicPayload(acc), freeSpinGift: true });
+      return sendJSON(res, 200, { ...accountPublicPayload(acc), sessionToken: issueSession(acc), freeSpinGift: true });
     } catch (e) {
       return sendJSON(res, 500, { ok: false, error: 'save-failed' });
     }
@@ -1205,14 +1532,16 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       const mobile = String(body.mobile || '').trim();
       const pin = String(body.pin || '').trim();
+      if (rateLimited(req, mobile, 5, 15 * 60 * 1000)) return sendJSON(res, 429, { ok: false, error: 'too-many-attempts', message: 'Bahut login attempts hue. 15 minute baad try karein.' });
       const accounts = loadAccounts();
       const acc = accounts.find(a => String(a.mobile) === mobile);
-      if (!acc) return sendJSON(res, 401, { ok: false, error: 'not-found' });
-      if (String(acc.pin) !== pin) return sendJSON(res, 401, { ok: false, error: 'wrong-pin' });
+      if (!acc) { recordAuthFailure(req, mobile); return sendJSON(res, 401, { ok: false, error: 'not-found' }); }
+      if (!verifyPin(acc, pin)) { recordAuthFailure(req, mobile); return sendJSON(res, 401, { ok: false, error: 'wrong-pin' }); }
+      clearAuthFailures(req, mobile);
       acc.visitCount = (acc.visitCount || 0) + 1;
       acc.lastVisitAt = new Date().toISOString();
       saveAccounts(accounts);
-      return sendJSON(res, 200, accountPublicPayload(acc));
+      return sendJSON(res, 200, { ...accountPublicPayload(acc), sessionToken: issueSession(acc) });
     } catch (e) {
       return sendJSON(res, 400, { ok: false, error: 'bad-request' });
     }
@@ -1221,11 +1550,9 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && urlPath === '/api/restore-session') {
     try {
       const body = await readBody(req);
-      const mobile = String(body.mobile || '').trim();
-      const pin = String(body.pin || '').trim();
       const accounts = loadAccounts();
-      const acc = accounts.find(a => String(a.mobile) === mobile);
-      if (!acc || String(acc.pin) !== pin) return sendJSON(res, 401, { ok: false, error: 'not-found' });
+      const acc = sessionAccount(req, body, accounts);
+      if (!acc) return sendJSON(res, 401, { ok: false, error: 'not-found' });
       return sendJSON(res, 200, accountPublicPayload(acc));
     } catch (e) {
       return sendJSON(res, 400, { ok: false });
@@ -1236,11 +1563,9 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && urlPath === '/api/claim-ad-token') {
     try {
       const body = await readBody(req);
-      const mobile = String(body.mobile || '').trim();
-      const pin = String(body.pin || '').trim();
       const accounts = loadAccounts();
-      const acc = accounts.find(a => String(a.mobile) === mobile);
-      if (!acc || String(acc.pin) !== pin) return sendJSON(res, 401, { ok: false, error: 'auth', message: 'Login required' });
+      const acc = sessionAccount(req, body, accounts);
+      if (!acc) return sendJSON(res, 401, { ok: false, error: 'auth', message: 'Login required' });
       const today = todayIST();
       if ((acc.lastAdTokenClaim || '') === today) {
         return sendJSON(res, 400, {
@@ -1266,11 +1591,9 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && urlPath === '/api/exchange-ad-tokens') {
     try {
       const body = await readBody(req);
-      const mobile = String(body.mobile || '').trim();
-      const pin = String(body.pin || '').trim();
       const accounts = loadAccounts();
-      const acc = accounts.find(a => String(a.mobile) === mobile);
-      if (!acc || String(acc.pin) !== pin) return sendJSON(res, 401, { ok: false, error: 'auth', message: 'Login required' });
+      const acc = sessionAccount(req, body, accounts);
+      if (!acc) return sendJSON(res, 401, { ok: false, error: 'auth', message: 'Login required' });
       const tokens = Number(acc.adTokens) || 0;
       if (tokens < 10) {
         return sendJSON(res, 400, {
@@ -1298,18 +1621,13 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && urlPath === '/api/wallet/apply-coupon') {
     try {
       const body = await readBody(req);
-      const mobile = String(body.mobile || '').trim();
-      const pin = String(body.pin || '').trim();
       const couponId = String(body.couponId || '').trim();
-      if (!/^[6-9]\d{9}$/.test(mobile) || !couponId) {
-        return sendJSON(res, 400, { ok: false, error: 'invalid', message: 'Mobile aur couponId zaroori' });
+      if (!couponId) {
+        return sendJSON(res, 400, { ok: false, error: 'invalid', message: 'Coupon zaroori hai' });
       }
       const accounts = loadAccounts();
-      const acc = accounts.find(a => String(a.mobile) === mobile);
-      if (!acc) return sendJSON(res, 404, { ok: false, error: 'not-found', message: 'Account nahi mila' });
-      if (pin && String(acc.pin) !== pin) {
-        return sendJSON(res, 401, { ok: false, error: 'wrong-pin', message: 'PIN galat' });
-      }
+      const acc = sessionAccount(req, body, accounts);
+      if (!acc) return sendJSON(res, 401, { ok: false, error: 'auth', message: 'Login required' });
       ensureWallet(acc);
       acc.history = acc.history || [];
       const entry = acc.history.find(h => String(h.couponId || h.entryId || '') === couponId);
@@ -1353,16 +1671,13 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && urlPath === '/api/wallet/redeem-code') {
     try {
       const body = await readBody(req);
-      const mobile = String(body.mobile || '').trim();
-      const pin = String(body.pin || '').trim();
       const code = String(body.code || '').trim().toUpperCase();
-      if (!/^[6-9]\d{9}$/.test(mobile) || !code) {
-        return sendJSON(res, 400, { ok: false, error: 'invalid', message: 'Mobile aur code zaroori' });
+      if (!code) {
+        return sendJSON(res, 400, { ok: false, error: 'invalid', message: 'Code zaroori hai' });
       }
       const accounts = loadAccounts();
-      const acc = accounts.find(a => String(a.mobile) === mobile);
-      if (!acc) return sendJSON(res, 404, { ok: false, error: 'not-found' });
-      if (pin && String(acc.pin) !== pin) return sendJSON(res, 401, { ok: false, error: 'wrong-pin' });
+      const acc = sessionAccount(req, body, accounts);
+      if (!acc) return sendJSON(res, 401, { ok: false, error: 'auth', message: 'Login required' });
       const codes = loadCodes();
       const row = codes.find(c => String(c.code).toUpperCase() === code);
       if (!row) return sendJSON(res, 404, { ok: false, error: 'invalid-code', message: 'Code galat hai' });
@@ -1379,7 +1694,7 @@ const server = http.createServer(async (req, res) => {
         ref: code
       });
       row.used = true;
-      row.usedBy = mobile;
+      row.usedBy = acc.mobile;
       row.usedAt = new Date().toISOString();
       saveCodes(codes);
       saveAccounts(accounts);
@@ -1396,14 +1711,42 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  if (req.method === 'GET' && urlPath === '/api/wallet/history') {
+  // Wallet top-up: amount is pending until the admin verifies UTR/proof.
+  if (req.method === 'POST' && urlPath === '/api/wallet/topup') {
     try {
-      const u = new URL(req.url, 'http://x');
-      const mobile = String(u.searchParams.get('mobile') || '').trim();
-      if (!/^[6-9]\d{9}$/.test(mobile)) return sendJSON(res, 400, { ok: false, error: 'invalid' });
+      const body = await readBody(req, 2e6);
+      const amount = Math.round(Number(body.amount) || 0);
+      const utr = String(body.utr || '').trim().toUpperCase();
+      const proof = String(body.proof || '');
+      if (amount < 1 || amount > 100000) return sendJSON(res, 400, { ok:false, message:'₹1 से ₹1,00,000 तक amount डालें' });
+      if (!/^[A-Z0-9_-]{6,40}$/.test(utr) && !/^data:image\/(png|jpeg|webp);base64,/i.test(proof)) {
+        return sendJSON(res, 400, { ok:false, message:'UTR (कम से कम 6 characters) या payment screenshot जरूरी है' });
+      }
+      if (proof && (!/^data:image\/(png|jpeg|webp);base64,/i.test(proof) || proof.length > 1500000)) {
+        return sendJSON(res, 400, { ok:false, message:'Screenshot PNG, JPG या WEBP और 1MB से छोटा रखें' });
+      }
       const accounts = loadAccounts();
-      const acc = accounts.find(a => String(a.mobile) === mobile);
-      if (!acc) return sendJSON(res, 404, { ok: false, error: 'not-found' });
+      const acc = sessionAccount(req, body, accounts);
+      if (!acc) return sendJSON(res, 401, { ok:false, message:'Login required' });
+      ensureWallet(acc);
+      const topups = loadWalletTopups();
+      const topupId = 'WT-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2,5).toUpperCase();
+      topups.unshift({ id:topupId, mobile:acc.mobile, customerId:acc.id, name:acc.name || '', amount, utr, proof, status:'pending', createdAt:new Date().toISOString() });
+      acc.walletPendingBalance += amount;
+      acc.walletHistory.unshift({ id:walletHistoryId(), type:'pending', amount, balanceAfter:acc.walletBalance, reason:'Top-up pending admin verification', source:'wallet_topup', ref:topupId, timestamp:new Date().toISOString() });
+      saveWalletTopups(topups); saveAccounts(accounts);
+      return sendJSON(res, 200, { ok:true, topupId, message:'Payment proof submit हो गया। Admin verify करने के बाद ₹'+amount+' wallet में usable होगा।', walletPendingBalance:acc.walletPendingBalance });
+    } catch (e) {
+      console.error('wallet/topup', e); return sendJSON(res, 500, { ok:false, message:'Top-up save नहीं हो पाया' });
+    }
+  }
+
+  if (req.method === 'POST' && urlPath === '/api/wallet/history') {
+    try {
+      const body = await readBody(req);
+      const accounts = loadAccounts();
+      const acc = sessionAccount(req, body, accounts);
+      if (!acc) return sendJSON(res, 401, { ok: false, error: 'auth', message: 'Login required' });
       ensureWallet(acc);
       return sendJSON(res, 200, {
         ok: true,
@@ -1423,8 +1766,8 @@ const server = http.createServer(async (req, res) => {
       if (!/^[6-9]\d{9}$/.test(mobile)) return sendJSON(res, 400, { ok: false, error: 'invalid-mobile' });
       if (amount < 50) return sendJSON(res, 400, { ok: false, error: 'invalid-amount' });
       const accounts = loadAccounts();
-      const acc = accounts.find(a => String(a.mobile) === mobile);
-      if (!acc) return sendJSON(res, 404, { ok: false, error: 'no-account' });
+      const acc = sessionAccount(req, body, accounts);
+      if (!acc || String(acc.mobile) !== mobile) return sendJSON(res, 401, { ok: false, error: 'auth' });
       const { prize, stats } = assignWorkPrize(amount);
       console.log('Work-spin assign', mobile, '₹' + amount, prize.val, stats.key, 'left', stats.left);
       return sendJSON(res, 200, { ok: true, prize, stats });
@@ -1440,33 +1783,17 @@ const server = http.createServer(async (req, res) => {
       const mobile = String(body.mobile || '').trim();
       if (!/^[6-9]\d{9}$/.test(mobile)) return sendJSON(res, 400, { ok: false, error: 'invalid-mobile' });
       const accounts = loadAccounts();
-      let acc = accounts.find(a => String(a.mobile) === mobile);
-      // Soft create if session exists on client but not on server (after wipe/migrate)
-      if (!acc && body.name) {
-        acc = {
-          id: body.id || nextCustomerId(accounts),
-          name: String(body.name || '').trim(),
-          mobile,
-          village: String(body.village || '').trim(),
-          pin: String(body.pin || '0000'),
-          createdAt: new Date().toISOString(),
-          history: [],
-          mobileVerified: !!body.mobileVerified,
-          freeSpinUsed: false,
-          totalSpend: 0
-        };
-        accounts.push(acc);
-        saveAccounts(accounts);
-        console.log('assign-free-spin soft account', acc.id, mobile);
-      }
-      if (!acc) return sendJSON(res, 404, { ok: false, error: 'no-account', message: 'Account server pe nahi — dubara login/register karein' });
+      const acc = sessionAccount(req, body, accounts);
+      if (!acc || String(acc.mobile) !== mobile) return sendJSON(res, 401, { ok: false, error: 'auth', message: 'Login required' });
       if (acc.freeSpinUsed) return sendJSON(res, 409, { ok: false, error: 'already-used', message: 'Free spin pehle use ho chuki hai' });
-      // Welcome free spin: OTP NOT required — register gift direct spin
-      if (!acc.mobileVerified && body.mobileVerified) {
-        acc.mobileVerified = true;
-        saveAccounts(accounts);
-      }
+      // Mobile OTP profile se optional verification ke liye hai. Welcome free spin
+      // register/login ke turant baad bhi milna chahiye.
       const { prize, stats } = assignNextFreePrize();
+      // Spin शुरू होते ही इसे consume करें. इससे refresh, slow network या multiple
+      // tabs की वजह से वही free spin फिर से popup में नहीं आएगी.
+      acc.freeSpinUsed = true;
+      acc.freeSpinAssignedAt = new Date().toISOString();
+      saveAccounts(accounts);
       console.log('Free-spin assign', mobile, prize.val, 'batch left', stats.leftInBatch);
       return sendJSON(res, 200, { ok: true, prize, stats });
     } catch (e) {
@@ -1480,8 +1807,8 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       const mobile = String(body.mobile || '').trim();
       const accounts = loadAccounts();
-      const acc = accounts.find(a => String(a.mobile) === mobile);
-      if (!acc) return sendJSON(res, 404, { ok: false });
+      const acc = sessionAccount(req, body, accounts);
+      if (!acc || String(acc.mobile) !== mobile) return sendJSON(res, 401, { ok: false, error: 'auth' });
       acc.freeSpinUsed = true;
       acc.history = acc.history || [];
       const couponId = 'C-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
@@ -1505,8 +1832,8 @@ const server = http.createServer(async (req, res) => {
       const mobile = String(body.mobile || '').trim();
       const amount = Number(body.amount) || 0;
       const accounts = loadAccounts();
-      const acc = accounts.find(a => String(a.mobile) === mobile);
-      if (!acc) return sendJSON(res, 404, { ok: false });
+      const acc = sessionAccount(req, body, accounts);
+      if (!acc || String(acc.mobile) !== mobile) return sendJSON(res, 401, { ok: false, error: 'auth' });
       const entryId = acc.id + '-E' + String((acc.history || []).length + 1);
       acc.history = acc.history || [];
       acc.history.push({ entryId, amount, tier: body.tier || tierName(amount), timestamp: new Date().toISOString() });
@@ -1524,8 +1851,8 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       const mobile = String(body.mobile || '').trim();
       const accounts = loadAccounts();
-      const acc = accounts.find(a => String(a.mobile) === mobile);
-      if (!acc) return sendJSON(res, 404, { ok: false });
+      const acc = sessionAccount(req, body, accounts);
+      if (!acc || String(acc.mobile) !== mobile) return sendJSON(res, 401, { ok: false, error: 'auth' });
       const entry = (acc.history || []).find(h => h.entryId === body.entryId);
       if (entry) {
         entry.discount = body.discount;
@@ -1568,32 +1895,16 @@ const server = http.createServer(async (req, res) => {
     try {
       const body = await readBody(req);
       const code = String(body.code || '').trim().toUpperCase();
-      const mobile = String(body.mobile || '').trim();
       const codes = loadCodes();
       const row = codes.find(c => String(c.code).toUpperCase() === code);
       if (!row) return sendJSON(res, 404, { ok: false, error: 'not-found' });
       if (row.used) return sendJSON(res, 409, { ok: false, error: 'used' });
       const accounts = loadAccounts();
-      let acc = accounts.find(a => String(a.mobile) === mobile);
-      if (!acc && body.name) {
-        acc = {
-          id: body.id || nextCustomerId(accounts),
-          name: String(body.name || '').trim(),
-          mobile,
-          village: String(body.village || '').trim(),
-          pin: String(body.pin || '0000'),
-          createdAt: new Date().toISOString(),
-          history: [],
-          mobileVerified: false,
-          totalSpend: 0
-        };
-        accounts.push(acc);
-        console.log('Redeem: soft account', acc.id, mobile);
-      }
-      if (!acc) return sendJSON(res, 404, { ok: false, error: 'no-account', message: 'Account server pe nahi — dubara login/register karein' });
+      const acc = sessionAccount(req, body, accounts);
+      if (!acc) return sendJSON(res, 401, { ok: false, error: 'auth', message: 'Login required' });
       const amount = Number(row.amount) || 0;
       row.used = true;
-      row.usedBy = acc.id + ' / ' + mobile;
+      row.usedBy = acc.id + ' / ' + acc.mobile;
       row.usedAt = new Date().toISOString();
       saveCodes(codes);
       const tier = tierName(amount);
@@ -1616,6 +1927,10 @@ const server = http.createServer(async (req, res) => {
     try {
       const body = await readBody(req);
       const mobile = String(body.mobile || '').trim();
+      if (!/^[6-9]\d{9}$/.test(mobile)) return sendJSON(res, 400, { ok: false, error: 'invalid-mobile' });
+      if (rateLimited(req, mobile + ':pin-reset', 3, 15 * 60 * 1000)) {
+        return sendJSON(res, 429, { ok: false, error: 'too-many-requests', message: 'Thodi der baad phir try karein' });
+      }
       const accounts = loadAccounts();
       const acc = accounts.find(a => a.mobile === mobile);
       if (!acc) return sendJSON(res, 404, { ok: false, error: 'no-account' });
@@ -1793,6 +2108,73 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+
+
+  if (req.method === 'POST' && urlPath === '/admin/quality-save') {
+    try {
+      const body = await readBody(req);
+      const cur = loadSettings();
+      let list = Array.isArray(body.options) ? body.options : [];
+      list = list.map((q, i) => ({
+        id: String(q.id || ('q' + (i + 1))).trim().slice(0, 40) || ('q' + (i + 1)),
+        label: String(q.label || '').trim().slice(0, 60) || ('Option ' + (i + 1)),
+        sub: String(q.sub || '').trim().slice(0, 80),
+        extra: Math.max(0, Number(q.extra) || 0)
+      })).filter(q => q.label);
+      if (!list.length) {
+        list = (defaultSettings().qualityOptions || []).slice();
+      }
+      cur.qualityOptions = list;
+      saveSettings(cur);
+      return sendJSON(res, 200, { ok: true, qualityOptions: list });
+    } catch (e) {
+      console.error('quality-save', e);
+      return sendJSON(res, 500, { ok: false, error: 'server-error' });
+    }
+  }
+
+
+  if (req.method === 'POST' && urlPath === '/admin/ui-save') {
+    try {
+      const body = await readBody(req);
+      const cur = loadSettings();
+      cur.adminUi = cur.adminUi || { hidden: {} };
+      if (body.hidden && typeof body.hidden === 'object') {
+        cur.adminUi.hidden = body.hidden;
+      }
+      if (body.sectionId && typeof body.visible === 'boolean') {
+        cur.adminUi.hidden = cur.adminUi.hidden || {};
+        if (body.visible) delete cur.adminUi.hidden[body.sectionId];
+        else cur.adminUi.hidden[body.sectionId] = true;
+      }
+      saveSettings(cur);
+      return sendJSON(res, 200, { ok: true, adminUi: cur.adminUi });
+    } catch (e) {
+      return sendJSON(res, 500, { ok: false, error: 'server-error' });
+    }
+  }
+
+  if (req.method === 'POST' && urlPath === '/admin/fees-save') {
+    try {
+      const body = await readBody(req);
+      const cur = loadSettings();
+      const fees = Object.assign({}, cur.fees || {}, {
+        platformFee: Math.max(0, Number(body.platformFee) || 0),
+        deliveryFee: Math.max(0, Number(body.deliveryFee) || 0),
+        platformMode: ['always','never','above_amount'].includes(String(body.platformMode)) ? String(body.platformMode) : 'always',
+        platformMinAmount: Math.max(0, Number(body.platformMinAmount) || 0),
+        deliveryMode: ['always','never','free_above','above_amount'].includes(String(body.deliveryMode)) ? String(body.deliveryMode) : 'always',
+        deliveryMinAmount: Math.max(0, Number(body.deliveryMinAmount) || 0),
+        deliveryFreeAbove: Math.max(0, Number(body.deliveryFreeAbove) || 0)
+      });
+      cur.fees = fees;
+      saveSettings(cur);
+      return sendJSON(res, 200, { ok: true, fees });
+    } catch (e) {
+      return sendJSON(res, 500, { ok: false, error: 'server-error' });
+    }
+  }
+
   if (req.method === 'POST' && urlPath === '/admin/frame-order-update') {
     try {
       const body = await readBody(req);
@@ -1805,12 +2187,20 @@ const server = http.createServer(async (req, res) => {
       if (body.deliveryDate !== undefined) ord.deliveryDate = String(body.deliveryDate || '');
       if (body.deliveryTime !== undefined) ord.deliveryTime = String(body.deliveryTime || '');
       if (body.adminNote !== undefined) ord.adminNote = String(body.adminNote || '');
+      // Opening/updating an order acknowledges the new-order alert in admin.
+      ord.adminAlert = false;
       // Admin payment confirm shortcut
       if (body.confirmPayment === true || body.confirmPayment === 'true') {
         ord.paymentStatus = 'confirmed';
         if (!ord.status || ord.status === 'processing' || ord.status === 'pending') {
           ord.status = 'confirmed';
         }
+      }
+      if (body.reject === true || body.reject === 'true') {
+        ord.status = 'rejected';
+        const reason = String(body.rejectReason || body.adminNote || '').trim().slice(0, 300);
+        if (reason) ord.adminNote = reason;
+        ord.rejectedAt = new Date().toISOString();
       }
       ord.updatedAt = new Date().toISOString();
       saveFrameOrders(orders);
@@ -1933,6 +2323,53 @@ const server = http.createServer(async (req, res) => {
     } catch (e) {
       console.error('banner-upload', e);
       return sendJSON(res, 500, { ok: false, error: 'server-error' });
+    }
+  }
+
+  // Current Deals cards shown on the home page. Each card has its own photo/text/link.
+  if (req.method === 'POST' && urlPath === '/admin/home-deals-save') {
+    try {
+      const body = await readBody(req, 28e6);
+      const items = (Array.isArray(body.items) ? body.items : []).slice(0, 12).map((it, i) => ({
+        url: String(it.url || '').slice(0, 2.5e6),
+        title: String(it.title || ('Deal ' + (i + 1))).trim().slice(0, 80),
+        sub: String(it.sub || '').trim().slice(0, 160),
+        link: String(it.link || '').trim().slice(0, 300),
+        active: it.active !== false
+      })).filter(it => it.url);
+      if (!items.length) return sendJSON(res, 400, { ok: false, error: 'no-deals', message: 'Kam se kam ek photo wala deal card zaroori hai.' });
+      const cur = loadSettings();
+      cur.offerImages = items;
+      cur.homeDealsEnabled = true;
+      cur.homeDealsDurationSec = Math.max(8, Math.min(60, Number(body.durationSec) || 20));
+      saveSettings(cur);
+      return sendJSON(res, 200, { ok: true, count: items.length, durationSec: cur.homeDealsDurationSec });
+    } catch (e) {
+      console.error('home-deals-save', e);
+      return sendJSON(res, 500, { ok: false, error: 'server-error' });
+    }
+  }
+
+  // Colorful CTA on the Login/Register page (admin editable).
+  if (req.method === 'POST' && urlPath === '/admin/save-login-promo') {
+    try {
+      const body = await readFormBody(req);
+      const defaults = defaultSettings().loginPromo;
+      const color = function(v, fallback) { return /^#[0-9a-f]{6}$/i.test(String(v || '')) ? String(v) : fallback; };
+      const cur = loadSettings();
+      cur.loginPromo = {
+        text: String(body.text || defaults.text).trim().slice(0, 140),
+        link: String(body.link || defaults.link).trim().slice(0, 300),
+        colorA: color(body.colorA, defaults.colorA),
+        colorB: color(body.colorB, defaults.colorB),
+        textColor: color(body.textColor, defaults.textColor)
+      };
+      saveSettings(cur);
+      res.writeHead(302, { Location: '/admin?loginPromo=ok#sec-login-promo' });
+      return res.end();
+    } catch (e) {
+      res.writeHead(302, { Location: '/admin?loginPromo=fail#sec-login-promo' });
+      return res.end();
     }
   }
 
@@ -2229,7 +2666,7 @@ const server = http.createServer(async (req, res) => {
       const accounts = loadAccounts();
       const acc = accounts.find(a => a.mobile === mobile);
       if (acc && /^\d{4}$/.test(newPin)) {
-        acc.pin = newPin;
+      setPin(acc, newPin);
         acc.pinResetRequested = false;
         acc.pinResetRequestedAt = null;
         saveAccounts(accounts);
@@ -2260,11 +2697,12 @@ const server = http.createServer(async (req, res) => {
       at: a.pinResetRequestedAt || null
     }));
     const pendingOtps = loadOtpRequests().filter(r => !r.verified).map(r => ({
-      mobile: r.mobile, name: r.name || '', id: r.id || '', otp: r.otp,
-      at: r.createdAt || null
+      mobile: r.mobile, name: r.name || '', id: r.id || '',
+      at: r.createdAt || null, expiresAt: r.expiresAt || null
     }));
     const codes = loadCodes();
     const notifs = loadNotifs().slice(0, 10);
+    const latestOrder = (loadFrameOrders()[0]) || null;
     return sendJSON(res, 200, {
       ok: true,
       at: new Date().toISOString(),
@@ -2273,17 +2711,209 @@ const server = http.createServer(async (req, res) => {
         pendingOtp: pendingOtps.length,
         pendingPin: pendingResets.length,
         unusedCodes: codes.filter(c => !c.used).length,
-        notifs: notifs.length
+        notifs: notifs.length,
+        orders: loadFrameOrders().length
       },
       pendingOtps,
       pendingResets,
-      notifications: notifs
+      notifications: notifs,
+      latestOrder: latestOrder ? {
+        orderId: latestOrder.orderId,
+        name: latestOrder.name || '',
+        mobile: latestOrder.mobile || '',
+        createdAt: latestOrder.createdAt || '',
+        paymentStatus: latestOrder.paymentStatus || ''
+      } : null
     });
+  }
+
+  if (req.method === 'GET' && urlPath === '/admin/orders-csv') {
+    const u = new URL(req.url, 'http://x');
+    const range = String(u.searchParams.get('range') || 'all').toLowerCase();
+    const now = new Date();
+    const start = new Date(now);
+    if (range === 'today') start.setHours(0, 0, 0, 0);
+    else if (range === 'week') start.setDate(start.getDate() - 7);
+    else if (range === 'month') start.setMonth(start.getMonth() - 1);
+    const rows = loadFrameOrders().filter(o => {
+      if (range === 'all') return true;
+      const created = new Date(o.createdAt || 0);
+      return !isNaN(created) && created >= start;
+    });
+    const csvCell = value => '"' + String(value == null ? '' : value).replace(/"/g, '""').replace(/[\r\n]+/g, ' ') + '"';
+    const headings = ['Order No', 'Order Date', 'Customer', 'Mobile', 'Frame', 'Size', 'Total', 'Due', 'UTR', 'Payment Status', 'Order Status', 'Address', 'Admin Note'];
+    const csv = [headings, ...rows.map(o => [
+      o.orderId, o.createdAt, o.name, o.mobile, o.frameTitle, o.size, o.finalAmount, o.amountDue,
+      o.utr, o.paymentStatus, o.status, [o.address, o.village, o.district, o.state, o.pincode].filter(Boolean).join(', '), o.adminNote
+    ])].map(row => row.map(csvCell).join(',')).join('\r\n');
+    const stamp = now.toISOString().slice(0, 10);
+    res.writeHead(200, {
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': 'attachment; filename="aditya-studio-orders-' + range + '-' + stamp + '.csv"'
+    });
+    return res.end('\ufeff' + csv);
+  }
+
+
+  if (req.method === 'GET' && urlPath === '/admin/orders') {
+    const html = `<!DOCTYPE html>
+<html lang="hi"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Orders — Aditya Studio</title>
+<script>window.alert=function(m){function s(){var o=document.getElementById('adityaPageAlert');if(o)o.remove();var t=String(m||''),bad=/(fail|error|wrong|network|nahi|नहीं|गलत|invalid|missing|expire|chhoti|required|check)/i.test(t),b=document.createElement('div');b.id='adityaPageAlert';b.style.cssText='position:fixed;left:16px;right:16px;top:18px;z-index:99999;max-width:520px;margin:auto;padding:13px 42px 13px 15px;border-radius:13px;font:600 14px Arial,sans-serif;line-height:1.45;color:'+(bad?'#fecaca':'#dcfce7')+';background:'+(bad?'#571b22':'#14532d')+';border:1px solid '+(bad?'#ef4444':'#4ade80')+';box-shadow:0 12px 30px rgba(0,0,0,.42)';b.innerHTML=(bad?'⚠️ ':'✅ ')+t+'<button style="position:absolute;right:10px;top:8px;border:0;background:transparent;color:inherit;font-size:22px">×</button>';b.querySelector('button').onclick=function(){b.remove()};document.body.appendChild(b);setTimeout(function(){b.remove()},5000)}if(document.body)s();else document.addEventListener('DOMContentLoaded',s,{once:true})}</script>
+<style>
+:root{--bg:#0c0a09;--card:#1c1917;--gold:#D4AF37;--muted:#a8a29e;--text:#f5f5f4}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);padding:16px;max-width:920px;margin-inline:auto}
+a{color:var(--gold)}h1{font-size:1.3rem;margin:0 0 6px;color:var(--gold)}.sub{color:var(--muted);font-size:13px;margin:0 0 14px}
+.filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.filters a{padding:8px 14px;border-radius:999px;border:1px solid rgba(212,175,55,.35);color:var(--gold);text-decoration:none;font-size:13px}
+.filters a.active{background:rgba(212,175,55,.18)}
+.toolbar{display:grid;grid-template-columns:1fr auto auto;gap:8px;margin:0 0 14px}.toolbar input,.toolbar select{width:100%;padding:10px;border-radius:9px;border:1px solid rgba(212,175,55,.3);background:#0c0a09;color:var(--text)}.csv-link{padding:10px 12px;border:1px solid rgba(212,175,55,.35);border-radius:9px;color:var(--gold);text-decoration:none;font-size:13px;white-space:nowrap}@media(max-width:600px){.toolbar{grid-template-columns:1fr}.csv-link{text-align:center}}
+.msg-card{background:var(--card);border:1px solid rgba(212,175,55,.22);border-radius:14px;padding:14px;margin-top:12px}
+.msg-text{font-size:14px;line-height:1.5}.muted{color:var(--muted);font-size:12px}
+.inp{width:100%;max-width:240px;padding:8px 10px;border-radius:8px;border:1px solid rgba(212,175,55,.3);background:#0c0a09;color:var(--text)}
+.gen-btn{padding:8px 14px;border-radius:8px;border:none;background:linear-gradient(135deg,#D4AF37,#b8860b);color:#1a1200;font-weight:700;cursor:pointer}
+.btn-reject{padding:8px 12px;background:#7f1d1d;color:#fecaca;border:1px solid #991b1b;border-radius:8px;cursor:pointer}
+.btn-ok{padding:8px 12px;background:#14532d;color:#bbf7d0;border:1px solid #166534;border-radius:8px;cursor:pointer}
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+#imgView{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9999;align-items:center;justify-content:center;padding:16px;flex-direction:column;gap:12px}
+#imgView.show{display:flex}
+#imgView img{max-width:94vw;max-height:78vh;border-radius:12px;border:2px solid #D4AF37;background:#111}
+</style></head><body>
+<div id="imgView" onclick="if(event.target===this)closeImg()"><img alt="view"/><button type="button" class="gen-btn" onclick="closeImg()">Close</button></div>
+<div class="topbar"><div><h1>📦 Frame Orders</h1><p class="sub">Alag page — filter, confirm, reject fake orders.</p></div><a href="/admin">← Admin home</a></div>
+<div class="filters" id="filters">
+<a href="/admin/orders?filter=all" data-f="all">All</a>
+<a href="/admin/orders?filter=unread" data-f="unread">🔔 New <span id="unreadCount">0</span></a>
+<a href="/admin/orders?filter=new" data-f="new">Pending</a>
+<a href="/admin/orders?filter=confirmed" data-f="confirmed">Confirmed</a>
+<a href="/admin/orders?filter=pay_pending" data-f="pay_pending">Pay Pending</a>
+<a href="/admin/orders?filter=rejected" data-f="rejected">Rejected</a>
+<a href="/admin/orders?filter=delivered" data-f="delivered">Delivered</a>
+</div>
+<div class="toolbar">
+<input id="orderSearch" type="search" placeholder="Search: Order No., mobile ya customer name" autocomplete="off"/>
+<select id="dateRange"><option value="all">All dates</option><option value="today">Today</option><option value="week">Last 7 days</option><option value="month">Last 30 days</option></select>
+<a class="csv-link" id="csvDownload" href="/admin/orders-csv?range=all">⬇️ Excel CSV</a>
+</div>
+<div id="list" class="muted">Loading…</div>
+<script>
+function esc(t){return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function fmt(iso){try{var d=new Date(iso);return isNaN(d)?'—':d.toLocaleString('en-IN');}catch(e){return '—';}}
+var FILTER=(new URLSearchParams(location.search).get('filter')||'all').toLowerCase();
+var SEARCH=''; var RANGE='all'; var ORDERS_BY_ID={};
+document.querySelectorAll('#filters a').forEach(function(a){if(a.getAttribute('data-f')===FILTER)a.classList.add('active');});
+function matchFilter(o){
+  var st=String(o.status||'processing').toLowerCase();
+  var pay=String(o.paymentStatus||'unpaid').toLowerCase();
+  if(FILTER==='all')return true;
+  if(FILTER==='unread')return !!o.adminAlert;
+  if(FILTER==='new'||FILTER==='pending')return st==='processing'||st==='pending'||st==='';
+  if(FILTER==='confirmed')return st==='confirmed'||st==='ready';
+  if(FILTER==='delivered')return st==='delivered';
+  if(FILTER==='rejected')return st==='rejected'||st==='cancelled';
+  if(FILTER==='pay_pending')return pay==='unpaid'||pay==='paid_claimed';
+  return true;
+}
+function dateMatches(o){if(RANGE==='all')return true;var d=new Date(o.createdAt||0);if(isNaN(d))return false;var now=new Date();if(RANGE==='today')return d.toDateString()===now.toDateString();var days=RANGE==='week'?7:30;return d>=new Date(now.getTime()-days*86400000);}
+function searchMatches(o){if(!SEARCH)return true;var hay=[o.orderId,o.mobile,o.name,o.frameTitle,o.utr].join(' ').toLowerCase();return hay.indexOf(SEARCH)>=0;}
+document.getElementById('orderSearch').addEventListener('input',function(){SEARCH=this.value.trim().toLowerCase();loadOrdersPage();});
+document.getElementById('dateRange').addEventListener('change',function(){RANGE=this.value;document.getElementById('csvDownload').href='/admin/orders-csv?range='+encodeURIComponent(RANGE);loadOrdersPage();});
+function viewImg(src){var m=document.getElementById('imgView');if(!m||!src)return;m.querySelector('img').src=src;m.classList.add('show');}
+function closeImg(){var m=document.getElementById('imgView');if(!m)return;m.classList.remove('show');m.querySelector('img').src='';}
+function dlImg(src,name){if(!src)return;try{var a=document.createElement('a');a.href=src;a.download=name||'photo.jpg';document.body.appendChild(a);a.click();a.remove();}catch(e){window.open(src,'_blank');}}
+function waCustomer(mobile,orderId,status,payment){var n=String(mobile||'').replace(/\D/g,'');if(n.length!==10)return alert('Customer mobile invalid');var msg='Namaste, Aditya Studio se aapke order '+orderId+' ka update: Status '+(status||'updated')+(payment?' | Payment '+payment:'')+'. Dhanyavaad.';window.open('https://wa.me/91'+n+'?text='+encodeURIComponent(msg),'_blank');}
+var _ordMedia={n:0};
+function stashMedia(src){var id='k'+(++_ordMedia.n);_ordMedia[id]=src;return id;}
+function mediaBlock(src,label,fname){
+  if(!src) return '<div class="muted" style="margin-top:8px">'+label+' nahi mila</div>';
+  var id=stashMedia(src);
+  return '<div style="margin-top:10px;padding:10px;background:#0c0a09;border:1px solid rgba(212,175,55,.28);border-radius:10px">'
+    +'<b style="color:#D4AF37">'+label+'</b>'
+    +'<div style="margin-top:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">'
+    +'<img src="'+src+'" alt="" onclick="viewImg(_ordMedia.'+id+')" style="width:110px;height:110px;object-fit:cover;border-radius:10px;border:2px solid #D4AF37;cursor:zoom-in;background:#111" title="Click to view"/>'
+    +'<button type="button" class="gen-btn" onclick="viewImg(_ordMedia.'+id+')">View</button>'
+    +'<button type="button" class="gen-btn" onclick="dlImg(_ordMedia.'+id+',\\''+esc(fname)+'\\')">Download</button>'
+    +'</div></div>';
+}
+function proofCard(o){return '<div style="margin-top:10px;padding:11px;background:#0c0a09;border:1px solid rgba(212,175,55,.35);border-radius:11px"><b style="color:#D4AF37">💳 Payment & Photos</b><div class="muted" style="margin-top:4px">Payment: '+esc(o.paymentStatus||'unpaid')+(o.utr?' · UTR: '+esc(o.utr):' · UTR nahi mila')+'</div>'+mediaBlock(o.paymentScreenshot,'Payment screenshot','payment-'+o.orderId+'.jpg')+mediaBlock(o.customerPhoto,'Customer photo','customer-photo-'+o.orderId+'.jpg')+'</div>';}
+function card(o){
+  var rejected=String(o.status||'').toLowerCase()==='rejected';
+  return '<div class="msg-card" style="'+(rejected?'border-color:rgba(239,68,68,.5)':'')+'"><div class="msg-text"><b>'+esc(o.orderId)+'</b> · '+esc(o.frameTitle||'')+' ('+esc(o.size)+')'
+    +(rejected?' <span style="color:#f87171;font-weight:700">REJECTED</span>':'')
+    +(o.adminAlert?'<br><span style="display:inline-block;margin-top:7px;padding:5px 9px;border-radius:999px;background:#7c2d12;color:#fde68a;font-weight:800">🔔 NEW ORDER — payment proof check karein</span>':'')
+    +'<br>👤 '+esc(o.name)+' · '+esc(o.mobile)+' · Total ₹'+(o.finalAmount||0)+(o.amountDue!=null?(' · Due ₹'+o.amountDue):'')+(o.walletPaid?(' · Wallet ₹'+o.walletPaid):'')
+    +(o.qualityLabel?'<br>🖨️ Quality: '+esc(o.qualityLabel)+(o.qualityExtra?(' (+₹'+o.qualityExtra+')'):''):'')
+    +(o.colourName?'<br>🎨 Colour: '+esc(o.colourName):'')
+    +(o.orientation?'<br>↔️ Orientation: '+esc(o.orientation):'')
+    +'<br>📍 '+esc(o.address||'')+(o.village?' · गाँव: '+esc(o.village):'')+(o.district?' · जिला: '+esc(o.district):'')+(o.state?' · राज्य: '+esc(o.state):'')+(o.pincode?' · PIN: '+esc(o.pincode):'')
+    +(o.note?'<br>📝 '+esc(o.note):'')
+    +'<br>💳 <b>'+esc(o.paymentStatus||'unpaid')+'</b> · Status: <b>'+esc(o.status||'processing')+'</b>'
+    +(o.platformFee!=null?'<br>Fees: platform ₹'+(o.platformFee||0)+' · delivery ₹'+(o.deliveryFee||0):'')
+    +(o.trackingNumber?'<br>🔖 '+esc(o.trackingNumber):'')+(o.adminNote?'<br>📌 '+esc(o.adminNote):'')
+    + proofCard(o)
+    +'<br><span class="muted">'+esc(fmt(o.createdAt))+'</span></div>'
+    +'<div style="display:grid;gap:6px;margin-top:10px">'
+    +'<label class="muted">Status <select class="inp" id="st-'+esc(o.orderId)+'">'
+    +['processing','pending','confirmed','ready','delivered','cancelled','rejected'].map(function(s){return '<option value="'+s+'"'+(o.status===s?' selected':'')+'>'+s+'</option>';}).join('')
+    +'</select></label>'
+    +'<label class="muted">Payment <select class="inp" id="pay-'+esc(o.orderId)+'">'
+    +['unpaid','paid_claimed','confirmed'].map(function(s){return '<option value="'+s+'"'+((o.paymentStatus||'unpaid')===s?' selected':'')+'>'+s+'</option>';}).join('')
+    +'</select></label>'
+    +'<label class="muted">Delivery date <input class="inp" id="dd-'+esc(o.orderId)+'" type="date" value="'+esc(o.deliveryDate||'')+'"></label>'
+    +'<label class="muted">Delivery time <input class="inp" id="dt-'+esc(o.orderId)+'" type="time" value="'+esc(o.deliveryTime||'')+'"></label>'
+    +'<label class="muted">Admin note <input class="inp" id="an-'+esc(o.orderId)+'" value="'+esc(o.adminNote||'')+'" style="max-width:100%"></label>'
+    +'<label class="muted"><input type="checkbox" id="wa-'+esc(o.orderId)+'"> Update ke baad WhatsApp message kholen</label>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
+    +'<button class="gen-btn" onclick="updateOrder(\\''+esc(o.orderId)+'\\')">Update + Notify</button>'
+    +'<button class="gen-btn" onclick="waCustomer(\\''+esc(o.mobile)+'\\',\\''+esc(o.orderId)+'\\')">💬 WhatsApp Customer</button>'
+    +(o.paymentStatus!=='confirmed'?'<button class="btn-ok" onclick="confirmPay(\\''+esc(o.orderId)+'\\')">✅ Confirm Pay</button>':'')
+    +(rejected?'<button class="gen-btn" onclick="restoreOrder(\\''+esc(o.orderId)+'\\')">↩️ Restore</button>':'<button class="btn-reject" onclick="rejectOrder(\\''+esc(o.orderId)+'\\')">❌ Reject (fake)</button>')
+    +'</div></div></div>';
+}
+async function loadOrdersPage(){
+  _ordMedia={n:0};
+  var box=document.getElementById('list');
+  try{
+    var res=await fetch('/admin/frames-json',{credentials:'same-origin',cache:'no-store'});
+    var data=await res.json();
+    var all=(data.orders||[]).slice(); ORDERS_BY_ID={}; all.forEach(function(o){ORDERS_BY_ID[o.orderId]=o;});
+    var unread=all.filter(function(o){return !!o.adminAlert;}).length; document.getElementById('unreadCount').textContent=unread;
+    var orders=all.reverse().filter(function(o){return matchFilter(o)&&dateMatches(o)&&searchMatches(o);});
+    box.innerHTML=orders.length?orders.map(card).join(''):'<div class="muted">Is filter me koi order nahi</div>';
+  }catch(e){box.innerHTML='<div class="muted">Load fail</div>';}
+}
+async function updateOrder(id){
+  var body={orderId:id,status:(document.getElementById('st-'+id)||{}).value,paymentStatus:(document.getElementById('pay-'+id)||{}).value,deliveryDate:(document.getElementById('dd-'+id)||{}).value,deliveryTime:(document.getElementById('dt-'+id)||{}).value,adminNote:(document.getElementById('an-'+id)||{}).value};
+  var res=await fetch('/admin/frame-order-update',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  var data=await res.json();if(data.ok){var o=data.order||ORDERS_BY_ID[id]||{};if((document.getElementById('wa-'+id)||{}).checked)waCustomer(o.mobile,id,o.status,o.paymentStatus);alert('Updated ✅');loadOrdersPage();}else alert('Fail');
+}
+async function confirmPay(id){
+  if(!confirm('Payment confirm?'))return;
+  var res=await fetch('/admin/frame-order-update',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({orderId:id,confirmPayment:true,status:'confirmed',deliveryDate:(document.getElementById('dd-'+id)||{}).value,deliveryTime:(document.getElementById('dt-'+id)||{}).value})});
+  var data=await res.json();if(data.ok){var o=data.order||ORDERS_BY_ID[id]||{};if((document.getElementById('wa-'+id)||{}).checked)waCustomer(o.mobile,id,o.status,o.paymentStatus);alert('Confirmed');loadOrdersPage();}else alert('Fail');
+}
+async function rejectOrder(id){
+  var reason=prompt('Reject reason (fake order):',(document.getElementById('an-'+id)||{}).value||'Fake / invalid');
+  if(reason===null)return;if(!confirm('Reject '+id+'?'))return;
+  var res=await fetch('/admin/frame-order-update',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({orderId:id,reject:true,status:'rejected',adminNote:reason,rejectReason:reason})});
+  var data=await res.json();if(data.ok){var o=data.order||ORDERS_BY_ID[id]||{};if((document.getElementById('wa-'+id)||{}).checked)waCustomer(o.mobile,id,o.status,o.paymentStatus);alert('Rejected ❌');loadOrdersPage();}else alert('Fail');
+}
+async function restoreOrder(id){
+  if(!confirm('Restore to processing?'))return;
+  var res=await fetch('/admin/frame-order-update',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({orderId:id,status:'processing'})});
+  var data=await res.json();if(data.ok){alert('Restored');loadOrdersPage();}else alert('Fail');
+}
+loadOrdersPage();setInterval(loadOrdersPage,20000);
+</script></body></html>`;
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    return res.end(html);
   }
 
   if (req.method === 'GET' && urlPath === '/admin') {
     const accounts = loadAccounts().slice().reverse();
     const settings = loadSettings();
+    const adminHidden = (settings.adminUi && settings.adminUi.hidden) || {};
     const bi = settings.bookImages || {};
     const pendingResets = accounts.filter(a => a.pinResetRequested);
     const pendingOtps = loadOtpRequests().filter(r => !r.verified);
@@ -2310,10 +2940,10 @@ const server = http.createServer(async (req, res) => {
       const pay = String(o.paymentStatus || 'unpaid').toLowerCase();
       return pay === 'unpaid' || pay === 'paid_claimed' || pay === 'partial_wallet';
     }).length;
+    const ordRejected = frameOrdersAdmin.filter(o => String(o.status || '').toLowerCase() === 'rejected').length;
 
     const otpCards = pendingOtps.map(r => {
-      const msg = encodeURIComponent('Namaste ' + (r.name || '') + '!\nAditya Studio Spin OTP: *' + r.otp + '*\n— Aditya Studio');
-      return '<div class="msg-card"><div class="msg-text">🎡 <b>' + esc(r.name || '') + '</b> (' + esc(r.mobile) + ')<br>OTP: <span class="otp-big">' + esc(r.otp) + '</span><br><span class="muted">' + esc(fmtDate(r.createdAt)) + '</span></div><div class="msg-actions"><a class="gen-btn wa-link" href="https://wa.me/91' + esc(r.mobile) + '?text=' + msg + '" target="_blank">💬 WhatsApp OTP</a></div></div>';
+      return '<div class="msg-card"><div class="msg-text">📱 <b>' + esc(r.name || '') + '</b> (' + esc(r.mobile) + ')<br><span style="color:#8fd19e;font-weight:700">SMS OTP sent</span><br><span class="muted">Requested: ' + esc(fmtDate(r.createdAt)) + (r.expiresAt ? ' · Expires: ' + esc(fmtDate(r.expiresAt)) : '') + '</span></div><div class="msg-actions"><button type="button" class="gen-btn" style="background:#7f1d1d;color:#fecaca;border:1px solid #991b1b" data-oid="'+esc(r.id||'')+'" data-omobile="'+esc(r.mobile||'')+'" onclick="adminDeleteOtp(this.dataset.oid,this.dataset.omobile)">🗑️ Cancel OTP</button></div></div>';
     }).join('') || '<div class="muted">No pending OTP</div>';
 
     const resetCards = pendingResets.map(acc => {
@@ -2416,7 +3046,7 @@ const server = http.createServer(async (req, res) => {
         (acc.mobileVerified ? '<span class="ok">✓ Verified</span>' : '<span class="bad">✗ Unverified</span>') +
         ' <span class="tag">' + esc(acc.badge || tierName(acc.totalSpend || 0)) + '</span>' +
         ' <span class="tag" style="background:rgba(212,175,55,0.2)">💰 ₹' + esc(wBal) + '</span></summary><div class="acc-body"><div class="grid">' +
-        '<div><span class="lbl">PIN</span><div class="mono gold">' + esc(acc.pin) + '</div></div>' +
+        '<div><span class="lbl">PIN</span><div class="mono gold">•••• (secured)</div></div>' +
         '<div><span class="lbl">Village</span><div>' + esc(acc.village || '—') + '</div></div>' +
         '<div><span class="lbl">Total spend</span><div>₹' + esc(acc.totalSpend || 0) + '</div></div>' +
         '<div><span class="lbl">Wallet</span><div class="gold">₹' + esc(wBal) + '</div></div></div>' +
@@ -2426,7 +3056,7 @@ const server = http.createServer(async (req, res) => {
         '<table><thead><tr><th>Coupon</th><th>From</th><th>Status</th><th>Time</th><th>Action</th></tr></thead><tbody>' + couponRows + '</tbody></table></div></details>';
     }).join('') || '<p class="muted">No customers yet</p>';
 
-    const html = `<!DOCTYPE html><html lang="hi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+    const html = `<!DOCTYPE html><html lang="hi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script>window.alert=function(m){function s(){var o=document.getElementById('adityaPageAlert');if(o)o.remove();var t=String(m||''),bad=/(fail|error|wrong|network|nahi|नहीं|गलत|invalid|missing|expire|chhoti|required|check)/i.test(t),b=document.createElement('div');b.id='adityaPageAlert';b.style.cssText='position:fixed;left:16px;right:16px;top:18px;z-index:99999;max-width:520px;margin:auto;padding:13px 42px 13px 15px;border-radius:13px;font:600 14px Arial,sans-serif;line-height:1.45;color:'+(bad?'#fecaca':'#dcfce7')+';background:'+(bad?'#571b22':'#14532d')+';border:1px solid '+(bad?'#ef4444':'#4ade80')+';box-shadow:0 12px 30px rgba(0,0,0,.42)';b.innerHTML=(bad?'⚠️ ':'✅ ')+t+'<button style="position:absolute;right:10px;top:8px;border:0;background:transparent;color:inherit;font-size:22px">×</button>';b.querySelector('button').onclick=function(){b.remove()};document.body.appendChild(b);setTimeout(function(){b.remove()},5000)}if(document.body)s();else document.addEventListener('DOMContentLoaded',s,{once:true})}</script>
 <title>Aditya Studio Admin</title>
 <style>
 *{box-sizing:border-box}html{scroll-behavior:smooth}
@@ -2468,6 +3098,11 @@ table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}
 th,td{padding:10px 8px;border-bottom:1px solid #221a14;text-align:left}th{color:#D4AF37;font-size:11px;text-transform:uppercase;letter-spacing:.03em}
 .inp,textarea,select.inp{background:#0a0806;border:1px solid rgba(212,175,55,.28);border-radius:8px;padding:8px 10px;color:#F4EAD6;font-size:13px}
 .inp{width:100%;max-width:100%}
+#imgView{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9999;align-items:center;justify-content:center;padding:16px;flex-direction:column;gap:12px}
+#imgView.show{display:flex}
+#imgView img{max-width:94vw;max-height:78vh;border-radius:12px;border:2px solid #D4AF37;background:#111}
+#newOrderBanner{display:none;background:#14532d;border:1px solid #4ade80;color:#bbf7d0;padding:12px 16px;border-radius:12px;margin-bottom:16px;font-weight:700;cursor:pointer}
+#newOrderBanner.show{display:block}
 .form-grid{display:grid;gap:10px;max-width:520px}
 .form-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .acc summary{cursor:pointer;padding:4px 0}.c-id{color:#D4AF37;font-family:ui-monospace,monospace}
@@ -2483,7 +3118,15 @@ label.muted{display:block;font-size:12px;margin-bottom:2px}
   .main{margin-left:0;padding:16px}
   .nav-link{display:inline-flex;margin:2px}
 }
+
+.sec-hidden{display:none!important}
+.sec-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.sec-hide-btn{font-size:11px;padding:4px 10px;border-radius:999px;border:1px solid rgba(212,175,55,.35);background:transparent;color:#D4AF37;cursor:pointer}
+.sec-hide-btn:hover{background:rgba(212,175,55,.12)}
+#sec-ui-panel .ui-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px}
+#sec-ui-panel label{display:flex;align-items:center;gap:8px;font-size:13px;color:#e5e2e1;cursor:pointer}
 </style></head><body>
+<div id="imgView" onclick="if(event.target===this)closeImg()"><img alt="view"/><button type="button" class="gen-btn" onclick="closeImg()">Close</button></div>
 <div class="layout">
 <aside class="sidebar">
   <div class="brand">Aditya Studio</div>
@@ -2510,6 +3153,7 @@ label.muted{display:block;font-size:12px;margin-bottom:2px}
   <h1>Dashboard</h1>
   <div class="links"><a href="/">Home</a><a href="/book-now">Studio page</a></div>
 </div>
+<div id="newOrderBanner" onclick="location.hash='sec-orders'"></div>
 
 <section class="panel" id="sec-overview">
 <h2>Overview</h2>
@@ -2528,22 +3172,69 @@ label.muted{display:block;font-size:12px;margin-bottom:2px}
 </div>
 </section>
 
+
+<section class="panel" id="sec-ui-panel">
+<h2>👁️ Admin Sections Show / Hide</h2>
+<p class="sub">Jis function ki zaroorat nahi, yahan se hide karo. Dobara show bhi yahi se.</p>
+<div class="ui-grid" id="adminUiToggles"></div>
+<button type="button" class="gen-btn" style="margin-top:12px" onclick="adminSaveUi()">💾 Save Show/Hide</button>
+<button type="button" class="gen-btn" style="margin-top:12px;margin-left:8px;background:#333;color:#D4AF37" onclick="adminShowAllSections()">Show All</button>
+<p id="adminUiMsg" class="muted"></p>
+</section>
 <section class="panel" id="sec-order-stats">
 <h2>📦 Frame Orders Summary</h2>
 <p class="sub">Orders ka live status — New red me, Confirmed green me.</p>
 <div class="cards">
-<div class="card" title="Total orders"><div class="n" id="cntOrdTotal">${ordTotal}</div><div class="l">Total Orders</div></div>
-<div class="card" title="Aaj naye orders" style="border-color:rgba(239,68,68,0.45)"><div class="n" id="cntOrdNew" style="color:#f87171">${ordNew}</div><div class="l" style="color:#f87171">New Today</div></div>
-<div class="card" title="Pending / processing" style="border-color:rgba(251,146,60,0.4)"><div class="n" id="cntOrdPending" style="color:#fb923c">${ordPending}</div><div class="l">Pending</div></div>
-<div class="card" title="Confirmed / ready / delivered" style="border-color:rgba(74,222,128,0.4)"><div class="n" id="cntOrdConfirmed" style="color:#4ade80">${ordConfirmed}</div><div class="l" style="color:#4ade80">Confirmed</div></div>
-<div class="card" title="Payment pending"><div class="n" id="cntOrdPayPend" style="color:#fbbf24">${ordPayPending}</div><div class="l">Pay Pending</div></div>
+<a class="card" href="/admin/orders?filter=all" style="text-decoration:none;color:inherit;cursor:pointer" title="All orders"><div class="n" id="cntOrdTotal">${ordTotal}</div><div class="l">Total Orders</div></a>
+<a class="card" href="/admin/orders?filter=new" style="text-decoration:none;color:inherit;cursor:pointer;border-color:rgba(239,68,68,0.45)" title="New today"><div class="n" id="cntOrdNew" style="color:#f87171">${ordNew}</div><div class="l" style="color:#f87171">New Today</div></a>
+<a class="card" href="/admin/orders?filter=pending" style="text-decoration:none;color:inherit;cursor:pointer;border-color:rgba(251,146,60,0.4)" title="Pending"><div class="n" id="cntOrdPending" style="color:#fb923c">${ordPending}</div><div class="l">Pending</div></a>
+<a class="card" href="/admin/orders?filter=confirmed" style="text-decoration:none;color:inherit;cursor:pointer;border-color:rgba(74,222,128,0.4)" title="Confirmed"><div class="n" id="cntOrdConfirmed" style="color:#4ade80">${ordConfirmed}</div><div class="l" style="color:#4ade80">Confirmed</div></a>
+<a class="card" href="/admin/orders?filter=pay_pending" style="text-decoration:none;color:inherit;cursor:pointer" title="Pay pending"><div class="n" id="cntOrdPayPend" style="color:#fbbf24">${ordPayPending}</div><div class="l">Pay Pending</div></a>
+<a class="card" href="/admin/orders?filter=rejected" style="text-decoration:none;color:inherit;cursor:pointer;border-color:rgba(239,68,68,0.55)" title="Rejected"><div class="n" id="cntOrdRejected" style="color:#f87171">${ordRejected}</div><div class="l" style="color:#f87171">Rejected</div></a>
 </div>
-<p class="muted" style="margin-top:8px"><a href="#sec-orders" style="color:#D4AF37">↓ Neeche full order list</a></p>
+<p class="muted" style="margin-top:10px"><a href="/admin/orders" style="color:#D4AF37;font-weight:700">→ Open full Orders page (alag manage)</a></p>
+</section>
+
+<section class="panel" id="sec-fees">
+<h2>💰 Platform & Delivery Fees</h2>
+<p class="sub">Kab fees lage / kab free — Save ke baad place-order pe apply.</p>
+<div class="form-grid" style="max-width:520px">
+<label class="muted">Platform fee ₹ <input class="inp" id="feePlatformAmt" type="number" min="0" value="10"></label>
+<label class="muted">Platform kab?
+<select class="inp" id="feePlatformMode">
+<option value="always">Hamesha</option>
+<option value="never">Kabhi nahi (Off)</option>
+<option value="above_amount">Sirf order ≥ ₹X</option>
+</select></label>
+<label class="muted">Platform min ₹ <input class="inp" id="feePlatformMin" type="number" min="0" value="0"></label>
+<label class="muted">Delivery fee ₹ <input class="inp" id="feeDeliveryAmt" type="number" min="0" value="40"></label>
+<label class="muted">Delivery kab?
+<select class="inp" id="feeDeliveryMode">
+<option value="always">Hamesha</option>
+<option value="never">Hamesha free</option>
+<option value="free_above">Free jab order ≥ ₹X</option>
+<option value="above_amount">Sirf order ≥ ₹X</option>
+</select></label>
+<label class="muted">Delivery free above ₹ <input class="inp" id="feeDeliveryFreeAbove" type="number" min="0" value="500"></label>
+<label class="muted">Delivery min ₹ <input class="inp" id="feeDeliveryMin" type="number" min="0" value="0"></label>
+<button type="button" class="gen-btn" onclick="adminSaveFees()">💾 Save Fee Rules</button>
+<p id="feeSaveMsg" class="muted"></p>
+</div>
+</section>
+
+
+<section class="panel" id="sec-quality">
+<h2>🖨️ Photo Quality Options</h2>
+<p class="sub">Customer frames page pe ye options dikhenge (Normal / Lamination / NTR …). Extra price ₹ me.</p>
+<div id="qualityAdminList" style="display:grid;gap:10px;max-width:560px"></div>
+<button type="button" class="gen-btn" style="margin-top:10px" onclick="qualityAddRow()">+ Add option</button>
+<button type="button" class="gen-btn" style="margin-top:10px;margin-left:8px" onclick="adminSaveQuality()">💾 Save Quality Options</button>
+<p id="qualitySaveMsg" class="muted"></p>
 </section>
 
 <section class="panel" id="sec-orders">
-<h2>📦 Frame Orders</h2>
-<p class="sub">Customer frame orders — status, payment confirm, delivery date/time.</p>
+<h2>📦 Frame Orders (preview)</h2>
+<p class="sub">Naye orders yahan. Full manage: <a href="/admin/orders" style="color:#D4AF37;font-weight:700">Open Orders Page →</a></p>
 <div id="adminOrdersList" class="muted">Loading orders…</div>
 </section>
 
@@ -2589,6 +3280,30 @@ label.muted{display:block;font-size:12px;margin-bottom:2px}
 <button class="gen-btn" type="button" onclick="adminUploadBanners()">📤 Upload (jitni select ki)</button>
 <p id="bannerUploadStatus" class="muted"></p>
 </div>
+</section>
+
+<section class="panel" id="sec-home-deals">
+<h2>🎞️ Current Deals — Full Customization</h2>
+<p class="sub">Home page ke har deal card ki photo, title, subtitle, link, order aur slide duration yahin se badlo. Save karne par purane fixed cards ki jagah aapke cards dikhenge.</p>
+<div class="form-row" style="align-items:end;margin-bottom:10px">
+<label class="muted">Carousel duration (seconds)<input id="dealDuration" class="inp" type="number" min="8" max="60" value="${esc(settings.homeDealsDurationSec||20)}" style="max-width:130px"></label>
+<button type="button" class="gen-btn" onclick="adminAddDeal()">＋ Deal card add</button>
+<button type="button" class="gen-btn" onclick="adminSaveDeals()">💾 Save Current Deals</button>
+</div>
+<div id="homeDealsEditor"></div>
+<p id="homeDealsStatus" class="muted"></p>
+<script>window.__HOME_DEALS__=${JSON.stringify(settings.offerImages || []).replace(/</g, '\\u003c')};</script>
+</section>
+
+<section class="panel" id="sec-login-promo">
+<h2>🌈 Login Page Color Button</h2>
+<p class="sub">Register/Login page par dikhne wala colorful offer button. Iska text, link aur colors yahin se badlein.</p>
+<form method="POST" action="/admin/save-login-promo" class="form-grid">
+<label class="muted">Button text<input class="inp" name="text" maxlength="140" value="${esc((settings.loginPromo||{}).text||'')}"></label>
+<label class="muted">Click link<input class="inp" name="link" maxlength="300" value="${esc((settings.loginPromo||{}).link||'/#sizes')}"></label>
+<div class="form-row"><label class="muted">Left color <input name="colorA" type="color" value="${esc((settings.loginPromo||{}).colorA||'#8E2A38')}"></label><label class="muted">Right color <input name="colorB" type="color" value="${esc((settings.loginPromo||{}).colorB||'#D4AF37')}"></label><label class="muted">Text color <input name="textColor" type="color" value="${esc((settings.loginPromo||{}).textColor||'#FFF4C8')}"></label></div>
+<button class="gen-btn" type="submit">💾 Save Color Button</button>
+</form>
 </section>
 
 <section class="panel" id="sec-hero">
@@ -2822,7 +3537,48 @@ function filterPanel(kind){
 }
 
 var lastSig = '';
+var lastOrderIdSeen = '';
 var audioCtx = null;
+function viewImg(src) {
+  var m = document.getElementById('imgView');
+  if (!m || !src) return;
+  m.querySelector('img').src = src;
+  m.classList.add('show');
+}
+function closeImg() {
+  var m = document.getElementById('imgView');
+  if (!m) return;
+  m.classList.remove('show');
+  m.querySelector('img').src = '';
+}
+function dlImg(src, name) {
+  if (!src) return;
+  try {
+    var a = document.createElement('a');
+    a.href = src;
+    a.download = name || 'photo.jpg';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  } catch (e) { window.open(src, '_blank'); }
+}
+var _ordMedia = { n: 0 };
+function stashMedia(src) {
+  var id = 'k' + (++_ordMedia.n);
+  _ordMedia[id] = src;
+  return id;
+}
+function mediaBlock(src, label, fname) {
+  if (!src) return '<div class="muted" style="margin-top:8px">' + label + ' nahi mila</div>';
+  var id = stashMedia(src);
+  return '<div style="margin-top:10px;padding:10px;background:#0a0806;border:1px solid rgba(212,175,55,.28);border-radius:10px">'
+    + '<b style="color:#D4AF37">' + label + '</b>'
+    + '<div style="margin-top:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">'
+    + '<img src="' + src + '" alt="" onclick="viewImg(_ordMedia.' + id + ')" style="width:110px;height:110px;object-fit:cover;border-radius:10px;border:2px solid #D4AF37;cursor:zoom-in;background:#111" title="Click to view"/>'
+    + '<button type="button" class="gen-btn" onclick="viewImg(_ordMedia.' + id + ')">View</button>'
+    + '<button type="button" class="gen-btn" onclick="dlImg(_ordMedia.' + id + ',\\'' + esc(fname) + '\\')">Download</button>'
+    + '</div></div>';
+}
 function playAlert() {
   if (document.getElementById('soundToggle') && !document.getElementById('soundToggle').checked) return;
   try {
@@ -2856,10 +3612,10 @@ function renderOtps(list) {
   if (!box) return;
   if (!list.length) { box.innerHTML = '<div class="muted">No pending OTP</div>'; return; }
   box.innerHTML = list.map(function(r) {
-    var msg = encodeURIComponent('Namaste ' + (r.name || '') + '!\\nAditya Studio Spin OTP: *' + r.otp + '*\\n— Aditya Studio');
     return '<div class="msg-card" style="border-color:rgba(255,80,80,0.4);box-shadow:0 0 12px rgba(255,80,80,0.15)">'
-      + '<div class="msg-text">🎡 <b>' + esc(r.name || '') + '</b> (' + esc(r.mobile) + ')<br>OTP: <span class="otp-big">' + esc(r.otp) + '</span><br><span class="muted">' + esc(fmt(r.at)) + '</span></div>'
-      + '<div class="msg-actions"><a class="gen-btn wa-link" href="https://wa.me/91' + esc(r.mobile) + '?text=' + msg + '" target="_blank">💬 WhatsApp OTP</a></div></div>';
+      + '<div class="msg-text">📱 <b>' + esc(r.name || '') + '</b> (' + esc(r.mobile) + ')<br><span style="color:#8fd19e;font-weight:700">SMS OTP sent</span><br><span class="muted">' + esc(fmt(r.at)) + (r.expiresAt ? ' · Expires: ' + esc(fmt(r.expiresAt)) : '') + '</span></div>'
+      + '<div class="msg-actions" style="display:flex;gap:8px;flex-wrap:wrap">'
+      + '<button type="button" class="gen-btn" style="background:#7f1d1d;color:#fecaca;border:1px solid #991b1b" data-oid="'+esc(r.id||'')+'" data-omobile="'+esc(r.mobile||'')+'" onclick="adminDeleteOtp(this.dataset.oid,this.dataset.omobile)">🗑️ Delete</button></div></div>';
   }).join('');
 }
 
@@ -2892,6 +3648,22 @@ function setCount(id, n) {
   if (el) el.textContent = n;
 }
 
+async function adminDeleteOtp(id, mobile) {
+  if (!confirm('OTP delete karein?\\n' + (mobile || id || ''))) return;
+  try {
+    var res = await fetch('/admin/otp-delete', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: id || '', mobile: mobile || '' })
+    });
+    var data = await res.json();
+    if (data.ok) {
+      if (typeof pollLive === 'function') pollLive();
+      else location.reload();
+    } else alert('Delete fail');
+  } catch (e) { alert('Network error'); }
+}
+
 async function pollLive() {
   var st = document.getElementById('liveStatus');
   try {
@@ -2903,7 +3675,7 @@ async function pollLive() {
     if (!res.ok) throw new Error('HTTP ' + res.status);
     var data = await res.json();
     if (!data.ok) throw new Error('bad');
-    var sig = JSON.stringify({ o: data.pendingOtps, p: data.pendingResets, n: data.notifications });
+    var sig = JSON.stringify({ o: data.pendingOtps, p: data.pendingResets, n: data.notifications, oid: data.latestOrder && data.latestOrder.orderId });
     if (lastSig && sig !== lastSig) {
       var prev = {};
       try { prev = JSON.parse(lastSig); } catch(e) {}
@@ -2913,11 +3685,28 @@ async function pollLive() {
       var prevN0 = (prev.n && prev.n[0]) ? (prev.n[0].at + '|' + prev.n[0].title) : '';
       var curN0 = (data.notifications && data.notifications[0]) ? (data.notifications[0].at + '|' + data.notifications[0].title) : '';
       if (curN0 && curN0 !== prevN0) newNotif = true;
-      // also detect brand-new mobile
-      var prevOtpKeys = (prev.o || []).map(function(x){ return x.mobile + ':' + x.otp; }).join('|');
+      var prevOtpKeys = (prev.o || []).map(function(x){ return x.mobile + ':' + (x.at || ''); }).join('|');
       (data.pendingOtps || []).forEach(function(r) {
-        if (prevOtpKeys && prevOtpKeys.indexOf(r.mobile + ':' + r.otp) < 0) newOtp = true;
+        if (prevOtpKeys && prevOtpKeys.indexOf(r.mobile + ':' + (r.at || '')) < 0) newOtp = true;
       });
+      var lo = data.latestOrder || null;
+      var newOrd = !!(lo && lo.orderId && prev.oid && lo.orderId !== prev.oid);
+      if (!prev.oid && lo && lo.orderId && lastOrderIdSeen && lo.orderId !== lastOrderIdSeen) newOrd = true;
+      if (newOrd) {
+        playAlert();
+        var ban = document.getElementById('newOrderBanner');
+        if (ban) {
+          ban.textContent = 'Naya order: ' + lo.orderId + ' · ' + (lo.name || '') + ' · ' + (lo.mobile || '') + ' — click karke details dekho';
+          ban.classList.add('show');
+        }
+        alert('Naya order aaya!\\nOrder No: ' + lo.orderId + '\\n' + (lo.name || '') + ' · ' + (lo.mobile || ''));
+        try {
+          if (Notification && Notification.permission === 'granted') {
+            new Notification('Naya Frame Order', { body: lo.orderId + ' · ' + (lo.name || '') });
+          }
+        } catch(e) {}
+        if (typeof loadAdminFrames === 'function') loadAdminFrames();
+      }
       if (newOtp || newPin || newNotif) {
         playAlert();
         if (st) st.innerHTML = '<span style="color:#3ee06b">🔔 NEW ' + (newOtp ? 'OTP' : newPin ? 'PIN' : 'Notification') + '!</span>';
@@ -2926,13 +3715,14 @@ async function pollLive() {
             new Notification('Aditya Studio Admin', { body: newOtp ? 'Naya OTP request' : 'Naya PIN reset request' });
           }
         } catch(e) {}
-      } else if (st) {
+      } else if (st && !newOrd) {
         st.textContent = 'ok · ' + new Date().toLocaleTimeString('en-IN');
       }
     } else if (st) {
       st.textContent = 'ok · ' + new Date().toLocaleTimeString('en-IN');
     }
     lastSig = sig;
+    if (data.latestOrder && data.latestOrder.orderId) lastOrderIdSeen = data.latestOrder.orderId;
     renderOtps(data.pendingOtps || []);
     renderPins(data.pendingResets || []);
     if (typeof renderAdminNotifs === 'function') renderAdminNotifs(data.notifications || []);
@@ -3002,6 +3792,82 @@ async function adminUploadBanners() {
   }
 }
 
+/* ---- Current Deals editor (Home page) ---- */
+var _homeDeals = Array.isArray(window.__HOME_DEALS__) ? window.__HOME_DEALS__.map(function(item) {
+  return (item && typeof item === 'object') ? item : { url: String(item || ''), title: 'Aditya Studio', sub: '', link: '/frames', active: true };
+}) : [];
+
+function dealText(value) {
+  return String(value == null ? '' : value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function renderHomeDealsEditor() {
+  var root = document.getElementById('homeDealsEditor');
+  if (!root) return;
+  if (!_homeDeals.length) {
+    root.innerHTML = '<p class="muted">Abhi koi custom deal nahi hai. “Deal card add” dabakar photo aur text add karein.</p>';
+    return;
+  }
+  root.innerHTML = _homeDeals.map(function(deal, index) {
+    var photo = deal.url ? '<img src="' + dealText(deal.url) + '" style="width:100%;height:110px;object-fit:cover;border-radius:9px;border:1px solid #6b5522">' : '<div style="height:110px;display:grid;place-items:center;border:1px dashed #6b5522;border-radius:9px;color:#a99b7d">Photo choose karein</div>';
+    return '<div class="panel" style="padding:14px;margin:10px 0;background:#18130d">'
+      + '<div class="form-row" style="justify-content:space-between"><b>Deal ' + (index + 1) + '</b><span><button type="button" class="mini-btn" onclick="adminMoveDeal(' + index + ',-1)">↑</button> <button type="button" class="mini-btn" onclick="adminMoveDeal(' + index + ',1)">↓</button> <button type="button" class="mini-btn" style="color:#fca5a5" onclick="adminRemoveDeal(' + index + ')">Remove</button></span></div>'
+      + '<div class="form-grid" style="grid-template-columns:minmax(120px,180px) 1fr;align-items:start">'
+      + '<div id="dealPreview' + index + '">' + photo + '</div>'
+      + '<div><label class="muted">Deal photo<input type="file" accept="image/*" class="field-file" onchange="adminDealImage(this,' + index + ')"></label>'
+      + '<label class="muted">Heading<input class="inp deal-title" maxlength="80" value="' + dealText(deal.title || '') + '"></label>'
+      + '<label class="muted">Neeche ka text<input class="inp deal-sub" maxlength="160" value="' + dealText(deal.sub || '') + '"></label>'
+      + '<label class="muted">Click karne par link<input class="inp deal-link" maxlength="300" value="' + dealText(deal.link || '/frames') + '" placeholder="/frames ya /book-now"></label>'
+      + '<label class="muted" style="display:flex;align-items:center;gap:8px"><input class="deal-active" type="checkbox" ' + (deal.active !== false ? 'checked' : '') + '> Is deal ko show karein</label></div></div></div>';
+  }).join('');
+}
+function adminAddDeal() {
+  if (_homeDeals.length >= 12) return alert('Maximum 12 deal cards rakh sakte hain');
+  _homeDeals.push({ url: '', title: 'Naya Deal', sub: 'Offer details yahan likhein', link: '/frames', active: true });
+  renderHomeDealsEditor();
+}
+function adminRemoveDeal(index) {
+  _homeDeals.splice(index, 1);
+  renderHomeDealsEditor();
+}
+function adminMoveDeal(index, direction) {
+  var next = index + direction;
+  if (next < 0 || next >= _homeDeals.length) return;
+  var temp = _homeDeals[index]; _homeDeals[index] = _homeDeals[next]; _homeDeals[next] = temp;
+  renderHomeDealsEditor();
+}
+async function adminDealImage(input, index) {
+  var file = input && input.files && input.files[0];
+  if (!file) return;
+  if (!/^image\//.test(file.type) || file.size > 2.2e6) { alert('Sirf image file aur 2MB se chhoti photo choose karein'); input.value = ''; return; }
+  try {
+    var dataUrl = typeof compressImageFile === 'function' ? await compressImageFile(file, 1100, 0.82) : await new Promise(function(resolve, reject) { var reader = new FileReader(); reader.onload = function(){ resolve(reader.result); }; reader.onerror = reject; reader.readAsDataURL(file); });
+    _homeDeals[index].url = dataUrl;
+    var preview = document.getElementById('dealPreview' + index);
+    if (preview) preview.innerHTML = '<img src="' + dealText(dataUrl) + '" style="width:100%;height:110px;object-fit:cover;border-radius:9px;border:1px solid #6b5522">';
+  } catch (e) { alert('Photo process nahi ho paayi — doosri photo try karein'); }
+}
+async function adminSaveDeals() {
+  var cards = Array.from(document.querySelectorAll('#homeDealsEditor .panel'));
+  cards.forEach(function(card, index) {
+    var deal = _homeDeals[index]; if (!deal) return;
+    deal.title = (card.querySelector('.deal-title') || {}).value || 'Deal ' + (index + 1);
+    deal.sub = (card.querySelector('.deal-sub') || {}).value || '';
+    deal.link = (card.querySelector('.deal-link') || {}).value || '/frames';
+    deal.active = !!((card.querySelector('.deal-active') || {}).checked);
+  });
+  var usable = _homeDeals.filter(function(item) { return item.url; });
+  if (!usable.length) return alert('Kam se kam ek deal me photo choose karein');
+  var status = document.getElementById('homeDealsStatus'); if (status) status.textContent = 'Saving…';
+  try {
+    var duration = Number((document.getElementById('dealDuration') || {}).value) || 20;
+    var res = await fetch('/admin/home-deals-save', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: _homeDeals, durationSec: duration }) });
+    var data = await res.json();
+    if (!data.ok) throw new Error(data.message || 'Save fail');
+    if (status) status.textContent = '✅ ' + data.count + ' Current Deals save ho gaye. Home page refresh karke dekhein.';
+  } catch (e) { if (status) status.textContent = '❌ ' + (e.message || 'Save fail'); }
+}
+renderHomeDealsEditor();
+
 async function adminUpload3dPhotos() {
   var input = document.getElementById('f3dFiles');
   var status = document.getElementById('f3dStatus');
@@ -3050,17 +3916,35 @@ function compressImageFile(file, maxW, quality) {
   quality = quality || 0.82;
   return new Promise(function(resolve, reject) {
     var r = new FileReader();
-    r.onerror = reject;
+    r.onerror = function() { reject(new Error('FileReader fail')); };
     r.onload = function() {
       var img = new Image();
-      img.onerror = reject;
       img.onload = function() {
-        var w = img.width, h = img.height;
-        if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
-        var c = document.createElement('canvas');
-        c.width = w; c.height = h;
-        c.getContext('2d').drawImage(img, 0, 0, w, h);
-        resolve(c.toDataURL('image/jpeg', quality));
+        try {
+          var w = img.width || 1, h = img.height || 1;
+          if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+          // max dimension safety
+          if (w * h > 4000000) {
+            var scale = Math.sqrt(4000000 / (w * h));
+            w = Math.max(1, Math.round(w * scale));
+            h = Math.max(1, Math.round(h * scale));
+          }
+          var c = document.createElement('canvas');
+          c.width = w; c.height = h;
+          var ctx = c.getContext('2d');
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, w, h);
+          ctx.drawImage(img, 0, 0, w, h);
+          resolve(c.toDataURL('image/jpeg', quality));
+        } catch (err) {
+          // canvas fail → return original data URL if small enough
+          if (r.result && String(r.result).length < 3e6) resolve(r.result);
+          else reject(err);
+        }
+      };
+      img.onerror = function() {
+        if (r.result && String(r.result).length < 3e6) resolve(r.result);
+        else reject(new Error('Image decode fail'));
       };
       img.src = r.result;
     };
@@ -3219,38 +4103,70 @@ function setFrPhotoPreview(src) {
   }
 }
 
-if (frFileEl) frFileEl.addEventListener('change', async function(e) {
+if (frFileEl) frFileEl.addEventListener('change', function(e) {
   var f = e.target.files && e.target.files[0];
   if (!f) { return; }
-  if (f.size > 8e6) { alert('Image 8MB se chhoti rakho'); e.target.value=''; return; }
+  if (f.size > 12e6) { alert('Image 12MB se chhoti rakho'); e.target.value=''; return; }
   var st = document.getElementById('frPhotoStatus');
-  if (st) st.textContent = 'Compressing…';
-  try {
-    if (typeof compressImageFile === 'function') {
-      _frImageData = await compressImageFile(f, 1200, 0.82);
-    } else {
-      _frImageData = await new Promise(function(resolve, reject) {
-        var r = new FileReader();
-        r.onload = function() { resolve(r.result || ''); };
-        r.onerror = reject;
-        r.readAsDataURL(f);
-      });
-    }
-    if (_frImageData && _frImageData.length > 3.5e6) {
-      alert('Compress ke baad bhi image badi hai. Chhoti photo try karo.');
-      _frImageData = '';
-      e.target.value = '';
-      setFrPhotoPreview('');
-      return;
-    }
-    _frKeepExistingImage = false;
-    setFrPhotoPreview(_frImageData);
-  } catch (err) {
-    alert('Image read fail');
-    _frImageData = '';
-    e.target.value = '';
-    setFrPhotoPreview('');
-  }
+  if (st) st.textContent = 'Loading preview…';
+  _frImageData = '';
+  _frKeepExistingImage = false;
+  // 1) Turant preview (raw file) — pehle jaisa side me dikhe
+  var previewReader = new FileReader();
+  previewReader.onload = function() {
+    var raw = previewReader.result || '';
+    setFrPhotoPreview(raw);
+    if (st) st.textContent = 'Preview ready — compress ho raha hai…';
+    // 2) Background compress for upload size
+    var doCompress = (typeof compressImageFile === 'function')
+      ? compressImageFile(f, 1000, 0.8)
+      : Promise.resolve(raw);
+    doCompress.then(function(dataUrl) {
+      if (!dataUrl) throw new Error('empty');
+      if (dataUrl.length > 4e6) {
+        // try harder compress
+        return (typeof compressImageFile === 'function')
+          ? compressImageFile(f, 800, 0.7)
+          : dataUrl;
+      }
+      return dataUrl;
+    }).then(function(dataUrl) {
+      if (!dataUrl) {
+        // fallback: use raw preview if not huge
+        if (raw && raw.length < 4e6) {
+          _frImageData = raw;
+          if (st) st.textContent = 'Photo ready ✅';
+          return;
+        }
+        alert('Photo bahut badi hai — chhoti image try karo');
+        _frImageData = '';
+        e.target.value = '';
+        setFrPhotoPreview('');
+        return;
+      }
+      _frImageData = dataUrl;
+      setFrPhotoPreview(dataUrl);
+      if (st) st.textContent = 'Photo ready ✅';
+    }).catch(function(err) {
+      // compress fail → raw use if possible
+      if (raw && raw.length < 4e6) {
+        _frImageData = raw;
+        setFrPhotoPreview(raw);
+        if (st) st.textContent = 'Photo ready ✅ (raw)';
+      } else {
+        alert('Image process fail — doosri photo try karo');
+        _frImageData = '';
+        e.target.value = '';
+        setFrPhotoPreview('');
+        if (st) st.textContent = 'Fail — phir se choose karo';
+      }
+    });
+  };
+  previewReader.onerror = function() {
+    alert('File read fail');
+    if (st) st.textContent = 'Read fail';
+  };
+  previewReader.readAsDataURL(f);
 });
 
 function adminCancelEditFrame() {
@@ -3300,8 +4216,30 @@ async function adminSaveFrame() {
   if (!size) return alert('Size choose karo');
   if (!title) return alert('Frame Type name likho (jaise Golden border)');
   var fileInput = document.getElementById('frFile');
+  // Agar file choose hai lekin compress pending — save pe wait karke process karo
   if (fileInput && fileInput.files && fileInput.files[0] && !_frImageData) {
-    return alert('Photo abhi process ho rahi hai — 1-2 sec wait karke Save dobara dabao');
+    var st = document.getElementById('frPhotoStatus');
+    if (st) st.textContent = 'Saving — photo process…';
+    try {
+      var f = fileInput.files[0];
+      if (typeof compressImageFile === 'function') {
+        _frImageData = await compressImageFile(f, 1000, 0.8);
+      } else {
+        _frImageData = await new Promise(function(resolve, reject) {
+          var r = new FileReader();
+          r.onload = function() { resolve(r.result || ''); };
+          r.onerror = reject;
+          r.readAsDataURL(f);
+        });
+      }
+    } catch (err) {
+      return alert('Photo process fail — doosri image try karo');
+    }
+    if (!_frImageData) {
+      return alert('Photo process nahi hui — phir se choose karo');
+    }
+    setFrPhotoPreview(_frImageData);
+    if (st) st.textContent = 'Photo ready ✅';
   }
   var payload = {
     id: id || undefined,
@@ -3445,6 +4383,7 @@ async function loadAdminFrames() {
       else oBox.innerHTML = orders.map(function(o) {
         return '<div class="msg-card" style="margin-top:10px">'
           + '<div class="msg-text"><b>'+esc(o.orderId)+'</b> · '+esc(o.frameTitle||'')+' ('+esc(o.size)+')'
+          + (o.adminAlert ? '<br><span style="display:inline-block;margin-top:7px;padding:5px 9px;border-radius:999px;background:#7c2d12;color:#fde68a;font-weight:800">🔔 NEW ORDER — payment proof check karein</span>' : '')
           + '<br>👤 '+esc(o.name)+' · '+esc(o.mobile)+' · ₹'+(o.finalAmount||0)
           + '<br>📍 '+esc(o.address||'')
           + (o.village ? ' · गाँव: '+esc(o.village) : '')
@@ -3455,11 +4394,12 @@ async function loadAdminFrames() {
           + '<br>💳 Payment: <b>'+esc(o.paymentStatus||'unpaid')+'</b>'
           + (o.trackingNumber ? '<br>🔖 Track: <b>'+esc(o.trackingNumber)+'</b>' : '')
           + (o.utr ? '<br>UTR: <b>'+esc(o.utr)+'</b>' : '')
-          + (o.paymentScreenshot ? '<br><a href="'+esc(o.paymentScreenshot)+'" target="_blank" style="color:#D4AF37">📷 Payment screenshot dekhо</a>' : '')
+          + (o.paymentScreenshot ? '<br><div style="margin-top:8px"><b style="color:#D4AF37">💳 Payment proof</b><div style="margin-top:6px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><a href="'+esc(o.paymentScreenshot)+'" target="_blank"><img src="'+esc(o.paymentScreenshot)+'" style="width:120px;height:120px;object-fit:cover;border-radius:10px;border:2px solid #D4AF37;background:#111;cursor:pointer" title="Click to open"/></a><a download="payment-'+esc(o.orderId)+'.jpg" href="'+esc(o.paymentScreenshot)+'" style="padding:8px 14px;background:linear-gradient(135deg,#D4AF37,#b8860b);color:#1a1200;font-weight:700;border-radius:8px;text-decoration:none;font-size:13px">⬇️ Payment Proof Download</a></div></div>' : '<br><span class="muted">Payment screenshot nahi mila</span>')
+          + (o.customerPhoto ? '<br><div style="margin-top:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><img src="'+esc(o.customerPhoto)+'" style="width:72px;height:72px;object-fit:cover;border-radius:10px;border:2px solid #D4AF37;background:#111"/><a download="customer-photo-'+esc(o.orderId)+'.jpg" href="'+esc(o.customerPhoto)+'" style="padding:8px 14px;background:linear-gradient(135deg,#D4AF37,#b8860b);color:#1a1200;font-weight:700;border-radius:8px;text-decoration:none;font-size:13px">⬇️ Customer Photo Download</a></div>' : '<br><span class="muted">Customer photo nahi mili</span>')
           + '<br><span class="muted">'+esc(fmt(o.createdAt))+'</span></div>'
           + '<div style="display:grid;gap:6px;margin-top:8px;max-width:420px">'
           + '<label class="muted">Status <select class="inp" id="st-'+esc(o.orderId)+'" style="width:100%;max-width:200px">'
-          + ['processing','pending','confirmed','ready','delivered','cancelled'].map(function(s){
+          + ['processing','pending','confirmed','ready','delivered','cancelled','rejected'].map(function(s){
               return '<option value="'+s+'"'+(o.status===s?' selected':'')+'>'+s+'</option>';
             }).join('')
           + '</select></label>'
@@ -3476,6 +4416,7 @@ async function loadAdminFrames() {
           + (o.paymentStatus !== 'confirmed'
               ? '<button type="button" style="padding:8px 12px;background:#14532d;color:#bbf7d0;border:1px solid #166534;border-radius:8px;cursor:pointer" onclick="adminConfirmPay(\\''+esc(o.orderId)+'\\')">✅ Confirm Payment</button>'
               : '<span class="muted">Payment confirmed</span>')
+          + ' <button type="button" style="padding:8px 12px;background:#7f1d1d;color:#fecaca;border:1px solid #991b1b;border-radius:8px;cursor:pointer" data-oid="'+esc(o.orderId)+'" onclick="adminRejectOrder(this.dataset.oid)">❌ Reject</button>'
           + '</div>'
           + '</div></div>';
       }).join('');
@@ -3484,6 +4425,243 @@ async function loadAdminFrames() {
     if (fBox) fBox.innerHTML = '<div class="muted">Load fail: ' + (e && e.message ? e.message : 'network') + ' — page refresh karke try karo</div>';
   }
 }
+
+async function adminRejectOrder(orderId) {
+  var reason = prompt('Reject reason (fake/wrong order):', (document.getElementById('an-' + orderId) || {}).value || 'Fake / invalid order');
+  if (reason === null) return;
+  if (!confirm('Order ' + orderId + ' REJECT?')) return;
+  try {
+    var res = await fetch('/admin/frame-order-update', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderId: orderId, reject: true, status: 'rejected', adminNote: reason, rejectReason: reason })
+    });
+    var data = await res.json();
+    if (data.ok) { alert('Rejected ❌'); if (typeof loadAdminFrames==='function') loadAdminFrames(); if (typeof loadOrdersPage==='function') loadOrdersPage(); }
+    else alert('Fail');
+  } catch (e) { alert('Network error'); }
+}
+async function adminSaveFees() {
+  var payload = {
+    platformFee: Number((document.getElementById('feePlatformAmt')||{}).value||0),
+    platformMode: (document.getElementById('feePlatformMode')||{}).value||'always',
+    platformMinAmount: Number((document.getElementById('feePlatformMin')||{}).value||0),
+    deliveryFee: Number((document.getElementById('feeDeliveryAmt')||{}).value||0),
+    deliveryMode: (document.getElementById('feeDeliveryMode')||{}).value||'always',
+    deliveryFreeAbove: Number((document.getElementById('feeDeliveryFreeAbove')||{}).value||0),
+    deliveryMinAmount: Number((document.getElementById('feeDeliveryMin')||{}).value||0)
+  };
+  try {
+    var res = await fetch('/admin/fees-save', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+    var data = await res.json();
+    var m=document.getElementById('feeSaveMsg');
+    if (data.ok) {
+      if(m) m.textContent='Saved ✅ Platform ₹'+payload.platformFee+' · Delivery ₹'+payload.deliveryFee;
+      alert('Fee rules saved ✅');
+    } else {
+      if(m) m.textContent='Save fail: '+(data.error||res.status);
+      alert('Save fail: '+(data.error||res.status));
+    }
+  } catch(e){
+    var m=document.getElementById('feeSaveMsg');
+    if(m) m.textContent='Network/JS error: '+(e && e.message ? e.message : e);
+    alert('Save error: '+(e && e.message ? e.message : e));
+  }
+}
+async function adminLoadFees() {
+  try {
+    var res = await fetch('/api/settings', { credentials:'same-origin' });
+    var data = await res.json();
+    var f = (data.settings && data.settings.fees) || {};
+    var set = function(id,v){ var el=document.getElementById(id); if(el && v!=null) el.value=v; };
+    set('feePlatformAmt', f.platformFee); set('feePlatformMode', f.platformMode);
+    set('feePlatformMin', f.platformMinAmount); set('feeDeliveryAmt', f.deliveryFee);
+    set('feeDeliveryMode', f.deliveryMode); set('feeDeliveryFreeAbove', f.deliveryFreeAbove);
+    set('feeDeliveryMin', f.deliveryMinAmount);
+  } catch(e){}
+}
+if (document.getElementById('feePlatformAmt')) adminLoadFees();
+
+function qualityAddRow(data) {
+  data = data || { id: '', label: '', sub: '', extra: 0 };
+  var box = document.getElementById('qualityAdminList');
+  if (!box) return;
+  var row = document.createElement('div');
+  row.className = 'quality-admin-row';
+  row.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 90px 40px;gap:8px;align-items:center;margin-bottom:6px';
+  row.innerHTML = '<input class="inp q-label" placeholder="Name" value="'+esc(data.label||'')+'"/>'
+    + '<input class="inp q-sub" placeholder="Sub text" value="'+esc(data.sub||'')+'"/>'
+    + '<input class="inp q-extra" type="number" min="0" value="'+(data.extra!=null?data.extra:0)+'"/>'
+    + '<button type="button" class="gen-btn" style="background:#7f1d1d;color:#fecaca;padding:6px" onclick="this.parentNode.remove()">✕</button>'
+    + '<input type="hidden" class="q-id" value="'+esc(data.id||'')+'"/>';
+  box.appendChild(row);
+}
+async function adminLoadQuality() {
+  try {
+    var res = await fetch('/api/settings', { credentials: 'same-origin' });
+    var data = await res.json();
+    var list = (data.settings && data.settings.qualityOptions) || [];
+    var box = document.getElementById('qualityAdminList');
+    if (!box) return;
+    box.innerHTML = '';
+    if (!list.length) {
+      list = [
+        { id:'normal', label:'Normal', sub:'Standard print', extra:0 },
+        { id:'lamination', label:'Lamination', sub:'Gloss protect', extra:80 },
+        { id:'ntr', label:'NTR Print', sub:'Premium NTR', extra:150 }
+      ];
+    }
+    list.forEach(function(q){ qualityAddRow(q); });
+  } catch (e) {}
+}
+async function adminSaveQuality() {
+  var rows = document.querySelectorAll('#qualityAdminList .quality-admin-row');
+  var options = [];
+  rows.forEach(function(row) {
+    var label = ((row.querySelector('.q-label')||{}).value||'').trim();
+    if (!label) return;
+    var sub = ((row.querySelector('.q-sub')||{}).value||'').trim();
+    var extra = Number((row.querySelector('.q-extra')||{}).value||0);
+    var id = ((row.querySelector('.q-id')||{}).value||'').trim();
+    if (!id) id = label.toLowerCase().replace(/[^a-z0-9]+/g,'-').slice(0,30);
+    options.push({ id: id, label: label, sub: sub, extra: extra });
+  });
+  try {
+    var res = await fetch('/admin/quality-save', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ options: options })
+    });
+    var data = await res.json();
+    var msg = document.getElementById('qualitySaveMsg');
+    if (data.ok) {
+      if (msg) msg.textContent = 'Saved ✅ ' + options.length + ' options';
+      alert('Photo quality saved ✅');
+    } else {
+      if (msg) msg.textContent = 'Fail';
+      alert('Save fail');
+    }
+  } catch (e) {
+    alert('Error: ' + (e.message||e));
+  }
+}
+if (document.getElementById('qualityAdminList')) adminLoadQuality();
+
+var ADMIN_SECTIONS = [
+  { id: 'sec-order-stats', label: 'Orders Summary' },
+  { id: 'sec-orders', label: 'Order List' },
+  { id: 'sec-fees', label: 'Platform & Delivery Fees' },
+  { id: 'sec-quality', label: 'Photo Quality' },
+  { id: 'sec-frames', label: 'Frame Types' },
+  { id: 'sec-banner', label: 'Home Banner' },
+  { id: 'sec-hero', label: 'Hero Text + BG' },
+  { id: 'sec-home-frame', label: 'Home 3D Frame' },
+  { id: 'sec-book', label: 'Book Cards' },
+  { id: 'sec-otp', label: 'OTP / PIN' },
+  { id: 'sec-codes', label: 'Spin Codes' },
+  { id: 'sec-customers', label: 'Customers' },
+  { id: 'sec-notif', label: 'Notifications' },
+  { id: 'sec-backup', label: 'Backup' }
+];
+var adminHiddenMap = {};
+
+async function adminInitUi() {
+  try {
+    var res = await fetch('/api/settings', { credentials: 'same-origin' });
+    var data = await res.json();
+    adminHiddenMap = (data.settings && data.settings.adminUi && data.settings.adminUi.hidden) || {};
+  } catch (e) { adminHiddenMap = adminHiddenMap || {}; }
+  applyAdminHidden();
+  renderAdminUiToggles();
+  addSectionHideButtons();
+}
+
+function applyAdminHidden() {
+  ADMIN_SECTIONS.forEach(function(s) {
+    var el = document.getElementById(s.id);
+    if (!el) return;
+    if (adminHiddenMap[s.id]) el.classList.add('sec-hidden');
+    else el.classList.remove('sec-hidden');
+  });
+}
+
+function renderAdminUiToggles() {
+  var box = document.getElementById('adminUiToggles');
+  if (!box) return;
+  box.innerHTML = ADMIN_SECTIONS.map(function(s) {
+    var checked = !adminHiddenMap[s.id];
+    return '<label><input type="checkbox" data-sec="'+s.id+'" '+(checked?'checked':'')+'/> '+s.label+'</label>';
+  }).join('');
+}
+
+function addSectionHideButtons() {
+  ADMIN_SECTIONS.forEach(function(s) {
+    var el = document.getElementById(s.id);
+    if (!el || el.querySelector('.sec-hide-btn')) return;
+    var h2 = el.querySelector('h2');
+    if (!h2) return;
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sec-hide-btn';
+    btn.textContent = 'Hide';
+    btn.onclick = function() {
+      adminHiddenMap[s.id] = true;
+      applyAdminHidden();
+      renderAdminUiToggles();
+      adminSaveUi(true);
+    };
+    var wrap = document.createElement('div');
+    wrap.className = 'sec-head';
+    h2.parentNode.insertBefore(wrap, h2);
+    wrap.appendChild(h2);
+    wrap.appendChild(btn);
+  });
+}
+
+async function adminSaveUi(silent) {
+  var box = document.getElementById('adminUiToggles');
+  if (box) {
+    adminHiddenMap = {};
+    box.querySelectorAll('input[data-sec]').forEach(function(inp) {
+      if (!inp.checked) adminHiddenMap[inp.getAttribute('data-sec')] = true;
+    });
+  }
+  applyAdminHidden();
+  try {
+    var res = await fetch('/admin/ui-save', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hidden: adminHiddenMap })
+    });
+    var data = await res.json();
+    var msg = document.getElementById('adminUiMsg');
+    if (data.ok) {
+      if (msg) msg.textContent = 'Saved ✅';
+      if (!silent) alert('Section visibility saved ✅');
+    } else {
+      if (msg) msg.textContent = 'Save fail';
+      if (!silent) alert('Save fail');
+    }
+  } catch (e) {
+    if (!silent) alert('Error: ' + (e.message || e));
+  }
+}
+
+function adminShowAllSections() {
+  adminHiddenMap = {};
+  var box = document.getElementById('adminUiToggles');
+  if (box) box.querySelectorAll('input[data-sec]').forEach(function(inp){ inp.checked = true; });
+  applyAdminHidden();
+  adminSaveUi(true);
+  alert('All sections visible');
+}
+
+adminInitUi();
+
+
+
+
+
 loadAdminFrames();
 setInterval(loadAdminFrames, 15000);
 
@@ -3530,14 +4708,24 @@ async function hydrateFromMongo() {
   }
 }
 
+// Server PEHLE start — Mongo baad me background (hang nahi hoga)
+server.listen(PORT, '0.0.0.0', () => {
+  console.log('========================================');
+  console.log(' Aditya Studio server READY');
+  console.log(' Port:', PORT);
+  console.log(' Open: http://localhost:' + PORT);
+  console.log(' Admin: http://localhost:' + PORT + '/admin');
+  console.log(' Data:', DATA_DIR);
+  console.log('========================================');
+});
+
 (async () => {
-  await initMongo();
-  await hydrateFromMongo();
-  await hydrateFreeSpinBag();
-  server.listen(PORT, '0.0.0.0', () => {
-    console.log('Aditya Studio server port:', PORT);
-    console.log('Data folder:', DATA_DIR);
-    console.log('DB mode:', useMongo ? 'MongoDB Atlas ✅' : 'JSON files (Render pe wipe ho sakta hai)');
-    console.log('Admin:', ADMIN_PASSWORD ? 'password protected' : 'LOCKED — set ADMIN_PASSWORD');
-  });
+  try {
+    await initMongo();
+    await hydrateFromMongo();
+    await hydrateFreeSpinBag();
+    console.log('DB mode:', useMongo ? 'MongoDB Atlas ✅' : 'JSON files');
+  } catch (e) {
+    console.error('[boot] DB init error (server already running):', e && e.message ? e.message : e);
+  }
 })();

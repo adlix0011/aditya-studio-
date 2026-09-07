@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html class="dark" lang="hi">
 <head>
+<script>
+window.alert=function(message){function show(){var old=document.getElementById('adityaPageAlert');if(old)old.remove();var text=String(message||''),bad=/(fail|error|wrong|network|nahi|नहीं|गलत|invalid|missing|expire|chhoti|required|check)/i.test(text),box=document.createElement('div');box.id='adityaPageAlert';box.style.cssText='position:fixed;left:16px;right:16px;top:18px;z-index:99999;max-width:520px;margin:auto;padding:13px 42px 13px 15px;border-radius:13px;font:600 14px Arial,sans-serif;line-height:1.45;color:'+(bad?'#fecaca':'#dcfce7')+';background:'+(bad?'#571b22':'#14532d')+';border:1px solid '+(bad?'#ef4444':'#4ade80')+';box-shadow:0 12px 30px rgba(0,0,0,.42)';box.innerHTML=(bad?'⚠️ ':'✅ ')+text+'<button style="position:absolute;right:10px;top:8px;border:0;background:transparent;color:inherit;font-size:22px">×</button>';box.querySelector('button').onclick=function(){box.remove()};document.body.appendChild(box);setTimeout(function(){box.remove()},5000)}if(document.body)show();else document.addEventListener('DOMContentLoaded',show,{once:true})};
+</script>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Aditya Studio — Luxury Custom Photo Frames</title>
@@ -8,6 +11,23 @@
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <script>
+const SESSION_KEY = "aditya_studio_session_v1";
+function isLoggedIn() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SESSION_KEY) || "null");
+    if (!s) return false;
+    const m = String(s.mobile || "").replace(/\D/g, "");
+    return !!(m || s.id);
+  } catch (e) { return false; }
+}
+function requireLoginOrRedirect() {
+  if (isLoggedIn()) return true;
+  alert("Order se pehle Login ya Register karein.");
+  // ctx already in sessionStorage — login ke baad place-order pe wapas
+  location.href = "/book-now?next=" + encodeURIComponent("/place-order.html");
+  return false;
+}
+
 tailwind.config = {
   darkMode: "class",
   theme: {
@@ -293,6 +313,136 @@ tailwind.config = {
     0% { left: -60%; }
     55%, 100% { left: 120%; }
   }
+
+  /* ===== MOBILE FRAME FIX ===== */
+  @media (max-width: 768px) {
+    /* Mobile par ek baar me 2 frame options dikhein, bada single card nahi. */
+    #frames-grid { grid-template-columns:repeat(2,minmax(0,1fr)) !important; gap:9px !important; }
+    #frames-grid .product-card > div:first-child { min-height:0 !important; padding:5px !important; }
+    #frames-grid .product-card .p-4 { padding:9px !important; gap:3px !important; }
+    #frames-grid .product-card h4 { font-size:.82rem !important; line-height:1.15 !important; }
+    #frames-grid .product-card .text-xl { font-size:1rem !important; }
+    #frames-grid .product-card .font-label-caps { font-size:9px !important; }
+    #frames-grid .product-card .text-sm { font-size:.7rem !important; }
+    /* Upload card compact rakho, taki user ko neeche ke frame options jaldi dikhein. */
+    #upload { padding-top:22px !important; padding-bottom:22px !important; }
+    #upload .bg-surface-container-low { padding:16px !important; }
+    #upload .bg-surface-container-low > p { margin-bottom:14px !important; }
+    #main-upload-trigger { padding:22px 12px !important; }
+    #main-upload-trigger .material-symbols-outlined { font-size:2.5rem !important; margin-bottom:4px !important; }
+    #main-upload-trigger p:first-of-type { font-size:1.05rem !important; margin-bottom:2px !important; }
+    #main-upload-trigger p:last-of-type { font-size:.72rem !important; margin-top:2px !important; }
+    #pd-main-preview {
+      min-height: 320px !important;
+      max-height: none !important;
+      height: auto !important;
+      padding: 12px !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      overflow: visible !important;
+    }
+    #pd-main-preview .fp-box,
+    #pd-main-preview .fp-wrap {
+      width: 100% !important;
+      max-width: 100% !important;
+      max-height: none !important;
+      height: auto !important;
+    }
+    #pd-main-preview .fp-frame,
+    #pd-main-preview .fp-box > img.fp-frame {
+      max-height: none !important;
+      width: 100% !important;
+      height: 100% !important;
+      display: block !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+    }
+    /* Product grid — full frame visible, no top/bottom crop */
+    .product-card .fp-box {
+      width: 100% !important;
+      max-width: 100% !important;
+      height: auto !important;
+    }
+    .product-card .fp-frame {
+      display: block !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+    }
+    .frame-shell {
+      width: 100% !important;
+      max-width: 100% !important;
+    }
+    .frame-shell .frame-border-img {
+      width: 100% !important;
+      height: auto !important;
+      display: block !important;
+    }
+    #threejs-container {
+      min-height: 260px !important;
+      height: 55vw !important;
+      max-height: 380px !important;
+    }
+    .user-image-container {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      overflow: hidden !important;
+      width: 100% !important;
+      height: 100% !important;
+    }
+    /* Do NOT force object-fit:cover on frame img — only photo inside .fp-photo */
+    .user-image-container .fp-photo img {
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: cover !important;
+      display: block !important;
+    }
+    .user-image-container .fp-frame {
+      object-fit: fill !important;
+    }
+  }
+
+  /* ===== COLORFUL BUTTONS ===== */
+  .btn-gold, #pd-order-btn, #submit-order-btn, #pay-order-btn, #frames-login-btn {
+    background: linear-gradient(135deg, #f2ca50 0%, #d4af37 40%, #b8860b 100%) !important;
+    color: #1a1200 !important;
+    font-weight: 700 !important;
+    border: none !important;
+    box-shadow: 0 4px 14px rgba(212,175,55,0.35) !important;
+  }
+  .btn-gold:hover, #pd-order-btn:hover, #submit-order-btn:hover, #pay-order-btn:hover {
+    filter: brightness(1.08);
+    box-shadow: 0 6px 20px rgba(212,175,55,0.5) !important;
+  }
+  .quality-btn {
+    transition: all 0.2s ease !important;
+  }
+  .quality-btn.active, .quality-btn[data-quality].border-secondary {
+    background: linear-gradient(135deg, rgba(242,202,80,0.25), rgba(212,175,55,0.15)) !important;
+    border-color: #f2ca50 !important;
+    color: #f2ca50 !important;
+    box-shadow: 0 0 12px rgba(242,202,80,0.25);
+  }
+  #er-submit-btn, #er-pick-btn {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6) !important;
+    color: #fff !important;
+    border: none !important;
+    font-weight: 600 !important;
+  }
+  #load-orders-btn {
+    background: linear-gradient(135deg, #0ea5e9, #0284c7) !important;
+    color: #fff !important;
+    border: none !important;
+  }
+  #frames-logout-btn {
+    background: linear-gradient(135deg, #ef4444, #b91c1c) !important;
+    color: #fff !important;
+    border: none !important;
+    border-radius: 8px !important;
+    padding: 10px !important;
+  }
+
 </style>
 </head>
 <body class="font-body-md text-body-md relative overflow-x-hidden">
@@ -540,7 +690,7 @@ tailwind.config = {
       </div>
     </div>
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6" id="frames-grid">
+    <div class="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6" id="frames-grid">
       <div class="col-span-full text-center text-on-surface-variant py-12">Loading frames…</div>
     </div>
   </section>
@@ -806,7 +956,6 @@ tailwind.config = {
     <div class="flex flex-col space-y-2">
       <a class="text-on-surface-variant hover:text-secondary transition-colors" href="/book-now">Old Home / Studio</a>
       <a class="text-on-surface-variant hover:text-secondary transition-colors" href="#sizes">Frame Sizes</a>
-      <a class="text-on-surface-variant hover:text-secondary transition-colors" href="/admin">Admin</a>
     </div>
   </div>
   <div class="border-t border-outline-variant w-full">
@@ -995,39 +1144,42 @@ function frameRating(frame) {
 }
 
 
-/** Frame + photo — same aspect box so photo ALWAYS inside frame */
+/** Frame + photo — mobile-safe: NO height:100% (collapses on mobile WebKit).
+ *  width + aspect-ratio only → frame always visible first, photo fits inside. */
 function buildFramePreview(frameImg, photoUrl, opts) {
   opts = opts || {};
-  const insetX = opts.insetX != null ? opts.insetX : 11;
-  const insetY = opts.insetY != null ? opts.insetY : 11;
+  const insetX = opts.insetX != null ? opts.insetX : 14;
+  const insetY = opts.insetY != null ? opts.insetY : 15;
   const showGlass = opts.glass !== false;
   const portrait = opts.portrait !== false;
   // Fixed ratio box (8x12 vertical ≈ 2/3, horizontal ≈ 3/2)
   const ratio = portrait ? "2 / 3" : "3 / 2";
   const shine = showGlass ? '<div class="glass-shine"></div>' : '';
+  // Critical mobile fix: never use height:100% with aspect-ratio (parent height:auto → collapse)
+  const boxStyle = `position:relative;width:100%;max-width:100%;aspect-ratio:${ratio};margin:0 auto;background:#0a0a0a;overflow:hidden;`;
 
   if (frameImg && photoUrl) {
-    return `<div class="fp-box" style="position:relative;height:100%;max-width:100%;aspect-ratio:${ratio};margin:0 auto;">
-      <img src="${frameImg}" alt="frame" style="position:absolute;inset:0;width:100%;height:100%;object-fit:fill;display:block;z-index:1;"/>
-      <div style="position:absolute;left:${insetX}%;right:${insetX}%;top:${insetY}%;bottom:${insetY}%;overflow:hidden;z-index:2;">
+    return `<div class="fp-box" style="${boxStyle}">
+      <img class="fp-frame" src="${frameImg}" alt="frame" style="position:absolute;inset:0;width:100%;height:100%;object-fit:fill;display:block;z-index:1;" onerror="this.style.display='none'"/>
+      <div class="fp-photo" style="position:absolute;left:${insetX}%;right:${insetX}%;top:${insetY}%;bottom:${insetY}%;overflow:hidden;z-index:2;">
         <img src="${photoUrl}" alt="photo" style="width:100%;height:100%;object-fit:cover;display:block;"/>
         ${shine}
       </div>
     </div>`;
   }
   if (frameImg) {
-    return `<div class="fp-box" style="position:relative;height:100%;max-width:100%;aspect-ratio:${ratio};margin:0 auto;">
-      <img src="${frameImg}" alt="frame" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block;"/>
+    return `<div class="fp-box" style="${boxStyle}">
+      <img class="fp-frame" src="${frameImg}" alt="frame" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block;" onerror="this.style.display='none'"/>
     </div>`;
   }
   if (photoUrl) {
-    return `<div class="fp-box" style="position:relative;height:100%;max-width:100%;aspect-ratio:${ratio};margin:0 auto;overflow:hidden;">
+    return `<div class="fp-box" style="${boxStyle}">
       <img src="${photoUrl}" alt="photo" style="width:100%;height:100%;object-fit:cover;display:block;"/>
       ${shine}
     </div>`;
   }
-  return `<div style="height:100%;aspect-ratio:${ratio};margin:auto;display:flex;align-items:center;justify-content:center;background:linear-gradient(145deg,#f0f2f8,#d8dee8);">
-    <span style="color:rgba(60,70,90,0.5);font-size:12px;text-align:center;">Upload Your Photo</span>
+  return `<div class="fp-box" style="${boxStyle}display:flex;align-items:center;justify-content:center;background:linear-gradient(145deg,#1a1814,#0a0a0a);">
+    <span style="color:rgba(183,176,168,0.7);font-size:12px;text-align:center;padding:12px;">Pehle frame select karein · phir photo upload</span>
   </div>`;
 }
 
@@ -1063,14 +1215,14 @@ function renderFrames(filterSize = null) {
     // Pura frame dikhe + photo andar (pehle jaisa clean look)
     const isPortrait = orientation !== "horizontal";
     const innerHtml = buildFramePreview(frame.image || "", userPhotoDataUrl || "", {
-      insetX: 10, insetY: 10, portrait: isPortrait, glass: true
+      insetX: 14, insetY: 15, portrait: isPortrait, glass: true
     });
 
     // Product card — NO Order Now; click opens detail
     return `
     <div class="product-card bg-surface-container rounded-DEFAULT gallery-border gallery-shadow flex flex-col group hover:bg-surface-container-highest transition-colors relative overflow-hidden animated-frame cursor-pointer" style="animation-delay:${index * 0.04}s" data-id="${frame.id}">
-      <div class="w-full h-56 sm:h-64 bg-background flex items-center justify-center relative overflow-hidden p-3">
-        <div class="user-image-container h-full max-w-full flex items-center justify-center">
+      <div class="w-full bg-background flex items-center justify-center relative overflow-hidden p-3" style="aspect-ratio:${isPortrait ? '3 / 4' : '4 / 3'};min-height:220px;">
+        <div class="user-image-container w-full h-full max-w-full flex items-center justify-center">
           ${innerHtml}
         </div>
         ${discount > 0 ? `<span class="absolute top-2 left-2 text-[10px] font-label-caps px-2 py-1 rounded-full z-10" style="background:#166534;color:#bbf7d0">${discount}% OFF</span>` : ""}
@@ -1234,7 +1386,7 @@ function renderPdSamples() {
   const frameImg = selectedFrame.image || "";
   const photo = userPhotoDataUrl || "";
   main.innerHTML = buildFramePreview(frameImg, photo, {
-    insetX: 12, insetY: 13, portrait: orientation !== "horizontal", glass: true
+    insetX: 14, insetY: 15, portrait: orientation !== "horizontal", glass: true
   });
   // samples hidden — only straight front view
   const box = document.getElementById("pd-samples");
@@ -1307,8 +1459,12 @@ document.getElementById("pd-order-btn").addEventListener("click", () => {
     colourName: (selectedColour && selectedColour.name) || "",
     orientation: orientation || "vertical"
   };
-  try { sessionStorage.setItem("aditya_order_ctx", JSON.stringify(ctx)); } catch (e) {}
-  // Fast dedicated order page (no heavy modal)
+  try {
+    sessionStorage.setItem("aditya_order_ctx", JSON.stringify(ctx));
+    localStorage.setItem("aditya_order_ctx", JSON.stringify(ctx));
+  } catch (e) {}
+  // Pehle login zaroori — warna register/login page
+  if (!requireLoginOrRedirect()) return;
   window.location.href = "/place-order.html";
 });
 
@@ -1586,7 +1742,9 @@ document.getElementById("submit-order-btn").addEventListener("click", async () =
         paymentClaimed: true,
         utr: utr,
         paymentScreenshot: payScreenshotData,
-        useWallet
+      customerPhoto: userPhotoDataUrl || "",
+        useWallet,
+        sessionToken: (frLoadSession() || {}).sessionToken || ""
       })
     });
     const data = await res.json();
@@ -2033,16 +2191,26 @@ function updateCropPreview() {
 }
 
 function sync2dPhotoPreviews() {
+  // ONLY update the photo img INSIDE existing frame structure — never destroy the frame
   if (!userPhotoDataUrl) return;
   const z = Math.max(1, photoZoom || 1);
   const posX = (photoPanX * 100).toFixed(1) + "%";
   const posY = (photoPanY * 100).toFixed(1) + "%";
+  const photoStyle =
+    "width:100%;height:100%;object-fit:cover;display:block;" +
+    "object-position:" + posX + " " + posY + ";" +
+    "transform:scale(" + z + ");transform-origin:" + posX + " " + posY + ";";
+
   document.querySelectorAll(".user-image-container").forEach(function (container) {
-    container.innerHTML =
-      '<img src="' + userPhotoDataUrl + '" class="w-full h-full" alt="Your photo" style="' +
-      "object-fit:cover;object-position:" + posX + " " + posY + ";" +
-      "transform:scale(" + z + ");transform-origin:" + posX + " " + posY + ";" +
-      '"/>';
+    // Prefer updating photo inside .fp-photo (frame+photo structure from buildFramePreview)
+    const photoSlot = container.querySelector(".fp-photo img");
+    if (photoSlot) {
+      photoSlot.src = userPhotoDataUrl;
+      photoSlot.setAttribute("style", photoStyle);
+      return;
+    }
+    // If frame-only (no photo yet), re-render full frame+photo via renderFrames later
+    // Do NOT replace container with photo-only — that removes the frame
   });
 }
 
@@ -2245,15 +2413,20 @@ sidebarBackdrop.addEventListener("click", toggleSidebar);
 
 // Load customer orders
 document.getElementById("load-orders-btn").addEventListener("click", async () => {
-  const mobile = document.getElementById("profile-mobile").value.trim();
+  const mobile = framesUser && framesUser.mobile;
   const box = document.getElementById("order-history");
-  if (!/^\d{10}$/.test(mobile)) {
-    box.innerHTML = `<div class="p-4 bg-surface-container rounded-DEFAULT gallery-border text-error">Valid 10-digit mobile daalo.</div>`;
+  const session = frLoadSession();
+  if (!mobile || !session || !session.sessionToken) {
+    box.innerHTML = `<div class="p-4 bg-surface-container rounded-DEFAULT gallery-border text-error">Orders dekhne ke liye pehle login karein.</div>`;
     return;
   }
   box.innerHTML = `<div class="p-4 bg-surface-container rounded-DEFAULT gallery-border">Loading…</div>`;
   try {
-    const res = await fetch("/api/my-frame-orders?mobile=" + encodeURIComponent(mobile));
+    const res = await fetch("/api/my-frame-orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mobile, sessionToken: session.sessionToken })
+    });
     const data = await res.json();
     const orders = Array.isArray(data) ? data : (data.orders || []);
     if (!orders.length) {
@@ -2490,11 +2663,16 @@ document.getElementById("banner-next")?.addEventListener("click", () => { nextBa
 const FR_SESSION = "aditya_studio_session_v1";
 let framesUser = null;
 function frLoadSession() {
-  try { return JSON.parse(localStorage.getItem(FR_SESSION) || "null"); } catch (e) { return null; }
+  try {
+    const session = JSON.parse(localStorage.getItem(FR_SESSION) || "null");
+    if (session && session.pin) { localStorage.removeItem(FR_SESSION); return null; }
+    return session;
+  } catch (e) { return null; }
 }
 function frSaveSession(d) {
   const prev = frLoadSession() || {};
-  localStorage.setItem(FR_SESSION, JSON.stringify({ ...prev, ...d }));
+  const next = { ...prev, ...d }; delete next.pin;
+  localStorage.setItem(FR_SESSION, JSON.stringify(next));
 }
 function frClearSession() { localStorage.removeItem(FR_SESSION); }
 
@@ -2541,7 +2719,7 @@ function updateFramesWalletUI() {
           try {
             const res = await fetch("/api/wallet/apply-coupon", {
               method: "POST", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ mobile: s.mobile, pin: s.pin, couponId: btn.dataset.cid })
+              body: JSON.stringify({ sessionToken: s.sessionToken || '', couponId: btn.dataset.cid })
             });
             const data = await res.json();
             if (data.ok) {
@@ -2561,16 +2739,16 @@ function updateFramesWalletUI() {
 
 async function restoreFramesUser() {
   const s = frLoadSession();
-  if (!s || !s.mobile || !s.pin) { framesUser = null; updateFramesWalletUI(); return; }
+  if (!s || !s.mobile || !s.sessionToken) { framesUser = null; updateFramesWalletUI(); return; }
   try {
     const res = await fetch("/api/restore-session", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mobile: s.mobile, pin: s.pin })
+      body: JSON.stringify({ sessionToken: s.sessionToken })
     });
     const data = await res.json();
     if (data.ok) {
       framesUser = data;
-      frSaveSession({ mobile: data.mobile, pin: s.pin, name: data.name, id: data.id });
+      frSaveSession({ mobile: data.mobile, sessionToken: s.sessionToken, name: data.name, id: data.id });
     } else framesUser = null;
   } catch (e) { framesUser = null; }
   updateFramesWalletUI();
@@ -2592,7 +2770,7 @@ document.getElementById("frames-login-btn")?.addEventListener("click", async () 
       return;
     }
     framesUser = data;
-    frSaveSession({ mobile: data.mobile, pin: pin.trim(), name: data.name, id: data.id });
+    frSaveSession({ mobile: data.mobile, sessionToken: data.sessionToken, name: data.name, id: data.id });
     updateFramesWalletUI();
   } catch (e) {
     if (err) { err.textContent = "Network error"; err.classList.remove("hidden"); }
@@ -2602,6 +2780,15 @@ document.getElementById("frames-logout-btn")?.addEventListener("click", () => {
   frClearSession();
   framesUser = null;
   updateFramesWalletUI();
+});
+
+// Doosre open page par logout hote hi Frames page ki profile/session bhi hatao.
+window.addEventListener("storage", (event) => {
+  if (event.key === FR_SESSION && !event.newValue) {
+    framesUser = null;
+    updateFramesWalletUI();
+    location.href = "/";
+  }
 });
 
 async function loadFramesNotifs() {

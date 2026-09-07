@@ -1,345 +1,1048 @@
 <!DOCTYPE html>
-<html lang="hi">
+<html class="dark" lang="hi">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Place Order · Aditya Studio</title>
-<style>
-*{box-sizing:border-box}
-body{margin:0;font-family:system-ui,-apple-system,sans-serif;background:#131313;color:#e5e2e1;min-height:100vh}
-a{color:#D4AF37;text-decoration:none}
-.wrap{max-width:480px;margin:0 auto;padding:16px 16px 48px}
-.top{display:flex;justify-content:space-between;align-items:center;padding:12px 0;margin-bottom:8px}
-.top h1{margin:0;font-size:1.25rem;color:#F4EAD6;font-weight:600}
-.card{background:#1c1b1b;border:1px solid #4f453f;border-radius:12px;padding:16px;margin-bottom:14px}
-label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#8a7a62;margin-bottom:4px}
-input,textarea{width:100%;background:#131313;border:1px solid #4f453f;border-radius:8px;padding:10px 12px;color:#e5e2e1;font-size:15px;margin-bottom:12px}
-input:focus,textarea:focus{outline:none;border-color:#D4AF37}
-.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.btn{display:block;width:100%;padding:14px;border:none;border-radius:8px;font-weight:700;font-size:15px;cursor:pointer;margin-top:8px}
-.btn-gold{background:linear-gradient(180deg,#F3DE9A,#D4AF37);color:#241804}
-.btn-dark{background:#2a2418;color:#F3DE9A;border:1px solid rgba(212,175,55,.4)}
-.btn-green{background:#166534;color:#bbf7d0;border:1px solid #4ade80}
-.btn:disabled{opacity:.6;cursor:not-allowed}
-.preview{text-align:center;color:#B7A480;font-size:14px;line-height:1.5}
-.preview b{color:#F4EAD6;display:block;font-size:16px;margin-bottom:4px}
-.price-line{display:flex;justify-content:space-between;font-size:14px;margin:6px 0;color:#B7A480}
-.price-total{display:flex;justify-content:space-between;align-items:center;border-top:1px solid #4f453f;padding-top:10px;margin-top:8px}
-.price-total span:last-child{color:#D4AF37;font-size:1.5rem;font-weight:800}
-.hidden{display:none!important}
-.err{color:#f87171;font-size:13px;margin:8px 0}
-.hint{font-size:12px;color:#8a7a62;text-align:center;margin-top:10px}
-.qr-box{text-align:center}
-.qr-box img{width:200px;height:200px;background:#fff;border-radius:8px;padding:8px;object-fit:contain}
-.ok{border:1px solid #4ade80;background:rgba(22,101,52,.25);border-radius:12px;padding:16px;text-align:center;margin-top:12px}
-.ok p{margin:6px 0}
-.ok .t{color:#4ade80;font-weight:700;font-size:1.1rem}
-.green{color:#4ade80}
-</style>
-</head>
-<body>
-<div class="wrap">
-  <div class="top">
-    <h1>Place Order</h1>
-    <a href="/frames" id="back-link">← Back</a>
-  </div>
-
-  <div class="card preview" id="frame-preview">Loading…</div>
-
-  <div class="card" id="address-card">
-    <label>Name *</label>
-    <input id="order-name" type="text" placeholder="Apna naam" autocomplete="name"/>
-    <label>Mobile *</label>
-    <input id="order-mobile" type="tel" maxlength="10" placeholder="10 digit number" inputmode="numeric"/>
-    <label>Village / Area *</label>
-    <input id="order-village" type="text" placeholder="गाँव / मोहल्ला"/>
-    <label>Full Address *</label>
-    <textarea id="order-address" rows="2" placeholder="घर का पता / Landmark"></textarea>
-    <div class="row">
-      <div><label>District *</label><input id="order-district" type="text" placeholder="जिला"/></div>
-      <div><label>State *</label><input id="order-state" type="text" placeholder="राज्य"/></div>
-    </div>
-    <label>Pincode *</label>
-    <input id="order-pincode" type="text" maxlength="6" placeholder="6 digit pincode" inputmode="numeric"/>
-    <label>Notes (optional)</label>
-    <textarea id="order-notes" rows="2" placeholder="Koi special request"></textarea>
-    <button type="button" class="btn btn-gold" id="save-address-btn">Save Address & Continue</button>
-  </div>
-
-  <div class="card hidden" id="payment-section">
-    <div class="price-line"><span>Frame price</span><span id="op-mrp">—</span></div>
-    <div class="price-line"><span>Discount</span><span id="op-disc" class="green">—</span></div>
-    <div class="price-total"><span>Total payable</span><span id="op-total">—</span></div>
-    <button type="button" class="btn btn-gold" id="pay-order-btn">Pay Total Amount</button>
-
-    <div id="qr-pay-box" class="hidden qr-box" style="margin-top:14px">
-      <p style="font-size:11px;letter-spacing:.12em;color:#D4AF37;text-transform:uppercase">Scan to Pay</p>
-      <img id="pay-qr-img" alt="QR" src="data:image/png;base64,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"/>
-      <p style="font-size:13px;color:#8a7a62">UPI / Scanner se pay karein</p>
-      <p id="qr-amount-label" style="color:#D4AF37;font-weight:800;font-size:1.25rem">₹0</p>
-      <button type="button" class="btn btn-dark" id="paid-claim-btn">Maine Pay Kar Diya</button>
-
-      <div id="utr-ss-box" class="hidden" style="text-align:left;margin-top:12px">
-        <p style="font-size:11px;letter-spacing:.1em;color:#D4AF37;text-transform:uppercase;text-align:center">Payment Proof</p>
-        <p style="font-size:12px;color:#8a7a62;text-align:center;margin:0 0 8px">UTR <b>ya</b> Screenshot — sirf ek zaroori</p>
-        <label>UTR / UPI Transaction ID (optional if SS)</label>
-        <input id="pay-utr" type="text" maxlength="30" placeholder="12-digit UTR ya UPI Ref No."/>
-        <label>Payment Screenshot (optional if UTR)</label>
-        <input id="pay-ss" type="file" accept="image/*"/>
-        <p id="pay-ss-status" class="hidden green" style="font-size:13px">✓ Successfully uploaded</p>
-        <div id="pay-ss-preview" class="hidden" style="text-align:center"><img alt="SS" style="max-height:100px;border-radius:8px;border:1px solid #4f453f"/></div>
-      </div>
-    </div>
-
-    <button type="button" class="btn btn-gold hidden" id="submit-order-btn">Submit Order</button>
-    <div id="order-success-box" class="ok hidden">
-      <p class="t">✓ Order Placed Successfully</p>
-      <p>Order No: <b id="ok-order-id">—</b></p>
-      <p>Track No: <b id="ok-track-id">—</b></p>
-      <p style="font-size:12px;color:#8a7a62">Profile / My Orders se status check kar sakte ho</p>
-      <a class="btn btn-dark" href="/frames" style="text-align:center;margin-top:12px">← Frames pe wapas</a>
-    </div>
-  </div>
-
-  <p id="order-error" class="err hidden"></p>
-  <p id="order-flow-hint" class="hint">Pehle address save karo → phir payment</p>
-
-  <div class="card" style="margin-top:18px;text-align:center">
-    <p style="font-size:11px;letter-spacing:.1em;color:#D4AF37;text-transform:uppercase;margin:0 0 8px">Need Help?</p>
-    <p style="font-size:13px;color:#8a7a62;margin:0 0 12px">Order / payment me problem? WhatsApp pe message karein</p>
-    <a id="wa-help-btn" class="btn btn-dark" href="#" target="_blank" rel="noopener" style="display:inline-block;width:auto;padding:12px 20px;text-decoration:none">
-      💬 WhatsApp Chat Help
-    </a>
-    <p id="help-phone-label" style="font-size:12px;color:#B7A480;margin:10px 0 0"></p>
-  </div>
-
-</div>
-
 <script>
-const ADDR_KEY = "aditya_studio_saved_address";
-// Studio WhatsApp help number (91 + 10 digit) — yahan apna number daalo
-const HELP_PHONE = "919876543210";
-
-const CTX_KEY = "aditya_order_ctx";
-let ctx = null;
-let paymentClaimed = false;
-let payScreenshotData = "";
-let totalPayable = 0;
-
-function formatPrice(n){ return "₹" + Math.round(Number(n)||0); }
-function showErr(msg){
-  const el = document.getElementById("order-error");
-  el.textContent = msg; el.classList.remove("hidden");
-}
-function clearErr(){ document.getElementById("order-error").classList.add("hidden"); }
-
-function loadCtx(){
-  try { ctx = JSON.parse(sessionStorage.getItem(CTX_KEY) || "null"); } catch(e){ ctx = null; }
-  if (!ctx || !ctx.frameId) {
-    document.getElementById("frame-preview").innerHTML = "<b>Frame select nahi hua</b>Frames page se order shuru karein.";
-    document.getElementById("address-card").classList.add("hidden");
-    return false;
-  }
-  const q = ctx.qualityLabel || "Normal";
-  const c = ctx.colourName || "—";
-  const orient = ctx.orientation === "horizontal" ? "Horizontal (Landscape)" : "Vertical (Portrait)";
-  document.getElementById("frame-preview").innerHTML =
-    "<b>" + (ctx.size||"") + " — " + (ctx.title||"Frame") + "</b>" +
-    orient + "<br/>Quality: " + q + " · Colour: " + c;
-  return true;
-}
-
-function loadSavedAddress(){
+window.alert=function(message){function show(){var old=document.getElementById('adityaPageAlert');if(old)old.remove();var text=String(message||''),bad=/(fail|error|wrong|network|nahi|नहीं|गलत|invalid|missing|expire|chhoti|required|check)/i.test(text),box=document.createElement('div');box.id='adityaPageAlert';box.style.cssText='position:fixed;left:16px;right:16px;top:18px;z-index:99999;max-width:520px;margin:auto;padding:13px 42px 13px 15px;border-radius:13px;font:600 14px Arial,sans-serif;line-height:1.45;color:'+(bad?'#fecaca':'#dcfce7')+';background:'+(bad?'#571b22':'#14532d')+';border:1px solid '+(bad?'#ef4444':'#4ade80')+';box-shadow:0 12px 30px rgba(0,0,0,.42)';box.innerHTML=(bad?'⚠️ ':'✅ ')+text+'<button style="position:absolute;right:10px;top:8px;border:0;background:transparent;color:inherit;font-size:22px">×</button>';box.querySelector('button').onclick=function(){box.remove()};document.body.appendChild(box);setTimeout(function(){box.remove()},5000)}if(document.body)show();else document.addEventListener('DOMContentLoaded',show,{once:true})};
+</script>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport"/>
+<title>Place Order — Aditya Studio</title>
+<script>
+/* STRICT: bina valid session ke place-order nahi khulega */
+(function(){
   try {
-    const s = JSON.parse(localStorage.getItem(ADDR_KEY) || "null");
-    if (!s) return;
-    if (s.name) document.getElementById("order-name").value = s.name;
-    if (s.mobile) document.getElementById("order-mobile").value = s.mobile;
-    if (s.village) document.getElementById("order-village").value = s.village;
-    if (s.address) document.getElementById("order-address").value = s.address;
-    if (s.district) document.getElementById("order-district").value = s.district;
-    if (s.state) document.getElementById("order-state").value = s.state;
-    if (s.pincode) document.getElementById("order-pincode").value = s.pincode;
-  } catch(e){}
-}
-
-function validateForm(){
-  const name = document.getElementById("order-name").value.trim();
-  const mobile = document.getElementById("order-mobile").value.trim();
-  const village = document.getElementById("order-village").value.trim();
-  const address = document.getElementById("order-address").value.trim();
-  const district = document.getElementById("order-district").value.trim();
-  const state = document.getElementById("order-state").value.trim();
-  const pincode = document.getElementById("order-pincode").value.trim();
-  if (!name || !mobile || !village || !address || !district || !state || !pincode) {
-    showErr("Name, Mobile, Village, Address, District, State aur Pincode zaroori hain.");
-    return null;
-  }
-  if (!/^[6-9]\d{9}$/.test(mobile)) { showErr("Mobile 10 digits (6-9 se start)."); return null; }
-  if (!/^\d{6}$/.test(pincode)) { showErr("Pincode 6 digit hona chahiye."); return null; }
-  clearErr();
-  return { name, mobile, village, address, district, state, pincode,
-    notes: document.getElementById("order-notes").value.trim() };
-}
-
-function showPayment(){
-  if (!ctx) return;
-  const price = Number(ctx.price)||0;
-  const disc = Number(ctx.discount)||0;
-  const extra = Number(ctx.qualityExtra)||0;
-  const finalP = disc > 0 ? Math.round(price * (1 - disc/100)) : price;
-  totalPayable = finalP + extra;
-  document.getElementById("op-mrp").textContent = formatPrice(price) + (extra ? " + " + formatPrice(extra) + " (" + (ctx.qualityLabel||"") + ")" : "");
-  document.getElementById("op-disc").textContent = disc > 0 ? (disc + "% OFF") : "—";
-  document.getElementById("op-total").textContent = formatPrice(totalPayable);
-  document.getElementById("qr-amount-label").textContent = formatPrice(totalPayable);
-  document.getElementById("payment-section").classList.remove("hidden");
-  document.getElementById("order-flow-hint").textContent = "Ab Pay Total Amount dabao → QR scan → Submit";
-}
-
-document.getElementById("save-address-btn").onclick = function(){
-  const form = validateForm();
-  if (!form) return;
-  localStorage.setItem(ADDR_KEY, JSON.stringify(form));
-  showPayment();
-  this.textContent = "Update Address";
-  document.getElementById("payment-section").scrollIntoView({behavior:"smooth"});
-};
-
-document.getElementById("pay-order-btn").onclick = function(){
-  if (!validateForm()) return;
-  document.getElementById("qr-pay-box").classList.remove("hidden");
-  this.classList.add("hidden");
-  document.getElementById("order-flow-hint").textContent = "QR scan karke pay karo, phir Maine Pay Kar Diya dabao.";
-};
-
-document.getElementById("paid-claim-btn").onclick = function(){
-  paymentClaimed = true;
-  this.textContent = "✓ Payment claimed";
-  this.disabled = true;
-  this.className = "btn btn-green";
-  document.getElementById("utr-ss-box").classList.remove("hidden");
-  document.getElementById("submit-order-btn").classList.remove("hidden");
-  document.getElementById("order-flow-hint").textContent = "UTR ya screenshot (ek kaafi), phir Submit Order.";
-};
-
-document.getElementById("pay-ss").onchange = function(e){
-  const f = e.target.files && e.target.files[0];
-  const st = document.getElementById("pay-ss-status");
-  const prev = document.getElementById("pay-ss-preview");
-  payScreenshotData = "";
-  if (!f) { st.classList.add("hidden"); prev.classList.add("hidden"); return; }
-  if (f.size > 4e6) { alert("Screenshot 4MB se chhoti rakho"); e.target.value=""; return; }
-  const r = new FileReader();
-  r.onload = function(){
-    const img = new Image();
-    img.onload = function(){
-      const maxW = 1200;
-      let w = img.width, h = img.height;
-      if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
-      const c = document.createElement("canvas");
-      c.width = w; c.height = h;
-      c.getContext("2d").drawImage(img, 0, 0, w, h);
-      payScreenshotData = c.toDataURL("image/jpeg", 0.82);
-      st.classList.remove("hidden");
-      st.textContent = "✓ Successfully uploaded";
-      prev.classList.remove("hidden");
-      prev.querySelector("img").src = payScreenshotData;
-    };
-    img.src = r.result;
-  };
-  r.readAsDataURL(f);
-};
-
-document.getElementById("submit-order-btn").onclick = async function(){
-  const form = validateForm();
-  if (!form) return;
-  if (!paymentClaimed) { showErr("Pehle payment claim karo."); return; }
-  const utr = document.getElementById("pay-utr").value.trim();
-  // UTR YA screenshot — sirf ek zaroori
-  if (utr.length < 6 && !payScreenshotData) {
-    showErr("UTR number YA payment screenshot — dono me se kam se kam ek do.");
-    return;
-  }
-  if (!ctx || !ctx.frameId) { showErr("Frame missing — frames page se dobara aao."); return; }
-
-  const btn = this;
-  btn.disabled = true;
-  btn.textContent = "Submitting…";
-  clearErr();
-
-  const note = [
-    form.notes,
-    "Orientation: " + (ctx.orientation || ""),
-    "Quality: " + (ctx.qualityLabel || "Normal"),
-    "Colour: " + (ctx.colourName || "—"),
-    "Payment claimed · UTR: " + utr
-  ].filter(Boolean).join(" | ");
-
-  try {
-    const res = await fetch("/api/frame-order", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        frameId: ctx.frameId,
-        name: form.name,
-        mobile: form.mobile,
-        village: form.village,
-        address: form.address,
-        district: form.district,
-        state: form.state,
-        pincode: form.pincode,
-        note: note,
-        paymentClaimed: true,
-        utr: utr,
-        paymentScreenshot: payScreenshotData
-      })
-    });
-    const data = await res.json();
-    if (!res.ok || !data.ok) throw new Error(data.message || data.error || "Order fail");
-
-    document.getElementById("order-success-box").classList.remove("hidden");
-    document.getElementById("ok-order-id").textContent = data.orderId || "—";
-    document.getElementById("ok-track-id").textContent = data.trackingNumber || data.orderId || "—";
-    document.getElementById("submit-order-btn").classList.add("hidden");
-    document.getElementById("qr-pay-box").classList.add("hidden");
-    document.getElementById("pay-order-btn").classList.add("hidden");
-    document.getElementById("order-flow-hint").textContent = "Order place ho gaya!";
-    try {
-      localStorage.setItem("aditya_last_order", JSON.stringify({
-        orderId: data.orderId, trackingNumber: data.trackingNumber, mobile: form.mobile, at: Date.now()
-      }));
-    } catch(e){}
-  } catch (e) {
-    showErr(e.message || "Order place nahi ho paya.");
-  } finally {
-    btn.disabled = false;
-    btn.textContent = "Submit Order";
-  }
-};
-
-
-(function setupHelp(){
-  const phone = String(HELP_PHONE || "").replace(/\D/g, "");
-  const msg = encodeURIComponent("Namaste Aditya Studio, mujhe order/payment me help chahiye.");
-  const a = document.getElementById("wa-help-btn");
-  const lab = document.getElementById("help-phone-label");
-  if (a && phone.length >= 12) {
-    a.href = "https://wa.me/" + phone + "?text=" + msg;
-  }
-  if (lab && phone.length >= 10) {
-    lab.textContent = "Help No: +" + phone;
+    if (location.protocol === "file:") return;
+    var raw = localStorage.getItem("aditya_studio_session_v1");
+    var s = raw ? JSON.parse(raw) : null;
+    var mob = s && String(s.mobile || s.phone || "").replace(/\D/g, "");
+    if (!mob || mob.length !== 10) {
+      try {
+        localStorage.setItem("aditya_pending_order_flow", JSON.stringify({
+          at: Date.now(),
+          returnTo: "/place-order.html"
+        }));
+      } catch(e) {}
+      var next = encodeURIComponent("/place-order.html");
+      location.replace("/book-now.html?next=" + next + "&from=order");
+    }
+  } catch(e) {
+    location.replace("/book-now.html?next=" + encodeURIComponent("/place-order.html") + "&from=order");
   }
 })();
 
-if (loadCtx()) {
-  loadSavedAddress();
-  // agar address pehle se saved hai to payment section ready
-  try {
-    const s = JSON.parse(localStorage.getItem(ADDR_KEY)||"null");
-    if (s && s.name && s.mobile) showPayment();
-  } catch(e){}
-}
+// Kisi doosre page se logout ho to payment/order page par logged-in order
+// continue nahi hona chahiye.
+window.addEventListener("storage", function(event){
+  if (event.key === "aditya_studio_session_v1" && !event.newValue) {
+    location.replace("/");
+  }
+});
+</script>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Hanken+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script>
+tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        "surface-bright": "#44324f",
+        "surface-container-highest": "#3f2e4a",
+        "primary-fixed-dim": "#e9c400",
+        "secondary-container": "#7701d0",
+        "surface-dim": "#1c0c27",
+        "on-primary-container": "#705e00",
+        "on-surface-variant": "#d0c6ab",
+        "background": "#1c0c27",
+        "outline": "#999077",
+        "surface-container-high": "#34233f",
+        "primary-container": "#ffd700",
+        "primary": "#fff6df",
+        "surface-container-lowest": "#170721",
+        "surface-container": "#291934",
+        "on-surface": "#f3daff",
+        "on-background": "#f3daff",
+        "surface-container-low": "#251530",
+        "surface-variant": "#3f2e4a",
+        "on-primary": "#3a3000",
+        "secondary": "#dcb8ff",
+        "surface-tint": "#e9c400",
+        "error": "#ffb4ab",
+        "surface": "#1c0c27"
+      },
+      borderRadius: { DEFAULT: "1rem", lg: "2rem", xl: "3rem", full: "9999px" },
+      spacing: {
+        "container-margin": "20px",
+        "stack-md": "24px",
+        "base": "8px",
+        "stack-lg": "48px",
+        "gutter": "16px",
+        "stack-sm": "12px"
+      },
+      fontFamily: {
+        "button-text": ["Sora"],
+        "headline-lg-mobile": ["Sora"],
+        "body-lg": ["Hanken Grotesk"],
+        "body-md": ["Hanken Grotesk"],
+        "label-md": ["JetBrains Mono"],
+        "headline-md": ["Sora"],
+        "headline-lg": ["Sora"],
+        "display-lg": ["Sora"]
+      },
+      fontSize: {
+        "button-text": ["16px", { lineHeight: "20px", fontWeight: "600" }],
+        "headline-lg-mobile": ["28px", { lineHeight: "36px", fontWeight: "700" }],
+        "body-lg": ["18px", { lineHeight: "28px", fontWeight: "400" }],
+        "body-md": ["16px", { lineHeight: "24px", fontWeight: "400" }],
+        "label-md": ["14px", { lineHeight: "20px", letterSpacing: "0.05em", fontWeight: "500" }],
+        "headline-md": ["24px", { lineHeight: "32px", fontWeight: "600" }],
+        "headline-lg": ["32px", { lineHeight: "40px", fontWeight: "700" }],
+        "display-lg": ["48px", { lineHeight: "56px", letterSpacing: "-0.02em", fontWeight: "800" }]
+      }
+    }
+  }
+};
+</script>
+<style>
+  .glass-card {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.15);
+  }
+  .glass-input {
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #1a0a3e; /* dark indigo — typed text clearly visible */
+    -webkit-text-fill-color: #1a0a3e;
+    caret-color: #4c1d95;
+  }
+  .glass-input:focus {
+    background: #ffffff;
+    border-color: #ffd700;
+    box-shadow: 0 0 12px rgba(255, 215, 0, 0.35);
+    outline: none;
+    color: #0f0528;
+    -webkit-text-fill-color: #0f0528;
+  }
+  .glass-input::placeholder {
+    color: #7c6b9a;
+    -webkit-text-fill-color: #7c6b9a;
+    opacity: 1;
+  }
+  /* autofill (Chrome) dark text */
+  .glass-input:-webkit-autofill,
+  .glass-input:-webkit-autofill:hover,
+  .glass-input:-webkit-autofill:focus {
+    -webkit-text-fill-color: #1a0a3e !important;
+    box-shadow: 0 0 0 1000px #f5f0ff inset !important;
+    transition: background-color 9999s ease-in-out 0s;
+  }
+  textarea.glass-input {
+    color: #1a0a3e;
+    -webkit-text-fill-color: #1a0a3e;
+  }
+  .text-glow { text-shadow: 0 0 10px rgba(233, 196, 0, 0.5); }
+  .aurora-bg {
+    background:
+      radial-gradient(circle at 50% -20%, rgba(119, 1, 208, 0.4), transparent 50%),
+      radial-gradient(circle at -20% 80%, rgba(233, 196, 0, 0.2), transparent 50%),
+      #0f021a;
+  }
+  .hidden { display: none !important; }
+  .fee-free { color: #22c55e; font-weight: 600; }
+  .status { font-size: 0.85rem; margin-top: 8px; color: #d0c6ab; }
+  .status.ok { color: #22c55e; }
+  .status.err { color: #ffb4ab; }
+
+  .btn-pay-now {
+    width: 100%;
+    padding: 18px 20px;
+    border: none;
+    border-radius: 16px;
+    font-family: Sora, system-ui, sans-serif;
+    font-size: 1.25rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #1a0a00;
+    cursor: pointer;
+    background: linear-gradient(135deg, #ffe566 0%, #ffd700 25%, #ff9f1c 55%, #ff6b35 80%, #ffd700 100%);
+    background-size: 200% 200%;
+    box-shadow:
+      0 0 0 2px rgba(255, 215, 0, 0.35),
+      0 8px 28px rgba(255, 107, 53, 0.45),
+      0 0 40px rgba(255, 215, 0, 0.25),
+      inset 0 1px 0 rgba(255,255,255,0.55);
+    animation: payPulse 2.2s ease-in-out infinite, payShine 3.5s ease infinite;
+    transition: transform 0.15s ease, filter 0.15s;
+  }
+  .btn-pay-now:hover { filter: brightness(1.08); transform: translateY(-2px) scale(1.01); }
+  .btn-pay-now:active { transform: scale(0.98); }
+  .btn-pay-now:disabled {
+    animation: none;
+    opacity: 0.45;
+    cursor: not-allowed;
+    filter: grayscale(0.4);
+  }
+  @keyframes payPulse {
+    0%, 100% { box-shadow: 0 0 0 2px rgba(255,215,0,0.35), 0 8px 28px rgba(255,107,53,0.4), 0 0 30px rgba(255,215,0,0.2); }
+    50% { box-shadow: 0 0 0 3px rgba(255,215,0,0.55), 0 12px 36px rgba(255,107,53,0.55), 0 0 50px rgba(255,215,0,0.4); }
+  }
+  @keyframes payShine {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+  .pay-timer {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    padding: 12px 16px; border-radius: 12px;
+    background: rgba(255, 80, 80, 0.12);
+    border: 1px solid rgba(255, 120, 100, 0.35);
+    color: #ffb4ab; font-family: "JetBrains Mono", monospace; font-weight: 600;
+  }
+  .pay-timer.ok { background: rgba(255, 215, 0, 0.1); border-color: rgba(255,215,0,0.35); color: #ffe16d; }
+  .pay-timer.expired { background: rgba(150,0,20,0.25); border-color: rgba(255,100,100,0.5); color: #ffb4ab; }
+  .pay-timer .clock { font-size: 1.4rem; letter-spacing: 0.08em; }
+  .upi-app-btn {
+    display: flex; align-items: center; gap: 14px;
+    width: 100%; padding: 14px 16px; border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.06);
+    color: #f3daff; text-decoration: none;
+    transition: transform 0.15s, border-color 0.15s, background 0.15s;
+  }
+  .upi-app-btn:hover { transform: translateY(-1px); border-color: rgba(255,215,0,0.4); background: rgba(255,255,255,0.1); }
+  .upi-app-btn:active { transform: scale(0.98); }
+  .upi-app-btn .logo {
+    width: 44px; height: 44px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 0.7rem; flex-shrink: 0;
+    color: #fff;
+  }
+  .upi-app-btn .logo.phonepe { background: linear-gradient(135deg, #5f259f, #7b3fb0); }
+  .upi-app-btn .logo.gpay { background: linear-gradient(135deg, #1a73e8, #34a853); }
+  .upi-app-btn .logo.paytm { background: linear-gradient(135deg, #00baf2, #002970); }
+  .upi-app-btn .meta { flex: 1; text-align: left; }
+  .upi-app-btn .meta .name { font-weight: 700; font-size: 1rem; }
+  .upi-app-btn .meta .sub { font-size: 0.75rem; opacity: 0.7; margin-top: 2px; }
+  .upi-app-btn .arrow { opacity: 0.5; font-size: 1.2rem; }
+  .upi-app-btn.disabled {
+    opacity: 0.4; pointer-events: none; filter: grayscale(0.5);
+  }
+
+</style>
+</head>
+<body class="bg-background text-on-surface aurora-bg min-h-screen pb-12 font-body-md overflow-x-hidden selection:bg-primary-container selection:text-on-primary-container">
+
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-container-margin py-3 bg-surface/20 backdrop-blur-xl border-b border-white/10">
+  <a class="flex items-center gap-1 text-primary-fixed-dim hover:opacity-80 p-2 -ml-2 rounded-full active:scale-95 transition-transform" href="/frames" title="Frames">
+    <span class="material-symbols-outlined">arrow_back</span>
+    <span class="text-sm font-medium hidden sm:inline">Frames</span>
+  </a>
+  <h1 class="font-headline-lg-mobile text-headline-lg-mobile text-primary-fixed-dim text-glow tracking-tight text-lg sm:text-xl">Aditya Studio</h1>
+  <a class="flex items-center gap-1 text-primary-fixed-dim hover:opacity-80 p-2 rounded-full active:scale-95 transition-transform" href="/" title="Home">
+    <span class="material-symbols-outlined">home</span>
+    <span class="text-sm font-medium hidden sm:inline">Home</span>
+  </a>
+</header>
+
+<main class="pt-[90px] px-container-margin max-w-3xl mx-auto space-y-stack-md relative z-10">
+
+  <div id="boot-msg" class="glass-card rounded-xl p-8 text-center text-on-surface-variant">
+    Order details load ho rahe hain...
+  </div>
+  <div id="boot-err" class="glass-card rounded-xl p-8 text-center hidden"></div>
+
+  <div id="app" class="hidden space-y-stack-md">
+    <div class="flex items-center justify-between">
+      <h2 class="font-headline-md text-headline-md text-primary-fixed">Place Order</h2>
+    </div>
+
+
+    <!-- Address -->
+    <section class="glass-card rounded-xl p-6 relative">
+      <h3 class="font-label-md text-label-md text-primary-fixed-dim mb-4 uppercase tracking-wider flex items-center gap-2">
+        <span class="material-symbols-outlined text-[18px]">local_shipping</span> Delivery Address
+      </h3>
+      <div id="addr-view" class="hidden">
+        <div id="addr-summary-text" class="glass-input rounded-lg px-4 py-3 text-on-surface leading-relaxed mb-3"></div>
+        <button type="button" id="btn-edit-addr" class="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-secondary/40 text-secondary text-sm font-medium hover:bg-secondary/10 transition-colors">
+          <span class="material-symbols-outlined text-[16px]">edit</span> Edit Address
+        </button>
+      </div>
+      <div id="addr-form-wrap" class="space-y-4">
+        <div>
+          <label class="block font-label-md text-label-md text-on-surface-variant mb-1 ml-1 flex items-center gap-1">
+            <span class="material-symbols-outlined text-[14px]">person</span> Full Name *
+          </label>
+          <input id="addr-name" class="glass-input w-full rounded-lg px-4 py-3 focus:outline-none transition-all duration-300" placeholder="Apna poora naam" type="text" autocomplete="name"/>
+        </div>
+        <div>
+          <label class="block font-label-md text-label-md text-on-surface-variant mb-1 ml-1 flex items-center gap-1">
+            <span class="material-symbols-outlined text-[14px]">call</span> Mobile *
+          </label>
+          <input id="addr-mobile" class="glass-input w-full rounded-lg px-4 py-3 focus:outline-none transition-all duration-300" placeholder="10 digit mobile" type="tel" inputmode="numeric" maxlength="10"/>
+        </div>
+        <div>
+          <label class="block font-label-md text-label-md text-on-surface-variant mb-1 ml-1 flex items-center gap-1">
+            <span class="material-symbols-outlined text-[14px]">home</span> Village / Area *
+          </label>
+          <input id="addr-village" class="glass-input w-full rounded-lg px-4 py-3 focus:outline-none transition-all duration-300" placeholder="Gaon / Area" type="text"/>
+        </div>
+        <div>
+          <label class="block font-label-md text-label-md text-on-surface-variant mb-1 ml-1 flex items-center gap-1">
+            <span class="material-symbols-outlined text-[14px]">location_on</span> Full Address *
+          </label>
+          <textarea id="addr-full" class="glass-input w-full rounded-lg px-4 py-3 focus:outline-none transition-all duration-300 resize-none" placeholder="Ghar number, gali, landmark..." rows="3"></textarea>
+        </div>
+        <div>
+          <label class="block font-label-md text-label-md text-on-surface-variant mb-1 ml-1 flex items-center gap-1">
+            <span class="material-symbols-outlined text-[14px]">pin_drop</span> Pincode
+          </label>
+          <input id="addr-pin" class="glass-input w-full rounded-lg px-4 py-3 focus:outline-none transition-all duration-300" placeholder="Pincode (optional)" type="text" inputmode="numeric" maxlength="6"/>
+        </div>
+        <button type="button" id="btn-save-addr" class="w-full bg-primary-container text-on-primary-container font-button-text text-button-text py-3 rounded-xl mt-2 active:scale-95 transition-transform hover:shadow-[0_0_15px_rgba(255,215,0,0.3)]">
+          Save Address
+        </button>
+        <button type="button" id="btn-cancel-addr" class="hidden w-full border border-white/15 text-on-surface-variant py-3 rounded-xl text-sm">Cancel</button>
+      </div>
+    </section>
+    <!-- Order Summary — address save ke baad hi (Amazon style) -->
+    <section id="summary-section" class="glass-card rounded-xl p-6 relative overflow-hidden group hidden">
+      <div class="absolute -top-10 -right-10 w-32 h-32 bg-secondary-container rounded-full blur-3xl opacity-30 group-hover:opacity-50 transition-opacity pointer-events-none"></div>
+      <h3 class="font-label-md text-label-md text-primary-fixed-dim mb-4 uppercase tracking-wider flex items-center gap-2 relative">
+        <span class="material-symbols-outlined text-[18px]">receipt_long</span> Order Summary
+      </h3>
+      <div id="order-summary-body" class="space-y-3 font-body-md text-on-surface-variant relative"></div>
+    </section>
+
+    <!-- Bill — address save ke baad -->
+    <section id="bill-section" class="glass-card rounded-xl p-6 relative hidden">
+      <h3 class="font-label-md text-label-md text-primary-fixed-dim mb-4 uppercase tracking-wider flex items-center gap-2">
+        <span class="material-symbols-outlined text-[18px]">request_quote</span> Bill Details
+      </h3>
+      <div id="bill-body" class="space-y-3 font-body-md text-on-surface-variant"></div>
+    </section>
+
+    <!-- PAY button (before scanner) -->
+    <section id="pay-cta-section" class="hidden">
+      <button type="button" id="btn-pay-now" class="btn-pay-now">
+        ⚡ Pay Now · <span id="pay-now-amount">₹0</span>
+      </button>
+      <p class="text-center text-on-surface-variant text-xs mt-3 opacity-70">Secure UPI payment · 5 min window</p>
+    </section>
+
+    <!-- Payment — Pay Now click ke baad -->
+    <section id="payment-section" class="glass-card rounded-xl p-6 relative hidden">
+      <h3 class="font-label-md text-label-md text-primary-fixed-dim mb-3 uppercase tracking-wider flex items-center gap-2">
+        <span class="material-symbols-outlined text-[18px]">qr_code_scanner</span> Payment
+      </h3>
+
+      <p id="pay-expired-msg" class="hidden text-center text-sm mb-4" style="color:#ffb4ab">
+        ⏰ Payment window expire ho gayi. Dobara <b>Pay Now</b> dabao.
+      </p>
+
+      <div id="pay-active-area">
+        <p class="font-body-md text-on-surface-variant/80 text-sm mb-4 text-center">QR scan karo ya neeche app se pay karo</p>
+
+        <div class="flex flex-col items-center justify-center bg-surface-container-low/50 rounded-xl p-4 mb-5 border border-white/5">
+          <img id="pay-qr-img" src="/payment-qr.png" alt="Aditya Studio UPI QR" class="w-48 h-48 object-contain bg-white p-2 rounded-lg mb-3"/>
+          <p id="pay-upi-text" class="font-label-md text-label-md text-primary-fixed-dim tracking-wider break-all text-center text-xs px-2"></p>
+          <p class="text-xs text-on-surface-variant mt-2">Amount: <b id="pay-qr-amount" class="text-primary-container">₹0</b></p>
+        </div>
+
+        <div id="pay-timer-box" class="pay-timer ok mb-5">
+          <span class="material-symbols-outlined">timer</span>
+          <span>Pay within</span>
+          <span class="clock" id="pay-timer">05:00</span>
+        </div>
+
+        <p class="font-label-md text-label-md text-on-surface-variant mb-3 uppercase tracking-wider text-center text-xs">Open in app</p>
+        <div class="space-y-3 mb-6" id="upi-app-btns">
+          <a href="#" id="pay-phonepe" class="upi-app-btn" target="_blank" rel="noopener">
+            <span class="logo phonepe">Pe</span>
+            <span class="meta"><span class="name">PhonePe</span><span class="sub">App me open karke pay karo</span></span>
+            <span class="arrow">›</span>
+          </a>
+          <a href="#" id="pay-gpay" class="upi-app-btn" target="_blank" rel="noopener">
+            <span class="logo gpay">G</span>
+            <span class="meta"><span class="name">Google Pay</span><span class="sub">App me open karke pay karo</span></span>
+            <span class="arrow">›</span>
+          </a>
+          <a href="#" id="pay-paytm" class="upi-app-btn" target="_blank" rel="noopener">
+            <span class="logo paytm">Pay</span>
+            <span class="meta"><span class="name">Paytm</span><span class="sub">App me open karke pay karo</span></span>
+            <span class="arrow">›</span>
+          </a>
+        </div>
+
+        <div class="space-y-4 border-t border-white/10 pt-5">
+          <p class="text-sm text-on-surface-variant text-center">Pay ke baad UTR ya screenshot me se koi ek daalo</p>
+          <div>
+            <label class="block font-label-md text-label-md text-on-surface-variant mb-1 ml-1">UTR / Transaction ID</label>
+            <input id="pay-utr" class="glass-input w-full rounded-lg px-4 py-3 focus:outline-none transition-all duration-300" placeholder="12 digit UTR / UPI ref" type="text" maxlength="12"/>
+          </div>
+          <div>
+            <label class="block font-label-md text-label-md text-on-surface-variant mb-1 ml-1">Payment Screenshot</label>
+            <div class="relative group">
+              <input id="pay-proof" accept="image/*" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" type="file"/>
+              <div class="glass-input w-full rounded-lg px-4 py-4 flex flex-col items-center justify-center text-on-surface-variant border-dashed border-2 border-white/15 group-hover:border-primary-fixed transition-colors duration-300 bg-surface-container-low/30">
+                <span class="material-symbols-outlined text-[32px] text-secondary mb-2 group-hover:text-primary-fixed transition-colors">cloud_upload</span>
+                <span class="font-button-text text-sm group-hover:text-primary-fixed transition-colors">Tap to Upload Screenshot</span>
+              </div>
+            </div>
+            <img id="pay-preview" alt="preview" class="mt-3 max-w-[140px] max-h-[140px] rounded-lg border border-white/10 hidden"/>
+            <div class="status" id="pay-status"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div id="submit-section" class="pt-2 pb-8 hidden">
+      <button type="button" id="btn-place" class="w-full bg-primary-container text-on-primary-container font-headline-md text-lg py-4 rounded-xl shadow-[0_0_20px_rgba(255,215,0,0.4)] active:scale-95 transition-all duration-300 flex items-center justify-center gap-2">
+        Submit Order <span class="material-symbols-outlined">check_circle</span>
+      </button>
+      <div class="text-center mt-6">
+        <p class="font-label-md text-label-md text-on-surface-variant/60 uppercase tracking-widest mb-2 text-xs">Need Help?</p>
+        <a id="wa-help" class="inline-flex items-center gap-2 text-primary-fixed-dim border border-primary-fixed-dim/30 rounded-full px-4 py-2 text-sm font-medium hover:bg-primary-fixed-dim/10 transition-colors" href="https://wa.me/91" target="_blank" rel="noopener">
+          <span class="material-symbols-outlined text-[18px]">chat</span> WhatsApp Chat Help
+        </a>
+      </div>
+    </div>
+
+    <!-- Order Success Screen -->
+    <div id="order-success-section" class="pt-2 pb-8 hidden">
+      <div class="text-center mb-6">
+        <a href="/" class="inline-flex items-center gap-1 text-on-surface-variant hover:text-primary-fixed-dim text-sm font-medium transition-colors">
+          <span class="material-symbols-outlined text-[18px]">arrow_back</span> Back to Home
+        </a>
+      </div>
+      <div class="glass-card rounded-xl p-8 text-center">
+        <span class="material-symbols-outlined text-[56px] mb-3" style="color:#4ade80">check_circle</span>
+        <p class="font-headline-md text-xl font-bold mb-2" style="color:#4ade80">Order Successful ✅</p>
+        <p class="text-on-surface-variant text-sm mb-1">Order No.</p>
+        <p id="success-order-id" class="font-label-md text-lg font-bold tracking-wider text-primary-fixed-dim mb-6">—</p>
+        <p class="text-on-surface-variant text-xs mb-6">Aapka order mil gaya hai. Confirmation ke baad delivery process shuru hogi.</p>
+        <a id="wa-help-success" class="inline-flex items-center gap-2 justify-center w-full bg-[#25D366]/15 text-[#25D366] border border-[#25D366]/40 rounded-xl px-4 py-3 text-sm font-semibold hover:bg-[#25D366]/25 transition-colors" href="https://wa.me/91" target="_blank" rel="noopener">
+          <span class="material-symbols-outlined text-[18px]">chat</span> WhatsApp se Help lo
+        </a>
+      </div>
+    </div>
+    </div>
+  </div>
+</main>
+
+<script>
+(function () {
+  var CTX_KEY = "aditya_order_ctx";
+  var PENDING_KEY = "aditya_pending_order_flow";
+  var ADDR_KEY = "aditya_saved_address_v1";
+  var CTX_KEYS = [CTX_KEY,"aditya_studio_order_ctx","order_ctx","aditya_frame_order","frameOrder","selectedFrame","aditya_selected_frame","pending_order","aditya_pending_order"];
+  var AUTH_URL = "/book-now.html";
+
+  function $(id){ return document.getElementById(id); }
+  function show(el){ if(el) el.classList.remove("hidden"); }
+  function hide(el){ if(el) el.classList.add("hidden"); }
+  function money(n){ n=Number(n)||0; return "₹"+(Math.round(n*100)/100); }
+  function safeParse(s){ try{ return JSON.parse(s); }catch(e){ return null; } }
+  function escapeHtml(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+  function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+  function lsSet(k,v){ try{ localStorage.setItem(k,v); return true; }catch(e){ return false; } }
+  function lsRemove(k){ try{ localStorage.removeItem(k); }catch(e){} }
+  function ssGet(k){ try{ return sessionStorage.getItem(k); }catch(e){ return null; } }
+  function canUseStorage(){ try{ var t="__t"; localStorage.setItem(t,"1"); localStorage.removeItem(t); return true; }catch(e){ return false; } }
+  function isFileProtocol(){ return location.protocol==="file:"; }
+
+  function getSession(){
+    var s = safeParse(lsGet("aditya_studio_session_v1"));
+    if (!s) return null;
+    if (s.pin || !s.sessionToken) { lsRemove("aditya_studio_session_v1"); return null; }
+    var mob = String(s.mobile || s.phone || "").replace(/\D/g, "");
+    if (mob.length !== 10) return null;
+    return s;
+  }
+  function looksLikeOrder(obj){
+    if(!obj||typeof obj!=="object") return false;
+    if(obj.frameName||obj.frame||obj.title||obj.frameTitle) return true;
+    if(obj.name&&(obj.price!=null||obj.mrp!=null||obj.size)) return true;
+    if(obj.price!=null||obj.mrp!=null) return true;
+    if(obj.size&&obj.quality) return true;
+    return false;
+  }
+  function normalizeCtx(obj){
+    if(!obj) return null;
+    return {
+      frameName: obj.frameName||obj.frame||obj.title||obj.frameTitle||obj.name||"Frame",
+      size: obj.size||obj.frameSize||obj.selectedSize||"",
+      price: Number(obj.finalPrice!=null?obj.finalPrice:(obj.price!=null?obj.price:obj.mrp))||0,
+      mrp: Number(obj.mrp!=null?obj.mrp:obj.price)||0,
+      discount: Number(obj.discount!=null?obj.discount:obj.disc)||0,
+      quality: obj.quality||obj.qualityLabel||obj.qualityName||obj.photoQuality||"Normal",
+      qualityExtra: Number(obj.qualityExtra!=null?obj.qualityExtra:obj.qualityPrice)||0,
+      image: obj.image||obj.photo||obj.img||""
+    };
+  }
+  function readCtx(){
+    var i, raw, obj, k, low, o, j, sk, so, p;
+    for(i=0;i<CTX_KEYS.length;i++){
+      raw = lsGet(CTX_KEYS[i])||ssGet(CTX_KEYS[i]);
+      obj = safeParse(raw);
+      if(looksLikeOrder(obj)) return normalizeCtx(obj);
+    }
+    try {
+      for(i=0;i<localStorage.length;i++){
+        k=localStorage.key(i); if(!k) continue;
+        low=k.toLowerCase();
+        if(low.indexOf("order")>=0||low.indexOf("frame")>=0||low.indexOf("cart")>=0){
+          o=safeParse(lsGet(k));
+          if(looksLikeOrder(o)) return normalizeCtx(o);
+        }
+      }
+    } catch(e){}
+    try {
+      for(j=0;j<sessionStorage.length;j++){
+        sk=sessionStorage.key(j); so=safeParse(ssGet(sk));
+        if(looksLikeOrder(so)) return normalizeCtx(so);
+      }
+    } catch(e2){}
+    p=new URLSearchParams(location.search);
+    if(p.get("frame")||p.get("name")||p.get("price")||p.get("mrp")||p.get("size")){
+      return normalizeCtx({
+        frameName: p.get("frame")||p.get("name")||"Frame",
+        size: p.get("size")||"",
+        price: p.get("price")||0,
+        mrp: p.get("mrp")||p.get("price")||0,
+        discount: p.get("discount")||0,
+        quality: p.get("quality")||"Normal",
+        qualityExtra: p.get("qualityExtra")||0
+      });
+    }
+    return null;
+  }
+  function debugStorage(){
+    var lines=["URL: "+location.href,"Protocol: "+location.protocol,"Storage OK: "+canUseStorage()];
+    try {
+      lines.push("--- localStorage keys ---");
+      for(var i=0;i<localStorage.length;i++){
+        var k=localStorage.key(i); var v=lsGet(k)||"";
+        lines.push(k+" = "+String(v).slice(0,100));
+      }
+    } catch(e){ lines.push("localStorage error: "+e.message); }
+    return lines.join("\n");
+  }
+  function readAddr(){ return safeParse(lsGet(ADDR_KEY))||null; }
+  function saveAddr(a){ lsSet(ADDR_KEY, JSON.stringify(a)); }
+
+  function goToRegisterFlow(){
+    lsSet(PENDING_KEY, JSON.stringify({at:Date.now(), returnTo:"/place-order.html"}));
+    location.replace(AUTH_URL+"?next="+encodeURIComponent("/place-order.html")+"&from=order");
+  }
+
+  var ctx=null;
+  var fees={platformFee:10,deliveryFee:40,platformMode:"always",deliveryMode:"always",platformMin:0,deliveryMin:0};
+  var proofDataUrl="";
+
+  function calcFees(baseAmount){
+    var platform=Number(fees.platformFee)||0, delivery=Number(fees.deliveryFee)||0;
+    var pm=fees.platformMode||"always", dm=fees.deliveryMode||"always";
+    var pMin=Number(fees.platformMin)||0, dMin=Number(fees.deliveryMin)||0, base=Number(baseAmount)||0;
+    if(pm==="never") platform=0; else if(pm==="min"&&base<pMin) platform=0;
+    if(dm==="never"||dm==="free") delivery=0;
+    else if(dm==="free_above"&&base>=dMin) delivery=0;
+    else if(dm==="min"&&base<dMin) delivery=0;
+    return {platform:platform, delivery:delivery};
+  }
+  function framePrice(c){
+    var mrp=Number(c.mrp!=null?c.mrp:c.price)||0, disc=Number(c.discount)||0;
+    var after=disc>0?mrp-(mrp*disc/100):(Number(c.price)||mrp);
+    return {mrp:mrp, disc:disc, after:Math.max(0,after)};
+  }
+
+  function row(label, valueHtml, icon){
+    return '<div class="flex justify-between items-center border-b border-white/5 pb-2">'
+      + '<span class="flex items-center gap-2">'
+      + (icon ? '<span class="material-symbols-outlined text-[16px] text-secondary">'+icon+'</span> ' : '')
+      + escapeHtml(label) + '</span>'
+      + '<span class="text-on-surface font-medium text-right">'+valueHtml+'</span></div>';
+  }
+
+  function renderSummary(){
+    var c=ctx, fp=framePrice(c), qExtra=Number(c.qualityExtra)||0, base=fp.after+qExtra;
+    var f=calcFees(base), total=base+f.platform+f.delivery;
+    var name=c.frameName||"Frame", size=c.size||"", quality=c.quality||"Normal";
+    var html="";
+    html += row("Frame", escapeHtml(name)+(size?" · "+escapeHtml(size):""), "image");
+    html += row("Quality", escapeHtml(quality)+(qExtra?" (+"+money(qExtra)+")":""), "high_quality");
+    if(fp.disc>0){
+      html += row("MRP", '<span class="line-through opacity-70" style="color:#ef4444">'+money(fp.mrp)+'</span>', "sell");
+      html += row("Discount", '<span style="color:#22c55e">−'+fp.disc+'%</span>', "percent");
+    }
+    html += '<div class="flex justify-between items-center pt-1">'
+      + '<span class="flex items-center gap-2 text-primary-fixed-dim font-medium"><span class="material-symbols-outlined text-[18px]">payments</span> Frame price</span>'
+      + '<span class="text-primary-fixed font-bold text-lg">'+money(fp.after)+'</span></div>';
+    $("order-summary-body").innerHTML = html;
+
+    var bill="";
+    bill += row("Frame after discount", money(fp.after));
+    if(qExtra>0) bill += row("Photo quality", "+"+money(qExtra));
+    bill += row("Platform fees", f.platform<=0?'<span class="fee-free">FREE</span>':money(f.platform));
+    bill += row("Delivery fees", f.delivery<=0?'<span class="fee-free">FREE</span>':'<span style="color:#22c55e">'+money(f.delivery)+'</span>');
+    bill += '<div class="flex justify-between items-center pt-4 border-t border-white/10 mt-2">'
+      + '<span class="font-headline-md text-lg text-primary-fixed-dim">Total Payable</span>'
+      + '<span class="font-headline-lg-mobile text-xl text-primary-container text-glow">'+money(total)+'</span></div>';
+    $("bill-body").innerHTML = bill;
+    return {total:total, platform:f.platform, delivery:f.delivery, frameAfter:fp.after, qualityExtra:qExtra, mrp:fp.mrp, discount:fp.disc};
+  }
+
+  function fillAddrForm(a){
+    if(!a) return;
+    $("addr-name").value = a.name||"";
+    $("addr-mobile").value = a.mobile||a.phone||"";
+    $("addr-village").value = a.village||a.area||"";
+    $("addr-full").value = a.address||a.full||"";
+    $("addr-pin").value = a.pincode||a.pin||"";
+  }
+  function showAddrSummary(a){
+    var lines = [
+      "<strong class='text-primary-fixed'>"+escapeHtml(a.name||"")+"</strong> · "+escapeHtml(a.mobile||a.phone||""),
+      escapeHtml(a.village||a.area||""),
+      escapeHtml(a.address||a.full||""),
+      a.pincode||a.pin ? escapeHtml(a.pincode||a.pin) : ""
+    ].filter(Boolean);
+    $("addr-summary-text").innerHTML = lines.join("<br>");
+    hide($("addr-form-wrap"));
+    show($("addr-view"));
+  }
+  function showAddrForm(isEdit){
+    show($("addr-form-wrap"));
+    hide($("addr-view"));
+    if(isEdit) show($("btn-cancel-addr")); else hide($("btn-cancel-addr"));
+  }
+  function currentAddrFromForm(){
+    return {
+      name: ($("addr-name").value||"").trim(),
+      mobile: ($("addr-mobile").value||"").trim(),
+      village: ($("addr-village").value||"").trim(),
+      address: ($("addr-full").value||"").trim(),
+      pincode: ($("addr-pin").value||"").trim()
+    };
+  }
+  function validateAddr(a){
+    if(!a.name) return "Name likho";
+    if(!/^\d{10}$/.test(a.mobile)) return "Sahi 10 digit mobile likho";
+    if(!a.village) return "Village / Area likho";
+    if(!a.address||a.address.length<5) return "Poora address likho";
+    return null;
+  }
+  function loadFees(){
+    if(isFileProtocol()) return Promise.resolve();
+    return Promise.race([
+      fetch("/api/fees",{credentials:"same-origin"}).then(function(r){ return r.ok?r.json():null; }).then(function(j){
+        if(j&&typeof j==="object"){
+          fees={
+            platformFee: Number(j.platformFee!=null?j.platformFee:(j.platform!=null?j.platform:10))||0,
+            deliveryFee: Number(j.deliveryFee!=null?j.deliveryFee:(j.delivery!=null?j.delivery:40))||0,
+            platformMode: j.platformMode||j.platform_mode||"always",
+            deliveryMode: j.deliveryMode||j.delivery_mode||"always",
+            platformMin: Number(j.platformMin||j.platform_min||0)||0,
+            deliveryMin: Number(j.deliveryMin||j.delivery_min||0)||0
+          };
+        }
+      }).catch(function(){}),
+      new Promise(function(res){ setTimeout(res,2000); })
+    ]);
+  }
+  function fileToDataUrl(file){
+    return new Promise(function(resolve,reject){
+      if(!file) return resolve("");
+      var fr=new FileReader();
+      fr.onload=function(){ resolve(String(fr.result||"")); };
+      fr.onerror=function(){ reject(new Error("read fail")); };
+      fr.readAsDataURL(file);
+    });
+  }
+
+  function helpLink(message){
+    var number = String(helpWhatsapp || "").replace(/\D/g, "");
+    var text = encodeURIComponent(message || "Namaste, mujhe Aditya Studio order mein help chahiye.");
+    // If the studio number is not configured yet, WhatsApp opens its contact picker.
+    return number ? "https://wa.me/"+(number.length===10?"91"+number:number)+"?text="+text : "https://wa.me/?text="+text;
+  }
+  function setHelpLinks(orderNo){
+    var msg = "Namaste, mujhe Aditya Studio order " + (orderNo || "") + " mein help chahiye.";
+    ["wa-help", "wa-help-success"].forEach(function(id){ var el=$(id); if(el) el.href=helpLink(msg); });
+  }
+
+  async function submitOrder(){
+    var addr=readAddr()||currentAddrFromForm();
+    var errA=validateAddr(addr);
+    if(errA){ alert(errA); showAddrForm(true); fillAddrForm(addr); return; }
+    saveAddr(addr);
+    var utr=($("pay-utr").value||"").trim();
+    var hasUtr = /^[A-Za-z0-9-]{6,40}$/.test(utr);
+    var hasProof = !!proofDataUrl;
+    if(utr && !hasUtr){ alert("UTR / transaction ID minimum 6 letters ya numbers mein daalein."); return; }
+    if(!hasUtr && !hasProof){ alert("UTR ya Payment Screenshot me se koi ek daalo"); return; }
+    if(isFileProtocol()){ alert("Server se open karo"); return; }
+    var bill=renderSummary();
+    var session=getSession()||{};
+    var payload={
+      frameName: ctx.frameName||"Frame", size: ctx.size||"", quality: ctx.quality||"Normal",
+      qualityExtra: bill.qualityExtra, mrp: bill.mrp, discount: bill.discount, framePrice: bill.frameAfter,
+      platformFee: bill.platform, deliveryFee: bill.delivery, amount: bill.total, total: bill.total,
+      name: addr.name, mobile: addr.mobile, phone: addr.mobile, village: addr.village,
+      address: addr.address, pincode: addr.pincode, utr: utr,
+      paymentProof: proofDataUrl, paymentScreenshot: proofDataUrl,
+      paymentClaimed: true,
+      customerPhoto: ssGet("as_user_photo") || lsGet("as_user_photo") || "",
+      userId: session.id||session.userId||"", sessionMobile: session.mobile||session.phone||addr.mobile,
+      sessionToken: session.sessionToken || ""
+    };
+    var btn=$("btn-place");
+    btn.disabled=true; btn.textContent="Submitting...";
+    $("pay-status").textContent="Order submit ho raha hai..."; $("pay-status").className="status";
+    try {
+      var res=await fetch("/api/orders",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"same-origin",body:JSON.stringify(payload)});
+      var data=await res.json().catch(function(){ return {}; });
+      if(!res.ok) throw new Error(data.error||data.message||("HTTP "+res.status));
+      CTX_KEYS.forEach(function(k){ lsRemove(k); }); lsRemove(PENDING_KEY);
+      var orderNo = data.id||data.orderId||data.trackingNumber||"OK";
+      ["payment-section","pay-cta-section","submit-section","bill-section","summary-section","addr-section","addr-form-section"].forEach(function(id){
+        var el=$(id); if(el) hide(el);
+      });
+      if($("success-order-id")) $("success-order-id").textContent = orderNo;
+      setHelpLinks(orderNo);
+      show($("order-success-section"));
+      $("order-success-section").scrollIntoView({behavior:"smooth", block:"start"});
+    } catch(e) {
+      $("pay-status").textContent="Error: "+(e.message||e); $("pay-status").className="status err";
+      alert("Order fail: "+(e.message||e)); btn.disabled=false;
+      btn.innerHTML='Submit Order <span class="material-symbols-outlined">check_circle</span>';
+    }
+  }
+
+  function showFileProtocolError(){
+    hide($("boot-msg"));
+    $("boot-err").innerHTML='<strong class="text-primary-fixed">Server se kholo</strong><br><br><code class="text-secondary">http://localhost:8000/frames</code>';
+    show($("boot-err"));
+  }
+  function showLoginNeeded(){
+    hide($("boot-msg"));
+    $("boot-err").innerHTML=
+      '<strong class="text-primary-fixed text-lg">Pehle Register / Login karo</strong><br><br>'+
+      '<span class="text-on-surface-variant">Order continue karne se pehle account + spin process complete karo.</span><br><br>'+
+      '<button type="button" class="w-full bg-primary-container text-on-primary-container font-button-text py-3 rounded-xl" id="btn-go-register">Register / Login →</button>';
+    show($("boot-err"));
+    setTimeout(function(){ var b=$("btn-go-register"); if(b) b.onclick=function(){ goToRegisterFlow(); }; },0);
+    setTimeout(function(){ goToRegisterFlow(); },1500);
+  }
+  function showNoFrame(){
+    hide($("boot-msg"));
+    $("boot-err").innerHTML='<strong class="text-primary-fixed">Frame select nahi hua</strong><br><br>Pehle <a class="text-secondary underline" href="/frames">Frames</a> se Order dabao.<br><br><pre class="text-left text-xs opacity-60 overflow-auto max-h-40 mt-3">'+escapeHtml(debugStorage())+'</pre>';
+    show($("boot-err"));
+  }
+
+  async function boot(){
+    try {
+      if(isFileProtocol()||!canUseStorage()){ showFileProtocolError(); return; }
+
+      try {
+        var spinDisc=safeParse(lsGet("aditya_spin_discount")||lsGet("spin_discount"));
+        if(spinDisc&&(spinDisc.percent!=null||spinDisc.discount!=null)){
+          var d=Number(spinDisc.percent!=null?spinDisc.percent:spinDisc.discount)||0;
+          var c0=readCtx();
+          if(c0&&d>0){ c0.discount=d; lsSet(CTX_KEY,JSON.stringify(c0)); }
+        }
+      } catch(e0){}
+
+      var session=getSession();
+      if(!session){
+        var maybeCtx=readCtx();
+        if(maybeCtx) lsSet(CTX_KEY,JSON.stringify(maybeCtx));
+        showLoginNeeded();
+        return;
+      }
+      try {
+        if (session.mobile && session.sessionToken) {
+          var vr = await fetch("/api/restore-session", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify({ sessionToken: session.sessionToken })
+          });
+          var vd = await vr.json().catch(function(){ return {}; });
+          if (!vd || !vd.ok) {
+            try { localStorage.removeItem("aditya_studio_session_v1"); } catch(e){}
+            showLoginNeeded();
+            return;
+          }
+          session = {
+            id: vd.id||session.id, name: vd.name||session.name,
+            mobile: vd.mobile||session.mobile, sessionToken: session.sessionToken,
+            village: vd.village||session.village||""
+          };
+          try { localStorage.setItem("aditya_studio_session_v1", JSON.stringify(session)); } catch(e){}
+        } else {
+          try { localStorage.removeItem("aditya_studio_session_v1"); } catch(e){}
+          showLoginNeeded();
+          return;
+        }
+      } catch(e) {}
+      lsRemove(PENDING_KEY);
+
+      ctx=readCtx();
+      if(!ctx){ showNoFrame(); return; }
+      lsSet(CTX_KEY, JSON.stringify(ctx));
+
+      var saved=readAddr();
+      if(saved && saved.name && saved.mobile && saved.address && saved.address.length>=5){
+        fillAddrForm(saved); showAddrSummary(saved);
+        // Address already saved — show summary/bill/payment
+        await loadFees();
+        renderSummary();
+        show($("summary-section"));
+        show($("bill-section"));
+        show($("pay-cta-section"));
+        hide($("payment-section"));
+        hide($("submit-section"));
+        if ($("pay-now-amount")) $("pay-now-amount").textContent = money(renderSummary().total);
+      } else {
+        var nm=(session.name&&String(session.name).trim().length>=3)?session.name:"";
+        var mb=session.mobile||session.phone||"";
+        fillAddrForm({name:nm, mobile:mb, village:"", address:"", pincode:""});
+        showAddrForm(false);
+        // Amazon style: pehle address, summary baad me
+        hide($("summary-section"));
+        hide($("bill-section"));
+        hide($("pay-cta-section"));
+        hide($("payment-section"));
+        hide($("submit-section"));
+        await loadFees();
+        // renderSummary later after address save
+      }
+
+      try {
+        var r=await fetch("/api/settings",{credentials:"same-origin"});
+        if(r.ok){
+          var s=await r.json();
+          var st=s.settings||s;
+          var wa=(st.whatsapp||st.wa||st.helpWhatsapp||s.whatsapp||"").toString().replace(/\D/g,"");
+          if(wa) helpWhatsapp=wa;
+          if(st.upiQr||s.upiQr){ $("pay-qr-img").src=st.upiQr||s.upiQr; $("pay-qr-img").classList.remove("hidden"); }
+          if(st.upiId||s.upiId){
+            payUpiId = String(st.upiId||s.upiId).trim() || DEFAULT_UPI;
+            if($("pay-upi-text")) $("pay-upi-text").textContent = payUpiId;
+          } else {
+            payUpiId = DEFAULT_UPI;
+            if($("pay-upi-text")) $("pay-upi-text").textContent = payUpiId;
+          }
+        }
+      } catch(e){}
+
+      hide($("boot-msg")); hide($("boot-err")); show($("app"));
+    } catch(e) {
+      hide($("boot-msg"));
+      var msg=(e&&e.message)?e.message:String(e);
+      if(msg.indexOf("localStorage")>=0||msg.indexOf("sandbox")>=0) showFileProtocolError();
+      else { $("boot-err").innerHTML="Load error: "+escapeHtml(msg)+'<br><br><a class="text-secondary underline" href="/frames">Frames pe jao</a>'; show($("boot-err")); }
+    }
+  }
+
+  var DEFAULT_UPI = "BHARATPE.9J0B0S0Y6I253580@unitype";
+  var payUpiId = DEFAULT_UPI;
+  var helpWhatsapp = "";
+  var payTimerId = null;
+  var payExpiresAt = 0;
+  var payWindowOpen = false;
+
+  function getBillTotal(){
+    try { return renderSummary().total; } catch(e){ return 0; }
+  }
+
+  function buildUpiParams(amount){
+    var am = (Math.round(Number(amount)*100)/100).toFixed(2);
+    var pn = encodeURIComponent("Aditya Studio");
+    var pa = encodeURIComponent(payUpiId);
+    var tn = encodeURIComponent("Frame Order");
+    return { pa: pa, pn: pn, am: am, tn: tn, cu: "INR" };
+  }
+
+  function upiLink(scheme, amount){
+    var p = buildUpiParams(amount);
+    var q = "pa="+p.pa+"&pn="+p.pn+"&am="+p.am+"&cu="+p.cu+"&tn="+p.tn;
+    if (scheme === "phonepe") return "phonepe://pay?" + q;
+    if (scheme === "gpay") return "tez://upi/pay?" + q;
+    if (scheme === "gpay2") return "gpay://upi/pay?" + q;
+    if (scheme === "paytm") return "paytmmp://pay?" + q;
+    return "upi://pay?" + q;
+  }
+
+  function wireUpiButtons(amount){
+    var phonepe = $("pay-phonepe");
+    var gpay = $("pay-gpay");
+    var paytm = $("pay-paytm");
+    if (phonepe) phonepe.href = upiLink("phonepe", amount);
+    if (gpay) {
+      gpay.href = upiLink("gpay", amount);
+      gpay.onclick = function(e){
+        // try tez then gpay then generic
+        e.preventDefault();
+        var a = upiLink("gpay", amount);
+        var b = upiLink("gpay2", amount);
+        var c = upiLink("upi", amount);
+        window.location.href = a;
+        setTimeout(function(){ window.location.href = b; }, 800);
+        setTimeout(function(){ window.location.href = c; }, 1600);
+      };
+    }
+    if (paytm) paytm.href = upiLink("paytm", amount);
+    // also generic fallback on phonepe if app missing
+    if (phonepe) {
+      phonepe.onclick = function(e){
+        e.preventDefault();
+        window.location.href = upiLink("phonepe", amount);
+        setTimeout(function(){ window.location.href = upiLink("upi", amount); }, 900);
+      };
+    }
+    if (paytm) {
+      paytm.onclick = function(e){
+        e.preventDefault();
+        window.location.href = upiLink("paytm", amount);
+        setTimeout(function(){ window.location.href = upiLink("upi", amount); }, 900);
+      };
+    }
+  }
+
+  function setUpiAppsEnabled(on){
+    ["pay-phonepe","pay-gpay","pay-paytm"].forEach(function(id){
+      var el = $(id);
+      if (!el) return;
+      if (on) el.classList.remove("disabled");
+      else el.classList.add("disabled");
+    });
+  }
+
+  function stopPayTimer(){
+    if (payTimerId) { clearInterval(payTimerId); payTimerId = null; }
+  }
+
+  function expirePayment(){
+    payWindowOpen = false;
+    stopPayTimer();
+    var box = $("pay-timer-box");
+    if (box) { box.className = "pay-timer expired mb-5"; }
+    if ($("pay-timer")) $("pay-timer").textContent = "00:00";
+    show($("pay-expired-msg"));
+    hide($("pay-active-area"));
+    setUpiAppsEnabled(false);
+    // show Pay Now again
+    show($("pay-cta-section"));
+    hide($("submit-section"));
+  }
+
+  function startPayTimer(){
+    stopPayTimer();
+    payExpiresAt = Date.now() + 5 * 60 * 1000;
+    payWindowOpen = true;
+    hide($("pay-expired-msg"));
+    show($("pay-active-area"));
+    var box = $("pay-timer-box");
+    if (box) box.className = "pay-timer ok mb-5";
+    setUpiAppsEnabled(true);
+    function tick(){
+      var left = Math.max(0, payExpiresAt - Date.now());
+      var sec = Math.ceil(left / 1000);
+      var m = Math.floor(sec / 60);
+      var s = sec % 60;
+      if ($("pay-timer")) $("pay-timer").textContent = (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s;
+      if (left <= 60000 && box) box.className = "pay-timer mb-5"; // warn red-ish
+      if (left <= 0) expirePayment();
+    }
+    tick();
+    payTimerId = setInterval(tick, 250);
+  }
+
+  function openPaymentScanner(){
+    var total = getBillTotal();
+    if ($("pay-now-amount")) $("pay-now-amount").textContent = money(total);
+    if ($("pay-qr-amount")) $("pay-qr-amount").textContent = money(total);
+    if ($("pay-upi-text")) $("pay-upi-text").textContent = payUpiId;
+    wireUpiButtons(total);
+    hide($("pay-cta-section"));
+    show($("payment-section"));
+    show($("submit-section"));
+    startPayTimer();
+    try {
+      $("payment-section").scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch(e){}
+  }
+
+  setHelpLinks("");
+
+  function revealCheckout(){
+    show($("summary-section"));
+    show($("bill-section"));
+    show($("pay-cta-section"));
+    hide($("payment-section"));
+    hide($("submit-section"));
+    var bill = renderSummary();
+    if ($("pay-now-amount")) $("pay-now-amount").textContent = money(bill.total);
+  }
+  function hideCheckout(){
+    hide($("summary-section"));
+    hide($("bill-section"));
+    hide($("pay-cta-section"));
+    hide($("payment-section"));
+    hide($("submit-section"));
+    stopPayTimer();
+  }
+
+  $("btn-save-addr").addEventListener("click", function(){
+    var a=currentAddrFromForm(); var err=validateAddr(a);
+    if(err) return alert(err);
+    saveAddr(a); showAddrSummary(a);
+    revealCheckout();
+    try {
+      var sec = $("summary-section");
+      if (sec) sec.scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch(e){}
+  });
+  $("btn-edit-addr").addEventListener("click", function(){ fillAddrForm(readAddr()); showAddrForm(true); });
+  $("btn-cancel-addr").addEventListener("click", function(){
+    var a=readAddr(); if(a&&a.name) showAddrSummary(a); else showAddrForm(false);
+  });
+  $("pay-proof").addEventListener("change", async function(){
+    var f=this.files&&this.files[0]; if(!f) return;
+    if(!/^image\/(png|jpe?g|webp)$/i.test(f.type||"")){ alert("Sirf PNG, JPG ya WEBP screenshot upload karein."); this.value=""; return; }
+    if(f.size > 2*1024*1024){ alert("Screenshot 2 MB se chhota upload karein."); this.value=""; return; }
+    try {
+      proofDataUrl=await fileToDataUrl(f);
+      $("pay-preview").src=proofDataUrl; show($("pay-preview"));
+      $("pay-status").textContent="Screenshot ready ✅"; $("pay-status").className="status ok";
+    } catch(e) {
+      proofDataUrl=""; $("pay-status").textContent="Screenshot read fail"; $("pay-status").className="status err";
+    }
+  });
+  if ($("btn-pay-now")) {
+    $("btn-pay-now").addEventListener("click", function(){
+      openPaymentScanner();
+    });
+  }
+  $("btn-place").addEventListener("click", function(){
+    if (!payWindowOpen) {
+      alert("Payment window expire ho gayi. Pehle Pay Now dabao aur 5 min me pay karke UTR daalo.");
+      show($("pay-cta-section"));
+      return;
+    }
+    submitOrder();
+  });
+
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", boot);
+  else boot();
+})();
 </script>
 </body>
 </html>

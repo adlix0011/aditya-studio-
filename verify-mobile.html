@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="hi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mobile Verify — Aditya Studio</title>
+  <style>
+    :root{--gold:#e6b73d;--bg:#0d0a07;--card:#1d1710;--text:#fff8e7;--muted:#c6bda9;--red:#ffaaa1;--green:#b8f4c5}
+    *{box-sizing:border-box}body{margin:0;min-height:100svh;display:grid;place-items:center;padding:20px;background:radial-gradient(circle at 50% 0,#3c2c10 0,transparent 42%),var(--bg);font-family:system-ui,Arial,sans-serif;color:var(--text)}
+    .card{width:min(100%,430px);padding:28px 22px;border:1px solid rgba(230,183,61,.4);border-radius:22px;background:linear-gradient(145deg,rgba(35,28,18,.98),rgba(16,12,8,.98));box-shadow:0 22px 60px rgba(0,0,0,.48);text-align:center}.icon{font-size:45px}.brand{color:var(--gold);letter-spacing:1px;font-size:13px;font-weight:800}.title{font-size:25px;margin:11px 0 8px}.desc{color:var(--muted);font-size:14px;line-height:1.55}.mobile{color:var(--gold);font-weight:800}.otp{width:100%;margin:20px 0 10px;padding:15px;border:1px solid rgba(230,183,61,.55);border-radius:12px;background:#0a0805;color:#fff;text-align:center;letter-spacing:8px;font-size:25px;outline:none}.btn{width:100%;padding:14px;border:0;border-radius:12px;background:linear-gradient(135deg,#f0ca5c,#b88016);color:#201400;font-size:15px;font-weight:900;cursor:pointer}.btn:disabled{opacity:.55;cursor:not-allowed}.link{margin-top:13px;border:0;background:none;color:var(--gold);font-weight:700;cursor:pointer}.status{min-height:22px;margin-top:14px;font-size:13px;line-height:1.45}.error{color:var(--red)}.ok{color:var(--green)}.hidden{display:none}
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="icon">📱</div>
+    <div class="brand">ADITYA STUDIO</div>
+    <h1 class="title">Mobile verification</h1>
+    <p class="desc">Aapke mobile <span class="mobile" id="mobile">—</span> par 6-digit SMS OTP bheja ja raha hai. OTP 5 minute tak valid rahega.</p>
+    <section id="verifyBox" class="hidden">
+      <input id="otp" class="otp" type="tel" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••" aria-label="6 digit OTP">
+      <button id="verify" class="btn" type="button">OTP Verify karein</button>
+    </section>
+    <p id="status" class="status">OTP SMS bhej rahe hain…</p>
+    <button id="resend" class="link" type="button" disabled>OTP dobara bhejein</button>
+    <p class="desc" style="font-size:12px;margin:18px 0 0">SMS na aaye to phone network aur SMS Gateway app ka server active check karein.</p>
+  </main>
+  <script>
+  (function(){
+    const KEY='aditya_studio_session_v1';
+    const $=id=>document.getElementById(id);
+    let session=null, resendTimer=null;
+    function status(text,kind){const el=$('status');el.textContent=text;el.className='status '+(kind||'');}
+    function readSession(){try{const s=JSON.parse(localStorage.getItem(KEY)||'null');return s&&s.mobile&&s.sessionToken&&!s.pin?s:null;}catch(e){return null;}}
+    function setBusy(id,busy,text){const b=$(id);b.disabled=busy;if(text)b.textContent=text;}
+    function startResendTimer(seconds){clearInterval(resendTimer);let left=seconds;const b=$('resend');b.disabled=true;b.textContent='OTP dobara bhejein ('+left+'s)';resendTimer=setInterval(function(){left--;if(left<=0){clearInterval(resendTimer);b.disabled=false;b.textContent='OTP dobara bhejein';}else b.textContent='OTP dobara bhejein ('+left+'s)';},1000);}
+    async function postJson(url, body){
+      const controller=new AbortController();
+      const timer=setTimeout(()=>controller.abort(),15000);
+      try{return await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:controller.signal});}
+      finally{clearTimeout(timer);}
+    }
+    async function sendOtp(){
+      if(!session)return;
+      setBusy('resend',true);status('OTP SMS bhej rahe hain…');
+      try{
+        const r=await postJson('/api/request-spin-otp',{mobile:session.mobile,sessionToken:session.sessionToken});
+        const out=await r.json().catch(()=>({}));
+        if(out.alreadyVerified){verified();return;}
+        if(!r.ok||!out.ok){
+          const msg=out.error==='sms-not-configured'?'SMS Gateway settings load nahi hui. Server restart karke URL aur API key check karein.':out.error==='resend-too-soon'?'OTP resend ke liye 1 minute rukhein.':(out.message||'OTP SMS nahi bhej paaye.');
+          status(msg,'error');startResendTimer(out.error==='resend-too-soon'?60:8);return;
+        }
+        $('verifyBox').classList.remove('hidden');status('✅ OTP SMS bhej diya gaya hai. Ab 6-digit OTP daalein.','ok');startResendTimer(60);$('otp').focus();
+      }catch(e){status('15 second tak response nahi mila. Server aur SMS Gateway app check karke “OTP dobara bhejein” dabayein.','error');startResendTimer(8);}
+    }
+    function verified(){status('✅ Mobile verify ho gaya! Free spin page khul raha hai…','ok');$('verifyBox').classList.add('hidden');setTimeout(function(){location.href='/aditya-studio-discount-wheel.html?next=free-spin';},900);}
+    async function verify(){
+      const otp=$('otp').value.replace(/\D/g,'');if(!/^\d{6}$/.test(otp)){status('6-digit OTP daalein.','error');return;}
+      setBusy('verify',true,'Verify ho raha hai…');
+      try{
+        const r=await postJson('/api/verify-spin-otp',{mobile:session.mobile,otp:otp,sessionToken:session.sessionToken});
+        const out=await r.json().catch(()=>({}));setBusy('verify',false,'OTP Verify karein');
+        if(!r.ok||!out.ok){status(out.error==='wrong-otp'?'OTP galat hai. Dobara check karein.':out.error==='otp-expired'?'OTP expire ho gaya. Naya OTP bhejein.':(out.message||'OTP verify nahi hua.'),'error');return;}
+        session.mobileVerified=true;localStorage.setItem(KEY,JSON.stringify(session));verified();
+      }catch(e){setBusy('verify',false,'OTP Verify karein');status('Verify server se connect nahi hua.','error');}
+    }
+    async function boot(){
+      session=readSession();if(!session){location.replace('/aditya-studio-discount-wheel.html');return;}
+      $('mobile').textContent='+91 '+session.mobile;
+      try{const r=await postJson('/api/restore-session',{sessionToken:session.sessionToken});const out=await r.json();if(!r.ok||!out.ok){throw new Error('session');}if(out.mobileVerified){session.mobileVerified=true;localStorage.setItem(KEY,JSON.stringify(session));verified();return;}}catch(e){status('Login session valid nahi hai ya server response nahi de raha. Dobara login karein.','error');return;}
+      sendOtp();
+    }
+    window.addEventListener('storage',function(event){if(event.key===KEY&&!event.newValue){location.replace('/');}});
+    $('verify').addEventListener('click',verify);$('resend').addEventListener('click',sendOtp);$('otp').addEventListener('keydown',e=>{if(e.key==='Enter')verify();});boot();
+  })();
+  </script>
+</body>
+</html>

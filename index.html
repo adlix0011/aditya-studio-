@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html class="dark" lang="en">
 <head>
+  <script>
+  window.alert=function(message){function show(){var old=document.getElementById('adityaPageAlert');if(old)old.remove();var text=String(message||''),bad=/(fail|error|wrong|network|nahi|नहीं|गलत|invalid|missing|expire|chhoti|required|check)/i.test(text),box=document.createElement('div');box.id='adityaPageAlert';box.style.cssText='position:fixed;left:16px;right:16px;top:18px;z-index:99999;max-width:520px;margin:auto;padding:13px 42px 13px 15px;border-radius:13px;font:600 14px Arial,sans-serif;line-height:1.45;color:'+(bad?'#fecaca':'#dcfce7')+';background:'+(bad?'#571b22':'#14532d')+';border:1px solid '+(bad?'#ef4444':'#4ade80')+';box-shadow:0 12px 30px rgba(0,0,0,.42)';box.innerHTML=(bad?'⚠️ ':'✅ ')+text+'<button style="position:absolute;right:10px;top:8px;border:0;background:transparent;color:inherit;font-size:22px">×</button>';box.querySelector('button').onclick=function(){box.remove()};document.body.appendChild(box);setTimeout(function(){box.remove()},5000)}if(document.body)show();else document.addEventListener('DOMContentLoaded',show,{once:true})};
+  </script>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
   <title>Aditya Studio - Premium Photography &amp; Gifts</title>
@@ -139,6 +142,13 @@
       animation: float-spin 15s infinite linear;
       transform-style: preserve-3d;
     }
+    /* Frame 360° ghoomta hai, label ulta nahi hoga. */
+    .hero-frame-label{transform-style:preserve-3d;backface-visibility:visible;-webkit-backface-visibility:visible;animation:frame-label-counter 15s linear infinite;}
+    @keyframes frame-label-counter{
+      0%{transform:translateZ(4px) rotateY(0deg)}
+      50%{transform:translateZ(4px) rotateY(-180deg)}
+      100%{transform:translateZ(4px) rotateY(-360deg)}
+    }
     /* Hero side BG slideshow — only inside #portfolio */
     .bg-slide {
       position: absolute;
@@ -174,8 +184,24 @@
       0% { transform: translateX(0); }
       100% { transform: translateX(-50%); }
     }
-    .carousel-track { animation: slide 20s linear infinite; }
+    .carousel-track { animation: slide var(--deal-duration, 20s) linear infinite; }
     .carousel-track:hover { animation-play-state: paused; }
+    /* Admin ke offers: ek set ke baad bilkul wahi set repeat hota hai,
+       isliye roll continuous dikhta hai aur har card click ho sakta hai. */
+    .home-deals-dynamic { width:max-content !important; gap:0; will-change:transform; }
+    .home-deals-interactive { animation:none !important; cursor:grab; touch-action:pan-y; user-select:none; }
+    .home-deals-interactive.dragging { cursor:grabbing; }
+    .home-deal-card { display:block; flex:0 0 clamp(240px,31vw,430px); width:clamp(240px,31vw,430px); padding:8px; text-decoration:none; color:inherit; }
+    .home-deal-card-inner { height:16rem; border-radius:0.9rem; overflow:hidden; position:relative; background:#1a1510; border:1px solid rgba(246,207,74,.62); box-shadow:0 0 16px rgba(246,207,74,.18),inset 0 0 18px rgba(255,255,255,.05); }
+    .home-deal-card:nth-child(3n+2) .home-deal-card-inner{border-color:rgba(238,87,195,.7);box-shadow:0 0 19px rgba(238,87,195,.24)}
+    .home-deal-card:nth-child(3n) .home-deal-card-inner{border-color:rgba(81,190,255,.72);box-shadow:0 0 19px rgba(81,190,255,.25)}
+    .home-deal-card-inner:hover .home-deal-photo { transform:scale(1.06); }
+    .home-deal-photo { position:absolute; inset:0; background-size:cover; background-position:center; transition:transform .7s ease; }
+    .home-deal-copy { position:absolute; inset:0; display:flex; flex-direction:column; justify-content:flex-end; padding:1rem; background:linear-gradient(to top,rgba(15,12,8,.94),rgba(15,12,8,.14),transparent); }
+    .home-deal-title { margin:0; color:#f3de9a; font-size:1.22rem; font-weight:800; line-height:1.12; }
+    .home-deal-sub { margin:.35rem 0 0; color:#f6edcf; font-size:.86rem; line-height:1.25; }
+    .future-offers-label{background:linear-gradient(100deg,#ff477e,#a92adb 46%,#26bff5);color:#fff9db;font-weight:900;letter-spacing:.08em;text-shadow:0 1px 7px #280019;box-shadow:0 0 18px rgba(239,82,205,.58),0 0 30px rgba(55,190,255,.22);animation:futureGlow 1.8s ease-in-out infinite alternate}
+    @keyframes futureGlow{from{filter:brightness(.95);transform:scale(1)}to{filter:brightness(1.25);transform:scale(1.06)}}
     /* Real spin wheel (same as /book-now landing) */
     .home-lw-stage{position:relative;width:min(280px,78vw);aspect-ratio:1/1;margin:0 auto}
     .home-lw-pointer{position:absolute;top:-12px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:12px solid transparent;border-right:12px solid transparent;border-top:24px solid #e9c349;z-index:5;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))}
@@ -290,6 +316,41 @@
       animation: blinkCur 0.7s step-end infinite;
     }
     @keyframes blinkCur { 50% { opacity: 0; } }
+    .studio-brand { text-shadow: 0 2px 0 #6f5110, 0 6px 18px rgba(212,175,55,.35); }
+    .profile-avatar-image { width:100%; height:100%; object-fit:cover; display:none; }
+    .profile-avatar-image.show { display:block; }
+    .profile-avatar-image.show + .profile-avatar-fallback { display:none; }
+    .profile-tab-panel { display:none; }
+    .profile-tab-panel.show { display:block; }
+    .profile-tab-btn.active { background:rgba(212,175,55,.18); border-color:rgba(242,202,80,.7); color:#ffe088; }
+    @media (max-width: 767px) {
+      header > div { min-height:72px; padding-top:10px!important; padding-bottom:10px!important; }
+      .studio-brand { position:absolute; left:50%; transform:translateX(-50%); white-space:nowrap; font-size:2.15rem!important; line-height:1; }
+      .header-actions { margin-left:auto; }
+      .header-notification { display:none; }
+      main { padding-top:68px!important; padding-bottom:48px!important; gap:8px!important; }
+      #portfolio { min-height:370px; margin-top:-28px!important; }
+      #portfolio > .grid { gap:0!important; padding-top:0!important; padding-bottom:0!important; align-content:start; }
+      #portfolio .hero-type-wrap { min-height:54px; align-items:flex-start; justify-content:center; text-align:center; }
+      #heroTypeLine { font-size:2.15rem!important; line-height:1.08!important; }
+      #portfolio .hero-frame-container { height:270px!important; align-items:flex-start; padding-top:0; }
+      #portfolio .hero-frame { width:11.7rem!important; height:14.6rem!important; }
+      #gift-shop { margin-top:0!important; }
+      /* Mobile deals: ek bada card, text clear; swipe karke agla deal dekho. */
+      #gift-shop{padding:5px!important;border-radius:16px!important}
+      #gift-shop .carousel-track:not(.home-deals-dynamic){width:auto!important;animation:none!important;overflow-x:auto!important;scroll-snap-type:x mandatory;scrollbar-width:none;gap:0!important;padding-top:22px}
+      #gift-shop .carousel-track:not(.home-deals-dynamic)::-webkit-scrollbar{display:none}
+      #gift-shop .carousel-track:not(.home-deals-dynamic)>div{width:auto!important;display:contents!important}
+      #gift-shop .carousel-track:not(.home-deals-dynamic)>div>div{width:82vw!important;flex:0 0 82vw!important;padding:4px!important;scroll-snap-align:center}
+      #gift-shop .carousel-track:not(.home-deals-dynamic)>div>div>div{height:142px!important}
+      #gift-shop .carousel-track.home-deals-dynamic{width:max-content!important;overflow:visible!important;animation:slide var(--deal-duration,20s) linear infinite!important;gap:0!important;padding:18px 0 4px!important}
+      #gift-shop .carousel-track.home-deals-interactive{animation:none!important}
+      #gift-shop .home-deal-card{width:82vw!important;flex:0 0 82vw!important;padding:5px!important}
+      #gift-shop .home-deal-card-inner{height:150px!important}
+      #gift-shop .home-deal-title{font-size:1.12rem!important;line-height:1.08!important}
+      #gift-shop .home-deal-sub{font-size:.78rem!important;line-height:1.25!important;margin-top:4px}
+      #gift-shop .home-deal-copy{padding:14px!important}
+    }
   
     /* book-card-link */
     a.glass-panel[href*="/book"] {
@@ -310,7 +371,7 @@
   <!-- TopAppBar -->
   <header class="fixed top-0 w-full z-50 bg-surface/40 backdrop-blur-xl border-b border-white/10 shadow-[0_0_20px_rgba(212,175,55,0.15)] transition-all duration-500 ease-in-out">
     <div class="flex justify-between items-center px-margin-mobile md:px-margin-desktop py-4 max-w-container-max mx-auto">
-      <a class="font-display-lg text-headline-lg-mobile md:text-headline-lg text-primary tracking-tighter" href="/">Aditya Studio</a>
+      <a class="studio-brand font-display-lg text-headline-lg-mobile md:text-headline-lg text-primary tracking-tighter" href="/">Aditya Studio</a>
       <nav class="hidden md:flex items-center gap-8" aria-label="Main navigation">
         <a class="text-primary font-bold border-b-2 border-primary pb-1 font-label-md text-label-md hover:backdrop-blur-2xl hover:bg-surface/60 rounded-sm px-1" href="/">Home</a>
         <a class="text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md hover:backdrop-blur-2xl hover:bg-surface/60 rounded-sm px-1" href="#portfolio">Portfolio</a>
@@ -319,14 +380,15 @@
         <a class="text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md hover:backdrop-blur-2xl hover:bg-surface/60 rounded-sm px-1" href="#bookings">Bookings</a>
         <a class="text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md hover:backdrop-blur-2xl hover:bg-surface/60 rounded-sm px-1" href="#galleries">Galleries</a>
       </nav>
-      <div class="flex items-center gap-4">
-        <button class="relative p-2 text-primary hover:bg-surface-variant rounded-full transition-colors group" aria-label="Notifications" type="button">
+      <div class="header-actions flex items-center gap-4">
+        <button class="header-notification relative p-2 text-primary hover:bg-surface-variant rounded-full transition-colors group" aria-label="Notifications" type="button">
           <span class="material-symbols-outlined notification-pulse relative z-10">notifications</span>
         </button>
         <button class="relative p-1 rounded-full group cursor-pointer" id="profileBtn" aria-label="Open client portal" type="button">
           <div class="absolute inset-0 rounded-full profile-ring opacity-50 group-hover:opacity-100 transition-opacity"></div>
-          <div class="relative bg-surface p-2 rounded-full border border-primary/30 z-10">
-            <span class="material-symbols-outlined text-primary">person</span>
+          <div class="relative bg-surface w-10 h-10 rounded-full border border-primary/30 z-10 overflow-hidden flex items-center justify-center">
+            <img id="profileAvatarImage" class="profile-avatar-image" alt="Profile photo"/>
+            <span id="profileAvatarFallback" class="profile-avatar-fallback material-symbols-outlined text-primary">person</span>
           </div>
         </button>
       </div>
@@ -354,26 +416,14 @@
     </div>
 
     <div id="profileUserBox" class="hidden flex flex-col gap-3">
-      <!-- Level badge -->
-      <div class="relative overflow-hidden rounded-2xl p-4 border border-primary/40" style="background:linear-gradient(145deg,#2a2210,#16120b)">
-        <div class="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-primary/20 blur-2xl"></div>
-        <div class="flex items-center gap-3 relative z-[1]">
-          <div class="w-14 h-14 rounded-full border-2 border-primary flex items-center justify-center text-xl font-bold text-primary bg-surface" id="profLevelIcon">★</div>
-          <div class="flex-1 min-w-0">
-            <p class="text-on-surface font-title-lg text-base truncate" id="profName">—</p>
-            <p class="text-primary text-xs font-semibold tracking-wide" id="profLevelName">Bronze Member</p>
-            <p class="text-on-surface-variant text-xs" id="profMobileShow">—</p>
-          </div>
-        </div>
-        <p class="text-[11px] text-on-surface-variant mt-2 relative z-[1]" id="profAddressLine">Address: —</p>
-        <p class="text-[10px] text-on-surface-variant mt-0.5 relative z-[1]">ID: <span class="text-primary" id="profId">—</span> · Spend ₹<span id="profSpend">0</span></p>
-      </div>
-
-      <!-- Wallet balance -->
+      <!-- Wallet is deliberately first in the customer profile. -->
       <div class="rounded-2xl border border-primary/50 p-4 text-center relative overflow-hidden" style="background:linear-gradient(145deg,#2a2210,#16120b);box-shadow:0 0 24px rgba(212,175,55,0.25)">
         <div class="absolute inset-0 opacity-30" style="background:radial-gradient(circle at 30% 20%,rgba(255,224,136,0.35),transparent 55%)"></div>
         <p class="text-[10px] uppercase tracking-[0.2em] text-primary/90 relative z-[1]">💰 Wallet Balance</p>
-        <p class="text-3xl font-bold text-gradient-gold relative z-[1] mt-1">₹<span id="profWalletBal">0</span></p>
+        <div class="relative z-[1] mt-1 flex items-center justify-center gap-3">
+          <p class="text-3xl font-bold text-gradient-gold">₹<span id="profWalletBal">0</span></p>
+          <button type="button" id="profAddMoneyBtn" class="rounded-lg text-white text-xs font-bold border border-sky-200/30 shadow-[0_4px_12px_rgba(2,132,199,.35)] px-3 py-2" style="background:linear-gradient(135deg,#38bdf8,#0284c7)">＋ Add Money</button>
+        </div>
         <p class="text-[11px] text-on-surface-variant mt-1 relative z-[1]">Orders me use kar sakte ho</p>
         <div class="mt-3 flex gap-2 relative z-[1]">
           <input id="profWalletCode" class="flex-1 bg-surface border border-outline-variant rounded-lg px-2 py-1.5 text-on-surface text-xs" placeholder="Wallet code" maxlength="12"/>
@@ -382,53 +432,71 @@
         <p id="profWalletMsg" class="text-[11px] mt-1 relative z-[1] hidden"></p>
       </div>
 
-      <!-- Wallet history -->
-      <div>
-        <p class="text-[10px] uppercase tracking-[0.15em] text-primary/90 mb-2 font-label-md">Wallet History</p>
-        <div id="profWalletHist" class="space-y-1.5 max-h-36 overflow-y-auto text-xs">
-          <p class="opacity-70">No transactions yet</p>
+      <!-- Profile photo + basic information -->
+      <div class="relative overflow-hidden rounded-2xl p-4 border border-primary/40" style="background:linear-gradient(145deg,#2a2210,#16120b)">
+        <div class="flex items-center gap-3">
+          <label class="w-16 h-16 rounded-full border-2 border-primary overflow-hidden bg-surface flex items-center justify-center cursor-pointer relative shrink-0" title="Photo upload/change">
+            <img id="profPhotoImage" class="profile-avatar-image" alt="Profile photo"/>
+            <span id="profPhotoFallback" class="profile-avatar-fallback material-symbols-outlined text-primary text-3xl">person</span>
+            <input id="profPhotoInput" class="absolute inset-0 opacity-0 cursor-pointer" type="file" accept="image/*"/>
+          </label>
+          <div class="min-w-0 flex-1">
+            <p class="text-on-surface font-title-lg text-base truncate" id="profName">—</p>
+            <p class="text-primary text-xs font-semibold tracking-wide" id="profLevelName">Bronze Member</p>
+            <p class="text-on-surface-variant text-xs" id="profMobileShow">—</p>
+          </div>
+          <div class="hidden" id="profLevelIcon">★</div>
         </div>
+        <button type="button" id="profPhotoChangeBtn" class="mt-3 text-xs text-primary underline">Upload / Change Photo</button>
+        <p class="text-[11px] text-on-surface-variant mt-2" id="profAddressLine">Address: —</p>
+        <p class="text-[10px] text-on-surface-variant mt-0.5">ID: <span class="text-primary" id="profId">—</span> · Spend ₹<span id="profSpend">0</span></p>
       </div>
 
-      <!-- Coupons sticker style -->
-      <div>
-        <p class="text-[10px] uppercase tracking-[0.15em] text-primary/90 mb-2 font-label-md">Available Coupons → Wallet</p>
-        <div id="profHistory" class="space-y-2 max-h-48 overflow-y-auto">
-          <p class="text-xs opacity-70">No coupons yet</p>
-        </div>
-      </div>
-
-      <!-- Spins -->
-      <div class="rounded-xl border border-primary/30 p-3 text-center" style="background:linear-gradient(145deg,#241c0e,#16120b)">
-        <p class="text-[10px] uppercase tracking-wider text-on-surface-variant">Your Spins</p>
-        <p class="text-3xl font-bold text-gradient-gold" id="profSpins">0</p>
-        <a href="/book-now" class="inline-block mt-1 text-primary text-xs underline">Spin Wheel →</a>
-      </div>
-
-      <!-- Tokens + actions -->
       <div class="grid grid-cols-2 gap-2">
-        <div class="rounded-xl bg-surface p-3 border border-primary/20 text-center">
-          <p class="text-[10px] uppercase tracking-wider text-on-surface-variant">AD Tokens</p>
-          <p class="text-xl font-bold text-primary" id="profAdTokens">0</p>
-        </div>
-        <div class="rounded-xl bg-surface p-3 border border-primary/20 text-center">
-          <p class="text-[10px] uppercase tracking-wider text-on-surface-variant">Free Spin</p>
-          <p class="text-sm font-bold text-primary" id="profFreeSpin">—</p>
-        </div>
+        <button type="button" class="profile-tab-btn profile-orders-btn rounded-lg px-3 py-2 text-xs font-bold" data-profile-tab="orders">📦 My Orders</button>
+        <button type="button" class="profile-tab-btn profile-coupons-btn rounded-lg px-3 py-2 text-xs font-bold" data-profile-tab="coupons">🎟️ My Coupons</button>
+        <button type="button" class="profile-tab-btn profile-wallet-btn rounded-lg px-3 py-2 text-xs font-bold" data-profile-tab="wallet">💳 Wallet History</button>
+        <button type="button" class="profile-tab-btn profile-rewards-btn rounded-lg px-3 py-2 text-xs font-bold" data-profile-tab="rewards">🎁 Rewards</button>
       </div>
-      <p class="text-[11px] text-on-surface-variant text-center">10 AD Tokens = 1 Spin</p>
-      <button type="button" id="profExchangeBtn" class="w-full border border-primary/40 text-primary font-label-md text-label-md py-2.5 rounded-lg hover:bg-primary/10 transition-all">
-        Exchange 10 Tokens → 1 Spin
-      </button>
-      <button type="button" id="profClaimBtn" class="w-full bg-gradient-gold text-on-primary font-label-md text-label-md py-2.5 rounded-lg shadow-[0_0_15px_rgba(212,175,55,0.4)]">
-        Claim Daily AD Token
-      </button>
-      <p id="profTokenMsg" class="text-xs text-center hidden"></p>
-      <button type="button" id="profLogoutBtn" class="text-error text-sm py-2">Logout</button>
+
+      <div id="profOrdersPanel" class="profile-tab-panel rounded-xl border border-primary/25 p-3">
+        <p class="text-[10px] uppercase tracking-[0.15em] text-primary/90 mb-2 font-label-md">Ordered Items</p>
+        <div id="profOrders" class="space-y-2 max-h-56 overflow-y-auto text-xs"><p class="opacity-70">Loading orders…</p></div>
+      </div>
+      <div id="profCouponPanel" class="profile-tab-panel rounded-xl border border-primary/25 p-3">
+        <p class="text-[10px] uppercase tracking-[0.15em] text-primary/90 mb-2 font-label-md">Available Coupons</p>
+        <div id="profHistory" class="space-y-2 max-h-48 overflow-y-auto"><p class="text-xs opacity-70">No coupons yet</p></div>
+      </div>
+      <div id="profWalletHistoryPanel" class="profile-tab-panel rounded-xl border border-primary/25 p-3">
+        <p class="text-[10px] uppercase tracking-[0.15em] text-primary/90 mb-2 font-label-md">Wallet History</p>
+        <div id="profWalletHist" class="space-y-1.5 max-h-36 overflow-y-auto text-xs"><p class="opacity-70">No transactions yet</p></div>
+      </div>
+      <div id="profRewardsPanel" class="profile-tab-panel space-y-3">
+        <div class="rounded-xl border border-primary/30 p-3 text-center" style="background:linear-gradient(145deg,#241c0e,#16120b)">
+          <p class="text-[10px] uppercase tracking-wider text-on-surface-variant">Your Spins</p>
+          <p class="text-3xl font-bold text-gradient-gold" id="profSpins">0</p>
+          <a href="/book-now" class="inline-block mt-1 text-primary text-xs underline">Spin Wheel →</a>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div class="rounded-xl bg-surface p-3 border border-primary/20 text-center"><p class="text-[10px] uppercase tracking-wider text-on-surface-variant">AD Tokens</p><p class="text-xl font-bold text-primary" id="profAdTokens">0</p></div>
+          <div class="rounded-xl bg-surface p-3 border border-primary/20 text-center"><p class="text-[10px] uppercase tracking-wider text-on-surface-variant">Free Spin</p><p class="text-sm font-bold text-primary" id="profFreeSpin">—</p></div>
+        </div>
+        <p class="text-[11px] text-on-surface-variant text-center">10 AD Tokens = 1 Spin</p>
+        <button type="button" id="profExchangeBtn" class="w-full border border-primary/40 text-primary font-label-md text-label-md py-2.5 rounded-lg hover:bg-primary/10 transition-all">Exchange 10 Tokens → 1 Spin</button>
+        <button type="button" id="profClaimBtn" class="w-full bg-gradient-gold text-on-primary font-label-md text-label-md py-2.5 rounded-lg shadow-[0_0_15px_rgba(212,175,55,0.4)]">Claim Daily AD Token</button>
+        <p id="profTokenMsg" class="text-xs text-center hidden"></p>
+      </div>
+      <button type="button" id="profLogoutBtn" class="w-full text-white text-sm font-bold py-2.5 rounded-lg border border-red-200/25 bg-gradient-to-r from-red-500 via-red-600 to-red-800 shadow-[0_7px_16px_rgba(185,28,28,0.32)] hover:brightness-110 transition-all">Logout</button>
     </div>
   </aside>
 
   <style>
+    .profile-tab-btn{border:1px solid rgba(255,255,255,.15);color:#fff;box-shadow:0 5px 14px rgba(0,0,0,.2);transition:transform .16s ease,filter .16s ease;}
+    .profile-tab-btn:hover,.profile-tab-btn.active{transform:translateY(-1px);filter:brightness(1.14);outline:2px solid rgba(255,255,255,.25);}
+    .profile-orders-btn{background:linear-gradient(135deg,#2563eb,#1d4ed8)}
+    .profile-coupons-btn{background:linear-gradient(135deg,#8b2be2,#5b21b6)}
+    .profile-wallet-btn{background:linear-gradient(135deg,#0891b2,#0369a1)}
+    .profile-rewards-btn{background:linear-gradient(135deg,#d97706,#b45309)}
     .coupon-sticker {
       position: relative;
       border-radius: 12px;
@@ -497,11 +565,8 @@
         <a href="/frames" class="hero-frame-container relative w-full h-[400px] md:h-[500px] flex items-center justify-center group cursor-pointer" title="Photo Frames — Book Now">
           <div class="hero-frame relative w-64 h-80 md:w-80 md:h-96 glass-panel rounded-xl flex items-center justify-center p-2 jewel-glow group-hover:shadow-[0_0_40px_rgba(212,175,55,0.45)] transition-shadow">
             <div class="w-full h-full rounded-lg overflow-hidden border border-primary/20 relative">
-              <div id="heroFramePhoto" class="bg-cover bg-center w-full h-full absolute inset-0 transition-opacity duration-700" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCYW4rqkG-Y71cDaGgRL2wFRqrO2XltrHYZfyPiH-Bk_eFNA9eoK-5XMN9yGCdC4KBiAmvzrkoQkpq-2oFPstgDjMZFUBR6ZeAjLvhXEXvD3VnRLO94f1WZwnJY6emwPMqMf5ETIPk39jQH77M57qvHoDOufk9JSsU2nzap4l4a9L3A7KyrUj74h0Nx-PyKjxevsmizfapfDGpkET_fvUf4QVxRpUDlhNkbhB7RcRci6cjRi-Cz3XFP7A");' role="img" aria-label="Photo frame preview"></div>
-              <div class="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent pointer-events-none"></div>
-              <div class="absolute bottom-3 left-0 right-0 text-center z-10">
-                <span class="inline-block px-3 py-1 rounded-full bg-primary/90 text-on-primary text-[11px] font-label-md tracking-wider">Photo Frame · Book Now</span>
-              </div>
+              <div id="heroFramePhoto" class="bg-cover bg-center w-full h-full absolute inset-0 transition-opacity duration-500" style="opacity:0;background-image:none;background-color:#1a1510;" role="img" aria-label="Photo frame preview"></div>
+              <div class="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent pointer-events-none"></div><div class="hero-frame-label absolute bottom-3 left-0 right-0 text-center z-10"><span class="inline-block px-3 py-1 rounded-full bg-primary/90 text-on-primary text-[11px] font-label-md tracking-wider">Photo Frame · Book Now</span></div>
             </div>
           </div>
           <div class="absolute top-10 right-10 w-24 h-24 rounded-full bg-primary/20 blur-3xl -z-10"></div>
@@ -513,7 +578,7 @@
     <!-- Offer Carousel -->
     <section class="w-full overflow-hidden relative rounded-2xl glass-panel p-1 mt-4" id="gift-shop" aria-label="Current deals">
       <div class="absolute top-4 left-6 z-10">
-        <span class="bg-error text-on-error font-label-md text-[10px] px-2 py-1 rounded-full uppercase tracking-wider shadow-lg">Current Deals</span>
+        <span class="future-offers-label font-label-md text-[10px] px-3 py-1.5 rounded-full uppercase shadow-lg">New Future</span>
       </div>
       <div class="flex w-[200%] carousel-track">
         <div class="flex w-1/2">
@@ -819,15 +884,94 @@
       });
 
       function loadSession() {
-        try { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch (e) { return null; }
+        try {
+          const session = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
+          if (session && session.pin) { localStorage.removeItem(SESSION_KEY); return null; }
+          return session;
+        } catch (e) { return null; }
       }
       function saveSession(data) {
         const prev = loadSession() || {};
-        localStorage.setItem(SESSION_KEY, JSON.stringify({ ...prev, ...data }));
+        const next = { ...prev, ...data };
+        delete next.pin;
+        localStorage.setItem(SESSION_KEY, JSON.stringify(next));
       }
       function clearSession() { localStorage.removeItem(SESSION_KEY); }
 
       let user = null;
+
+      function escapeProfileText(value) {
+        return String(value == null ? '' : value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      }
+      function profilePhotoKey() {
+        return user && user.mobile ? 'aditya_profile_photo_' + user.mobile : '';
+      }
+      function setProfilePhoto(dataUrl) {
+        ['profileAvatarImage', 'profPhotoImage'].forEach(function (id) {
+          const img = document.getElementById(id);
+          if (!img) return;
+          if (dataUrl) { img.src = dataUrl; img.classList.add('show'); }
+          else { img.removeAttribute('src'); img.classList.remove('show'); }
+        });
+      }
+      function loadProfilePhoto() {
+        try {
+          const saved = localStorage.getItem(profilePhotoKey()) || localStorage.getItem('as_user_photo') || sessionStorage.getItem('as_user_photo') || '';
+          setProfilePhoto(saved);
+        } catch (e) { setProfilePhoto(''); }
+      }
+      async function loadProfileOrders() {
+        const box = document.getElementById('profOrders');
+        if (!box || !user || !user.mobile) return;
+        box.innerHTML = '<p class="opacity-70">Loading orders…</p>';
+        try {
+          const session = loadSession() || {};
+          const res = await fetch('/api/my-frame-orders', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mobile: user.mobile, sessionToken: session.sessionToken || '' })
+          });
+          const data = await res.json();
+          const orders = data.orders || [];
+          box.innerHTML = orders.length ? orders.slice(0, 20).map(function (o) {
+            const status = String(o.status || 'processing').toLowerCase();
+            const payment = String(o.paymentStatus || 'unpaid').toLowerCase();
+            const steps = [['processing','Order received'],['confirmed','Payment confirmed'],['ready','Ready'],['delivered','Delivered']];
+            const done = status === 'delivered' ? 4 : status === 'ready' ? 3 : status === 'confirmed' ? 2 : 1;
+            const track = status === 'rejected' ? '<span class="text-red-300">Order rejected — profile note dekhein</span>' : steps.map(function (s, i) { return '<span class="' + (i < done ? 'text-green-400' : 'text-on-surface-variant') + '">' + (i < done ? '●' : '○') + ' ' + s[1] + '</span>'; }).join(' <span class="text-on-surface-variant">→</span> ');
+            const payText = payment === 'confirmed' ? '✅ Payment confirmed' : payment === 'paid_claimed' ? '⏳ Payment proof submitted — admin verification pending' : 'Payment pending';
+            return '<div class="rounded-lg bg-surface p-2 border border-white/5"><b class="text-primary">' + escapeProfileText(o.orderId) + '</b>'
+              + '<br>' + escapeProfileText(o.frameTitle || 'Photo Frame') + ' · ₹' + escapeProfileText(o.finalAmount || 0)
+              + '<br><span class="text-on-surface-variant">' + payText + '</span><div class="mt-2 text-[10px] leading-5">' + track + '</div>'
+              + (o.adminNote ? '<div class="mt-1 text-on-surface-variant">Note: ' + escapeProfileText(o.adminNote) + '</div>' : '') + '</div>';
+          }).join('') : '<p class="opacity-70">Abhi koi order nahi hai.</p>';
+        } catch (e) { box.innerHTML = '<p class="text-error">Orders load nahi hue. Dobara try karein.</p>'; }
+      }
+      function openProfileTab(name) {
+        const panels = { orders: 'profOrdersPanel', coupons: 'profCouponPanel', wallet: 'profWalletHistoryPanel', rewards: 'profRewardsPanel' };
+        Object.keys(panels).forEach(function (key) {
+          const panel = document.getElementById(panels[key]);
+          const button = document.querySelector('[data-profile-tab="' + key + '"]');
+          if (panel) panel.classList.toggle('show', key === name);
+          if (button) button.classList.toggle('active', key === name);
+        });
+        if (name === 'orders') loadProfileOrders();
+      }
+      document.querySelectorAll('[data-profile-tab]').forEach(function (button) {
+        button.addEventListener('click', function () { openProfileTab(button.getAttribute('data-profile-tab')); });
+      });
+      document.getElementById('profPhotoChangeBtn')?.addEventListener('click', function () { document.getElementById('profPhotoInput')?.click(); });
+      document.getElementById('profPhotoInput')?.addEventListener('change', function (event) {
+        const file = event.target.files && event.target.files[0];
+        if (!file || !user) return;
+        if (!file.type.startsWith('image/')) { alert('Sirf image upload karein.'); return; }
+        if (file.size > 2 * 1024 * 1024) { alert('Photo 2 MB se chhoti upload karein.'); return; }
+        const reader = new FileReader();
+        reader.onload = function () {
+          try { localStorage.setItem(profilePhotoKey(), String(reader.result || '')); setProfilePhoto(String(reader.result || '')); }
+          catch (e) { alert('Photo save nahi hui. Thodi chhoti photo try karein.'); }
+        };
+        reader.readAsDataURL(file);
+      });
 
       function updateTokenUI() {
         const tokens = user ? (user.adTokens || 0) : 0;
@@ -859,7 +1003,19 @@
           document.getElementById('profileLoginBox').classList.add('hidden');
           document.getElementById('profileUserBox').classList.remove('hidden');
           document.getElementById('profName').textContent = user.name || 'Member';
-          document.getElementById('profMobileShow').textContent = user.mobile || '';
+          const mobileShow = document.getElementById('profMobileShow');
+          if (mobileShow) {
+            mobileShow.textContent = user.mobile || '';
+            if (!user.mobileVerified) {
+              const verify = document.createElement('button');
+              verify.type = 'button';
+              verify.textContent = 'Verify';
+              verify.title = 'Mobile OTP verify karein';
+              verify.style.cssText = 'margin-left:7px;padding:3px 8px;border-radius:999px;border:1px solid #ef4444;background:linear-gradient(135deg,#ef4444,#991b1b);color:#fff;font-size:10px;font-weight:800;cursor:pointer;vertical-align:middle;box-shadow:0 3px 9px rgba(185,28,28,.3)';
+              verify.addEventListener('click', function(){ location.href = '/book-now?verify=1'; });
+              mobileShow.appendChild(verify);
+            }
+          }
           document.getElementById('profAdTokens').textContent = tokens;
           document.getElementById('profSpins').textContent = spins;
           const spend = Number(user.totalSpend) || 0;
@@ -879,6 +1035,7 @@
           document.getElementById('profFreeSpin').textContent = user.freeSpinUsed ? 'Used' : 'Available';
           const wBal = Number(user.walletBalance) || 0;
           document.getElementById('profWalletBal').textContent = wBal;
+          loadProfilePhoto();
           const wHistBox = document.getElementById('profWalletHist');
           const wHist = user.walletHistory || [];
           if (wHist.length) {
@@ -918,7 +1075,7 @@
                   const res = await fetch('/api/wallet/apply-coupon', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ mobile: s.mobile, pin: s.pin, couponId: code })
+                    body: JSON.stringify({ sessionToken: s.sessionToken || '', couponId: code })
                   });
                   const data = await res.json();
                   if (data.ok) {
@@ -953,17 +1110,17 @@
 
       async function restoreUser() {
         const s = loadSession();
-        if (!s || !s.mobile || !s.pin) { user = null; updateTokenUI(); return; }
+        if (!s || !s.mobile || !s.sessionToken) { user = null; updateTokenUI(); return; }
         try {
           const res = await fetch('/api/restore-session', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ mobile: s.mobile, pin: s.pin })
+            body: JSON.stringify({ sessionToken: s.sessionToken })
           });
           const data = await res.json();
           if (data.ok) {
             user = data;
-            saveSession({ mobile: data.mobile, pin: s.pin, name: data.name, id: data.id });
+            saveSession({ mobile: data.mobile, sessionToken: s.sessionToken, name: data.name, id: data.id });
           } else user = null;
         } catch (e) { user = null; }
         updateTokenUI();
@@ -987,7 +1144,7 @@
             return;
           }
           user = data;
-          saveSession({ mobile, pin, name: data.name, id: data.id });
+          saveSession({ mobile, sessionToken: data.sessionToken, name: data.name, id: data.id });
           updateTokenUI();
         } catch (e) {
           err.textContent = 'Network error';
@@ -1001,10 +1158,19 @@
         updateTokenUI();
       });
 
+      // Agar Book Now, Frames ya kisi aur tab se logout kiya gaya ho to Home
+      // bhi turant guest mode me aa jaye.
+      window.addEventListener('storage', (event) => {
+        if (event.key === SESSION_KEY && !event.newValue) {
+          user = null;
+          updateTokenUI();
+        }
+      });
+
       async function claimToken() {
         const s = loadSession();
         // Guest OR session stale (UI says Login) → open login panel, don't call API
-        if (!user || !s || !s.mobile || !s.pin) {
+        if (!user || !s || !s.mobile || !s.sessionToken) {
           openLoginPanel('Pehle mobile + PIN se login karo, phir AD Token claim hoga');
           return;
         }
@@ -1012,7 +1178,7 @@
           const res = await fetch('/api/claim-ad-token', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ mobile: s.mobile, pin: s.pin })
+            body: JSON.stringify({ sessionToken: s.sessionToken })
           });
           const data = await res.json();
           if (data.ok) {
@@ -1056,7 +1222,7 @@
           const res = await fetch('/api/exchange-ad-tokens', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ mobile: s.mobile, pin: s.pin })
+            body: JSON.stringify({ sessionToken: s.sessionToken })
           });
           const data = await res.json();
           const msg = document.getElementById('profTokenMsg');
@@ -1083,6 +1249,8 @@
       document.getElementById('profClaimBtn')?.addEventListener('click', claimToken);
       document.getElementById('profExchangeBtn')?.addEventListener('click', exchangeTokens);
 
+      document.getElementById('profAddMoneyBtn')?.addEventListener('click', () => { location.href = '/add-money'; });
+
       document.getElementById('profWalletRedeemBtn')?.addEventListener('click', async () => {
         const s = loadSession();
         const code = (document.getElementById('profWalletCode')?.value || '').trim().toUpperCase();
@@ -1093,7 +1261,7 @@
           const res = await fetch('/api/wallet/redeem-code', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ mobile: s.mobile, pin: s.pin, code })
+            body: JSON.stringify({ sessionToken: s.sessionToken, code })
           });
           const data = await res.json();
           msg.classList.remove('hidden');
@@ -1132,6 +1300,104 @@
           resultMsg.classList.add('text-primary');
         }
       });
+
+      // Current Deals: admin se save kiye hue photo, text aur link load karke
+      // continuous auto-roll cards banata hai. Har card apne link par clickable hai.
+      (async function initCurrentDeals() {
+        const track = document.querySelector('#gift-shop .carousel-track');
+        if (!track) return;
+        const fallback = Array.from(track.querySelectorAll('h3')).slice(0, 3).map(function (heading) {
+          const card = heading.closest('.w-1\\/3');
+          const photo = card && card.querySelector('[style*="background-image"]');
+          const sub = card && card.querySelector('p');
+          return { url: photo ? photo.style.backgroundImage : '', title: heading.textContent || 'Aditya Studio', sub: sub ? sub.textContent : '', link: '/frames', active: true, cssUrl: true };
+        });
+        let deals = fallback;
+        let duration = 20;
+        try {
+          const res = await fetch('/api/settings');
+          const data = await res.json();
+          const settings = data && data.settings ? data.settings : {};
+          const saved = Array.isArray(settings.offerImages) ? settings.offerImages : [];
+          if (settings.homeDealsEnabled && saved.length) deals = saved.filter(function (item) { return typeof item === 'object' && item.url && item.active !== false; });
+          duration = Math.max(8, Math.min(60, Number(settings.homeDealsDurationSec) || 20));
+        } catch (e) {}
+        if (!deals.length) return;
+        function cover(el, url, isCssUrl) {
+          const value = String(url || '');
+          el.style.backgroundImage = isCssUrl || /^url\(/i.test(value) ? value : 'url("' + value.replace(/"/g, '\\"') + '")';
+        }
+        function makeCard(item) {
+          const link = document.createElement('a');
+          link.className = 'home-deal-card'; link.href = String(item.link || '/frames');
+          link.setAttribute('aria-label', (item.title || 'Current deal') + ' dekhein');
+          const inner = document.createElement('div'); inner.className = 'home-deal-card-inner';
+          const photo = document.createElement('div'); photo.className = 'home-deal-photo'; cover(photo, item.url, item.cssUrl);
+          const copy = document.createElement('div'); copy.className = 'home-deal-copy';
+          const title = document.createElement('h3'); title.className = 'home-deal-title'; title.textContent = item.title || 'Aditya Studio';
+          const sub = document.createElement('p'); sub.className = 'home-deal-sub'; sub.textContent = item.sub || 'Tap karke dekhein';
+          copy.append(title, sub); inner.append(photo, copy); link.append(inner); return link;
+        }
+        track.innerHTML = '';
+        const fragment = document.createDocumentFragment();
+        deals.concat(deals).forEach(function (item) { fragment.appendChild(makeCard(item)); });
+        track.appendChild(fragment);
+        track.classList.add('home-deals-dynamic');
+        track.style.setProperty('--deal-duration', duration + 's');
+        makeDealsTouchSlider(track, duration);
+      })();
+
+      // Touch/drag control: photo ko pakadne par roll rukta hai, left/right
+      // move kiya ja sakta hai aur finger chhodne ke baad dobara auto-roll hota hai.
+      function makeDealsTouchSlider(track, durationSec) {
+        let paused = false, dragging = false, startX = 0, startOffset = 0, offset = 0, lastAt = performance.now(), resumeTimer = null, blockClick = false;
+        function halfWidth() { return track.scrollWidth / 2; }
+        function normalize() {
+          const half = halfWidth();
+          if (!half) return;
+          while (offset <= -half) offset += half;
+          while (offset > 0) offset -= half;
+        }
+        function paint() { track.style.transform = 'translate3d(' + offset + 'px,0,0)'; }
+        function pauseThenResume() {
+          paused = true; clearTimeout(resumeTimer);
+          resumeTimer = setTimeout(function () { paused = false; lastAt = performance.now(); }, 1100);
+        }
+        track.classList.add('home-deals-interactive');
+        function loop(now) {
+          const half = halfWidth();
+          if (!paused && !dragging && half) {
+            const speed = half / (Math.max(8, durationSec) * 1000);
+            offset -= speed * Math.min(40, now - lastAt);
+            normalize(); paint();
+          }
+          lastAt = now; requestAnimationFrame(loop);
+        }
+        requestAnimationFrame(loop);
+        track.addEventListener('pointerdown', function (event) {
+          if (event.pointerType === 'mouse' && event.button !== 0) return;
+          dragging = true; paused = true; blockClick = false; clearTimeout(resumeTimer);
+          startX = event.clientX; startOffset = offset; track.classList.add('dragging');
+          track.setPointerCapture && track.setPointerCapture(event.pointerId);
+        });
+        track.addEventListener('pointermove', function (event) {
+          if (!dragging) return;
+          const delta = event.clientX - startX;
+          if (Math.abs(delta) > 5) blockClick = true;
+          offset = startOffset + delta; normalize(); paint();
+        });
+        function finishDrag(event) {
+          if (!dragging) return;
+          dragging = false; track.classList.remove('dragging');
+          if (event && track.hasPointerCapture && track.hasPointerCapture(event.pointerId)) track.releasePointerCapture(event.pointerId);
+          pauseThenResume();
+        }
+        track.addEventListener('pointerup', finishDrag);
+        track.addEventListener('pointercancel', finishDrag);
+        track.addEventListener('click', function (event) { if (blockClick) { event.preventDefault(); event.stopPropagation(); blockClick = false; } }, true);
+        track.addEventListener('mouseenter', function () { paused = true; clearTimeout(resumeTimer); });
+        track.addEventListener('mouseleave', pauseThenResume);
+      }
 
       restoreUser();
 
@@ -1179,6 +1445,8 @@
       (async function initHeroFramePhotos() {
         const el = document.getElementById('heroFramePhoto');
         if (!el) return;
+        el.style.opacity = '0';
+        el.style.backgroundImage = 'none';
         let urls = [];
         try {
           const res = await fetch('/api/settings');
@@ -1187,16 +1455,32 @@
           urls = list.map(p => (typeof p === 'string' ? p : p.url)).filter(Boolean).slice(0, 5);
         } catch (e) {}
         if (!urls.length) return;
+
+        function setPhoto(url, fade) {
+          return new Promise(function (resolve) {
+            const img = new Image();
+            img.onload = function () {
+              const bg = 'url("' + String(url).replace(/"/g, '\\"') + '")';
+              el.style.backgroundImage = bg;
+              // next frame then fade in
+              requestAnimationFrame(function () {
+                requestAnimationFrame(function () {
+                  el.style.opacity = '1';
+                  resolve();
+                });
+              });
+            };
+            img.onerror = function () { resolve(); };
+            img.src = url;
+          });
+        }
+
         let idx = 0;
-        el.style.backgroundImage = 'url("' + urls[0].replace(/"/g, '\\"') + '")';
+        await setPhoto(urls[0], false);
         if (urls.length < 2) return;
-        setInterval(() => {
+        setInterval(function () {
           idx = (idx + 1) % urls.length;
-          el.style.opacity = '0';
-          setTimeout(() => {
-            el.style.backgroundImage = 'url("' + urls[idx].replace(/"/g, '\\"') + '")';
-            el.style.opacity = '1';
-          }, 400);
+          setPhoto(urls[idx], true);
         }, 5000);
       })();
 
