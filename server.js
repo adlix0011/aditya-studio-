@@ -59,6 +59,7 @@ const PLACE_ORDER_HTML_FILE = path.join(__dirname, 'place-order.html');
 const FRAME_DETAIL_HTML_FILE = path.join(__dirname, 'frame-detail.html');
 const BOOK_SERVICE_HTML_FILE = path.join(__dirname, 'book-service-sample.html');
 const ADD_MONEY_HTML_FILE = path.join(__dirname, 'add-money.html');
+const PHOTO_ADJUST_HTML_FILE = path.join(__dirname, 'photo-adjust.html');
 const PAYMENT_QR_FILE = path.join(__dirname, 'payment-qr.png');
 const HTML_FILE = BOOK_NOW_HTML_FILE; // legacy alias
 console.log('[boot] Using data dir:', DATA_DIR);
@@ -1066,6 +1067,14 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && (urlPath === '/add-money' || urlPath === '/add-money.html')) {
     fs.readFile(ADD_MONEY_HTML_FILE, (err, data) => {
       if (err) { res.writeHead(404); return res.end('add-money.html missing'); }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(data);
+    });
+    return;
+  }
+
+  if (req.method === 'GET' && (urlPath === '/photo-adjust' || urlPath === '/photo-adjust.html')) {
+    fs.readFile(PHOTO_ADJUST_HTML_FILE, (err, data) => {
+      if (err) { res.writeHead(404); return res.end('photo-adjust.html missing'); }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(data);
     });
     return;
