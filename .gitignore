@@ -1,7 +1,19 @@
 node_modules/
+.Env
 .env
+.aditya-local-settings.cmd
 
-# Real customer data — kabhi bhi public repo me nahi honi chahiye
+# Live/private customer and operational data: server creates these locally or on Render.
 accounts.json
-customers.csv
 codes.json
+customers.csv
+edit-requests.json
+notifications.json
+otp-requests.json
+frame-orders.json
+free-spin-bag.json
+sessions.json
+settings.json
+user-activity.json
+wallet-topups.json
+unbilled-charges.csv
