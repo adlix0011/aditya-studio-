@@ -1839,6 +1839,7 @@ function computeOrderFees(subtotal, settingsFees) {
       let otpList = loadOtpRequests().filter(r => keepPendingOtpForAdmin(r, now));
       otpList.unshift({ mobile, name: acc.name || '', id: acc.id || '', otpHash: hashOtp(otp), requestId, smsId:'', createdAt:new Date().toISOString(), expiresAt:new Date(now + MOBILE_VERIFY_OTP_TTL_MS).toISOString(), attempts:0, verified:false, purpose:'mobile_verify', manualOtp:otp, delivery:'whatsapp_manual' });
       saveOtpRequests(otpList.slice(0,100));
+      void sendTelegramAlert('New User Registered', 'Customer: ' + (acc.name || 'Customer') + '\nUser ID: ' + id + '\nMobile: ' + mobile + (acc.village ? ('\nVillage: ' + acc.village) : '') + '\nVerification: Pending');
       return sendJSON(res, 200, { ...accountPublicPayload(acc), sessionToken: issueSession(acc), otpRequested:true });
     } catch (e) {
       return sendJSON(res, 500, { ok: false, error: 'save-failed' });
@@ -1861,6 +1862,8 @@ function computeOrderFees(subtotal, settingsFees) {
       saveAccounts(accounts);
       // Legacy registrations ke liye bhi OTP queue recover ho jaye.
       ensureAdminWhatsAppOtp(acc);
+      // PIN aur OTP kabhi alert me nahi jaate; sirf successful login ki detail bhejte hain.
+      void sendTelegramAlert('Customer Login', 'Customer: ' + (acc.name || 'Customer') + '\nUser ID: ' + (acc.id || '—') + '\nMobile: ' + acc.mobile + '\nVisits: ' + acc.visitCount + '\nTime: ' + new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }));
       return sendJSON(res, 200, { ...accountPublicPayload(acc), sessionToken: issueSession(acc) });
     } catch (e) {
       return sendJSON(res, 400, { ok: false, error: 'bad-request' });
