@@ -312,9 +312,8 @@ function framePrice(f) {
 }
 
 function buildPreview(frameImg, photoUrl) {
-  const orient = qs("orient") || "vertical";
-  const portrait = orient !== "horizontal";
-  const ratio = portrait ? "2 / 3" : "3 / 2";
+  const dims = displayDims(selected && selected.size);
+  const ratio = dims.w + " / " + dims.h;
   // Mobile-safe: width + aspect-ratio only (no height:100% — collapses on mobile)
   const box = `position:relative;width:100%;max-width:420px;margin:0 auto;aspect-ratio:${ratio};background:#0a0a0a;overflow:hidden;`;
   // Photo inset tuned so photo sits inside frame border (~14–15%)
