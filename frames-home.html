@@ -1157,7 +1157,9 @@ function buildFramePreview(frameImg, photoUrl, opts) {
   const showGlass = opts.glass !== false;
   const portrait = opts.portrait !== false;
   // Fixed ratio box (8x12 vertical ≈ 2/3, horizontal ≈ 3/2)
-  const ratio = portrait ? "2 / 3" : "3 / 2";
+  // Har size ka asli ratio use karo. object-fit:cover photo ko automatic zoom
+  // karke frame ke andar fill karta hai, bina khaali strip ya manual resize ke.
+  const ratio = opts.ratio || (portrait ? "2 / 3" : "3 / 2");
   const shine = showGlass ? '<div class="glass-shine"></div>' : '';
   // Critical mobile fix: never use height:100% with aspect-ratio (parent height:auto → collapse)
   const boxStyle = `position:relative;width:100%;max-width:100%;aspect-ratio:${ratio};margin:0 auto;background:#0a0a0a;overflow:hidden;`;
@@ -1226,17 +1228,17 @@ function renderFrames(filterSize = null) {
     const price = Number(frame.price) || 0;
     const discount = Number(frame.discount) || 0;
     const finalPrice = discount > 0 ? Math.round(price * (1 - discount / 100)) : price;
-    const { rating, reviews } = frameRating(frame);
-    // Pura frame dikhe + photo andar (pehle jaisa clean look)
-    const isPortrait = orientation !== "horizontal";
+    // Pura frame dikhe aur photo har selected size ke exact ratio me auto-fit ho.
+    const isPortrait = dims.h >= dims.w;
+    const frameRatio = dims.w + " / " + dims.h;
     const innerHtml = buildFramePreview(frame.image || "", userPhotoDataUrl || "", {
-      insetX: 14, insetY: 15, portrait: isPortrait, glass: true
+      insetX: 14, insetY: 15, portrait: isPortrait, ratio: frameRatio, glass: true
     });
 
     // Product card — NO Order Now; click opens detail
     return `
     <div class="product-card bg-surface-container rounded-DEFAULT gallery-border gallery-shadow flex flex-col group hover:bg-surface-container-highest transition-colors relative overflow-hidden animated-frame cursor-pointer" style="animation-delay:${index * 0.04}s" data-id="${frame.id}">
-      <div class="w-full bg-background flex items-center justify-center relative overflow-hidden p-3" style="aspect-ratio:${isPortrait ? '3 / 4' : '4 / 3'};min-height:220px;">
+      <div class="w-full bg-background flex items-center justify-center relative overflow-hidden p-3" style="aspect-ratio:${frameRatio};min-height:220px;">
         <div class="user-image-container w-full h-full max-w-full flex items-center justify-center">
           ${innerHtml}
         </div>
@@ -1244,13 +1246,6 @@ function renderFrames(filterSize = null) {
       </div>
       <div class="p-4 flex flex-col gap-1">
         <h4 class="font-headline-sm leading-tight text-lg mb-1"><span style="color:#f3cd63">${frame.title ? frame.title : "Premium Frame"}</span> <span class="text-sm font-bold" style="color:#63d7ff">${dims.label} · ${orientLabel}</span></h4>
-        <div class="flex items-center gap-1 text-secondary text-sm">
-          <span class="material-symbols-outlined text-sm" style="font-variation-settings:'FILL' 1">star</span>
-          <span class="font-bold text-on-surface">${rating}</span>
-          <span class="text-on-surface-variant text-xs">${Number(reviews) > 0 ? "· " + reviews : "· No ratings yet"}</span>
-        </div>
-        <p class="font-label-caps text-label-caps text-on-surface-variant tracking-wider">ADITYA STUDIO</p>
-        <p class="text-[11px] text-on-surface-variant">${typeCount} frame type${typeCount > 1 ? "s" : ""} available · choose inside</p>
         <div class="mt-1 flex items-baseline gap-2 flex-wrap">
           <span class="text-secondary text-xl font-bold">${formatPrice(finalPrice)}</span>
           ${discount > 0 ? `<span class="price-strike text-on-surface-variant text-sm">${formatPrice(price)}</span>` : ""}
@@ -1410,7 +1405,7 @@ function renderPdSamples() {
   const frameImg = selectedFrame.image || "";
   const photo = userPhotoDataUrl || "";
   main.innerHTML = buildFramePreview(frameImg, photo, {
-    insetX: 14, insetY: 15, portrait: orientation !== "horizontal", glass: true
+    insetX: 14, insetY: 15, portrait: dims.h >= dims.w, ratio: dims.w + " / " + dims.h, glass: true
   });
   // samples hidden — only straight front view
   const box = document.getElementById("pd-samples");
