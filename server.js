@@ -1190,7 +1190,7 @@ function serveLiveHtml(res, data) {
 function liveRevision() {
   // Activity heartbeat ko jaanbujhkar include nahi karte, warna har visitor ke
   // normal page-view se sabke pages repeatedly reload ho jayenge.
-  const files = [ACCOUNTS_FILE, SETTINGS_FILE, FRAME_ORDERS_FILE, NOTIF_FILE, WALLET_TOPUPS_FILE, CODES_FILE, FRAMES_FILE, EDIT_REQUESTS_FILE];
+  const files = [DATA_FILE, SETTINGS_FILE, FRAME_ORDERS_FILE, NOTIF_FILE, WALLET_TOPUPS_FILE, CODES_FILE, FRAMES_FILE, EDIT_REQUESTS_FILE];
   return files.map(file => { try { return path.basename(file) + ':' + Math.floor(fs.statSync(file).mtimeMs); } catch (e) { return path.basename(file) + ':0'; } }).join('|');
 }
 
