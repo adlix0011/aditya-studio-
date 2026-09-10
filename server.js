@@ -1171,6 +1171,28 @@ function esc(t) {
 function fmtDate(d) {
   try { return d ? new Date(d).toLocaleString('en-IN') : '—'; } catch (e) { return '—'; }
 }
+// Har customer page me add hone wala lightweight live-sync. Page tabhi reload hota
+// hai jab server data sach me badla ho; typing/select ke waqt reload hold rehta hai.
+const LIVE_SYNC_SNIPPET = `<script>(function(){
+  var revision='', queued=false, timer=null;
+  var scrollKey='aditya_live_scroll:'+location.pathname+location.search;
+  try{var saved=Number(sessionStorage.getItem(scrollKey)||0);if(saved){setTimeout(function(){window.scrollTo(0,saved);sessionStorage.removeItem(scrollKey);},60)}}catch(e){}
+  function editing(){var el=document.activeElement;return !!(el&&/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName));}
+  function apply(){if(editing()){queued=true;return;}try{sessionStorage.setItem(scrollKey,String(window.scrollY||0))}catch(e){}window.dispatchEvent(new CustomEvent('aditya:live-update'));setTimeout(function(){location.reload()},120);}
+  function check(){fetch('/api/live-revision',{cache:'no-store'}).then(function(r){return r.json()}).then(function(d){if(!d||!d.ok)return;if(!revision){revision=d.revision;return;}if(revision!==d.revision){revision=d.revision;apply();}}).catch(function(){});}
+  document.addEventListener('focusout',function(){if(queued){queued=false;setTimeout(check,300)}});
+  setTimeout(check,1200);timer=setInterval(check,12000);
+})();</script>`;
+function serveLiveHtml(res, data) {
+  const html = Buffer.isBuffer(data) ? data.toString('utf8') : String(data || '');
+  res.end(html.replace(/<\/body>/i, LIVE_SYNC_SNIPPET + '</body>'));
+}
+function liveRevision() {
+  // Activity heartbeat ko jaanbujhkar include nahi karte, warna har visitor ke
+  // normal page-view se sabke pages repeatedly reload ho jayenge.
+  const files = [DATA_FILE, SETTINGS_FILE, FRAME_ORDERS_FILE, NOTIF_FILE, WALLET_TOPUPS_FILE, CODES_FILE, FRAMES_FILE, EDIT_REQUESTS_FILE];
+  return files.map(file => { try { return path.basename(file) + ':' + Math.floor(fs.statSync(file).mtimeMs); } catch (e) { return path.basename(file) + ':0'; } }).join('|');
+}
 
 const server = http.createServer(async (req, res) => {
   const urlPath = (req.url || '/').split('?')[0];
@@ -1196,7 +1218,7 @@ const server = http.createServer(async (req, res) => {
     fs.readFile(INDEX_HTML_FILE, (err, data) => {
       if (err) { res.writeHead(404); return res.end('index.html missing'); }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store, max-age=0' });
-      res.end(data);
+      serveLiveHtml(res, data);
     });
     return;
   }
@@ -1205,7 +1227,7 @@ const server = http.createServer(async (req, res) => {
     fs.readFile(MY_ORDERS_HTML_FILE, (err, data) => {
       if (err) { res.writeHead(404); return res.end('My Orders page missing'); }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store, max-age=0' });
-      res.end(data);
+      serveLiveHtml(res, data);
     });
     return;
   }
@@ -1214,7 +1236,7 @@ const server = http.createServer(async (req, res) => {
     fs.readFile(SPIN_ROLLER_HTML_FILE, (err, data) => {
       if (err) { res.writeHead(404); return res.end('Spin roller page missing'); }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store, max-age=0' });
-      res.end(data);
+      serveLiveHtml(res, data);
     });
     return;
   }
@@ -1224,7 +1246,7 @@ const server = http.createServer(async (req, res) => {
     fs.readFile(LEGAL_HTML_FILE, (err, data) => {
       if (err) { res.writeHead(404); return res.end('Information page missing'); }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store, max-age=0' });
-      res.end(data);
+      serveLiveHtml(res, data);
     });
     return;
   }
@@ -1234,7 +1256,7 @@ const server = http.createServer(async (req, res) => {
     fs.readFile(BOOK_NOW_HTML_FILE, (err, data) => {
       if (err) { res.writeHead(404); return res.end('Book Now page missing'); }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store, max-age=0' });
-      res.end(data);
+      serveLiveHtml(res, data);
     });
     return;
   }
@@ -1243,7 +1265,7 @@ const server = http.createServer(async (req, res) => {
     fs.readFile(VERIFY_MOBILE_HTML_FILE, (err, data) => {
       if (err) { res.writeHead(404); return res.end('Verify page missing'); }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end(data);
+      serveLiveHtml(res, data);
     });
     return;
   }
@@ -1252,7 +1274,7 @@ const server = http.createServer(async (req, res) => {
     fs.readFile(FRAMES_HTML_FILE, (err, data) => {
       if (err) { res.writeHead(404); return res.end('Photo Frames page missing'); }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end(data);
+      serveLiveHtml(res, data);
     });
     return;
   }
@@ -1261,7 +1283,7 @@ const server = http.createServer(async (req, res) => {
     fs.readFile(PLACE_ORDER_HTML_FILE, (err, data) => {
       if (err) { res.writeHead(404); return res.end('Place order page missing'); }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end(data);
+      serveLiveHtml(res, data);
     });
     return;
   }
@@ -1269,7 +1291,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && (urlPath === '/add-money' || urlPath === '/add-money.html')) {
     fs.readFile(ADD_MONEY_HTML_FILE, (err, data) => {
       if (err) { res.writeHead(404); return res.end('add-money.html missing'); }
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(data);
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); serveLiveHtml(res, data);
     });
     return;
   }
@@ -1277,7 +1299,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && (urlPath === '/photo-adjust' || urlPath === '/photo-adjust.html')) {
     fs.readFile(PHOTO_ADJUST_HTML_FILE, (err, data) => {
       if (err) { res.writeHead(404); return res.end('photo-adjust.html missing'); }
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(data);
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); serveLiveHtml(res, data);
     });
     return;
   }
@@ -1286,7 +1308,7 @@ const server = http.createServer(async (req, res) => {
     fs.readFile(FRAME_DETAIL_HTML_FILE, (err, data) => {
       if (err) { res.writeHead(404); return res.end('Frame detail page missing'); }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end(data);
+      serveLiveHtml(res, data);
     });
     return;
   }
@@ -1296,7 +1318,7 @@ const server = http.createServer(async (req, res) => {
     fs.readFile(BOOK_SERVICE_HTML_FILE, (err, data) => {
       if (err) { res.writeHead(404); return res.end('Book service page missing'); }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end(data);
+      serveLiveHtml(res, data);
     });
     return;
   }
@@ -1311,6 +1333,9 @@ const server = http.createServer(async (req, res) => {
   }
 
   // ---- Public APIs ----
+  if (req.method === 'GET' && urlPath === '/api/live-revision') {
+    return sendJSON(res, 200, { ok: true, revision: liveRevision() });
+  }
   if (req.method === 'GET' && urlPath === '/api/settings') {
     return sendJSON(res, 200, { ok: true, settings: loadSettings() });
   }
