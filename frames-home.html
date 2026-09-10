@@ -552,7 +552,7 @@ tailwind.config = {
         </div>
       </div>
       <div>
-        <p class="text-[10px] uppercase tracking-wider text-secondary mb-1">Coupons → Wallet</p>
+        <p class="text-[10px] uppercase tracking-wider text-secondary mb-1">🎟️ Your Active Coupons</p>
         <div id="framesCoupons" class="space-y-2 max-h-36 overflow-y-auto text-xs"></div>
       </div>
       <button id="load-orders-btn" class="w-full py-2 border border-secondary text-secondary hover:bg-secondary hover:text-on-secondary transition-colors font-label-caps text-label-caps rounded-DEFAULT">
@@ -2818,7 +2818,9 @@ function updateFramesWalletUI() {
   }
   const coup = document.getElementById("framesCoupons");
   if (coup) {
-    const active = (framesUser.history || []).filter(h => (h.couponStatus || "active") === "active" && (h.walletValue > 0 || Number(h.discount) > 0 || /₹\s*\d+/.test(String(h.prize || ""))));
+    const active = (framesUser.history || []).filter(h => (h.couponStatus || "active") === "active"
+      && (!h.expiresAt || new Date(h.expiresAt).getTime() >= Date.now())
+      && (h.walletValue > 0 || Number(h.discount) > 0 || /₹\s*\d+/.test(String(h.prize || ""))));
     if (!active.length) {
       coup.innerHTML = '<p class="opacity-70">No active coupons</p>';
     } else {
