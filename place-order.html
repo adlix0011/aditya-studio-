@@ -2,7 +2,7 @@
 <html class="dark" lang="hi">
 <head>
 <script>
-window.alert=function(message){function show(){var old=document.getElementById('adityaPageAlert');if(old)old.remove();var text=String(message||''),bad=/(fail|error|wrong|network|nahi|नहीं|गलत|invalid|missing|expire|chhoti|required|check)/i.test(text),box=document.createElement('div');box.id='adityaPageAlert';box.style.cssText='position:fixed;left:16px;right:16px;top:18px;z-index:99999;max-width:520px;margin:auto;padding:13px 42px 13px 15px;border-radius:13px;font:600 14px Arial,sans-serif;line-height:1.45;color:'+(bad?'#fecaca':'#dcfce7')+';background:'+(bad?'#571b22':'#14532d')+';border:1px solid '+(bad?'#ef4444':'#4ade80')+';box-shadow:0 12px 30px rgba(0,0,0,.42)';box.innerHTML=(bad?'⚠️ ':'✅ ')+text+'<button style="position:absolute;right:10px;top:8px;border:0;background:transparent;color:inherit;font-size:22px">×</button>';box.querySelector('button').onclick=function(){box.remove()};document.body.appendChild(box);setTimeout(function(){box.remove()},5000)}if(document.body)show();else document.addEventListener('DOMContentLoaded',show,{once:true})};
+window.alert=function(message){function show(){var old=document.getElementById('adityaPageAlert');if(old)old.remove();var text=String(message||''),bad=/(fail|error|wrong|network|nahi|नहीं|गलत|invalid|missing|expire|chhoti|required|check|reject|denied|access)/i.test(text),box=document.createElement('div');box.id='adityaPageAlert';box.style.cssText='position:fixed;left:16px;right:16px;top:18px;z-index:99999;max-width:520px;margin:auto;padding:14px 42px 14px 16px;border-radius:14px;font:700 14px Arial,sans-serif;line-height:1.45;color:'+(bad?'#fff1f2':'#f0fdf4')+';background:'+(bad?'linear-gradient(135deg,#991b1b,#450a0a)':'linear-gradient(135deg,#15803d,#064e3b)')+';border:1px solid '+(bad?'#fb7185':'#4ade80')+';box-shadow:0 0 24px '+(bad?'rgba(251,113,133,.5)':'rgba(74,222,128,.48)');box.innerHTML=(bad?'⚠️ ':'✅ ')+text+'<button style="position:absolute;right:10px;top:8px;border:0;background:transparent;color:inherit;font-size:22px">×</button>';box.querySelector('button').onclick=function(){box.remove()};document.body.appendChild(box);setTimeout(function(){box.remove()},5000)}if(document.body)show();else document.addEventListener('DOMContentLoaded',show,{once:true})};
 </script>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport"/>
@@ -12,9 +12,11 @@ window.alert=function(message){function show(){var old=document.getElementById('
 (function(){
   try {
     if (location.protocol === "file:") return;
-    var raw = localStorage.getItem("aditya_studio_session_v1");
+    var raw = localStorage.getItem("aditya_studio_session_v1") || localStorage.getItem("aditya_studio_persistent_login_v2");
     var s = raw ? JSON.parse(raw) : null;
+    if (s && s.pin) delete s.pin;
     var mob = s && String(s.mobile || s.phone || "").replace(/\D/g, "");
+    if (s && mob && s.sessionToken) { localStorage.setItem("aditya_studio_session_v1", JSON.stringify(s)); localStorage.setItem("aditya_studio_persistent_login_v2", JSON.stringify(s)); }
     if (!mob || mob.length !== 10) {
       try {
         localStorage.setItem("aditya_pending_order_flow", JSON.stringify({
@@ -457,12 +459,43 @@ tailwind.config = {
   function isFileProtocol(){ return location.protocol==="file:"; }
 
   function getSession(){
-    var s = safeParse(lsGet("aditya_studio_session_v1"));
+    var s = safeParse(lsGet("aditya_studio_session_v1") || lsGet("aditya_studio_persistent_login_v2"));
     if (!s) return null;
-    if (s.pin || !s.sessionToken) { lsRemove("aditya_studio_session_v1"); return null; }
+    if (s.pin) delete s.pin;
+    if (!s.sessionToken) return null;
     var mob = String(s.mobile || s.phone || "").replace(/\D/g, "");
     if (mob.length !== 10) return null;
+    lsSet("aditya_studio_session_v1", JSON.stringify(s));
+    lsSet("aditya_studio_persistent_login_v2", JSON.stringify(s));
     return s;
+  }
+  function getSessionCandidates(){
+    var raw=[lsGet("aditya_studio_session_v1"),lsGet("aditya_studio_persistent_login_v2")], out=[], seen={};
+    raw.forEach(function(v){
+      var s=safeParse(v); if(!s) return;
+      if(s.pin) delete s.pin;
+      var m=String(s.mobile||s.phone||"").replace(/\D/g,"");
+      if(!s.sessionToken||m.length!==10||seen[s.sessionToken]) return;
+      seen[s.sessionToken]=true; out.push(s);
+    });
+    return out;
+  }
+  async function restoreActiveSession(){
+    var candidates=getSessionCandidates();
+    for(var i=0;i<candidates.length;i++){
+      var s=candidates[i];
+      try{
+        var res=await fetch("/api/restore-session",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"same-origin",body:JSON.stringify({sessionToken:s.sessionToken})});
+        var data=await res.json().catch(function(){return {};});
+        if(res.ok&&data&&data.ok){
+          var active={id:data.id||s.id,name:data.name||s.name,mobile:data.mobile||s.mobile,sessionToken:s.sessionToken,village:data.village||s.village||""};
+          lsSet("aditya_studio_session_v1",JSON.stringify(active));
+          lsSet("aditya_studio_persistent_login_v2",JSON.stringify(active));
+          return active;
+        }
+      }catch(e){}
+    }
+    return null;
   }
   function looksLikeOrder(obj){
     if(!obj||typeof obj!=="object") return false;
@@ -664,6 +697,59 @@ tailwind.config = {
       fr.readAsDataURL(file);
     });
   }
+  var r2PhotoFallbackData="";
+  function compactPhotoDataUrl(dataUrl){
+    return new Promise(function(resolve){
+      var img=new Image();
+      img.onload=function(){
+        var w=img.naturalWidth||img.width,h=img.naturalHeight||img.height,max=1600;
+        if(w>max||h>max){if(w>=h){h=Math.round(h*max/w);w=max}else{w=Math.round(w*max/h);h=max}}
+        var c=document.createElement("canvas");c.width=w;c.height=h;
+        c.getContext("2d").drawImage(img,0,0,w,h);
+        resolve(c.toDataURL("image/jpeg",0.8));
+      };
+      img.onerror=function(){resolve(dataUrl)};
+      img.src=dataUrl;
+    });
+  }
+  async function uploadCustomerPhotoToR2(session){
+    var existing=ssGet("as_user_photo_r2_key")||lsGet("as_user_photo_r2_key");
+    var owner=String(session.mobile||"").replace(/\D/g,"");
+    if(existing && existing.indexOf("customer-photos/"+owner+"/")===0) return existing;
+    if(existing){
+      try{sessionStorage.removeItem("as_user_photo_r2_key");localStorage.removeItem("as_user_photo_r2_key");}catch(e){}
+    }
+    var photo=ssGet("as_user_photo")||lsGet("as_user_photo")||"";
+    if(!photo) return "";
+    var compactPhoto=await compactPhotoDataUrl(photo);
+    var photoRes=await fetch(compactPhoto);
+    var blob=await photoRes.blob();
+    if(!blob.size||blob.size>4*1024*1024) throw new Error("Photo bahut badi hai. Kripya photo dobara upload karein.");
+    var ticketRes=await fetch("/api/r2/frame-photo-upload",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"same-origin",body:JSON.stringify({mobile:session.mobile,sessionToken:session.sessionToken,contentType:blob.type||"image/jpeg"})});
+    var ticket=await ticketRes.json().catch(function(){return {};});
+    if(!ticketRes.ok||!ticket.ok||!ticket.uploadUrl||!ticket.key) throw new Error(ticket.message||"Photo upload prepare nahi ho paya.");
+    try{
+      var put=await fetch(ticket.uploadUrl,{method:"PUT",headers:{"Content-Type":blob.type||"image/jpeg"},body:blob});
+      if(!put.ok) throw new Error("Direct upload failed");
+      try{sessionStorage.setItem("as_user_photo_r2_key",ticket.key);localStorage.setItem("as_user_photo_r2_key",ticket.key);}catch(e){}
+      return ticket.key;
+    }catch(directError){
+      // R2 CORS policy kabhi-kabhi dashboard save ke baad delay se active hoti
+      // hai. Is fallback me photo server disk par save nahi hoti; seedha R2 ko
+      // forward hoti hai so order block nahi hota.
+      var backupRes=await fetch("/api/r2/frame-photo-proxy",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"same-origin",body:JSON.stringify({mobile:session.mobile,sessionToken:session.sessionToken,dataUrl:compactPhoto})});
+      var backup=await backupRes.json().catch(function(){return {};});
+      if(!backupRes.ok||!backup.ok||!backup.key){
+        // Keep customer orders operational if Cloudflare credentials are being
+        // corrected. This compact image is stored with the order, never as a
+        // public URL, and R2 direct upload remains the preferred path.
+        r2PhotoFallbackData=compactPhoto;
+        return "";
+      }
+      try{sessionStorage.setItem("as_user_photo_r2_key",backup.key);localStorage.setItem("as_user_photo_r2_key",backup.key);}catch(e){}
+      return backup.key;
+    }
+  }
 
   function helpLink(message){
     var number = String(helpWhatsapp || "").replace(/\D/g, "");
@@ -677,7 +763,13 @@ tailwind.config = {
   }
 
   async function submitOrder(){
+    var session=await restoreActiveSession();
+    if(!session){ showLoginNeeded(); alert("Login session valid nahi hai. Login karke order dobara submit karein."); return; }
     var addr=readAddr()||currentAddrFromForm();
+    // Saved address can belong to an older account. Orders always use the
+    // currently logged-in mobile so server authentication cannot mismatch.
+    addr.mobile=String(session.mobile||"").replace(/\D/g,"");
+    if($("addr-mobile")) $("addr-mobile").value=addr.mobile;
     var errA=validateAddr(addr);
     if(errA){ alert(errA); showAddrForm(true); fillAddrForm(addr); return; }
     saveAddr(addr);
@@ -688,7 +780,12 @@ tailwind.config = {
     if(!hasUtr && !hasProof){ alert("UTR ya Payment Screenshot me se koi ek daalo"); return; }
     if(isFileProtocol()){ alert("Server se open karo"); return; }
     var bill=renderSummary();
-    var session=getSession()||{};
+    var btn=$("btn-place");
+    btn.disabled=true; btn.textContent="Submitting...";
+    $("pay-status").textContent="Photo upload aur order submit ho raha hai..."; $("pay-status").className="status";
+    try {
+    r2PhotoFallbackData="";
+    var customerPhotoKey=await uploadCustomerPhotoToR2(session);
     var payload={
       frameName: ctx.frameName||"Frame", size: ctx.size||"", quality: ctx.quality||"Normal",
       qualityExtra: bill.qualityExtra, mrp: bill.mrp, discount: bill.discount, framePrice: bill.frameAfter,
@@ -697,14 +794,11 @@ tailwind.config = {
       address: addr.address, pincode: addr.pincode, utr: utr,
       paymentProof: proofDataUrl, paymentScreenshot: proofDataUrl,
       paymentClaimed: true,
-      customerPhoto: ssGet("as_user_photo") || lsGet("as_user_photo") || "",
+      customerPhoto: r2PhotoFallbackData || "",
+      customerPhotoKey: customerPhotoKey || "",
       userId: session.id||session.userId||"", sessionMobile: session.mobile||session.phone||addr.mobile,
       sessionToken: session.sessionToken || ""
     };
-    var btn=$("btn-place");
-    btn.disabled=true; btn.textContent="Submitting...";
-    $("pay-status").textContent="Order submit ho raha hai..."; $("pay-status").className="status";
-    try {
       var res=await fetch("/api/orders",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"same-origin",body:JSON.stringify(payload)});
       var data=await res.json().catch(function(){ return {}; });
       if(!res.ok) throw new Error(data.error||data.message||("HTTP "+res.status));
@@ -717,6 +811,7 @@ tailwind.config = {
       setHelpLinks(orderNo);
       show($("order-success-section"));
       $("order-success-section").scrollIntoView({behavior:"smooth", block:"start"});
+      alert("Order successfully submitted! Admin jaldi verify karega.");
     } catch(e) {
       $("pay-status").textContent="Error: "+(e.message||e); $("pay-status").className="status err";
       alert("Order fail: "+(e.message||e)); btn.disabled=false;
@@ -766,31 +861,9 @@ tailwind.config = {
         return;
       }
       try {
-        if (session.mobile && session.sessionToken) {
-          var vr = await fetch("/api/restore-session", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "same-origin",
-            body: JSON.stringify({ sessionToken: session.sessionToken })
-          });
-          var vd = await vr.json().catch(function(){ return {}; });
-          if (!vd || !vd.ok) {
-            try { localStorage.removeItem("aditya_studio_session_v1"); } catch(e){}
-            showLoginNeeded();
-            return;
-          }
-          session = {
-            id: vd.id||session.id, name: vd.name||session.name,
-            mobile: vd.mobile||session.mobile, sessionToken: session.sessionToken,
-            village: vd.village||session.village||""
-          };
-          try { localStorage.setItem("aditya_studio_session_v1", JSON.stringify(session)); } catch(e){}
-        } else {
-          try { localStorage.removeItem("aditya_studio_session_v1"); } catch(e){}
-          showLoginNeeded();
-          return;
-        }
-      } catch(e) {}
+        session = await restoreActiveSession();
+        if (!session) { showLoginNeeded(); return; }
+      } catch(e) { showLoginNeeded(); return; }
       lsRemove(PENDING_KEY);
 
       ctx=readCtx();
@@ -1032,11 +1105,6 @@ tailwind.config = {
     });
   }
   $("btn-place").addEventListener("click", function(){
-    if (!payWindowOpen) {
-      alert("Payment window expire ho gayi. Pehle Pay Now dabao aur 5 min me pay karke UTR daalo.");
-      show($("pay-cta-section"));
-      return;
-    }
     submitOrder();
   });
 

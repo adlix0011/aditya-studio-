@@ -89,37 +89,45 @@ loadFdQuality();
   <style>
     body { background: #131313; color: #e5e2e1; margin: 0; }
     .glass-shine {
-      position: absolute; inset: 0; pointer-events: none; z-index: 3;
-      background:
-        linear-gradient(90deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.18) 10%, transparent 20%),
-        linear-gradient(270deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.12) 8%, transparent 18%);
+      position: absolute; inset: 0; pointer-events: none; z-index: 3; overflow:hidden;
+      background:linear-gradient(112deg,transparent 30%,rgba(255,255,255,.04) 39%,rgba(255,250,221,.48) 48%,rgba(255,255,255,.13) 54%,transparent 65%);
+      background-size:230% 100%; background-position:145% 0; mix-blend-mode:screen; opacity:.82;
+      animation:frame-glass-sweep 4.6s ease-in-out infinite;
     }
+    .glass-shine::before { content:""; position:absolute; inset:0; border:1px solid rgba(255,238,177,.28); box-shadow:inset 0 1px 7px rgba(255,255,255,.24),inset 0 -7px 12px rgba(0,0,0,.15); }
+    @keyframes frame-glass-sweep { 0%,18%{background-position:145% 0;opacity:.34} 52%{background-position:-45% 0;opacity:.92} 100%{background-position:-45% 0;opacity:.34} }
     .fp-wrap { position: relative; line-height: 0; max-width: 100%; }
     .fp-frame { display: block; max-width: 100%; height: auto; object-fit: contain; }
     .fp-photo {
       position: absolute; overflow: hidden;
       left: 14%; right: 14%; top: 15%; bottom: 15%;
     }
-    .fp-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .fp-photo img { width: 100%; height: 100%; object-fit: cover; display: block; filter:saturate(1.07) contrast(1.04); transform:scale(1.012); }
     .type-card.active { border-color: #e9c176; box-shadow: 0 0 0 1px #e9c176; }
     .quality-btn.active { border-color: #e9c176; background: rgba(233,193,118,0.12); color: #e9c176; }
     .swatch.active { outline: 2px solid #e9c176; outline-offset: 2px; }
+    #rating { color: #facc15; font-weight: 800; }
+    #reviews { color: #b7b0a8; }
+    .old-price { color: #ff5a5f; text-decoration: line-through; text-decoration-thickness: 2px; text-decoration-color: #ff3b30; }
+    .discount-price { color: #4ade80; font-weight: 800; }
+    #desc { color: #d8c7ae; font-size: .82rem; border-left: 2px solid rgba(233,193,118,.55); padding-left: .65rem; }
+    .frame-title-ribbon { display:inline-block; max-width:72vw; padding:7px 16px; border:1px solid #f5d36b; border-radius:0 0 14px 14px; background:linear-gradient(135deg,#7c2d12,#dc2626 45%,#f59e0b); color:#fff7d0; box-shadow:0 5px 16px rgba(220,38,38,.35), inset 0 1px 0 rgba(255,255,255,.35); text-shadow:0 1px 2px #3b1200; }
   
     /* Mobile frame + photo fix — frame always visible, photo fits inside */
     @media (max-width: 768px) {
       #preview-box {
-        min-height: 320px !important;
-        padding: 10px !important;
+        min-height: 235px !important;
+        padding: 8px !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
       }
       #preview-box .fp-box,
       #preview-box > div {
-        width: 100% !important;
-        max-width: 100% !important;
+        width: 180px !important;
+        max-width: 180px !important;
         height: auto !important;
-        min-height: 280px !important;
+        min-height: 0 !important;
       }
       #preview-box .fp-frame,
       #preview-box img.fp-frame,
@@ -132,6 +140,7 @@ loadFdQuality();
       #preview-box .fp-photo {
         z-index: 2 !important;
       }
+      #detail-options > * + * { margin-top: .8rem !important; }
     }
     /* Colorful buttons */
     label[for], label.cursor-pointer {
@@ -165,13 +174,13 @@ loadFdQuality();
 <body class="min-h-screen flex flex-col">
 
   <!-- Top bar -->
-  <header class="sticky top-0 z-40 bg-[#1c1b1b]/95 backdrop-blur border-b border-[#3d3530] px-4 py-3 flex items-center gap-3">
+  <header class="sticky top-0 z-40 relative bg-[#1c1b1b]/95 backdrop-blur border-b border-[#3d3530] px-4 py-3 flex items-center">
     <a href="/frames" class="flex items-center justify-center w-10 h-10 rounded-full hover:bg-[#2a2929] text-[#b7b0a8]">
       <span class="material-symbols-outlined">arrow_back</span>
     </a>
-    <div class="flex-1 min-w-0">
-      <h1 id="page-title" class="text-base sm:text-lg font-semibold text-[#f3de9a] truncate">Frame</h1>
-      <p id="page-sub" class="text-xs text-[#b7b0a8] truncate"></p>
+    <div class="absolute left-1/2 -translate-x-1/2 text-center whitespace-nowrap">
+      <h1 id="page-title" class="frame-title-ribbon text-sm sm:text-base font-bold truncate">Frame</h1>
+      <p id="page-sub" class="hidden"></p>
     </div>
   </header>
 
@@ -183,11 +192,10 @@ loadFdQuality();
         <div id="preview-box" class="w-full bg-[#0a0a0a] rounded-xl border border-[#3d3530] flex items-center justify-center p-3 sm:p-6 min-h-[280px] sm:min-h-[420px]">
           <p class="text-[#b7b0a8] text-sm">Loading…</p>
         </div>
-        <p class="text-center text-xs text-[#b7b0a8]">Seedha front view · Photo frame ke andar</p>
       </div>
 
       <!-- RIGHT: Options -->
-      <div class="space-y-6 pb-28 lg:pb-8">
+      <div id="detail-options" class="space-y-6 pb-28 lg:pb-8">
         <div>
           <div class="flex items-center gap-2 text-[#e9c176] text-sm mb-1">
             <span class="material-symbols-outlined text-base" style="font-variation-settings:'FILL' 1">star</span>
@@ -199,7 +207,7 @@ loadFdQuality();
         </div>
 
         <!-- Photo upload on this page -->
-        <div>
+        <div class="hidden">
           <p class="text-xs uppercase tracking-widest text-[#b7b0a8] mb-2">Your Photo</p>
           <div class="flex flex-wrap gap-2 items-center">
             <label class="cursor-pointer px-4 py-2.5 rounded-lg border border-[#e9c176] text-[#e9c176] text-sm font-medium hover:bg-[#e9c176]/10">
@@ -211,7 +219,7 @@ loadFdQuality();
         </div>
 
         <!-- Quality -->
-        <div>
+        <div class="hidden">
           <p class="text-xs uppercase tracking-widest text-[#b7b0a8] mb-2">Photo Quality</p>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-2" id="quality-box">
             <!-- quality options from API -->
@@ -226,13 +234,16 @@ loadFdQuality();
         </div>
 
         <!-- Colours -->
-        <div>
+        <div class="hidden">
           <p class="text-xs uppercase tracking-widest text-[#b7b0a8] mb-2">Frame Colour</p>
           <div id="colours-box" class="flex flex-wrap gap-3"></div>
           <p id="colour-label" class="text-sm text-[#b7b0a8] mt-2"></p>
         </div>
 
         <!-- Desktop order btn -->
+        <button id="photo-adjust-btn" type="button" class="w-full py-3 bg-[#2563eb] text-white font-semibold rounded-lg hover:brightness-110 transition shadow-[0_4px_14px_rgba(37,99,235,.32)]">
+          🎚️ Photo Adjustment
+        </button>
         <button id="order-btn" type="button" disabled class="hidden lg:block w-full py-4 bg-[#e9c176] text-[#241804] font-semibold rounded-lg hover:brightness-105 disabled:opacity-50 disabled:cursor-not-allowed">
           Continue to Order
         </button>
@@ -342,7 +353,7 @@ function updatePrice() {
   const { price, discount, finalPrice } = framePrice(selected);
   const total = finalPrice + qualityExtra;
   const html = formatPrice(total) +
-    (discount > 0 ? ` <span class="text-base text-[#b7b0a8] line-through font-normal">${formatPrice(price)}</span> <span class="text-sm font-normal">(${discount}% OFF)</span>` : "");
+    (discount > 0 ? ` <span class="old-price text-base font-normal">${formatPrice(price)}</span> <span class="discount-price text-sm">(${discount}% OFF)</span>` : "");
   document.getElementById("price-line").innerHTML = html;
   document.getElementById("mobile-price").textContent = formatPrice(total);
 }
@@ -517,9 +528,11 @@ function goOrder() {
   // STRICT login — sirf 10-digit mobile wali session
   let loggedIn = false;
   try {
-    const s = JSON.parse(localStorage.getItem("aditya_studio_session_v1") || "null");
+    const s = JSON.parse(localStorage.getItem("aditya_studio_session_v1") || localStorage.getItem("aditya_studio_persistent_login_v2") || "null");
+    if (s && s.pin) delete s.pin;
     const mob = s ? String(s.mobile || s.phone || "").replace(/\D/g, "") : "";
     loggedIn = (mob.length === 10);
+    if (loggedIn) { localStorage.setItem("aditya_studio_session_v1", JSON.stringify(s)); localStorage.setItem("aditya_studio_persistent_login_v2", JSON.stringify(s)); }
   } catch (e) { loggedIn = false; }
 
   if (!loggedIn) {
@@ -530,15 +543,29 @@ function goOrder() {
       }));
     } catch (e) {}
     // clear any fake/partial session
-    try { localStorage.removeItem("aditya_studio_session_v1"); } catch (e) {}
+    try { localStorage.removeItem("aditya_studio_session_v1"); localStorage.removeItem("aditya_studio_persistent_login_v2"); } catch (e) {}
     window.location.href = "/book-now.html?next=" + encodeURIComponent("/place-order.html") + "&from=order";
     return;
   }
   window.location.href = "/place-order.html";
 }
 
+function goPhotoAdjust() {
+  if (!userPhoto) {
+    alert("Pehle photo upload karein, phir Photo Adjustment khulega.");
+    return;
+  }
+  try {
+    sessionStorage.setItem(PHOTO_KEY, userPhoto);
+    const back = "/frame-detail.html?id=" + encodeURIComponent(selected && selected.id ? selected.id : "") + (qs("orient") ? "&orient=" + encodeURIComponent(qs("orient")) : "");
+    sessionStorage.setItem("aditya_photo_adjust_return", back);
+  } catch (e) {}
+  window.location.href = "/photo-adjust.html";
+}
+
 document.getElementById("order-btn").addEventListener("click", goOrder);
 document.getElementById("order-btn-m").addEventListener("click", goOrder);
+document.getElementById("photo-adjust-btn").addEventListener("click", goPhotoAdjust);
 
 // Doosre page/tab me logout hone par is selected-frame page se bhi bahar bhejo.
 window.addEventListener("storage", function(event) {

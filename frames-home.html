@@ -179,6 +179,25 @@ tailwind.config = {
     right: 0;
     background: linear-gradient(270deg, rgba(255,255,255,0.45), rgba(255,255,255,0.12) 50%, transparent);
   }
+  /* Uploaded photo par moving glass reflection — real glossy photo-frame look */
+  .fp-photo { isolation: isolate; background: #090909; box-shadow: inset 0 0 12px rgba(0,0,0,.42); }
+  .fp-photo img { filter: saturate(1.07) contrast(1.04); transform: scale(1.012); }
+  .fp-photo .glass-shine {
+    position: absolute; inset: 0; z-index: 5; overflow: hidden; pointer-events: none;
+    background: linear-gradient(112deg, transparent 30%, rgba(255,255,255,.04) 39%, rgba(255,250,221,.48) 48%, rgba(255,255,255,.13) 54%, transparent 65%);
+    background-size: 230% 100%; background-position: 145% 0;
+    mix-blend-mode: screen; opacity: .82;
+    animation: frame-glass-sweep 4.6s ease-in-out infinite;
+  }
+  .fp-photo .glass-shine::before {
+    content: ""; position: absolute; inset: 0; border: 1px solid rgba(255,238,177,.28);
+    box-shadow: inset 0 1px 7px rgba(255,255,255,.24), inset 0 -7px 12px rgba(0,0,0,.15);
+  }
+  @keyframes frame-glass-sweep {
+    0%, 18% { background-position: 145% 0; opacity: .34; }
+    52% { background-position: -45% 0; opacity: .92; }
+    100% { background-position: -45% 0; opacity: .34; }
+  }
   .frame-shell {
     position: relative;
     width: 100%;
@@ -244,7 +263,26 @@ tailwind.config = {
   }
   .animated-frame { opacity: 0; }
   .animated-frame.animate { animation: fadeIn 0.6s ease-out forwards; }
-  .price-strike { text-decoration: line-through; opacity: 0.6; font-size: 0.85em; }
+  .price-strike {
+    color: #ff5a5f !important;
+    opacity: 1;
+    font-size: 0.85em;
+    font-weight: 700;
+    text-decoration: line-through;
+    text-decoration-color: #ff3b30;
+    text-decoration-thickness: 2px;
+  }
+  .upload-glow {
+    border: 2px solid transparent !important;
+    background: linear-gradient(#1d1812, #1d1812) padding-box,
+      linear-gradient(100deg, #ec4899, #f59e0b, #22c55e, #38bdf8, #a855f7, #ec4899) border-box !important;
+    background-size: 100% 100%, 300% 100% !important;
+    animation: upload-border-flow 3.5s linear infinite, upload-breathe 1.9s ease-in-out infinite alternate;
+    box-shadow: 0 0 16px rgba(236,72,153,.24), 0 0 26px rgba(245,158,11,.18) !important;
+  }
+  .upload-glow:hover { filter: brightness(1.15); }
+  @keyframes upload-border-flow { to { background-position: 0 0, 300% 0; } }
+  @keyframes upload-breathe { from { transform: scale(1); } to { transform: scale(1.025); } }
   .modal-backdrop { background: rgba(0,0,0,0.75); backdrop-filter: blur(4px); }
   .banner-slide {
     position: absolute; inset: 0;
@@ -318,7 +356,8 @@ tailwind.config = {
   @media (max-width: 768px) {
     /* Mobile par ek baar me 2 frame options dikhein, bada single card nahi. */
     #frames-grid { grid-template-columns:repeat(2,minmax(0,1fr)) !important; gap:9px !important; }
-    #frames-grid .product-card > div:first-child { min-height:0 !important; padding:5px !important; }
+    #frames-grid .product-card > div:first-child { min-height:0 !important; padding:5px !important; aspect-ratio:4 / 5 !important; }
+    #frames-grid .user-image-container .fp-box { max-width:76% !important; }
     #frames-grid .product-card .p-4 { padding:9px !important; gap:3px !important; }
     #frames-grid .product-card h4 { font-size:.82rem !important; line-height:1.15 !important; }
     #frames-grid .product-card .text-xl { font-size:1rem !important; }
@@ -328,9 +367,9 @@ tailwind.config = {
     #upload { padding-top:22px !important; padding-bottom:22px !important; }
     #upload .bg-surface-container-low { padding:16px !important; }
     #upload .bg-surface-container-low > p { margin-bottom:14px !important; }
-    #main-upload-trigger { padding:22px 12px !important; }
-    #main-upload-trigger .material-symbols-outlined { font-size:2.5rem !important; margin-bottom:4px !important; }
-    #main-upload-trigger p:first-of-type { font-size:1.05rem !important; margin-bottom:2px !important; }
+    #main-upload-trigger { padding:10px 14px !important; }
+    #main-upload-trigger .material-symbols-outlined { font-size:1.3rem !important; margin-bottom:0 !important; }
+    #main-upload-trigger p:first-of-type { font-size:.86rem !important; margin:0 !important; }
     #main-upload-trigger p:last-of-type { font-size:.72rem !important; margin-top:2px !important; }
     #pd-main-preview {
       min-height: 320px !important;
@@ -379,33 +418,10 @@ tailwind.config = {
       display: block !important;
     }
     #threejs-container {
-      min-height: 220px !important;
-      height: 52vw !important;
-      max-height: 270px !important;
+      min-height: 260px !important;
+      height: 55vw !important;
+      max-height: 380px !important;
     }
-    /* Crop ka exact live result chhote preview mein dikhe; controls side mein rahein. */
-    #photo-adjust-box > .flex {
-      flex-direction: row !important;
-      gap: 12px !important;
-      align-items: flex-start !important;
-    }
-    #photo-adjust-box > .flex > div:first-child {
-      flex: 0 0 150px !important;
-      width: 150px !important;
-    }
-    #photo-adjust-box > .flex > div:last-child { flex: 1 1 auto !important; gap: 10px !important; }
-    #crop-stage { max-width: 150px !important; }
-    #photo-adjust-box p { font-size: .72rem !important; line-height: 1.35 !important; }
-    #photo-adjust-box .flex-wrap { gap: 5px !important; }
-    #photo-adjust-box .flex-wrap button { min-width: 0 !important; padding: 7px 4px !important; font-size: .68rem !important; }
-    /* Vertical/Horizontal cards ko ek compact row mein rakho. */
-    #orientation-box .flex { flex-direction: row !important; gap: 8px !important; }
-    #orientation-box .orient-btn { padding: 10px 5px !important; gap: 3px !important; flex-direction: column !important; }
-    #orientation-box .orient-btn .material-symbols-outlined { font-size: 26px !important; }
-    #orientation-box .orient-btn .text-left { text-align: center !important; }
-    #orientation-box .orient-btn .font-headline-sm { font-size: 1rem !important; }
-    #orientation-box .orient-btn .text-xs { font-size: .62rem !important; }
-    #orientation-box #orient-hint { font-size: .72rem !important; margin-top: 8px !important; }
     .user-image-container {
       display: flex !important;
       align-items: center !important;
@@ -566,11 +582,9 @@ tailwind.config = {
   <section id="upload" class="w-full py-12 px-margin-mobile md:px-margin-desktop bg-surface">
     <div class="max-w-3xl mx-auto">
       <div class="bg-surface-container-low p-5 rounded-xl border border-secondary/30 shadow-2xl text-center">
-        <h2 class="font-headline-sm text-headline-sm text-primary mb-1">अपनी फोटो चुनें</h2>
-        <p class="text-xs text-on-surface-variant mb-4">पहले photo adjust करें, फिर अपना frame चुनें</p>
-        <div class="border border-secondary/60 rounded-lg px-4 py-3 inline-flex items-center justify-center gap-2 hover:border-secondary hover:bg-secondary/10 transition-all cursor-pointer bg-surface/50 group" id="main-upload-trigger">
+        <div class="upload-glow rounded-lg px-4 py-3 inline-flex items-center justify-center gap-2 transition-all cursor-pointer group" id="main-upload-trigger">
           <span class="material-symbols-outlined text-2xl text-secondary group-hover:text-secondary transition-colors">add_photo_alternate</span>
-          <p class="font-medium text-on-surface group-hover:text-secondary transition-colors">Photo Upload करें</p>
+          <p class="font-medium text-on-surface group-hover:text-secondary transition-colors">Upload Your Photo</p>
           <input accept="image/*" class="hidden" id="main-upload" type="file"/>
         </div>
 
@@ -620,7 +634,7 @@ tailwind.config = {
                 <div class="absolute inset-0 pointer-events-none border border-secondary/40 rounded-lg" style="box-shadow: inset 0 0 0 2px rgba(212,175,55,0.35);"></div>
                 <div class="absolute bottom-2 left-1/2 -translate-x-1/2 z-10 px-2 py-0.5 rounded-full bg-black/60 text-[10px] text-secondary border border-secondary/30 pointer-events-none whitespace-nowrap">Drag to move</div>
               </div>
-              <p class="text-[11px] text-on-surface-variant mt-2 text-center">Live frame preview — crop ke baad itna hissa dikhega</p>
+              <p class="text-[11px] text-on-surface-variant mt-2 text-center">Yeh window = frame ke andar dikhne wala hissa</p>
             </div>
             <div class="flex-1 flex flex-col justify-center gap-4 min-w-0">
               <div>
@@ -652,14 +666,15 @@ tailwind.config = {
   </section>
 
   <!-- 3D Viewer + Frame Sizes -->
-  <section id="sizes" class="max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-margin-desktop">
+  <section id="sizes" class="max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop pt-3 pb-margin-desktop">
     <div class="grid grid-cols-1 items-start mb-margin-desktop">
-      <!-- Frame choices + WhatsApp editing request -->
       <div id="frame-selection-panel" class="flex flex-col space-y-gutter">
-        <a href="https://wa.me/917024230041?text=Namaste%20Aditya%20Studio%2C%20mujhe%20photo%20editing%20request%20bhejni%20hai." target="_blank" rel="noopener" class="w-full inline-flex items-center justify-center gap-2 px-6 py-3 rounded-DEFAULT bg-[#25D366] text-white font-semibold shadow-lg hover:brightness-110 transition-all">
-          <span class="material-symbols-outlined">chat</span>
-          WhatsApp पर Photo Editing Request भेजें
-        </a>
+        <div class="text-center">
+          <a href="https://wa.me/917024230041?text=Namaste%20Aditya%20Studio%2C%20mujhe%20photo%20editing%20request%20bhejni%20hai." target="_blank" rel="noopener" class="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-[#22c55e] via-[#25D366] to-[#0ea5e9] text-white font-bold text-sm shadow-lg shadow-green-500/30 hover:scale-[1.03] hover:brightness-110 transition-all">
+            <span class="material-symbols-outlined text-lg">chat</span>
+            Editing Request
+          </a>
+        </div>
       </div>
     </div>
 
@@ -730,7 +745,7 @@ tailwind.config = {
       </div>
 
       <!-- Frame colour -->
-      <div>
+      <div class="hidden">
         <p class="font-label-caps text-label-caps text-on-surface-variant mb-2 tracking-widest">FRAME COLOUR</p>
         <div class="flex flex-wrap gap-3" id="pd-colours">
           <!-- filled by JS / admin defaults -->
@@ -944,6 +959,9 @@ let allFrames = [];
 let selectedFrame = null;
 let userPhotoDataUrl = null;
 try { userPhotoDataUrl = sessionStorage.getItem("as_user_photo") || null; } catch (e) {}
+let userPhotoFile = null;
+let userPhotoR2Key = null;
+try { userPhotoR2Key = sessionStorage.getItem("as_user_photo_r2_key") || null; } catch (e) {}
 let orientation = "vertical"; // vertical | horizontal
 // Photo crop inside frame: zoom 1–3, pan 0–1 (0.5 = center)
 let photoZoom = 1;
@@ -1169,12 +1187,20 @@ function renderFrames(filterSize = null) {
   let list = allFrames.slice();
   if (filterSize) list = list.filter(f => f.size === filterSize);
 
-  // Har uploaded frame = alag product card (same size ke multiple types bhi alag dikhenge)
+  // Same size ke multiple frame types ek hi card me group honge. Customer card kholkar
+  // us size ke sab available types choose karega.
   list.sort((a, b) => {
     const d = sizeArea(a.size) - sizeArea(b.size);
     if (d !== 0) return d;
     return String(a.title || "").localeCompare(String(b.title || ""));
   });
+  const bySize = new Map();
+  list.forEach(frame => {
+    const key = String(frame.size || "—");
+    if (!bySize.has(key)) bySize.set(key, []);
+    bySize.get(key).push(frame);
+  });
+  list = Array.from(bySize.values()).map(group => group[0]);
 
   if (!list.length) {
     grid.innerHTML = `<div class="col-span-full text-center text-on-surface-variant py-12">
@@ -1187,6 +1213,7 @@ function renderFrames(filterSize = null) {
 
   grid.innerHTML = list.map((frame, index) => {
     const size = frame.size || "—";
+    const typeCount = (bySize.get(String(size)) || []).length;
     const dims = displayDims(size);
     const aspect = dims.w / dims.h;
     const price = Number(frame.price) || 0;
@@ -1209,18 +1236,20 @@ function renderFrames(filterSize = null) {
         ${discount > 0 ? `<span class="absolute top-2 left-2 text-[10px] font-label-caps px-2 py-1 rounded-full z-10" style="background:#166534;color:#bbf7d0">${discount}% OFF</span>` : ""}
       </div>
       <div class="p-4 flex flex-col gap-1">
+        <h4 class="font-headline-sm leading-tight text-lg mb-1"><span style="color:#f3cd63">${frame.title ? frame.title : "Premium Frame"}</span> <span class="text-sm font-bold" style="color:#63d7ff">${dims.label} · ${orientLabel}</span></h4>
         <div class="flex items-center gap-1 text-secondary text-sm">
           <span class="material-symbols-outlined text-sm" style="font-variation-settings:'FILL' 1">star</span>
           <span class="font-bold text-on-surface">${rating}</span>
           <span class="text-on-surface-variant text-xs">${Number(reviews) > 0 ? "· " + reviews : "· No ratings yet"}</span>
         </div>
         <p class="font-label-caps text-label-caps text-on-surface-variant tracking-wider">ADITYA STUDIO</p>
-        <h4 class="font-headline-sm text-on-surface leading-tight">${frame.title ? frame.title : (dims.label + " Frame")} <span class="text-xs text-on-surface-variant">(${dims.label} · ${orientLabel})</span></h4>
+        <p class="text-[11px] text-on-surface-variant">${typeCount} frame type${typeCount > 1 ? "s" : ""} available · choose inside</p>
         <div class="mt-1 flex items-baseline gap-2 flex-wrap">
           <span class="text-secondary text-xl font-bold">${formatPrice(finalPrice)}</span>
           ${discount > 0 ? `<span class="price-strike text-on-surface-variant text-sm">${formatPrice(price)}</span>` : ""}
           ${discount > 0 ? `<span class="text-xs font-label-caps" style="color:#4ade80">(${discount}% OFF)</span>` : ""}
         </div>
+        <button type="button" data-buy-frame="${frame.id}" class="mt-2 w-full rounded-lg py-2 text-xs font-bold text-white bg-gradient-to-r from-fuchsia-600 via-purple-600 to-indigo-500 shadow-lg shadow-purple-500/25 hover:brightness-110 transition-all">🛍️ Buy Now</button>
       </div>
     </div>`;
   }).join("");
@@ -1241,6 +1270,13 @@ function renderFrames(filterSize = null) {
       } catch (e) {}
       const orient = orientation === "horizontal" ? "horizontal" : "vertical";
       window.location.href = "/frame-detail.html?id=" + encodeURIComponent(id) + "&orient=" + orient;
+    });
+  });
+  grid.querySelectorAll("[data-buy-frame]").forEach(btn => {
+    btn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const orient = orientation === "horizontal" ? "horizontal" : "vertical";
+      window.location.href = "/frame-detail.html?id=" + encodeURIComponent(btn.dataset.buyFrame) + "&orient=" + orient;
     });
   });
 }
@@ -1691,6 +1727,9 @@ document.getElementById("submit-order-btn").addEventListener("click", async () =
   document.getElementById("order-error").classList.add("hidden");
 
   try {
+    // Customer photo is compressed in the browser and uploaded directly to
+    // private Cloudflare R2. Only its small object key goes with the order.
+    const customerPhotoKey = await ensureCustomerPhotoInR2();
     const dims = displayDims(selectedFrame.size);
     const orientLabel = orientation === "horizontal" ? "Horizontal" : "Vertical";
     const fullNote = [
@@ -1723,7 +1762,8 @@ document.getElementById("submit-order-btn").addEventListener("click", async () =
         paymentClaimed: true,
         utr: utr,
         paymentScreenshot: payScreenshotData,
-      customerPhoto: userPhotoDataUrl || "",
+      customerPhoto: "",
+      customerPhotoKey: customerPhotoKey || "",
         useWallet,
         sessionToken: (frLoadSession() || {}).sessionToken || ""
       })
@@ -2348,6 +2388,56 @@ function bindPhotoAdjustOnce() {
 }
 
 // ========== Photo Upload ==========
+async function ensureCustomerPhotoInR2() {
+  if (!userPhotoDataUrl) return "";
+  if (userPhotoR2Key) return userPhotoR2Key;
+  const session = frLoadSession() || {};
+  const mobile = String(session.mobile || "").replace(/\D/g, "");
+  if (!/^[6-9]\d{9}$/.test(mobile) || !session.sessionToken) {
+    throw new Error("Photo upload ke liye pehle apne account se login karein.");
+  }
+  let compactDataUrl = userPhotoDataUrl;
+  if (userPhotoFile) compactDataUrl = await compressImage(userPhotoFile, 1600, 0.8);
+  const photoBlob = await (await fetch(compactDataUrl)).blob();
+  if (!photoBlob.size || photoBlob.size > 4 * 1024 * 1024) {
+    throw new Error("Photo compress nahi ho payi. Kripya chhoti photo try karein.");
+  }
+  const ticketRes = await fetch("/api/r2/frame-photo-upload", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      mobile,
+      sessionToken: session.sessionToken,
+      contentType: photoBlob.type || "image/jpeg"
+    })
+  });
+  const ticket = await ticketRes.json().catch(() => ({}));
+  if (!ticketRes.ok || !ticket.ok || !ticket.uploadUrl || !ticket.key) {
+    throw new Error(ticket.message || "Photo upload prepare nahi ho paya.");
+  }
+  try {
+    const uploadRes = await fetch(ticket.uploadUrl, {
+      method: "PUT",
+      headers: { "Content-Type": photoBlob.type || "image/jpeg" },
+      body: photoBlob
+    });
+    if (!uploadRes.ok) throw new Error("Direct upload failed");
+    userPhotoR2Key = ticket.key;
+  } catch (directError) {
+    // Cloudflare CORS can be delayed after a policy edit. Keep the order
+    // working by forwarding the compact photo; it is still stored only in R2.
+    const backupRes = await fetch("/api/r2/frame-photo-proxy", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mobile, sessionToken: session.sessionToken, dataUrl: compactDataUrl })
+    });
+    const backup = await backupRes.json().catch(() => ({}));
+    if (!backupRes.ok || !backup.ok || !backup.key) throw new Error(backup.message || "Photo Cloud storage me upload nahi ho payi. Dobara try karein.");
+    userPhotoR2Key = backup.key;
+  }
+  try { sessionStorage.setItem("as_user_photo_r2_key", userPhotoR2Key); } catch (e) {}
+  return userPhotoR2Key;
+}
 const mainUploadTrigger = document.getElementById("main-upload-trigger");
 const mainUploadInput = document.getElementById("main-upload");
 mainUploadTrigger.addEventListener("click", () => mainUploadInput.click());
@@ -2360,6 +2450,9 @@ document.getElementById("open-photo-adjust").addEventListener("click", function 
 mainUploadInput.addEventListener("change", (e) => {
   if (!e.target.files || !e.target.files[0]) return;
   const file = e.target.files[0];
+  userPhotoFile = file;
+  userPhotoR2Key = null;
+  try { sessionStorage.removeItem("as_user_photo_r2_key"); } catch (err) {}
   const reader = new FileReader();
   reader.onload = (ev) => {
     userPhotoDataUrl = ev.target.result;
@@ -2611,7 +2704,7 @@ document.getElementById("er-submit-btn")?.addEventListener("click", async () => 
 // ========== Home Banner Carousel (admin: Offer / Home banner photos) ==========
 const DEFAULT_BANNERS = [
   { url: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=1400&q=80", title: "Aditya Studio", sub: "Museum-quality photo frames" },
-  { url: "https://images.unsplash.com/photo-1519741497674-611481863552?w=1400&q=80", title: "Raksha Bandhan Special", sub: "Apni yaadein frame karo" },
+  { url: "https://images.unsplash.com/photo-1519741497674-611481863552?w=1400&q=80", title: "Special Memories", sub: "Apni yaadein frame karo" },
   { url: "https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=1400&q=80", title: "The Artisan Collection", sub: "Custom sizes · Premium finish" }
 ];
 let bannerList = DEFAULT_BANNERS.slice();
@@ -2677,11 +2770,16 @@ document.getElementById("banner-next")?.addEventListener("click", () => { nextBa
 
 // ========== Wallet + session (same as home) ==========
 const FR_SESSION = "aditya_studio_session_v1";
+const FR_PERSIST_SESSION = "aditya_studio_persistent_login_v2";
 let framesUser = null;
 function frLoadSession() {
   try {
-    const session = JSON.parse(localStorage.getItem(FR_SESSION) || "null");
-    if (session && session.pin) { localStorage.removeItem(FR_SESSION); return null; }
+    const session = JSON.parse(localStorage.getItem(FR_SESSION) || localStorage.getItem(FR_PERSIST_SESSION) || "null");
+    if (session && session.pin) delete session.pin;
+    if (session && session.mobile && session.sessionToken) {
+      localStorage.setItem(FR_SESSION, JSON.stringify(session));
+      localStorage.setItem(FR_PERSIST_SESSION, JSON.stringify(session));
+    }
     return session;
   } catch (e) { return null; }
 }
@@ -2689,8 +2787,9 @@ function frSaveSession(d) {
   const prev = frLoadSession() || {};
   const next = { ...prev, ...d }; delete next.pin;
   localStorage.setItem(FR_SESSION, JSON.stringify(next));
+  localStorage.setItem(FR_PERSIST_SESSION, JSON.stringify(next));
 }
-function frClearSession() { localStorage.removeItem(FR_SESSION); }
+function frClearSession() { localStorage.removeItem(FR_SESSION); localStorage.removeItem(FR_PERSIST_SESSION); }
 
 function updateFramesWalletUI() {
   const loginBox = document.getElementById("framesLoginBox");
@@ -2726,26 +2825,10 @@ function updateFramesWalletUI() {
       coup.innerHTML = active.slice(0, 8).map(h => {
         const id = h.couponId || h.entryId;
         const label = h.prize || ("₹" + h.discount);
-        return `<div class="p-2 rounded border border-secondary/30 flex justify-between items-center gap-2"><span>${label}</span><button type="button" data-cid="${id}" class="fr-apply-coupon px-2 py-1 text-[10px] rounded bg-secondary text-on-secondary">→ Wallet</button></div>`;
+        const exp = h.expiresAt ? new Date(h.expiresAt) : null;
+        const expLabel = exp && !isNaN(exp) ? exp.toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" }) : "Not set";
+        return `<div class="p-2 rounded border border-secondary/30"><b>${label}</b><div class="text-[10px] opacity-75 mt-1">Code: ${id} · Valid till: ${expLabel}</div><div class="text-[10px] opacity-60 mt-1">Wallet me add nahi hoga</div></div>`;
       }).join("");
-      coup.querySelectorAll(".fr-apply-coupon").forEach(btn => {
-        btn.addEventListener("click", async () => {
-          const s = frLoadSession();
-          if (!s) return;
-          try {
-            const res = await fetch("/api/wallet/apply-coupon", {
-              method: "POST", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ sessionToken: s.sessionToken || '', couponId: btn.dataset.cid })
-            });
-            const data = await res.json();
-            if (data.ok) {
-              framesUser = { ...framesUser, walletBalance: data.walletBalance, walletHistory: data.walletHistory, history: data.history || framesUser.history };
-              updateFramesWalletUI();
-              alert(data.message);
-            } else alert(data.message || "Fail");
-          } catch (e) { alert("Network error"); }
-        });
-      });
     }
   }
   // prefill order mobile

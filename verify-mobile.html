@@ -50,7 +50,7 @@
           const msg=out.error==='sms-not-configured'?'SMS Gateway settings load nahi hui. Server restart karke URL aur API key check karein.':out.error==='resend-too-soon'?'OTP resend ke liye 1 minute rukhein.':(out.message||'OTP SMS nahi bhej paaye.');
           status(msg,'error');startResendTimer(out.error==='resend-too-soon'?60:8);return;
         }
-        $('verifyBox').classList.remove('hidden');status('✅ OTP SMS bhej diya gaya hai. Ab 6-digit OTP daalein.','ok');startResendTimer(60);$('otp').focus();
+        $('verifyBox').classList.remove('hidden');status(out.delivery==='whatsapp_manual'?'✅ OTP request admin ko mil gayi hai. Admin WhatsApp par OTP bhejenge, phir yahan 6-digit OTP daalein.':'✅ OTP SMS bhej diya gaya hai. Ab 6-digit OTP daalein.','ok');startResendTimer(60);$('otp').focus();
       }catch(e){status('15 second tak response nahi mila. Server aur SMS Gateway app check karke “OTP dobara bhejein” dabayein.','error');startResendTimer(8);}
     }
     function verified(){status('✅ Mobile verify ho gaya! Free spin page khul raha hai…','ok');$('verifyBox').classList.add('hidden');setTimeout(function(){location.href='/aditya-studio-discount-wheel.html?next=free-spin';},900);}

@@ -16,13 +16,77 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
 // SMS gateway secrets stay only in process environment, never in source/data files.
 const SMS_GATEWAY_URL = String(process.env.SMS_GATEWAY_URL || '').replace(/\/+$/, '');
 const SMS_GATEWAY_API_KEY = String(process.env.SMS_GATEWAY_API_KEY || '');
+// Telegram credentials live only in local/Render environment variables.
+const TELEGRAM_BOT_TOKEN = String(process.env.TELEGRAM_BOT_TOKEN || '').trim();
+const TELEGRAM_CHAT_ID = String(process.env.TELEGRAM_CHAT_ID || '').trim();
+// Cloudflare R2 is optional. These private values live only in the local
+// environment / Render dashboard — never in this source file or browser code.
+const R2_BUCKET = String(process.env.R2_BUCKET || '').trim();
+const R2_ACCESS_KEY_ID = String(process.env.R2_ACCESS_KEY_ID || '').trim();
+const R2_SECRET_ACCESS_KEY = String(process.env.R2_SECRET_ACCESS_KEY || '').trim();
+const R2_ENDPOINT = String(process.env.R2_ENDPOINT || '').trim().replace(/\/+$/, '');
 const OTP_TTL_MS = 5 * 60 * 1000;
+// Mobile verification OTP admin panel me user verify karne tak pending rahega.
+// PIN-reset OTP alag se sirf 5 minute ke liye valid hota hai.
+const MOBILE_VERIFY_OTP_TTL_MS = 365 * 24 * 60 * 60 * 1000;
 const OTP_RESEND_COOLDOWN_MS = 60 * 1000;
 const OTP_MAX_ATTEMPTS = 5;
 const OTP_PEPPER = process.env.OTP_SECRET || SMS_GATEWAY_API_KEY || crypto.randomBytes(32).toString('hex');
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const sessions = new Map();
 const authAttempts = new Map();
+
+function r2Ready() {
+  return !!(R2_BUCKET && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY && /^https:\/\//i.test(R2_ENDPOINT));
+}
+function telegramReady() { return !!(TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID); }
+async function sendTelegramAlert(title, details) {
+  if (!telegramReady()) return false;
+  const text = '🔔 *Aditya Studio Alert*\n\n*' + String(title || 'Update').replace(/[\\*_`]/g, '') + '*\n' + String(details || '').replace(/[\\*_`]/g, '').slice(0, 3500);
+  try {
+    const response = await fetch('https://api.telegram.org/bot' + TELEGRAM_BOT_TOKEN + '/sendMessage', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ chat_id:TELEGRAM_CHAT_ID, text, parse_mode:'Markdown' })
+    });
+    return response.ok;
+  } catch (e) { console.error('telegram alert failed:', e.message); return false; }
+}
+function awsEncode(value) {
+  return encodeURIComponent(String(value)).replace(/[!'()*]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase());
+}
+function hmacSha256(key, value, encoding) {
+  return crypto.createHmac('sha256', key).update(value, 'utf8').digest(encoding);
+}
+function r2PresignedUrl(method, objectKey, expiresSeconds) {
+  if (!r2Ready()) throw new Error('R2 is not configured');
+  const endpoint = new URL(R2_ENDPOINT);
+  const now = new Date();
+  const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, '');
+  const dateStamp = amzDate.slice(0, 8);
+  const region = 'auto', service = 's3';
+  const credentialScope = dateStamp + '/' + region + '/' + service + '/aws4_request';
+  const canonicalUri = '/' + [R2_BUCKET].concat(String(objectKey).split('/')).map(awsEncode).join('/');
+  const query = {
+    'X-Amz-Algorithm': 'AWS4-HMAC-SHA256',
+    'X-Amz-Credential': R2_ACCESS_KEY_ID + '/' + credentialScope,
+    'X-Amz-Date': amzDate,
+    'X-Amz-Expires': String(Math.max(60, Math.min(Number(expiresSeconds) || 600, 900))),
+    'X-Amz-SignedHeaders': 'host'
+  };
+  const canonicalQuery = Object.keys(query).sort().map(k => awsEncode(k) + '=' + awsEncode(query[k])).join('&');
+  const canonicalHeaders = 'host:' + endpoint.host + '\n';
+  const canonicalRequest = [method, canonicalUri, canonicalQuery, canonicalHeaders, 'host', 'UNSIGNED-PAYLOAD'].join('\n');
+  const stringToSign = ['AWS4-HMAC-SHA256', amzDate, credentialScope, crypto.createHash('sha256').update(canonicalRequest, 'utf8').digest('hex')].join('\n');
+  const dateKey = hmacSha256('AWS4' + R2_SECRET_ACCESS_KEY, dateStamp);
+  const regionKey = hmacSha256(dateKey, region);
+  const serviceKey = hmacSha256(regionKey, service);
+  const signingKey = hmacSha256(serviceKey, 'aws4_request');
+  const signature = hmacSha256(signingKey, stringToSign, 'hex');
+  return endpoint.origin + canonicalUri + '?' + canonicalQuery + '&X-Amz-Signature=' + signature;
+}
+function isSafeR2PhotoKey(key, mobile) {
+  const safeMobile = String(mobile || '').replace(/\D/g, '');
+  return new RegExp('^customer-photos/' + safeMobile + '/[a-zA-Z0-9._-]+\\.(jpg|jpeg|png|webp)$', 'i').test(String(key || ''));
+}
 
 function resolveDataDir() {
   const preferred = process.env.DATA_DIR || __dirname;
@@ -51,8 +115,17 @@ const FRAMES_FILE = path.join(DATA_DIR, 'photo-frames.json');
 const FRAME_ORDERS_FILE = path.join(DATA_DIR, 'frame-orders.json');
 const EDIT_REQUESTS_FILE = path.join(DATA_DIR, 'edit-requests.json');
 const WALLET_TOPUPS_FILE = path.join(DATA_DIR, 'wallet-topups.json');
+const ACTIVITY_FILE = path.join(DATA_DIR, 'user-activity.json');
+// Browser login ko server restart ke baad bhi valid rakhne ke liye (7 days).
+const SESSIONS_FILE = path.join(DATA_DIR, 'sessions.json');
 const INDEX_HTML_FILE = path.join(__dirname, 'index.html');
-const BOOK_NOW_HTML_FILE = path.join(__dirname, 'aditya-studio-discount-wheel.html');
+const MY_ORDERS_HTML_FILE = path.join(__dirname, 'my-orders.html');
+const SPIN_ROLLER_HTML_FILE = path.join(__dirname, 'spin-roller.html');
+const LEGAL_HTML_FILE = path.join(__dirname, 'legal.html');
+// Local project me legacy Book Now file kabhi backup folder me hoti hai; dono locations support karo.
+const BOOK_NOW_PRIMARY_FILE = path.join(__dirname, 'aditya-studio-discount-wheel.html');
+const BOOK_NOW_BACKUP_FILE = path.join(__dirname, '_repo_inspect', 'aditya-studio-discount-wheel.html');
+const BOOK_NOW_HTML_FILE = fs.existsSync(BOOK_NOW_PRIMARY_FILE) ? BOOK_NOW_PRIMARY_FILE : BOOK_NOW_BACKUP_FILE;
 const VERIFY_MOBILE_HTML_FILE = path.join(__dirname, 'verify-mobile.html');
 const FRAMES_HTML_FILE = path.join(__dirname, 'frames-home.html'); // 3D frames shop + order
 const PLACE_ORDER_HTML_FILE = path.join(__dirname, 'place-order.html');
@@ -196,18 +269,43 @@ function verifyPin(acc, pin) {
   return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
 }
 function setPin(acc, pin) { acc.pin = hashPin(pin); }
+function restoreSessions() {
+  try {
+    if (!fs.existsSync(SESSIONS_FILE)) return;
+    const rows = JSON.parse(fs.readFileSync(SESSIONS_FILE, 'utf8'));
+    const now = Date.now();
+    if (!Array.isArray(rows)) return;
+    rows.forEach(row => {
+      if (row && row.token && row.mobile && Number(row.expiresAt) > now) {
+        sessions.set(String(row.token), { mobile: String(row.mobile), expiresAt: Number(row.expiresAt) });
+      }
+    });
+  } catch (e) { console.warn('session restore failed:', e.message); }
+}
+function saveSessions() {
+  try {
+    const now = Date.now();
+    const rows = [];
+    sessions.forEach((row, token) => {
+      if (row && Number(row.expiresAt) > now) rows.push({ token, mobile: String(row.mobile), expiresAt: Number(row.expiresAt) });
+    });
+    fs.writeFileSync(SESSIONS_FILE, JSON.stringify(rows), 'utf8');
+  } catch (e) { console.warn('session save failed:', e.message); }
+}
 function issueSession(acc) {
   const token = crypto.randomBytes(32).toString('base64url');
   sessions.set(token, { mobile: String(acc.mobile), expiresAt: Date.now() + SESSION_TTL_MS });
+  saveSessions();
   return token;
 }
 function sessionAccount(req, body, accounts) {
   const bearer = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
   const token = String((body && body.sessionToken) || bearer || '');
   const row = sessions.get(token);
-  if (!row || row.expiresAt < Date.now()) { if (row) sessions.delete(token); return null; }
+  if (!row || row.expiresAt < Date.now()) { if (row) { sessions.delete(token); saveSessions(); } return null; }
   return accounts.find(a => String(a.mobile) === row.mobile) || null;
 }
+restoreSessions();
 function clientKey(req, mobile) { return String(req.socket.remoteAddress || 'unknown') + ':' + String(mobile || ''); }
 function rateLimited(req, mobile, limit, windowMs) {
   const key = clientKey(req, mobile), now = Date.now();
@@ -430,6 +528,33 @@ function saveOtpRequests(list) {
   }
 }
 
+function keepPendingOtpForAdmin(row, now) {
+  if (!row || !row.otpHash) return false;
+  if (row.verified) return true;
+  // Mobile verification request ko kisi naye registration ke time delete mat karo.
+  if (row.purpose === 'mobile_verify') return true;
+  return !!(row.expiresAt && new Date(row.expiresAt).getTime() > now);
+}
+
+// Registration ke waqt ya purane account ke agle login par admin ke liye
+// ek hi pending WhatsApp OTP rakho. User ko OTP kabhi response me nahi bheja jata.
+function ensureAdminWhatsAppOtp(acc) {
+  if (!acc || acc.mobileVerified || !/^[6-9]\d{9}$/.test(String(acc.mobile || ''))) return false;
+  const now = Date.now();
+  let list = loadOtpRequests().filter(r => keepPendingOtpForAdmin(r, now));
+  const pending = list.find(r => r.mobile === acc.mobile && !r.verified && r.purpose === 'mobile_verify');
+  if (pending) return false;
+  const otp = generateOtp();
+  list.unshift({
+    mobile: acc.mobile, name: acc.name || '', id: acc.id || '', otpHash: hashOtp(otp),
+    requestId: 'otp-' + acc.mobile + '-' + now, smsId: '', createdAt: new Date().toISOString(),
+    expiresAt: new Date(now + MOBILE_VERIFY_OTP_TTL_MS).toISOString(), attempts: 0, verified: false,
+    purpose: 'mobile_verify', manualOtp: otp, delivery: 'whatsapp_manual'
+  });
+  saveOtpRequests(list.slice(0, 100));
+  return true;
+}
+
 /* ===== Free-spin fair bag (register users only) =====
    Har 100 spins:
      5  × Photo Frame
@@ -624,6 +749,13 @@ function saveNotifs(list) {
     mongoSaveNotifs(_cache.notifs).catch(e => console.error('mongo save notifs:', e.message));
   }
 }
+function loadUserActivity() {
+  try { return fs.existsSync(ACTIVITY_FILE) ? (JSON.parse(fs.readFileSync(ACTIVITY_FILE, 'utf8')) || []) : []; }
+  catch (e) { return []; }
+}
+function saveUserActivity(list) {
+  try { fs.writeFileSync(ACTIVITY_FILE, JSON.stringify((list || []).slice(0, 1200), null, 2)); } catch (e) { console.error('save activity', e.message); }
+}
 function defaultSettings() {
   return {
     // Default payment details. The QR image is kept with the project so it works
@@ -649,7 +781,7 @@ function defaultSettings() {
     homeDealsDurationSec: 20,
     // Colorful CTA button on the Register/Login landing page.
     loginPromo: {
-      text: '🎀 रक्षाबंधन स्पेशल — Photo Frames देखें / Order करें →',
+      text: '🎀 Premium Photo Frames देखें / Order करें →',
       link: '/#sizes',
       colorA: '#8E2A38',
       colorB: '#D4AF37',
@@ -921,6 +1053,7 @@ function accountPublicPayload(acc) {
     mobile: acc.mobile,
     history: publicHistory(acc),
     mobileVerified: !!acc.mobileVerified,
+    verificationOtpSentAt: acc.verificationOtpSentAt || '',
     badge: acc.badge || null,
     totalSpend: acc.totalSpend || 0,
     freeSpinUsed: !!acc.freeSpinUsed,
@@ -980,7 +1113,19 @@ function readFormBody(req) {
     req.on('error', reject);
   });
 }
-function isAdminAuthed(req) {
+function adminCookieToken() {
+  return crypto.createHmac('sha256', ADMIN_PASSWORD || 'disabled').update('aditya-studio-admin-local').digest('hex');
+}
+function hasAdminCookie(req) {
+  const cookies = String(req.headers.cookie || '').split(';').map(v => v.trim());
+  const row = cookies.find(v => v.startsWith('aditya_admin_session='));
+  if (!row || !ADMIN_PASSWORD) return false;
+  const token = row.slice('aditya_admin_session='.length);
+  const expected = adminCookieToken();
+  const given = Buffer.from(token, 'utf8'), wanted = Buffer.from(expected, 'utf8');
+  return given.length === wanted.length && crypto.timingSafeEqual(given, wanted);
+}
+function hasAdminBasicAuth(req) {
   if (!ADMIN_PASSWORD) return false;
   const header = req.headers['authorization'] || '';
   if (!header.startsWith('Basic ')) return false;
@@ -989,6 +1134,12 @@ function isAdminAuthed(req) {
   const expected = Buffer.from(ADMIN_PASSWORD, 'utf8');
   const provided = Buffer.from(pass, 'utf8');
   return expected.length === provided.length && crypto.timingSafeEqual(expected, provided);
+}
+function isAdminAuthed(req) { return hasAdminCookie(req) || hasAdminBasicAuth(req); }
+function establishAdminSession(req, res) {
+  if (hasAdminBasicAuth(req)) {
+    res.setHeader('Set-Cookie', 'aditya_admin_session=' + adminCookieToken() + '; Path=/; HttpOnly; SameSite=Lax; Max-Age=28800');
+  }
 }
 function requireAdminAuth(req, res) {
   res.writeHead(401, {
@@ -1008,6 +1159,13 @@ function fmtDate(d) {
 const server = http.createServer(async (req, res) => {
   const urlPath = (req.url || '/').split('?')[0];
 
+  // Relative "admin" link kisi bhi page (jaise /place-order.html) se khulne par
+  // browser /place-order.html/admin bana deta hai. Use hamesha root admin par bhejo.
+  if (req.method === 'GET' && urlPath !== '/admin' && /\/admin\/?$/.test(urlPath)) {
+    res.writeHead(302, { Location: '/admin' });
+    return res.end();
+  }
+
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
       'Access-Control-Allow-Origin': '*',
@@ -1021,7 +1179,35 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && (urlPath === '/' || urlPath === '/index.html')) {
     fs.readFile(INDEX_HTML_FILE, (err, data) => {
       if (err) { res.writeHead(404); return res.end('index.html missing'); }
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store, max-age=0' });
+      res.end(data);
+    });
+    return;
+  }
+
+  if (req.method === 'GET' && (urlPath === '/my-orders' || urlPath === '/my-orders.html')) {
+    fs.readFile(MY_ORDERS_HTML_FILE, (err, data) => {
+      if (err) { res.writeHead(404); return res.end('My Orders page missing'); }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store, max-age=0' });
+      res.end(data);
+    });
+    return;
+  }
+
+  if (req.method === 'GET' && (urlPath === '/spin' || urlPath === '/spin-roller')) {
+    fs.readFile(SPIN_ROLLER_HTML_FILE, (err, data) => {
+      if (err) { res.writeHead(404); return res.end('Spin roller page missing'); }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store, max-age=0' });
+      res.end(data);
+    });
+    return;
+  }
+
+  // Footer information pages use one local template with the appropriate content.
+  if (req.method === 'GET' && ['/privacy-policy', '/terms-of-service', '/careers', '/contact-us'].includes(urlPath)) {
+    fs.readFile(LEGAL_HTML_FILE, (err, data) => {
+      if (err) { res.writeHead(404); return res.end('Information page missing'); }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store, max-age=0' });
       res.end(data);
     });
     return;
@@ -1031,7 +1217,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && (urlPath === '/book-now' || urlPath === '/book-now.html' || urlPath === '/aditya-studio-discount-wheel.html')) {
     fs.readFile(BOOK_NOW_HTML_FILE, (err, data) => {
       if (err) { res.writeHead(404); return res.end('Book Now page missing'); }
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store, max-age=0' });
       res.end(data);
     });
     return;
@@ -1115,6 +1301,21 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && urlPath === '/api/notifications') {
     return sendJSON(res, 200, { ok: true, items: loadNotifs() });
   }
+  // Customer notifications are private: a logged-in user can receive only
+  // their own order updates plus messages sent to every customer.
+  if (req.method === 'POST' && urlPath === '/api/my-notifications') {
+    try {
+      const body = await readBody(req, 30000);
+      const accounts = loadAccounts();
+      const account = sessionAccount(req, body, accounts);
+      if (!account) return sendJSON(res, 401, { ok: false, error: 'auth', message: 'Login required' });
+      const mobile = String(account.mobile || '');
+      const items = loadNotifs().filter(n => !n.mobile || String(n.mobile) === mobile).slice(0, 30);
+      return sendJSON(res, 200, { ok: true, items });
+    } catch (e) {
+      return sendJSON(res, 500, { ok: false, error: 'server-error' });
+    }
+  }
 
   /* ---- Photo Frames public APIs ---- */
   if (req.method === 'GET' && urlPath === '/api/frames') {
@@ -1135,6 +1336,65 @@ const server = http.createServer(async (req, res) => {
       deliveryFreeAbove: f.deliveryFreeAbove,
       platform: f.platformFee, delivery: f.deliveryFee
     });
+  }
+
+  // Browser uploads customer photos straight to the private R2 bucket. The
+  // server returns only a short-lived, single-object upload URL, so large
+  // images never travel through or get stored in this Node server.
+  if (req.method === 'POST' && urlPath === '/api/r2/frame-photo-upload') {
+    try {
+      if (!r2Ready()) return sendJSON(res, 503, { ok: false, error: 'r2-not-configured', message: 'Photo storage abhi configured nahi hai' });
+      const body = await readBody(req, 20000);
+      const mobile = String(body.mobile || '').replace(/\D/g, '');
+      const account = sessionAccount(req, body, loadAccounts());
+      if (!account || String(account.mobile) !== mobile) {
+        return sendJSON(res, 401, { ok: false, error: 'auth', message: 'Photo upload ke liye account login zaroori hai' });
+      }
+      const type = String(body.contentType || '').toLowerCase();
+      const ext = ({ 'image/jpeg': 'jpg', 'image/jpg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' })[type];
+      if (!ext) return sendJSON(res, 400, { ok: false, error: 'invalid-image', message: 'Sirf JPG, PNG ya WEBP photo upload karein' });
+      const objectKey = 'customer-photos/' + mobile + '/' + Date.now() + '-' + crypto.randomBytes(10).toString('hex') + '.' + ext;
+      return sendJSON(res, 200, {
+        ok: true,
+        key: objectKey,
+        uploadUrl: r2PresignedUrl('PUT', objectKey, 600),
+        expiresIn: 600
+      });
+    } catch (e) {
+      console.error('r2 photo presign', e.message);
+      return sendJSON(res, 500, { ok: false, error: 'r2-upload-error', message: 'Photo upload link nahi ban saka' });
+    }
+  }
+
+  // Fallback for a bucket whose CORS policy has not propagated yet. The photo
+  // is forwarded to R2 immediately and is never written to this server disk.
+  if (req.method === 'POST' && urlPath === '/api/r2/frame-photo-proxy') {
+    try {
+      if (!r2Ready()) return sendJSON(res, 503, { ok: false, error: 'r2-not-configured' });
+      const body = await readBody(req, 6e6);
+      const mobile = String(body.mobile || '').replace(/\D/g, '');
+      const account = sessionAccount(req, body, loadAccounts());
+      if (!account || String(account.mobile) !== mobile) return sendJSON(res, 401, { ok: false, error: 'auth', message: 'Login session valid nahi hai' });
+      const dataUrl = String(body.dataUrl || '');
+      const match = /^data:(image\/(?:png|jpe?g|webp));base64,([A-Za-z0-9+/=\s]+)$/i.exec(dataUrl);
+      if (!match) return sendJSON(res, 400, { ok: false, error: 'invalid-image', message: 'Photo format sahi nahi hai' });
+      const bytes = Buffer.from(match[2].replace(/\s/g, ''), 'base64');
+      if (!bytes.length || bytes.length > 4 * 1024 * 1024) return sendJSON(res, 400, { ok: false, error: 'photo-too-large', message: 'Photo 4 MB se chhoti honi chahiye' });
+      const type = match[1].toLowerCase();
+      const ext = ({ 'image/jpeg': 'jpg', 'image/jpg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' })[type];
+      const key = 'customer-photos/' + mobile + '/' + Date.now() + '-' + crypto.randomBytes(10).toString('hex') + '.' + ext;
+      const put = await fetch(r2PresignedUrl('PUT', key, 600), { method: 'PUT', headers: { 'Content-Type': type }, body: bytes });
+      if (!put.ok) {
+        const detail = (await put.text().catch(() => '')).match(/<Code>([^<]+)<\/Code>/i);
+        const safeCode = detail ? detail[1] : ('HTTP ' + put.status);
+        console.error('r2 proxy put failed:', put.status, safeCode);
+        return sendJSON(res, 502, { ok: false, error: 'r2-upload-failed', message: 'Cloud storage rejected upload: ' + safeCode });
+      }
+      return sendJSON(res, 200, { ok: true, key });
+    } catch (e) {
+      console.error('r2 photo proxy', e.message);
+      return sendJSON(res, 500, { ok: false, error: 'r2-upload-error', message: 'Photo upload fail hua' });
+    }
   }
 
 
@@ -1230,10 +1490,16 @@ function computeOrderFees(subtotal, settingsFees) {
       const paymentClaimed = !!(utr || paymentScreenshot);
       // Customer uploaded photo for the frame (base64) — admin can download
       const customerPhotoRaw = String(body.customerPhoto || body.userPhoto || '');
+      const customerPhotoKey = String(body.customerPhotoKey || '').trim();
       if (customerPhotoRaw.length > 5e6 || (customerPhotoRaw && !/^data:image\/(png|jpe?g|webp);base64,/i.test(customerPhotoRaw))) {
         return sendJSON(res, 400, { ok: false, error: 'invalid-photo', message: 'Customer photo PNG, JPG ya WEBP format mein 3 MB se chhoti honi chahiye' });
       }
-      const customerPhoto = customerPhotoRaw;
+      if (customerPhotoKey && !isSafeR2PhotoKey(customerPhotoKey, mobile)) {
+        return sendJSON(res, 400, { ok: false, error: 'invalid-photo-key', message: 'Photo upload verify nahi hua' });
+      }
+      // r2: prefix keeps old base64 orders compatible while new orders contain
+      // only a tiny private object key in the database.
+      const customerPhoto = customerPhotoKey ? ('r2:' + customerPhotoKey) : customerPhotoRaw;
       let walletPaid = 0;
       let paymentStatus = paymentClaimed ? 'paid_claimed' : 'unpaid';
       // Wallet pay (partial or full)
@@ -1298,6 +1564,7 @@ function computeOrderFees(subtotal, settingsFees) {
         mobile: mobile
       });
       saveNotifs(notifs.slice(0, 50));
+      void sendTelegramAlert('New Frame Order', 'Order: ' + orderId + '\nCustomer: ' + (order.name || mobile) + ' · ' + mobile + '\nFrame: ' + (frame.title || frame.size) + '\nTotal: ₹' + order.finalAmount + '\nPayment: ' + paymentStatus);
       console.log('Frame order:', orderId, mobile, frame.size, 'total', order.finalAmount, 'wallet', walletPaid, 'due', finalAmount, paymentStatus);
       return sendJSON(res, 200, {
         ok: true, orderId, trackingNumber: order.trackingNumber,
@@ -1325,6 +1592,29 @@ function computeOrderFees(subtotal, settingsFees) {
     } catch (e) {
       return sendJSON(res, 500, { ok: false, error: 'server-error' });
     }
+  }
+
+  // Lightweight customer analytics. Only page/action labels are stored; never form text, PIN, UTR or payment data.
+  if (req.method === 'POST' && urlPath === '/api/activity') {
+    try {
+      const body = await readBody(req, 20000);
+      const accounts = loadAccounts();
+      const acc = sessionAccount(req, body, accounts);
+      if (!acc) return sendJSON(res, 401, { ok:false, error:'auth' });
+      const page = String(body.page || '/').slice(0, 80).replace(/[^a-zA-Z0-9_\-/.?=]/g, '');
+      const action = String(body.action || 'page_view').slice(0, 80).replace(/[^a-zA-Z0-9_\-/. ]/g, '');
+      const list = loadUserActivity();
+      const now = new Date().toISOString();
+      let row = list.find(x => String(x.mobile) === String(acc.mobile));
+      if (!row) { row = { mobile:acc.mobile, name:acc.name||'', totalSeconds:0, lastSeenAt:now, lastPage:page, events:[] }; list.unshift(row); }
+      const prev = new Date(row.lastSeenAt || 0).getTime();
+      const gap = Date.now() - prev;
+      if (gap > 0 && gap < 90000) row.totalSeconds = Number(row.totalSeconds || 0) + Math.round(gap / 1000);
+      row.name = acc.name || row.name || ''; row.lastSeenAt = now; row.lastPage = page;
+      if (action !== 'heartbeat') row.events = [{ at:now, page, action }].concat(row.events || []).slice(0, 80);
+      saveUserActivity(list);
+      return sendJSON(res, 200, { ok:true });
+    } catch (e) { return sendJSON(res, 500, { ok:false }); }
   }
 
   // Photo editing request — up to 10 photos
@@ -1389,25 +1679,40 @@ function computeOrderFees(subtotal, settingsFees) {
       if (acc.mobileVerified) return sendJSON(res, 200, { ok: true, alreadyVerified: true });
       let list = loadOtpRequests();
       const now = Date.now();
-      // Expired/legacy plaintext OTPs are never valid and are removed.
-      list = list.filter(r => r.verified || (r.expiresAt && new Date(r.expiresAt).getTime() > now && r.otpHash));
+      // Dusre user ka pending mobile OTP kabhi delete nahi hoga.
+      list = list.filter(r => keepPendingOtpForAdmin(r, now));
       const existing = list.find(r => r.mobile === mobile && !r.verified && r.purpose === 'mobile_verify');
+      // Admin WhatsApp OTP ko baar-baar request karne par naya OTP mat banao.
+      // Wahi pending 6-digit OTP 5 minute tak admin panel me rahega.
+      if (existing && existing.manualOtp) {
+        return sendJSON(res, 200, { ok: true, alreadyVerified: false, delivery: 'whatsapp_manual', alreadyPending: true, expiresInSeconds: Math.max(0, Math.floor((new Date(existing.expiresAt).getTime() - now) / 1000)) });
+      }
       if (existing && now - new Date(existing.createdAt || 0).getTime() < OTP_RESEND_COOLDOWN_MS) {
         return sendJSON(res, 429, { ok: false, error: 'resend-too-soon', message: 'OTP dobara bhejne ke liye 1 minute rukhein.' });
       }
       const otp = generateOtp();
       const requestId = 'otp-' + mobile + '-' + now;
-      const sms = await sendOtpSms(mobile, otp, requestId);
+      // Gateway set ho to direct SMS bhejo. Local/admin mode me request ko
+      // fail na karo — admin panel se WhatsApp par OTP bheja ja sakega.
+      let sms = {}, delivery = 'whatsapp_manual';
+      try {
+        sms = await sendOtpSms(mobile, otp, requestId);
+        delivery = 'sms';
+      } catch (sendErr) {
+        console.warn('OTP gateway unavailable; keeping request for admin WhatsApp:', sendErr.code || sendErr.message);
+      }
       if (existing) list = list.filter(r => r !== existing);
       list.unshift({
         mobile, name: acc.name || '', id: acc.id || '', otpHash: hashOtp(otp), requestId,
         smsId: sms.sms_id || sms.id || '', createdAt: new Date().toISOString(),
-        expiresAt: new Date(now + OTP_TTL_MS).toISOString(), attempts: 0, verified: false, purpose: 'mobile_verify'
+        expiresAt: new Date(now + MOBILE_VERIFY_OTP_TTL_MS).toISOString(), attempts: 0, verified: false, purpose: 'mobile_verify',
+        // Sirf password-protected admin panel me manual WhatsApp send ke liye.
+        manualOtp: delivery === 'whatsapp_manual' ? otp : '', delivery
       });
       saveOtpRequests(list.slice(0, 100));
       recordAuthFailure(req, mobile + ':otp');
-      console.log('SMS OTP sent for:', mobile, requestId);
-      return sendJSON(res, 200, { ok: true, alreadyVerified: false, expiresInSeconds: Math.floor(OTP_TTL_MS / 1000) });
+      console.log('OTP request created for:', mobile, requestId, delivery);
+      return sendJSON(res, 200, { ok: true, alreadyVerified: false, delivery, expiresInSeconds: Math.floor(OTP_TTL_MS / 1000) });
     } catch (e) {
       console.error('request-spin-otp', e);
       const status = e && e.code === 'sms-not-configured' ? 503 : 502;
@@ -1428,10 +1733,8 @@ function computeOrderFees(subtotal, settingsFees) {
       const list = loadOtpRequests();
       const row = list.find(r => r.mobile === mobile && !r.verified && r.purpose === 'mobile_verify');
       if (!row) return sendJSON(res, 400, { ok: false, error: 'no-request' });
-      if (!row.expiresAt || new Date(row.expiresAt).getTime() <= Date.now()) {
-        row.expiredAt = new Date().toISOString(); saveOtpRequests(list);
-        return sendJSON(res, 410, { ok: false, error: 'otp-expired', message: 'OTP expire ho gaya. Naya OTP maangein.' });
-      }
+      // Admin-panel mobile verification OTP user verify kare tabhi close hoga.
+      // Isliye is flow me time ke basis par OTP ko reject/delete nahi karte.
       row.attempts = Number(row.attempts || 0) + 1;
       if (row.attempts > OTP_MAX_ATTEMPTS) { row.lockedAt = new Date().toISOString(); saveOtpRequests(list); return sendJSON(res, 429, { ok: false, error: 'too-many-attempts' }); }
       if (!otpMatches(row, otp)) { saveOtpRequests(list); recordAuthFailure(req, mobile + ':verify-otp'); return sendJSON(res, 401, { ok: false, error: 'wrong-otp' }); }
@@ -1515,14 +1818,15 @@ function computeOrderFees(subtotal, settingsFees) {
   if (req.method === 'POST' && urlPath === '/api/register') {
     try {
       const body = await readBody(req);
+      const name = String(body.name || '').trim();
       const mobile = String(body.mobile || '').trim();
       const pin = String(body.pin || '').trim();
-      if (!/^[6-9]\d{9}$/.test(mobile) || !/^\d{4}$/.test(pin)) return sendJSON(res, 400, { ok: false, error: 'invalid' });
+      if (!/^[A-Za-z ]{2,}$/.test(name) || !/^[6-9]\d{9}$/.test(mobile) || !/^\d{4}$/.test(pin)) return sendJSON(res, 400, { ok: false, error: 'invalid' });
       const accounts = loadAccounts();
       if (accounts.find(a => a.mobile === mobile)) return sendJSON(res, 409, { ok: false, error: 'exists' });
       const id = nextCustomerId(accounts);
       const acc = {
-        id, name: String(body.name || '').trim(), mobile, village: String(body.village || '').trim(),
+        id, name, mobile, village: String(body.village || '').trim(),
         pin: hashPin(pin), createdAt: new Date().toISOString(), visitCount: 1, lastVisitAt: new Date().toISOString(),
         pinResetRequested: false, freeSpinUsed: false, mobileVerified: false, history: [], totalSpend: 0,
         adTokens: 0, spinBalance: 1, lastAdTokenClaim: '',
@@ -1530,7 +1834,12 @@ function computeOrderFees(subtotal, settingsFees) {
       };
       accounts.push(acc);
       saveAccounts(accounts);
-      return sendJSON(res, 200, { ...accountPublicPayload(acc), sessionToken: issueSession(acc), freeSpinGift: true });
+      // Naye register user ki verification request admin WhatsApp OTP list me seedha aaye.
+      const now = Date.now(), otp = generateOtp(), requestId = 'otp-' + mobile + '-' + now;
+      let otpList = loadOtpRequests().filter(r => keepPendingOtpForAdmin(r, now));
+      otpList.unshift({ mobile, name: acc.name || '', id: acc.id || '', otpHash: hashOtp(otp), requestId, smsId:'', createdAt:new Date().toISOString(), expiresAt:new Date(now + MOBILE_VERIFY_OTP_TTL_MS).toISOString(), attempts:0, verified:false, purpose:'mobile_verify', manualOtp:otp, delivery:'whatsapp_manual' });
+      saveOtpRequests(otpList.slice(0,100));
+      return sendJSON(res, 200, { ...accountPublicPayload(acc), sessionToken: issueSession(acc), otpRequested:true });
     } catch (e) {
       return sendJSON(res, 500, { ok: false, error: 'save-failed' });
     }
@@ -1550,6 +1859,8 @@ function computeOrderFees(subtotal, settingsFees) {
       acc.visitCount = (acc.visitCount || 0) + 1;
       acc.lastVisitAt = new Date().toISOString();
       saveAccounts(accounts);
+      // Legacy registrations ke liye bhi OTP queue recover ho jaye.
+      ensureAdminWhatsAppOtp(acc);
       return sendJSON(res, 200, { ...accountPublicPayload(acc), sessionToken: issueSession(acc) });
     } catch (e) {
       return sendJSON(res, 400, { ok: false, error: 'bad-request' });
@@ -1626,8 +1937,11 @@ function computeOrderFees(subtotal, settingsFees) {
   }
 
   /* ===== Wallet APIs ===== */
-  // Apply own active coupon → credit wallet
+  // Coupons are discounts/services only; they must never be converted into
+  // withdrawable or spendable wallet money.
   if (req.method === 'POST' && urlPath === '/api/wallet/apply-coupon') {
+    return sendJSON(res, 410, { ok: false, error: 'coupon-wallet-disabled', message: 'Coupon wallet me add nahi hota. Order ya studio service par use karein.' });
+    /* legacy implementation retained below for compatibility reference
     try {
       const body = await readBody(req);
       const couponId = String(body.couponId || '').trim();
@@ -1674,6 +1988,7 @@ function computeOrderFees(subtotal, settingsFees) {
       console.error('wallet/apply-coupon', e);
       return sendJSON(res, 500, { ok: false, error: 'server-error' });
     }
+    */
   }
 
   // Redeem admin-issued wallet code (codes.json with type wallet / walletAmount)
@@ -1744,6 +2059,7 @@ function computeOrderFees(subtotal, settingsFees) {
       acc.walletPendingBalance += amount;
       acc.walletHistory.unshift({ id:walletHistoryId(), type:'pending', amount, balanceAfter:acc.walletBalance, reason:'Top-up pending admin verification', source:'wallet_topup', ref:topupId, timestamp:new Date().toISOString() });
       saveWalletTopups(topups); saveAccounts(accounts);
+      void sendTelegramAlert('Wallet Recharge Pending', 'Customer: ' + (acc.name || acc.mobile) + ' · ' + acc.mobile + '\nAmount: ₹' + amount + '\nUTR: ' + (utr || 'Screenshot submitted') + '\nTop-up ID: ' + topupId);
       return sendJSON(res, 200, { ok:true, topupId, message:'Payment proof submit हो गया। Admin verify करने के बाद ₹'+amount+' wallet में usable होगा।', walletPendingBalance:acc.walletPendingBalance });
     } catch (e) {
       console.error('wallet/topup', e); return sendJSON(res, 500, { ok:false, message:'Top-up save नहीं हो पाया' });
@@ -1765,6 +2081,37 @@ function computeOrderFees(subtotal, settingsFees) {
     } catch (e) {
       return sendJSON(res, 500, { ok: false, error: 'server-error' });
     }
+  }
+
+  // Admin verifies wallet recharge after checking UTR / payment screenshot.
+  if (req.method === 'POST' && urlPath === '/admin/wallet-topup-action') {
+    try {
+      const body = await readFormBody(req);
+      const id = String(body.id || '').trim();
+      const action = String(body.action || '').trim();
+      const topups = loadWalletTopups();
+      const topup = topups.find(t => String(t.id) === id);
+      if (!topup || topup.status !== 'pending') { res.writeHead(302, { Location: '/admin?topup=missing' }); return res.end(); }
+      const accounts = loadAccounts();
+      const acc = accounts.find(a => String(a.mobile) === String(topup.mobile));
+      if (!acc) { res.writeHead(302, { Location: '/admin?topup=customer-missing' }); return res.end(); }
+      ensureWallet(acc);
+      const amount = Math.max(0, Number(topup.amount) || 0);
+      acc.walletPendingBalance = Math.max(0, Number(acc.walletPendingBalance || 0) - amount);
+      if (action === 'approve') {
+        topup.status = 'approved'; topup.verifiedAt = new Date().toISOString();
+        walletTxn(acc, 'credit', amount, { reason: 'Recharge approved · ' + id, source: 'wallet_topup', ref: id });
+      } else if (action === 'reject') {
+        topup.status = 'rejected'; topup.verifiedAt = new Date().toISOString();
+        acc.walletHistory.unshift({ id: walletHistoryId(), type: 'rejected', amount, balanceAfter: acc.walletBalance, reason: 'Recharge rejected · ' + id, source: 'wallet_topup', ref: id, timestamp: new Date().toISOString() });
+      } else { res.writeHead(302, { Location: '/admin?topup=invalid-action' }); return res.end(); }
+      saveWalletTopups(topups); saveAccounts(accounts);
+      const notifs = loadNotifs();
+      notifs.unshift({ id:'n-'+Date.now(), title: action === 'approve' ? '💰 Wallet Recharge Approved' : '⚠️ Wallet Recharge Rejected', body: action === 'approve' ? '₹'+amount+' aapke wallet me add ho gaya hai.' : '₹'+amount+' recharge verify nahi hua. Studio se sampark karein.', at:new Date().toISOString(), expiresAt:new Date(Date.now()+30*24*60*60*1000).toISOString(), mobile:acc.mobile });
+      saveNotifs(notifs.slice(0,50));
+      void sendTelegramAlert(action === 'approve' ? 'Wallet Recharge Approved' : 'Wallet Recharge Rejected', 'Customer: ' + (acc.name || acc.mobile) + ' · ' + acc.mobile + '\nAmount: ₹' + amount + '\nTop-up ID: ' + id);
+      res.writeHead(302, { Location: '/admin?topup='+action }); return res.end();
+    } catch (e) { console.error('wallet topup admin', e); res.writeHead(302, { Location: '/admin?topup=fail' }); return res.end(); }
   }
 
   if (req.method === 'POST' && urlPath === '/api/assign-work-spin') {
@@ -1890,13 +2237,48 @@ function computeOrderFees(subtotal, settingsFees) {
           discount: body.discount,
           timestamp: new Date().toISOString(),
           couponId: 'C-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6),
-          couponStatus: 'active'
+          couponStatus: 'active',
+          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
         });
         saveAccounts(accounts);
       }
       return sendJSON(res, 200, { ok: true });
     } catch (e) {
       return sendJSON(res, 400, { ok: false });
+    }
+  }
+
+  // The homepage roller consumes one earned spin and creates a usable coupon.
+  // Prize selection happens on the server so browser refreshes cannot reuse a spin.
+  if (req.method === 'POST' && urlPath === '/api/use-spin') {
+    try {
+      const body = await readBody(req);
+      const accounts = loadAccounts();
+      const acc = sessionAccount(req, body, accounts);
+      if (!acc) return sendJSON(res, 401, { ok: false, error: 'auth', message: 'Login required' });
+      const available = Math.max(0, Number(acc.spinBalance) || 0);
+      if (available < 1) return sendJSON(res, 409, { ok: false, error: 'no-spin', message: 'Pehle spin code claim karein ya AD tokens se spin add karein.' });
+      const options = [
+        { label: '₹10 Discount', discount: 10 }, { label: '₹20 Discount', discount: 20 },
+        { label: '₹30 Discount', discount: 30 }, { label: '₹50 Discount', discount: 50 },
+        { label: '₹100 Discount', discount: 100 }, { label: 'Good Luck', discount: 0 }
+      ];
+      const prize = options[crypto.randomInt(options.length)];
+      const now = new Date();
+      const couponCode = 'AS' + String(Date.now()).slice(-6) + crypto.randomBytes(2).toString('hex').toUpperCase();
+      acc.spinBalance = available - 1;
+      acc.history = acc.history || [];
+      acc.history.unshift({
+        entryId: (acc.id || 'AS') + '-SPIN-' + Date.now(), amount: 0,
+        prize: prize.label, discount: prize.discount, couponId: couponCode,
+        couponStatus: prize.discount > 0 ? 'active' : 'not_winner',
+        timestamp: now.toISOString(), expiresAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()
+      });
+      saveAccounts(accounts);
+      return sendJSON(res, 200, { ok: true, prize, couponCode: prize.discount > 0 ? couponCode : '', spinBalance: acc.spinBalance });
+    } catch (e) {
+      console.error('use-spin', e);
+      return sendJSON(res, 500, { ok: false, error: 'server-error', message: 'Spin save nahi ho paya' });
     }
   }
 
@@ -1911,6 +2293,9 @@ function computeOrderFees(subtotal, settingsFees) {
       const accounts = loadAccounts();
       const acc = sessionAccount(req, body, accounts);
       if (!acc) return sendJSON(res, 401, { ok: false, error: 'auth', message: 'Login required' });
+      if (row.type === 'wallet' || Number(row.walletAmount) > 0) {
+        return sendJSON(res, 400, { ok: false, error: 'wallet-code', message: 'Ye wallet code hai, spin code nahi.' });
+      }
       const amount = Number(row.amount) || 0;
       row.used = true;
       row.usedBy = acc.id + ' / ' + acc.mobile;
@@ -1922,9 +2307,11 @@ function computeOrderFees(subtotal, settingsFees) {
       acc.history.push({ entryId, amount, tier, code: row.code, timestamp: new Date().toISOString() });
       acc.totalSpend = acc.history.reduce((s, h) => s + (Number(h.amount) || 0), 0);
       acc.badge = tierName(acc.totalSpend);
+      acc.spinBalance = (Number(acc.spinBalance) || 0) + 1;
       saveAccounts(accounts);
       return sendJSON(res, 200, {
-        ok: true, amount, tier, entryId, badge: acc.badge, totalSpend: acc.totalSpend, code: row.code
+        ok: true, amount, tier, entryId, badge: acc.badge, totalSpend: acc.totalSpend, code: row.code,
+        spinBalance: acc.spinBalance, message: 'Spin code claim ho gaya — ab roller ghumayein!'
       });
     } catch (e) {
       console.error('redeem', e);
@@ -1955,6 +2342,40 @@ function computeOrderFees(subtotal, settingsFees) {
   // ---- Admin auth ----
   if (urlPath === '/api/customers' || urlPath === '/admin' || urlPath.startsWith('/admin/')) {
     if (!isAdminAuthed(req)) return requireAdminAuth(req, res);
+    establishAdminSession(req, res);
+  }
+
+  if (req.method === 'GET' && urlPath === '/admin/activity-json') {
+    const now = Date.now();
+    const users = loadUserActivity().map(x => ({ ...x, online: now - new Date(x.lastSeenAt || 0).getTime() < 90000 })).sort((a,b) => Number(b.totalSeconds||0)-Number(a.totalSeconds||0));
+    return sendJSON(res, 200, { ok:true, users });
+  }
+
+  if (req.method === 'GET' && urlPath === '/admin/activity') {
+    const html = `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>User Activity — Aditya Studio</title><style>body{margin:0;background:#0b0908;color:#f7f1e7;font:14px system-ui;padding:18px;max-width:980px;margin:auto}a{color:#f5d45d}.top{display:flex;justify-content:space-between;align-items:center;gap:12px}h1{color:#f5d45d}.sub{color:#a89c91}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:20px 0}.card,.user{background:#1b1511;border:1px solid rgba(245,212,93,.22);border-radius:15px;padding:15px}.num{font-size:28px;color:#f5d45d;font-weight:900}.online{color:#86efac}.offline{color:#aaa}.user{margin:12px 0}.head{display:flex;justify-content:space-between;gap:8px}.event{padding:8px;border-left:3px solid #22d3ee;background:#101c20;margin-top:7px;border-radius:0 8px 8px 0;font-size:12px}.tag{padding:4px 8px;border-radius:99px;background:#123d29;color:#bbf7d0;font-weight:800;font-size:11px}</style></head><body><div class="top"><div><h1>📊 User Activity Tracker</h1><p class="sub">Online users, time spent aur safe activity history. Refresh har 20 seconds me.</p></div><a href="/admin">← Admin Home</a></div><div class="grid" id="stats"></div><div id="list">Loading…</div><script>function e(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}function tm(s){let m=Math.floor((+s||0)/60),q=(+s||0)%60;return m+'m '+q+'s'}function dt(x){try{return new Date(x).toLocaleString('en-IN')}catch(_){return '—'}}async function load(){try{let d=await (await fetch('/admin/activity-json')).json(),u=d.users||[],on=u.filter(x=>x.online).length;document.getElementById('stats').innerHTML='<div class="card"><div class="num">'+on+'</div><div class="online">● Online now</div></div><div class="card"><div class="num">'+u.length+'</div><div>Total tracked users</div></div><div class="card"><div class="num">'+(u[0]?tm(u[0].totalSeconds):'0m')+'</div><div>Most active: '+e(u[0]?.name||'—')+'</div></div>';document.getElementById('list').innerHTML=u.length?u.map(x=>'<article class="user"><div class="head"><div><b>'+e(x.name||'Customer')+'</b> · '+e(x.mobile)+'<div class="sub">Last page: '+e(x.lastPage||'—')+' · Last active: '+dt(x.lastSeenAt)+'</div></div><div><span class="tag '+(x.online?'online':'offline')+'">'+(x.online?'● ONLINE':'○ Offline')+'</span><div class="sub" style="margin-top:8px;text-align:right">⏱ '+tm(x.totalSeconds)+'</div></div></div><div>'+((x.events||[]).slice(0,8).map(a=>'<div class="event">📍 '+e(a.page)+' &nbsp; → &nbsp; '+e(a.action)+' <span class="sub">('+dt(a.at)+')</span></div>').join('')||'<p class="sub">No actions yet</p>')+'</div></article>').join(''):'<p class="sub">Abhi tracking data nahi hai.</p>'}catch(e){document.getElementById('list').textContent='Load fail'}}load();setInterval(load,20000)</script></body></html>`;
+    res.writeHead(200,{ 'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store' }); return res.end(html);
+  }
+
+  if (req.method === 'POST' && urlPath === '/admin/otp-mark-sent') {
+    try {
+      const body = await readBody(req), mobile = String(body.mobile || '').replace(/\D/g, '');
+      const accounts = loadAccounts(), acc = accounts.find(a => String(a.mobile) === mobile);
+      if (!acc) return sendJSON(res, 404, { ok:false });
+      acc.verificationOtpSentAt = new Date().toISOString(); saveAccounts(accounts);
+      return sendJSON(res, 200, { ok:true });
+    } catch (e) { return sendJSON(res, 400, { ok:false }); }
+  }
+
+  if (req.method === 'POST' && urlPath === '/admin/otp-delete') {
+    if (!isAdminAuthed(req)) return requireAdminAuth(req, res);
+    try {
+      const body = await readBody(req);
+      const id = String(body.id || '').trim(), mobile = String(body.mobile || '').replace(/\D/g, '');
+      const before = loadOtpRequests();
+      const after = before.filter(r => !((id && String(r.id || '') === id) || (mobile && String(r.mobile || '') === mobile)));
+      saveOtpRequests(after);
+      return sendJSON(res, 200, { ok: true, removed: before.length - after.length });
+    } catch (e) { return sendJSON(res, 400, { ok: false }); }
   }
 
   if (req.method === 'GET' && urlPath === '/admin/backup') {
@@ -2069,7 +2490,15 @@ function computeOrderFees(subtotal, settingsFees) {
 
   /* ---- Admin: Photo Frames CRUD ---- */
   if (req.method === 'GET' && urlPath === '/admin/frames-json') {
-    return sendJSON(res, 200, { ok: true, frames: loadFrames(), orders: loadFrameOrders() });
+    const orders = loadFrameOrders().map(order => {
+      const copy = Object.assign({}, order);
+      if (String(copy.customerPhoto || '').startsWith('r2:') && r2Ready()) {
+        const key = String(copy.customerPhoto).slice(3);
+        try { copy.customerPhoto = r2PresignedUrl('GET', key, 600); } catch (e) { copy.customerPhoto = ''; }
+      }
+      return copy;
+    });
+    return sendJSON(res, 200, { ok: true, frames: loadFrames(), orders });
   }
 
   if (req.method === 'POST' && urlPath === '/admin/frame-save') {
@@ -2229,6 +2658,7 @@ function computeOrderFees(subtotal, settingsFees) {
         mobile: ord.mobile
       });
       saveNotifs(notifs.slice(0, 50));
+      void sendTelegramAlert('Order Status Updated', 'Order: ' + orderId + '\nCustomer: ' + (ord.name || ord.mobile) + '\nStatus: ' + stLabel + '\nPayment: ' + (payLabel || '—') + (ord.deliveryDate ? '\nDelivery: ' + ord.deliveryDate + ' ' + (ord.deliveryTime || '') : ''));
       return sendJSON(res, 200, { ok: true, order: ord });
     } catch (e) {
       console.error('frame-order-update', e);
@@ -2236,13 +2666,23 @@ function computeOrderFees(subtotal, settingsFees) {
     }
   }
 
+  if (req.method === 'POST' && urlPath === '/admin/telegram-test') {
+    const ok = await sendTelegramAlert('Telegram Test सफल', 'Aditya Studio bot connected hai. Ab new order, wallet recharge aur important admin alerts yahan aayenge.');
+    res.writeHead(302, { Location: '/admin?telegram=' + (ok ? 'ok' : 'fail') }); return res.end();
+  }
+
   if (req.method === 'POST' && urlPath === '/admin/send-notification') {
     try {
       const body = await readFormBody(req);
       const title = String(body.title || '').trim() || 'Aditya Studio';
       const bodyText = String(body.body || body.message || '').trim();
+      const mobile = String(body.mobile || '').replace(/\D/g, '');
       if (!bodyText) {
         res.writeHead(302, { Location: '/admin?notif=empty' });
+        return res.end();
+      }
+      if (mobile && !/^[6-9]\d{9}$/.test(mobile)) {
+        res.writeHead(302, { Location: '/admin?notif=invalid-mobile' });
         return res.end();
       }
       // expiresIn: hours (0 = never)
@@ -2254,11 +2694,13 @@ function computeOrderFees(subtotal, settingsFees) {
         title,
         body: bodyText,
         at: new Date().toISOString(),
-        expiresAt: hours > 0 ? new Date(Date.now() + hours * 60 * 60 * 1000).toISOString() : null
+        expiresAt: hours > 0 ? new Date(Date.now() + hours * 60 * 60 * 1000).toISOString() : null,
+        mobile: mobile || ''
       };
       const list = loadNotifs();
       list.unshift(item);
       saveNotifs(list);
+      void sendTelegramAlert('Admin Notification Sent', (mobile ? 'Personal alert to: ' + mobile : 'Studio alert to all customers') + '\nTitle: ' + title + '\nMessage: ' + bodyText);
       console.log('Notif saved:', title, 'expires', item.expiresAt || 'never');
       res.writeHead(302, { Location: '/admin?notif=ok' });
       return res.end();
@@ -2707,7 +3149,8 @@ function computeOrderFees(subtotal, settingsFees) {
     }));
     const pendingOtps = loadOtpRequests().filter(r => !r.verified).map(r => ({
       mobile: r.mobile, name: r.name || '', id: r.id || '',
-      at: r.createdAt || null, expiresAt: r.expiresAt || null
+      at: r.createdAt || null, expiresAt: r.expiresAt || null,
+      manualOtp: r.manualOtp || '', delivery: r.delivery || 'sms'
     }));
     const codes = loadCodes();
     const notifs = loadNotifs().slice(0, 10);
@@ -2792,12 +3235,12 @@ a{color:var(--gold)}h1{font-size:1.3rem;margin:0 0 6px;color:var(--gold)}.sub{co
 <div id="imgView" onclick="if(event.target===this)closeImg()"><img alt="view"/><button type="button" class="gen-btn" onclick="closeImg()">Close</button></div>
 <div class="topbar"><div><h1>📦 Frame Orders</h1><p class="sub">Alag page — filter, confirm, reject fake orders.</p></div><a href="/admin">← Admin home</a></div>
 <div class="filters" id="filters">
-<a href="/admin/orders?filter=all" data-f="all">All</a>
+<a href="/admin/orders?filter=all" data-f="all">📋 Order Dashboard</a>
 <a href="/admin/orders?filter=unread" data-f="unread">🔔 New <span id="unreadCount">0</span></a>
 <a href="/admin/orders?filter=new" data-f="new">Pending</a>
 <a href="/admin/orders?filter=confirmed" data-f="confirmed">Confirmed</a>
 <a href="/admin/orders?filter=pay_pending" data-f="pay_pending">Pay Pending</a>
-<a href="/admin/orders?filter=rejected" data-f="rejected">Rejected</a>
+<a href="/admin/orders?filter=recovery" data-f="recovery">🗃️ Recovery Orders</a>
 <a href="/admin/orders?filter=delivered" data-f="delivered">Delivered</a>
 </div>
 <div class="toolbar">
@@ -2815,12 +3258,13 @@ document.querySelectorAll('#filters a').forEach(function(a){if(a.getAttribute('d
 function matchFilter(o){
   var st=String(o.status||'processing').toLowerCase();
   var pay=String(o.paymentStatus||'unpaid').toLowerCase();
-  if(FILTER==='all')return true;
+  // Rejected orders are intentionally kept out of the daily active queue.
+  if(FILTER==='all')return st!=='rejected'&&st!=='cancelled';
   if(FILTER==='unread')return !!o.adminAlert;
   if(FILTER==='new'||FILTER==='pending')return st==='processing'||st==='pending'||st==='';
   if(FILTER==='confirmed')return st==='confirmed'||st==='ready';
   if(FILTER==='delivered')return st==='delivered';
-  if(FILTER==='rejected')return st==='rejected'||st==='cancelled';
+  if(FILTER==='recovery'||FILTER==='rejected')return st==='rejected'||st==='cancelled';
   if(FILTER==='pay_pending')return pay==='unpaid'||pay==='paid_claimed';
   return true;
 }
@@ -2847,7 +3291,8 @@ function mediaBlock(src,label,fname){
 }
 function proofCard(o){return '<div style="margin-top:10px;padding:11px;background:#0c0a09;border:1px solid rgba(212,175,55,.35);border-radius:11px"><b style="color:#D4AF37">💳 Payment & Photos</b><div class="muted" style="margin-top:4px">Payment: '+esc(o.paymentStatus||'unpaid')+(o.utr?' · UTR: '+esc(o.utr):' · UTR nahi mila')+'</div>'+mediaBlock(o.paymentScreenshot,'Payment screenshot','payment-'+o.orderId+'.jpg')+mediaBlock(o.customerPhoto,'Customer photo','customer-photo-'+o.orderId+'.jpg')+'</div>';}
 function card(o){
-  var rejected=String(o.status||'').toLowerCase()==='rejected';
+  var rejected=['rejected','cancelled'].indexOf(String(o.status||'').toLowerCase())>=0;
+  var accepted=!rejected&&['processing','pending',''].indexOf(String(o.status||'').toLowerCase())<0;
   return '<div class="msg-card" style="'+(rejected?'border-color:rgba(239,68,68,.5)':'')+'"><div class="msg-text"><b>'+esc(o.orderId)+'</b> · '+esc(o.frameTitle||'')+' ('+esc(o.size)+')'
     +(rejected?' <span style="color:#f87171;font-weight:700">REJECTED</span>':'')
     +(o.adminAlert?'<br><span style="display:inline-block;margin-top:7px;padding:5px 9px;border-radius:999px;background:#7c2d12;color:#fde68a;font-weight:800">🔔 NEW ORDER — payment proof check karein</span>':'')
@@ -2862,25 +3307,30 @@ function card(o){
     +(o.trackingNumber?'<br>🔖 '+esc(o.trackingNumber):'')+(o.adminNote?'<br>📌 '+esc(o.adminNote):'')
     + proofCard(o)
     +'<br><span class="muted">'+esc(fmt(o.createdAt))+'</span></div>'
-    +'<div style="display:grid;gap:6px;margin-top:10px">'
-    +'<label class="muted">Status <select class="inp" id="st-'+esc(o.orderId)+'">'
-    +['processing','pending','confirmed','ready','delivered','cancelled','rejected'].map(function(s){return '<option value="'+s+'"'+(o.status===s?' selected':'')+'>'+s+'</option>';}).join('')
-    +'</select></label>'
-    +'<label class="muted">Payment <select class="inp" id="pay-'+esc(o.orderId)+'">'
-    +['unpaid','paid_claimed','confirmed'].map(function(s){return '<option value="'+s+'"'+((o.paymentStatus||'unpaid')===s?' selected':'')+'>'+s+'</option>';}).join('')
-    +'</select></label>'
-    +'<label class="muted">Delivery date <input class="inp" id="dd-'+esc(o.orderId)+'" type="date" value="'+esc(o.deliveryDate||'')+'"></label>'
-    +'<label class="muted">Delivery time <input class="inp" id="dt-'+esc(o.orderId)+'" type="time" value="'+esc(o.deliveryTime||'')+'"></label>'
-    +'<label class="muted">Admin note <input class="inp" id="an-'+esc(o.orderId)+'" value="'+esc(o.adminNote||'')+'" style="max-width:100%"></label>'
-    +'<label class="muted"><input type="checkbox" id="wa-'+esc(o.orderId)+'"> Update ke baad WhatsApp message kholen</label>'
-    +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
-    +'<button class="gen-btn" onclick="updateOrder(\\''+esc(o.orderId)+'\\')">Update + Notify</button>'
-    +'<button class="gen-btn" onclick="waCustomer(\\''+esc(o.mobile)+'\\',\\''+esc(o.orderId)+'\\')">💬 WhatsApp Customer</button>'
-    +(o.paymentStatus!=='confirmed'?'<button class="btn-ok" onclick="confirmPay(\\''+esc(o.orderId)+'\\')">✅ Confirm Pay</button>':'')
-    +(rejected?'<button class="gen-btn" onclick="restoreOrder(\\''+esc(o.orderId)+'\\')">↩️ Restore</button>':'<button class="btn-reject" onclick="rejectOrder(\\''+esc(o.orderId)+'\\')">❌ Reject (fake)</button>')
-    +'</div></div></div>';
+    +(rejected
+      ?'<div style="margin-top:12px;padding:12px;border:1px dashed rgba(212,175,55,.55);border-radius:10px"><b style="color:#D4AF37">🗃️ Recovery Order</b><div class="muted" style="margin:6px 0 10px">Reason: '+esc(o.adminNote||'Not recorded')+'</div><button class="gen-btn" onclick="restoreOrder(\\''+esc(o.orderId)+'\\')">↩️ Recover Order</button></div>'
+      :'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px" id="start-'+esc(o.orderId)+'">'
+        +'<button class="btn-ok" onclick="acceptOrder(\\''+esc(o.orderId)+'\\')">✅ Accept Order</button>'
+        +'<select class="inp" id="rr-'+esc(o.orderId)+'" style="max-width:220px"><option value="Payment proof invalid">Payment proof invalid</option><option value="Photo is unclear">Photo is unclear</option><option value="Address incomplete">Address incomplete</option><option value="Frame unavailable">Frame unavailable</option><option value="Other">Other reason</option></select>'
+        +'<button class="btn-reject" onclick="rejectOrder(\\''+esc(o.orderId)+'\\')">❌ Reject</button>'
+      +'</div>'
+      +'<div id="accept-'+esc(o.orderId)+'" style="display:'+(accepted?'grid':'none')+';gap:8px;margin-top:12px;padding:12px;border:1px solid rgba(34,197,94,.4);border-radius:10px">'
+        +'<b style="color:#bbf7d0">Accepted order — delivery details set karein</b>'
+        +'<label class="muted">Delivery date <input class="inp" id="dd-'+esc(o.orderId)+'" type="date" value="'+esc(o.deliveryDate||'')+'"></label>'
+        +'<label class="muted">Delivery time <select class="inp" id="dt-'+esc(o.orderId)+'"><option value="">Select time</option>'+['10:00 AM','12:00 PM','5:00 PM','7:00 PM'].map(function(t){return '<option value="'+t+'"'+(o.deliveryTime===t?' selected':'')+'>'+t+'</option>';}).join('')+'</select></label>'
+        +'<label class="muted">Order status <select class="inp" id="st-'+esc(o.orderId)+'">'+['confirmed','ready','delivered'].map(function(s){return '<option value="'+s+'"'+(o.status===s?' selected':'')+'>'+s+'</option>';}).join('')+'</select></label>'
+        +'<label class="muted">Payment <select class="inp" id="pay-'+esc(o.orderId)+'">'+['unpaid','paid_claimed','confirmed'].map(function(s){return '<option value="'+s+'"'+((o.paymentStatus||'unpaid')===s?' selected':'')+'>'+s+'</option>';}).join('')+'</select></label>'
+        +'<label class="muted">Admin note <input class="inp" id="an-'+esc(o.orderId)+'" value="'+esc(o.adminNote||'')+'" style="max-width:100%"></label>'
+        +'<label class="muted"><input type="checkbox" id="wa-'+esc(o.orderId)+'"> WhatsApp update kholen</label>'
+        +'<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="gen-btn" onclick="updateOrder(\\''+esc(o.orderId)+'\\')">Save + Notify</button><button class="gen-btn" onclick="waCustomer(\\''+esc(o.mobile)+'\\',\\''+esc(o.orderId)+'\\')">💬 WhatsApp Customer</button>'+(o.paymentStatus!=='confirmed'?'<button class="btn-ok" onclick="confirmPay(\\''+esc(o.orderId)+'\\')">✅ Confirm Payment</button>':'')+'</div>'
+      +'</div>')
+    +'</div>';
 }
 async function loadOrdersPage(){
+  // Typing ke beech auto-refresh se form close/re-render nahi hona chahiye.
+  var active=document.activeElement;
+  if(active&&/^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName))return;
+  var keepScroll=window.scrollY||window.pageYOffset||0;
   _ordMedia={n:0};
   var box=document.getElementById('list');
   try{
@@ -2889,33 +3339,44 @@ async function loadOrdersPage(){
     var all=(data.orders||[]).slice(); ORDERS_BY_ID={}; all.forEach(function(o){ORDERS_BY_ID[o.orderId]=o;});
     var unread=all.filter(function(o){return !!o.adminAlert;}).length; document.getElementById('unreadCount').textContent=unread;
     var orders=all.reverse().filter(function(o){return matchFilter(o)&&dateMatches(o)&&searchMatches(o);});
-    box.innerHTML=orders.length?orders.map(card).join(''):'<div class="muted">Is filter me koi order nahi</div>';
-  }catch(e){box.innerHTML='<div class="muted">Load fail</div>';}
+    function section(title, icon, list, tone){return '<section style="margin:20px 0 26px"><h2 style="margin:0 0 8px;color:'+(tone||'#D4AF37')+';font-size:17px">'+icon+' '+title+' <span style="font-size:12px;opacity:.75">('+list.length+')</span></h2>'+ (list.length?list.map(card).join(''):'<div class="muted" style="padding:10px 0">Is section me abhi koi order nahi.</div>')+'</section>';}
+    if(FILTER==='all'&&!SEARCH&&RANGE==='all'){
+      var fresh=orders.filter(function(o){var s=String(o.status||'processing').toLowerCase();return s==='processing'||s==='pending'||s==='';});
+      var accepted=orders.filter(function(o){var s=String(o.status||'').toLowerCase();return s==='confirmed'||s==='ready';});
+      var delivered=orders.filter(function(o){return String(o.status||'').toLowerCase()==='delivered';});
+      var oldHtml=''; var byDate={}; delivered.forEach(function(o){var k=(o.updatedAt||o.createdAt||'').slice(0,10)||'Older';(byDate[k]=byDate[k]||[]).push(o);});
+      Object.keys(byDate).sort().reverse().forEach(function(k){oldHtml+=section('Delivered — '+k,'📅',byDate[k],'#a8a29e');});
+      box.innerHTML=section('New Orders','🔔',fresh,'#f87171')+section('Accepted / Processing','✅',accepted,'#4ade80')+'<section style="margin:20px 0"><h2 style="margin:0 0 8px;color:#a8a29e;font-size:17px">🗓️ Old Delivered Orders</h2>'+oldHtml+'</section>';
+    }else box.innerHTML=orders.length?orders.map(card).join(''):'<div class="muted">Is filter me koi order nahi</div>';
+    requestAnimationFrame(function(){window.scrollTo(0,keepScroll);});
+  }catch(e){box.innerHTML='<div class="muted">Load fail</div>';requestAnimationFrame(function(){window.scrollTo(0,keepScroll);});}
 }
 async function updateOrder(id){
   var body={orderId:id,status:(document.getElementById('st-'+id)||{}).value,paymentStatus:(document.getElementById('pay-'+id)||{}).value,deliveryDate:(document.getElementById('dd-'+id)||{}).value,deliveryTime:(document.getElementById('dt-'+id)||{}).value,adminNote:(document.getElementById('an-'+id)||{}).value};
   var res=await fetch('/admin/frame-order-update',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   var data=await res.json();if(data.ok){var o=data.order||ORDERS_BY_ID[id]||{};if((document.getElementById('wa-'+id)||{}).checked)waCustomer(o.mobile,id,o.status,o.paymentStatus);alert('Updated ✅');loadOrdersPage();}else alert('Fail');
 }
+function acceptOrder(id){var a=document.getElementById('accept-'+id),s=document.getElementById('start-'+id);if(a)a.style.display='grid';if(s)s.style.display='none';}
 async function confirmPay(id){
   if(!confirm('Payment confirm?'))return;
   var res=await fetch('/admin/frame-order-update',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({orderId:id,confirmPayment:true,status:'confirmed',deliveryDate:(document.getElementById('dd-'+id)||{}).value,deliveryTime:(document.getElementById('dt-'+id)||{}).value})});
   var data=await res.json();if(data.ok){var o=data.order||ORDERS_BY_ID[id]||{};if((document.getElementById('wa-'+id)||{}).checked)waCustomer(o.mobile,id,o.status,o.paymentStatus);alert('Confirmed');loadOrdersPage();}else alert('Fail');
 }
 async function rejectOrder(id){
-  var reason=prompt('Reject reason (fake order):',(document.getElementById('an-'+id)||{}).value||'Fake / invalid');
-  if(reason===null)return;if(!confirm('Reject '+id+'?'))return;
+  var reason=(document.getElementById('rr-'+id)||{}).value||'Rejected by studio';
+  if(reason==='Other'){reason=prompt('Reject reason likhein:','');if(!reason)return;}
+  if(!confirm('Reject '+id+' and move it to Recovery Orders?'))return;
   var res=await fetch('/admin/frame-order-update',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({orderId:id,reject:true,status:'rejected',adminNote:reason,rejectReason:reason})});
   var data=await res.json();if(data.ok){var o=data.order||ORDERS_BY_ID[id]||{};if((document.getElementById('wa-'+id)||{}).checked)waCustomer(o.mobile,id,o.status,o.paymentStatus);alert('Rejected ❌');loadOrdersPage();}else alert('Fail');
 }
 async function restoreOrder(id){
   if(!confirm('Restore to processing?'))return;
-  var res=await fetch('/admin/frame-order-update',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({orderId:id,status:'processing'})});
+  var res=await fetch('/admin/frame-order-update',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({orderId:id,status:'processing',adminNote:'Recovered from recovery orders'})});
   var data=await res.json();if(data.ok){alert('Restored');loadOrdersPage();}else alert('Fail');
 }
 loadOrdersPage();setInterval(loadOrdersPage,20000);
 </script></body></html>`;
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store, max-age=0' });
     return res.end(html);
   }
 
@@ -2932,27 +3393,37 @@ loadOrdersPage();setInterval(loadOrdersPage,20000);
     const verifiedCount = accounts.filter(a => a.mobileVerified).length;
     const freeUsed = accounts.filter(a => a.freeSpinUsed).length;
     const frameOrdersAdmin = loadFrameOrders();
-    const ordTotal = frameOrdersAdmin.length;
-    const ordNew = frameOrdersAdmin.filter(o => {
+    const activeFrameOrdersAdmin = frameOrdersAdmin.filter(o => !['rejected', 'cancelled'].includes(String(o.status || '').toLowerCase()));
+    const ordTotal = activeFrameOrdersAdmin.length;
+    const ordNew = activeFrameOrdersAdmin.filter(o => {
       if (!o.createdAt) return false;
       try { return new Date(o.createdAt).toDateString() === today; } catch (e) { return false; }
     }).length;
-    const ordPending = frameOrdersAdmin.filter(o => {
+    const ordPending = activeFrameOrdersAdmin.filter(o => {
       const st = String(o.status || 'processing').toLowerCase();
       return st === 'processing' || st === 'pending';
     }).length;
-    const ordConfirmed = frameOrdersAdmin.filter(o => {
+    const ordConfirmed = activeFrameOrdersAdmin.filter(o => {
       const st = String(o.status || '').toLowerCase();
       return st === 'confirmed' || st === 'ready' || st === 'delivered';
     }).length;
-    const ordPayPending = frameOrdersAdmin.filter(o => {
+    const ordPayPending = activeFrameOrdersAdmin.filter(o => {
       const pay = String(o.paymentStatus || 'unpaid').toLowerCase();
       return pay === 'unpaid' || pay === 'paid_claimed' || pay === 'partial_wallet';
     }).length;
-    const ordRejected = frameOrdersAdmin.filter(o => String(o.status || '').toLowerCase() === 'rejected').length;
+    const ordRejected = frameOrdersAdmin.filter(o => ['rejected', 'cancelled'].includes(String(o.status || '').toLowerCase())).length;
+    const pendingWalletTopups = loadWalletTopups().filter(t => String(t.status || 'pending') === 'pending');
+    const walletTopupCards = pendingWalletTopups.map(t => {
+      const proof = t.proof ? '<a href="'+esc(t.proof)+'" target="_blank"><img src="'+esc(t.proof)+'" style="width:82px;height:82px;object-fit:cover;border-radius:10px;border:2px solid #38bdf8" title="Open payment screenshot"></a>' : '<span class="muted">Screenshot nahi diya</span>';
+      return '<div class="msg-card" style="margin-top:10px;border-color:rgba(56,189,248,.7);background:linear-gradient(135deg,#0c2431,#1b1730);box-shadow:0 0 18px rgba(56,189,248,.15)"><div class="msg-text"><b style="color:#67e8f9">💳 Recharge Pending · ₹'+esc(t.amount)+'</b><br>👤 '+esc(t.name||'Customer')+' · '+esc(t.mobile)+'<br>UTR: <b>'+esc(t.utr||'Screenshot upload')+'</b><br><span class="muted">'+esc(fmtDate(t.createdAt))+'</span><div style="margin-top:9px">'+proof+'</div></div><div class="msg-actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><form method="POST" action="/admin/wallet-topup-action"><input type="hidden" name="id" value="'+esc(t.id)+'"><button class="gen-btn" type="submit" name="action" value="approve" style="background:linear-gradient(135deg,#22c55e,#0f766e);color:#fff;box-shadow:0 0 15px rgba(34,197,94,.35)">✅ Verify & Add ₹'+esc(t.amount)+'</button></form><form method="POST" action="/admin/wallet-topup-action" onsubmit="return confirm(\'Reject this recharge?\')"><input type="hidden" name="id" value="'+esc(t.id)+'"><button type="submit" name="action" value="reject" style="padding:8px 12px;border:0;border-radius:8px;background:#dc2626;color:#fff;font-weight:800;cursor:pointer">❌ Reject</button></form></div></div>';
+    }).join('') || '<div class="muted">Abhi koi wallet recharge verification pending nahi hai.</div>';
 
     const otpCards = pendingOtps.map(r => {
-      return '<div class="msg-card"><div class="msg-text">📱 <b>' + esc(r.name || '') + '</b> (' + esc(r.mobile) + ')<br><span style="color:#8fd19e;font-weight:700">SMS OTP sent</span><br><span class="muted">Requested: ' + esc(fmtDate(r.createdAt)) + (r.expiresAt ? ' · Expires: ' + esc(fmtDate(r.expiresAt)) : '') + '</span></div><div class="msg-actions"><button type="button" class="gen-btn" style="background:#7f1d1d;color:#fecaca;border:1px solid #991b1b" data-oid="'+esc(r.id||'')+'" data-omobile="'+esc(r.mobile||'')+'" onclick="adminDeleteOtp(this.dataset.oid,this.dataset.omobile)">🗑️ Cancel OTP</button></div></div>';
+      const manual = String(r.manualOtp || '');
+      const status = manual ? '<span style="color:#facc15;font-weight:700">WhatsApp OTP भेजना बाकी है</span>' : '<span style="color:#8fd19e;font-weight:700">SMS OTP sent</span>';
+      const code = manual ? '<div style="margin:9px 0;padding:8px 12px;border-radius:10px;background:#21170a;border:1px dashed #facc15;color:#fff3a6;font-size:22px;font-weight:900;letter-spacing:5px">OTP: '+esc(manual)+'</div>' : '';
+      const wa = manual ? '<button type="button" class="gen-btn" style="background:#16a34a;color:#fff;border:1px solid #4ade80" data-omobile="'+esc(r.mobile||'')+'" data-otp="'+esc(manual)+'" onclick="adminWhatsAppOtp(this.dataset.omobile,this.dataset.otp)">💬 WhatsApp OTP भेजें</button>' : '';
+      return '<div class="msg-card"><div class="msg-text">📱 <b>' + esc(r.name || '') + '</b> (' + esc(r.mobile) + ')<br>' + status + code + '<span class="muted">Requested: ' + esc(fmtDate(r.createdAt)) + (r.expiresAt ? ' · Expires: ' + esc(fmtDate(r.expiresAt)) : '') + '</span></div><div class="msg-actions">' + wa + '<button type="button" class="gen-btn" style="background:#7f1d1d;color:#fecaca;border:1px solid #991b1b" data-oid="'+esc(r.id||'')+'" data-omobile="'+esc(r.mobile||'')+'" onclick="adminDeleteOtp(this.dataset.oid,this.dataset.omobile)">🗑️ Cancel OTP</button></div></div>';
     }).join('') || '<div class="muted">No pending OTP</div>';
 
     const resetCards = pendingResets.map(acc => {
@@ -2985,11 +3456,14 @@ loadOrdersPage();setInterval(loadOrdersPage,20000);
     const notifAdminCards = (loadNotifs() || []).map(n => {
       const nid = esc(n.id || n.at || '');
       const exp = n.expiresAt ? fmtDate(n.expiresAt) : 'Never';
-      return '<div class="msg-card" style="margin-top:8px"><div class="msg-text"><b>' + esc(n.title || '') + '</b><br>' + esc(n.body || '') +
+      const personal = !!n.mobile;
+      return '<div class="msg-card" style="margin-top:8px;border-color:'+(personal?'rgba(34,211,238,.65)':'rgba(212,175,55,.35)')+';box-shadow:0 0 16px '+(personal?'rgba(34,211,238,.16)':'rgba(212,175,55,.10)')+'"><div class="msg-text"><b>'+(personal?'👤 Personal alert · ':'📣 Studio alert · ')+esc(n.title || '') + '</b><br>' + esc(n.body || '') +
+        (personal?'<br><span style="color:#67e8f9;font-size:12px">To: '+esc(n.mobile)+'</span>':'')+
         '<br><span class="muted">Sent: ' + esc(fmtDate(n.at)) + ' · Exp: ' + esc(exp) + '</span></div>' +
         '<div class="msg-actions"><form method="POST" action="/admin/delete-notification"><input type="hidden" name="id" value="' + nid + '">' +
         '<button type="submit" style="padding:6px 10px;background:#5a1a1a;color:#fca5a5;border:1px solid #7f1d1d;border-radius:6px;cursor:pointer">🗑 Delete</button></form></div></div>';
     }).join('') || '<div class="muted">No active notifications</div>';
+    const customerNotificationOptions = accounts.map(acc => '<option value="'+esc(acc.mobile)+'">'+esc(acc.name || 'Customer')+' · '+esc(acc.mobile)+'</option>').join('');
 
         const rows = accounts.map(acc => {
       const hist = (acc.history || []).slice().reverse();
@@ -3143,6 +3617,7 @@ label.muted{display:block;font-size:12px;margin-bottom:2px}
   <a class="nav-link" href="#sec-overview">📊 Overview</a>
   <a class="nav-link" href="#sec-order-stats">📦 Orders Summary</a>
   <a class="nav-link" href="#sec-orders">📋 Order List</a>
+  <a class="nav-link" href="/admin/activity" style="color:#67e8f9">📊 User Activity Tracker</a>
   <a class="nav-link" href="#sec-frames">🖼️ Frame Types</a>
   <a class="nav-link" href="#sec-banner">🎬 Home Banner</a>
   <a class="nav-link" href="#sec-hero">✨ Hero Text + BG Photos</a>
@@ -3199,9 +3674,15 @@ label.muted{display:block;font-size:12px;margin-bottom:2px}
 <a class="card" href="/admin/orders?filter=pending" style="text-decoration:none;color:inherit;cursor:pointer;border-color:rgba(251,146,60,0.4)" title="Pending"><div class="n" id="cntOrdPending" style="color:#fb923c">${ordPending}</div><div class="l">Pending</div></a>
 <a class="card" href="/admin/orders?filter=confirmed" style="text-decoration:none;color:inherit;cursor:pointer;border-color:rgba(74,222,128,0.4)" title="Confirmed"><div class="n" id="cntOrdConfirmed" style="color:#4ade80">${ordConfirmed}</div><div class="l" style="color:#4ade80">Confirmed</div></a>
 <a class="card" href="/admin/orders?filter=pay_pending" style="text-decoration:none;color:inherit;cursor:pointer" title="Pay pending"><div class="n" id="cntOrdPayPend" style="color:#fbbf24">${ordPayPending}</div><div class="l">Pay Pending</div></a>
-<a class="card" href="/admin/orders?filter=rejected" style="text-decoration:none;color:inherit;cursor:pointer;border-color:rgba(239,68,68,0.55)" title="Rejected"><div class="n" id="cntOrdRejected" style="color:#f87171">${ordRejected}</div><div class="l" style="color:#f87171">Rejected</div></a>
+<a class="card" href="/admin/orders?filter=recovery" style="text-decoration:none;color:inherit;cursor:pointer;border-color:rgba(239,68,68,0.55)" title="Recovery orders"><div class="n" id="cntOrdRejected" style="color:#f87171">${ordRejected}</div><div class="l" style="color:#f87171">Recovery Orders</div></a>
 </div>
 <p class="muted" style="margin-top:10px"><a href="/admin/orders" style="color:#D4AF37;font-weight:700">→ Open full Orders page (alag manage)</a></p>
+</section>
+
+<section class="panel" id="sec-wallet-recharges" style="border-color:rgba(56,189,248,.42)">
+<h2 style="color:#67e8f9">💳 Wallet Recharge Verification <span class="badge">${pendingWalletTopups.length}</span></h2>
+<p class="sub">Customer ne paisa add kiya ho to UTR / screenshot check karke green button se wallet me add karein.</p>
+<div id="walletTopupList">${walletTopupCards}</div>
 </section>
 
 <section class="panel" id="sec-fees">
@@ -3242,9 +3723,10 @@ label.muted{display:block;font-size:12px;margin-bottom:2px}
 </section>
 
 <section class="panel" id="sec-orders">
-<h2>📦 Frame Orders (preview)</h2>
-<p class="sub">Naye orders yahan. Full manage: <a href="/admin/orders" style="color:#D4AF37;font-weight:700">Open Orders Page →</a></p>
-<div id="adminOrdersList" class="muted">Loading orders…</div>
+<h2>📦 Order Manager</h2>
+<p class="sub">Orders ka handling sirf separate page par hoga, taki admin home clean rahe.</p>
+<a class="gen-btn" href="/admin/orders" style="display:inline-block;text-decoration:none">Open Separate Order Page →</a>
+<a href="/admin/orders?filter=recovery" style="display:inline-block;margin-left:9px;color:#67e8f9;font-weight:700">🗃️ Recovery Orders</a>
 </section>
 
 <section class="panel" id="sec-frames">
@@ -3261,6 +3743,7 @@ label.muted{display:block;font-size:12px;margin-bottom:2px}
 <label class="muted">Frame Type name<input class="inp" id="frTitle" placeholder="Golden Border / Wooden Classic"></label>
 <label class="muted">Price ₹<input class="inp" id="frPrice" type="number" min="0" placeholder="500" style="max-width:140px"></label>
 <label class="muted">Discount %<input class="inp" id="frDisc" type="number" min="0" max="90" placeholder="10" style="max-width:140px"></label>
+<label class="muted" style="display:flex;gap:8px;align-items:center;cursor:pointer"><input id="frActive" type="checkbox" checked> Order page par yeh frame type dikhayein</label>
 <input type="hidden" id="frId" value="">
 <label class="muted">Frame Type photo
 <input type="file" id="frFile" accept="image/*" class="field-file">
@@ -3463,8 +3946,12 @@ document.querySelectorAll('.book-up-btn').forEach(function(btn){
 </section>
 
 <section class="panel" id="sec-notif">
-<h2>🔔 Notifications</h2>
+<h2>🔔 Notification Studio</h2>
+<p class="sub">Gold = sab customers · Blue glow = sirf selected customer ka personal alert.</p>
 <form method="POST" action="/admin/send-notification" class="form-grid">
+<label class="muted">Recipient
+<select name="mobile" class="inp" style="max-width:420px"><option value="">📣 All customers (studio announcement)</option>${customerNotificationOptions}</select>
+</label>
 <input class="inp" name="title" placeholder="Title">
 <textarea name="body" rows="3" placeholder="Message..." required class="inp"></textarea>
 <label class="muted">Expire after
@@ -3480,8 +3967,9 @@ document.querySelectorAll('.book-up-btn').forEach(function(btn){
 <option value="0">Never expire</option>
 </select>
 </label>
-<button class="gen-btn" type="submit">📢 Send to all</button>
+<button class="gen-btn" type="submit">✨ Send Notification</button>
 </form>
+<form method="POST" action="/admin/telegram-test" style="margin-top:10px"><button type="submit" class="gen-btn" style="background:linear-gradient(135deg,#38bdf8,#2563eb);color:white">✈️ Send Telegram Test Alert</button><span class="muted" style="margin-left:8px">Bot token aur chat ID environment settings me set hone chahiye.</span></form>
 <div class="lbl" style="margin-top:16px">Active notifications</div>
 <div id="adminNotifList">${notifAdminCards}</div>
 </section>
@@ -3615,16 +4103,28 @@ function esc(t) {
 function fmt(d) {
   try { return d ? new Date(d).toLocaleString('en-IN') : ''; } catch(e) { return ''; }
 }
+function adminWhatsAppOtp(mobile, otp) {
+  var to = String(mobile || '').replace(/\\D/g, '');
+  var code = String(otp || '').replace(/\\D/g, '');
+  if (!/^[6-9]\\d{9}$/.test(to) || !/^\\d{6}$/.test(code)) { alert('OTP ya mobile invalid hai.'); return; }
+  fetch('/admin/otp-mark-sent',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({mobile:to})}).catch(function(){});
+  var text = 'Aditya Studio OTP: ' + code + '. Yeh 5 minute tak valid hai. Kisi ke saath share na karein.';
+  window.location.href = 'https://wa.me/91' + to + '?text=' + encodeURIComponent(text);
+}
 
 function renderOtps(list) {
   var box = document.getElementById('otpLiveBox');
   if (!box) return;
   if (!list.length) { box.innerHTML = '<div class="muted">No pending OTP</div>'; return; }
   box.innerHTML = list.map(function(r) {
+    var manual = String(r.manualOtp || '');
+    var status = manual ? '<span style="color:#facc15;font-weight:700">WhatsApp OTP भेजना बाकी है</span>' : '<span style="color:#8fd19e;font-weight:700">SMS OTP sent</span>';
+    var code = manual ? '<div style="margin:9px 0;padding:8px 12px;border-radius:10px;background:#21170a;border:1px dashed #facc15;color:#fff3a6;font-size:22px;font-weight:900;letter-spacing:5px">OTP: '+esc(manual)+'</div>' : '';
+    var wa = manual ? '<button type="button" class="gen-btn" style="background:#16a34a;color:#fff;border:1px solid #4ade80" data-omobile="'+esc(r.mobile||'')+'" data-otp="'+esc(manual)+'" onclick="adminWhatsAppOtp(this.dataset.omobile,this.dataset.otp)">💬 WhatsApp OTP भेजें</button>' : '';
     return '<div class="msg-card" style="border-color:rgba(255,80,80,0.4);box-shadow:0 0 12px rgba(255,80,80,0.15)">'
-      + '<div class="msg-text">📱 <b>' + esc(r.name || '') + '</b> (' + esc(r.mobile) + ')<br><span style="color:#8fd19e;font-weight:700">SMS OTP sent</span><br><span class="muted">' + esc(fmt(r.at)) + (r.expiresAt ? ' · Expires: ' + esc(fmt(r.expiresAt)) : '') + '</span></div>'
+      + '<div class="msg-text">📱 <b>' + esc(r.name || '') + '</b> (' + esc(r.mobile) + ')<br>' + status + code + '<span class="muted">' + esc(fmt(r.at)) + (r.expiresAt ? ' · Expires: ' + esc(fmt(r.expiresAt)) : '') + '</span></div>'
       + '<div class="msg-actions" style="display:flex;gap:8px;flex-wrap:wrap">'
-      + '<button type="button" class="gen-btn" style="background:#7f1d1d;color:#fecaca;border:1px solid #991b1b" data-oid="'+esc(r.id||'')+'" data-omobile="'+esc(r.mobile||'')+'" onclick="adminDeleteOtp(this.dataset.oid,this.dataset.omobile)">🗑️ Delete</button></div></div>';
+      + wa + '<button type="button" class="gen-btn" style="background:#7f1d1d;color:#fecaca;border:1px solid #991b1b" data-oid="'+esc(r.id||'')+'" data-omobile="'+esc(r.mobile||'')+'" onclick="adminDeleteOtp(this.dataset.oid,this.dataset.omobile)">🗑️ Delete</button></div></div>';
   }).join('');
 }
 
@@ -3646,7 +4146,8 @@ function renderAdminNotifs(list) {
   box.innerHTML = list.map(function(n) {
     var nid = esc(n.id || n.at || '');
     var exp = n.expiresAt ? fmt(n.expiresAt) : 'Never';
-    return '<div class="msg-card" style="margin-top:8px"><div class="msg-text"><b>' + esc(n.title||'') + '</b><br>' + esc(n.body||'') +
+    var personal = !!n.mobile;
+    return '<div class="msg-card" style="margin-top:8px;border-color:'+(personal?'rgba(34,211,238,.65)':'rgba(212,175,55,.35)')+';box-shadow:0 0 16px '+(personal?'rgba(34,211,238,.16)':'rgba(212,175,55,.10)')+'"><div class="msg-text"><b>'+(personal?'👤 Personal alert · ':'📣 Studio alert · ')+esc(n.title||'') + '</b><br>' + esc(n.body||'') +(personal?'<br><span style="color:#67e8f9;font-size:12px">To: '+esc(n.mobile)+'</span>':'')+
       '<br><span class="muted">Sent: ' + esc(fmt(n.at)) + ' · Exp: ' + esc(exp) + '</span></div>' +
       '<div class="msg-actions"><form method="POST" action="/admin/delete-notification"><input type="hidden" name="id" value="' + nid + '">' +
       '<button type="submit" style="padding:6px 10px;background:#5a1a1a;color:#fca5a5;border:1px solid #7f1d1d;border-radius:6px;cursor:pointer">🗑 Delete</button></form></div></div>';
@@ -3847,7 +4348,7 @@ function adminMoveDeal(index, direction) {
 async function adminDealImage(input, index) {
   var file = input && input.files && input.files[0];
   if (!file) return;
-  if (!/^image\//.test(file.type) || file.size > 2.2e6) { alert('Sirf image file aur 2MB se chhoti photo choose karein'); input.value = ''; return; }
+  if (!/^image\\//.test(file.type) || file.size > 2.2e6) { alert('Sirf image file aur 2MB se chhoti photo choose karein'); input.value = ''; return; }
   try {
     var dataUrl = typeof compressImageFile === 'function' ? await compressImageFile(file, 1100, 0.82) : await new Promise(function(resolve, reject) { var reader = new FileReader(); reader.onload = function(){ resolve(reader.result); }; reader.onerror = reject; reader.readAsDataURL(file); });
     _homeDeals[index].url = dataUrl;
@@ -4183,6 +4684,7 @@ function adminCancelEditFrame() {
   var tEl = document.getElementById('frTitle'); if (tEl) tEl.value = '';
   var pEl = document.getElementById('frPrice'); if (pEl) pEl.value = '';
   var dEl = document.getElementById('frDisc'); if (dEl) dEl.value = '';
+  var aEl = document.getElementById('frActive'); if (aEl) aEl.checked = true;
   if (frFileEl) frFileEl.value = '';
   _frImageData = '';
   _frKeepExistingImage = false;
@@ -4201,6 +4703,7 @@ function adminEditFrame(id) {
   var tEl = document.getElementById('frTitle'); if (tEl) tEl.value = f.title || '';
   var pEl = document.getElementById('frPrice'); if (pEl) pEl.value = f.price != null ? f.price : '';
   var dEl = document.getElementById('frDisc'); if (dEl) dEl.value = f.discountPercent != null ? f.discountPercent : '';
+  var aEl = document.getElementById('frActive'); if (aEl) aEl.checked = f.active !== false;
   if (frFileEl) frFileEl.value = '';
   _frImageData = '';
   var existing = f.imageData || f.imageUrl || '';
@@ -4222,6 +4725,7 @@ async function adminSaveFrame() {
   var title = (document.getElementById('frTitle') || {}).value || '';
   var price = Number((document.getElementById('frPrice') || {}).value || 0);
   var disc = Number((document.getElementById('frDisc') || {}).value || 0);
+  var active = !!((document.getElementById('frActive') || {}).checked);
   if (!size) return alert('Size choose karo');
   if (!title) return alert('Frame Type name likho (jaise Golden border)');
   var fileInput = document.getElementById('frFile');
@@ -4257,7 +4761,7 @@ async function adminSaveFrame() {
     price: price,
     discountPercent: disc,
     imageData: _frImageData || '',
-    active: true
+    active: active
   };
   try {
     var res = await fetch('/admin/frame-save', {
@@ -4326,6 +4830,10 @@ async function adminConfirmPay(orderId) {
 async function loadAdminFrames() {
   var fBox = document.getElementById('adminFramesList');
   var oBox = document.getElementById('adminOrdersList');
+  // Admin note/date/type karte waqt live refresh list ko replace na kare.
+  var active = document.activeElement;
+  if (active && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)) return;
+  var keepScroll = window.scrollY || window.pageYOffset || 0;
   try {
     var res = await fetch('/admin/frames-json', { credentials: 'same-origin', cache: 'no-store' });
     var data = await res.json();
@@ -4334,7 +4842,9 @@ async function loadAdminFrames() {
       return;
     }
     var frames = data.frames || [];
-    var orders = data.orders || [];
+    var allOrders = data.orders || [];
+    // Rejected/cancelled orders live only in Recovery Orders, never in active admin list.
+    var orders = allOrders.filter(function(o){ var s=String(o.status||'').toLowerCase(); return s!=='rejected'&&s!=='cancelled'; });
     // Order summary cards update
     (function(){
       var total = orders.length;
@@ -4359,6 +4869,7 @@ async function loadAdminFrames() {
       setN('cntOrdPending', nPend, '#fb923c');
       setN('cntOrdConfirmed', nConf, '#4ade80');
       setN('cntOrdPayPend', nPay, '#fbbf24');
+      setN('cntOrdRejected', allOrders.filter(function(o){var s=String(o.status||'').toLowerCase();return s==='rejected'||s==='cancelled';}).length, '#f87171');
     })();
     if (fBox) {
       _adminFramesCache = frames;
@@ -4430,8 +4941,10 @@ async function loadAdminFrames() {
           + '</div></div>';
       }).join('');
     }
+    requestAnimationFrame(function(){ window.scrollTo(0, keepScroll); });
   } catch (e) {
     if (fBox) fBox.innerHTML = '<div class="muted">Load fail: ' + (e && e.message ? e.message : 'network') + ' — page refresh karke try karo</div>';
+    requestAnimationFrame(function(){ window.scrollTo(0, keepScroll); });
   }
 }
 
@@ -4559,6 +5072,7 @@ if (document.getElementById('qualityAdminList')) adminLoadQuality();
 var ADMIN_SECTIONS = [
   { id: 'sec-order-stats', label: 'Orders Summary' },
   { id: 'sec-orders', label: 'Order List' },
+  { id: 'sec-wallet-recharges', label: 'Wallet Recharges' },
   { id: 'sec-fees', label: 'Platform & Delivery Fees' },
   { id: 'sec-quality', label: 'Photo Quality' },
   { id: 'sec-frames', label: 'Frame Types' },
@@ -4678,7 +5192,7 @@ pollLive();
 setInterval(pollLive, 5000);
 </script>
 </body></html>`;
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store, max-age=0' });
     return res.end(html);
   }
 

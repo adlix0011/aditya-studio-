@@ -317,6 +317,9 @@
     }
     @keyframes blinkCur { 50% { opacity: 0; } }
     .studio-brand { text-shadow: 0 2px 0 #6f5110, 0 6px 18px rgba(212,175,55,.35); }
+    .booking-offer { margin:-3px 0 5px auto; width:max-content; max-width:100%; padding:0; color:#4ade80; background:none; border:0; box-shadow:none; font-size:13px; font-weight:900; letter-spacing:.02em; text-shadow:0 0 9px rgba(74,222,128,.35); }
+    .booking-cta { margin-top:12px!important; display:flex!important; align-items:center; justify-content:center; gap:7px; padding:11px 13px; border-radius:12px; color:#fff!important; background:linear-gradient(100deg,#ec4899,#8b5cf6 48%,#06b6d4); border:1px solid rgba(255,255,255,.55); box-shadow:0 7px 17px rgba(139,92,246,.36), inset 0 1px 0 rgba(255,255,255,.32); font-weight:900; letter-spacing:.02em; }
+    .booking-cta .material-symbols-outlined { color:#fff; }
     .profile-avatar-image { width:100%; height:100%; object-fit:cover; display:none; }
     .profile-avatar-image.show { display:block; }
     .profile-avatar-image.show + .profile-avatar-fallback { display:none; }
@@ -325,9 +328,10 @@
     .profile-tab-btn.active { background:rgba(212,175,55,.18); border-color:rgba(242,202,80,.7); color:#ffe088; }
     @media (max-width: 767px) {
       header > div { min-height:72px; padding-top:10px!important; padding-bottom:10px!important; }
-      .studio-brand { position:absolute; left:50%; transform:translateX(-50%); white-space:nowrap; font-size:2.15rem!important; line-height:1; }
-      .header-actions { margin-left:auto; }
-      .header-notification { display:none; }
+      .studio-brand { position:absolute; left:13px; transform:none; white-space:nowrap; font-size:1.7rem!important; line-height:1; }
+      .header-actions { margin-left:auto; gap:7px!important; }
+      .header-notification { display:block; }
+      #guestLoginBtn { padding:9px 10px!important; font-size:11px!important; letter-spacing:.02em; }
       main { padding-top:68px!important; padding-bottom:48px!important; gap:8px!important; }
       #portfolio { min-height:370px; margin-top:-28px!important; }
       #portfolio > .grid { gap:0!important; padding-top:0!important; padding-bottom:0!important; align-content:start; }
@@ -381,8 +385,11 @@
         <a class="text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md hover:backdrop-blur-2xl hover:bg-surface/60 rounded-sm px-1" href="#galleries">Galleries</a>
       </nav>
       <div class="header-actions flex items-center gap-4">
-        <button class="header-notification relative p-2 text-primary hover:bg-surface-variant rounded-full transition-colors group" aria-label="Notifications" type="button">
+        <button class="header-notification relative p-2 text-primary hover:bg-surface-variant rounded-full transition-colors group" data-notification-button aria-label="Notifications" type="button">
           <span class="material-symbols-outlined notification-pulse relative z-10">notifications</span>
+        </button>
+        <button id="guestLoginBtn" type="button" class="rounded-full px-3 py-2 text-xs font-extrabold text-white border border-cyan-200/80 bg-gradient-to-r from-fuchsia-600 via-violet-600 to-cyan-500 shadow-[0_0_16px_rgba(34,211,238,.48)] hover:scale-105 transition-transform" aria-label="Login करें">
+          Login
         </button>
         <button class="relative p-1 rounded-full group cursor-pointer" id="profileBtn" aria-label="Open client portal" type="button">
           <div class="absolute inset-0 rounded-full profile-ring opacity-50 group-hover:opacity-100 transition-opacity"></div>
@@ -396,6 +403,16 @@
   </header>
 
   <!-- SideNavBar / Profile -->
+  <div id="notificationOverlay" class="hidden fixed inset-0 z-[70] bg-black/70 p-4 sm:p-6 backdrop-blur-sm">
+    <section class="ml-auto w-full max-w-md max-h-[80vh] overflow-hidden rounded-3xl border border-primary/70 shadow-[0_0_42px_rgba(212,175,55,.28)] flex flex-col" style="background:radial-gradient(circle at top right,#382a0e,#17130f 55%,#111)">
+      <div class="flex items-center justify-between gap-3 p-5 border-b border-primary/30" style="background:linear-gradient(90deg,rgba(212,175,55,.16),rgba(168,85,247,.14),rgba(34,211,238,.11))">
+        <div><p class="text-[10px] uppercase tracking-[.22em] text-cyan-200 font-bold">Aditya Studio</p><h2 class="text-2xl font-extrabold text-primary drop-shadow-[0_0_12px_rgba(212,175,55,.65)]">🔔 Notification Centre</h2><p class="text-xs text-on-surface-variant mt-1">Aapke personal order alerts aur studio updates</p></div>
+        <button id="closeNotifications" type="button" class="p-2 rounded-full text-on-surface-variant hover:text-primary hover:bg-white/5" aria-label="Close notifications"><span class="material-symbols-outlined">close</span></button>
+      </div>
+      <div id="notificationList" class="p-4 overflow-y-auto space-y-3"><p class="text-sm text-on-surface-variant">Loading…</p></div>
+    </section>
+  </div>
+
   <aside class="fixed right-0 top-0 h-full w-80 z-[60] bg-surface-container-highest/80 backdrop-blur-2xl border-l border-white/10 shadow-[-10px_0_30px_rgba(74,0,128,0.3)] flex flex-col p-gutter gap-4 overflow-y-auto" id="sideNav" aria-label="Client portal" aria-hidden="true">
     <div class="flex justify-between items-start pt-4">
       <div>
@@ -411,7 +428,7 @@
       <input id="profMobile" class="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 text-on-surface text-sm" placeholder="Mobile" maxlength="10" type="tel"/>
       <input id="profPin" class="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 text-on-surface text-sm" placeholder="PIN" maxlength="4" type="password"/>
       <button type="button" id="profLoginBtn" class="w-full bg-gradient-gold text-on-primary font-label-md text-label-md py-3 rounded-lg">Login</button>
-      <p class="text-xs text-on-surface-variant">Naya account? <a href="/book-now" class="text-primary underline">Studio page se register</a></p>
+      <p class="text-xs text-on-surface-variant">Naya account? <a href="/book-now?mode=register" class="text-primary underline">Studio page se register</a></p>
       <p id="profLoginErr" class="text-error text-xs hidden"></p>
     </div>
 
@@ -452,8 +469,18 @@
         <p class="text-[10px] text-on-surface-variant mt-0.5">ID: <span class="text-primary" id="profId">—</span> · Spend ₹<span id="profSpend">0</span></p>
       </div>
 
+      <div id="profVerifyBox" class="hidden rounded-2xl border border-yellow-300/60 p-3" style="background:linear-gradient(135deg,#3c2b0c,#191208);box-shadow:0 0 18px rgba(250,204,21,.18)">
+        <p class="font-bold text-yellow-200 text-sm">📲 नंबर Verify करें</p>
+        <p id="profVerifyMsg" class="mt-1 text-[11px] leading-4 text-yellow-50/75">WhatsApp OTP के लिए Request करें।</p>
+        <button type="button" id="profRequestOtpBtn" class="mt-3 w-full rounded-xl bg-gradient-to-r from-yellow-300 to-amber-500 px-3 py-2.5 text-xs font-extrabold text-[#321b00]">WhatsApp OTP Request करें</button>
+        <div id="profOtpArea" class="hidden mt-3 gap-2">
+          <input id="profOtpInput" inputmode="numeric" maxlength="6" placeholder="6-digit OTP" class="w-full rounded-xl border border-yellow-300/50 bg-black/35 px-3 py-2.5 text-center tracking-[.35em] text-yellow-100 outline-none"/>
+          <button type="button" id="profVerifyOtpBtn" class="w-full rounded-xl border border-green-300 bg-gradient-to-r from-green-500 to-emerald-400 px-3 py-2.5 text-xs font-extrabold text-[#082515]">OTP Verify करें</button>
+        </div>
+      </div>
+
       <div class="grid grid-cols-2 gap-2">
-        <button type="button" class="profile-tab-btn profile-orders-btn rounded-lg px-3 py-2 text-xs font-bold" data-profile-tab="orders">📦 My Orders</button>
+        <a href="/my-orders" class="profile-tab-btn profile-orders-btn rounded-lg px-3 py-2 text-xs font-bold text-center">📦 My Orders</a>
         <button type="button" class="profile-tab-btn profile-coupons-btn rounded-lg px-3 py-2 text-xs font-bold" data-profile-tab="coupons">🎟️ My Coupons</button>
         <button type="button" class="profile-tab-btn profile-wallet-btn rounded-lg px-3 py-2 text-xs font-bold" data-profile-tab="wallet">💳 Wallet History</button>
         <button type="button" class="profile-tab-btn profile-rewards-btn rounded-lg px-3 py-2 text-xs font-bold" data-profile-tab="rewards">🎁 Rewards</button>
@@ -475,7 +502,7 @@
         <div class="rounded-xl border border-primary/30 p-3 text-center" style="background:linear-gradient(145deg,#241c0e,#16120b)">
           <p class="text-[10px] uppercase tracking-wider text-on-surface-variant">Your Spins</p>
           <p class="text-3xl font-bold text-gradient-gold" id="profSpins">0</p>
-          <a href="/book-now" class="inline-block mt-1 text-primary text-xs underline">Spin Wheel →</a>
+          <button type="button" id="profSpinNowBtn" class="inline-block mt-2 rounded-lg px-3 py-2 text-xs font-extrabold text-white border border-cyan-200/50 bg-gradient-to-r from-fuchsia-600 via-violet-600 to-cyan-500 shadow-[0_0_14px_rgba(34,211,238,.42)]">🎡 Roll Now</button>
         </div>
         <div class="grid grid-cols-2 gap-2">
           <div class="rounded-xl bg-surface p-3 border border-primary/20 text-center"><p class="text-[10px] uppercase tracking-wider text-on-surface-variant">AD Tokens</p><p class="text-xl font-bold text-primary" id="profAdTokens">0</p></div>
@@ -654,7 +681,7 @@
           <div class="absolute inset-0 bg-gradient-to-r from-transparent to-background/40 md:to-background/80"></div>
         </div>
         <div class="p-8 md:p-10 flex flex-col justify-center gap-3">
-          <span class="text-primary font-label-md text-label-md uppercase tracking-widest text-xs">Raksha Bandhan · Gifting</span>
+          <span class="text-primary font-label-md text-label-md uppercase tracking-widest text-xs">Premium · Gifting</span>
           <h3 class="font-headline-md text-headline-md text-on-surface leading-tight">Photo Frame</h3>
           <p class="text-on-surface-variant font-body-md text-sm md:text-body-md">Museum-quality frames, 3D preview, custom sizes — upload photo and order online.</p>
           <span class="mt-2 inline-flex items-center gap-2 bg-gradient-gold text-on-primary font-label-md text-label-md px-6 py-3 rounded-lg w-fit shadow-[0_0_20px_rgba(212,175,55,0.35)] group-hover:shadow-[0_0_30px_rgba(212,175,55,0.55)] transition-shadow">
@@ -763,19 +790,19 @@
           <span class="inline-block px-3 py-1 rounded-full bg-surface-variant text-primary font-label-md text-xs mb-4 border border-primary/20">Daily Rewards</span>
           <h2 class="font-headline-md text-headline-md text-on-surface mb-4">Spin Wheel &amp; AD Tokens</h2>
           <p class="text-on-surface-variant font-body-md text-body-md mb-4">Live roller auto-spin ho raha hai. Click karke full spin page kholo. Har din <b class="text-primary">1 AD Token</b> claim karo — <b class="text-primary">10 tokens = 1 spin</b>.</p>
-          <div class="flex flex-wrap gap-4 mb-6">
-            <div class="relative overflow-hidden rounded-2xl px-6 py-4 min-w-[140px] border border-primary/40 shadow-[0_0_24px_rgba(212,175,55,0.25)]" style="background:linear-gradient(145deg,#2a2210,#1a150c 60%,#241c0e)">
-              <div class="absolute -right-4 -top-4 w-16 h-16 rounded-full bg-primary/20 blur-xl"></div>
-              <p class="text-[10px] uppercase tracking-[0.2em] text-primary/90 font-label-md">Your Spins</p>
+          <div class="grid grid-cols-2 gap-3 mb-6 max-w-[310px]">
+            <div class="relative overflow-hidden rounded-2xl px-4 py-4 min-w-0 border border-sky-300/25 shadow-[0_0_18px_rgba(56,125,180,0.16)]" style="background:linear-gradient(145deg,#1d3040,#17242e 60%,#132028)">
+              <div class="absolute -right-4 -top-4 w-16 h-16 rounded-full bg-sky-300/10 blur-xl"></div>
+              <p class="text-[10px] uppercase tracking-[0.16em] text-sky-200/80 font-label-md">Your Spins</p>
               <p class="text-3xl font-bold text-gradient-gold mt-1" id="homeSpinCount">0</p>
               <p class="text-[10px] text-on-surface-variant mt-1">Ready to play</p>
             </div>
-            <div class="relative overflow-hidden rounded-2xl px-6 py-4 min-w-[140px] border border-primary/40 shadow-[0_0_24px_rgba(212,175,55,0.25)]" style="background:linear-gradient(145deg,#2a2210,#1a150c 60%,#241c0e)">
-              <div class="absolute -right-4 -top-4 w-16 h-16 rounded-full bg-primary/20 blur-xl"></div>
-              <p class="text-[10px] uppercase tracking-[0.2em] text-primary/90 font-label-md">AD Tokens</p>
-              <p class="text-3xl font-bold text-gradient-gold mt-1" id="homeTokenCount">0</p>
-              <p class="text-[10px] text-on-surface-variant mt-1">10 tokens = 1 spin</p>
-            </div>
+            <button type="button" id="homeAddSpinBtn" class="relative overflow-hidden rounded-2xl px-4 py-4 min-w-0 text-left border border-fuchsia-300/25 shadow-[0_0_18px_rgba(147,79,170,0.15)]" style="background:linear-gradient(145deg,#38203d,#2a1b31 60%,#211724)">
+              <div class="absolute -right-4 -top-4 w-16 h-16 rounded-full bg-fuchsia-300/10 blur-xl"></div>
+              <p class="text-[10px] uppercase tracking-[0.16em] text-fuchsia-200/80 font-label-md">Add Spin</p>
+              <p class="text-3xl font-bold text-gradient-gold mt-1">+</p>
+              <p class="text-[10px] text-on-surface-variant mt-1"><span id="homeTokenCount">0</span> tokens = 1 spin</p>
+            </button>
           </div>
           <form class="flex flex-col sm:flex-row gap-4" id="spinCodeForm">
             <div class="relative flex-1">
@@ -788,7 +815,7 @@
           <p class="mt-4 text-sm font-label-md hidden" id="codeResult" role="status"></p>
         </div>
         <div class="flex flex-col items-center gap-4">
-          <a href="/book-now" class="home-lw-link" title="Open real spin page" id="homeRealWheelLink">
+          <button type="button" class="home-lw-link" title="Tap to spin" id="homeRealWheelLink" aria-label="Spin the reward wheel" style="background:transparent;border:0;padding:0;cursor:pointer">
             <div class="home-lw-stage">
               <div class="home-lw-pointer"></div>
               <div class="home-lw-outer">
@@ -799,17 +826,32 @@
               </div>
               <div class="home-lw-hub">📷</div>
             </div>
-          </a>
+          </button>
           <p class="text-primary font-label-md text-label-md tracking-wider">Spins left: <span id="homeSpinCount2">0</span></p>
+          <p id="homeSpinHint" class="text-xs text-on-surface-variant text-center">🎡 Roller ghumane ke liye wheel par tap karein</p>
           <button type="button" id="homeClaimTokenBtn" class="btn-claim-token claimable font-label-md text-label-md px-8 py-3 rounded-full">
             Claim AD Token
           </button>
           <p id="homeClaimMsg" class="text-xs text-on-surface-variant text-center max-w-xs"></p>
-          <p class="text-[11px] text-on-surface-variant">Click roller → full spin page</p>
         </div>
       </div>
     </section>
   </main>
+
+  <!-- Unverified members ke liye compact reminder: page ko cover nahi karega -->
+  <div id="verifyNudge" class="hidden fixed bottom-24 right-3 z-[90] max-w-[190px]" role="status">
+    <button id="verifyNudgeGo" type="button" class="w-full rounded-2xl border border-yellow-200 bg-gradient-to-r from-fuchsia-500 via-rose-500 to-amber-400 px-3 py-2.5 text-xs font-extrabold text-white shadow-[0_0_20px_rgba(244,63,94,.5)] animate-pulse">📲 Verify your no</button>
+  </div>
+
+  <div id="spinReadyPopup" class="hidden fixed inset-0 z-[100] bg-black/65 p-4 items-center justify-center">
+    <div class="w-full max-w-sm rounded-3xl border border-cyan-200/60 p-6 text-center shadow-[0_0_42px_rgba(168,85,247,.6)]" style="background:radial-gradient(circle at top,#3f1b63,#17101f 64%)">
+      <div class="text-5xl mb-3">🎡</div>
+      <h2 class="text-2xl font-extrabold text-primary">Spin Ready!</h2>
+      <p class="text-sm text-on-surface-variant mt-2">Aapka spin claim ho gaya. Ab roller ghumakar apna reward jeetiye.</p>
+      <button type="button" id="spinReadyGo" class="mt-5 w-full rounded-xl py-3 font-extrabold text-white bg-gradient-to-r from-fuchsia-600 via-violet-600 to-cyan-500 border border-cyan-100/60 shadow-[0_0_20px_rgba(34,211,238,.45)]">🎡 Roll Now</button>
+      <button type="button" id="spinReadyLater" class="mt-3 text-xs text-on-surface-variant underline">Baad me</button>
+    </div>
+  </div>
 
   <!-- Footer -->
   <footer class="w-full mt-auto bg-surface-container-lowest border-t border-outline-variant py-12 px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
@@ -818,17 +860,22 @@
       <p class="font-body-md text-body-md text-on-surface-variant">© 2026 Aditya Studio. All Rights Reserved.</p>
     </div>
     <nav class="flex flex-wrap justify-center gap-6" aria-label="Footer navigation">
-      <a class="font-body-md text-body-md text-on-surface-variant hover:text-primary transition-colors" href="#">Privacy Policy</a>
-      <a class="font-body-md text-body-md text-on-surface-variant hover:text-primary transition-colors" href="#">Terms of Service</a>
-      <a class="font-body-md text-body-md text-on-surface-variant hover:text-primary transition-colors" href="#">Careers</a>
-      <a class="font-body-md text-body-md text-on-surface-variant hover:text-primary transition-colors" href="#">Contact Us</a>
+      <a class="font-body-md text-body-md text-on-surface-variant hover:text-primary transition-colors" href="/privacy-policy">Privacy Policy</a>
+      <a class="font-body-md text-body-md text-on-surface-variant hover:text-primary transition-colors" href="/terms-of-service">Terms of Service</a>
+      <a class="font-body-md text-body-md text-on-surface-variant hover:text-primary transition-colors" href="/careers">Careers</a>
+      <a class="font-body-md text-body-md text-on-surface-variant hover:text-primary transition-colors" href="/contact-us">Contact Us</a>
     </nav>
   </footer>
 
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       const SESSION_KEY = 'aditya_studio_session_v1';
+      const PERSIST_SESSION_KEY = 'aditya_studio_persistent_login_v2';
       const profileBtn = document.getElementById('profileBtn');
+      const guestLoginBtn = document.getElementById('guestLoginBtn');
+      const verifyNudge = document.getElementById('verifyNudge');
+      let verifyNudgeTimer = null;
+      let verifyNudgeDelay = null;
       const sideNav = document.getElementById('sideNav');
       const closeSideNav = document.getElementById('closeSideNav');
       const navOverlay = document.getElementById('navOverlay');
@@ -877,6 +924,71 @@
       if (profileBtn) {
         profileBtn.addEventListener('click', () => sideNav.classList.contains('open') ? closeNav() : openNav());
       }
+      if (guestLoginBtn) guestLoginBtn.addEventListener('click', () => openLoginPanel('Login करके अपना profile और orders देखें'));
+      function hideVerifyNudge() {
+        if (verifyNudge) verifyNudge.classList.add('hidden');
+        if (verifyNudge) verifyNudge.classList.remove('flex');
+      }
+      function showVerifyNudge() {
+        if (!user || user.mobileVerified || !user.verificationOtpSentAt || !verifyNudge) return;
+        verifyNudge.classList.remove('hidden');
+      }
+      function refreshVerifyNudge() {
+        clearInterval(verifyNudgeTimer); clearTimeout(verifyNudgeDelay);
+        hideVerifyNudge();
+        if (!user || user.mobileVerified || !user.verificationOtpSentAt) return;
+        // Pehla reminder login ke kuch seconds baad, phir har 75 seconds.
+        verifyNudgeDelay = setTimeout(showVerifyNudge, 10000);
+        verifyNudgeTimer = setInterval(showVerifyNudge, 75000);
+      }
+      document.getElementById('verifyNudgeGo')?.addEventListener('click', () => openProfileVerify());
+      function setProfileVerifyMessage(text, bad) {
+        const msg = document.getElementById('profVerifyMsg');
+        if (!msg) return;
+        msg.textContent = text;
+        msg.className = 'mt-1 text-[11px] leading-4 ' + (bad ? 'text-red-200' : 'text-yellow-50/75');
+      }
+      async function requestProfileOtp() {
+        if (!user) return;
+        const button = document.getElementById('profRequestOtpBtn');
+        const area = document.getElementById('profOtpArea');
+        if (button) { button.disabled = true; button.textContent = 'Request भेज रहे हैं…'; }
+        try {
+          const s = loadSession() || {};
+          const res = await fetch('/api/request-spin-otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mobile: user.mobile, sessionToken: s.sessionToken || '' }) });
+          const out = await res.json().catch(() => ({}));
+          if (!res.ok || !out.ok) throw new Error(out.message || (out.error === 'resend-too-soon' ? 'एक मिनट बाद फिर try करें।' : 'OTP request नहीं जा सकी।'));
+          if (area) { area.classList.remove('hidden'); area.classList.add('grid'); }
+          setProfileVerifyMessage(out.delivery === 'whatsapp_manual' ? '✅ Request admin को मिल गई है। WhatsApp पर OTP आने के बाद नीचे डालें।' : '✅ OTP भेज दिया गया है। नीचे 6-digit OTP डालें।');
+          document.getElementById('profOtpInput')?.focus();
+        } catch (e) { setProfileVerifyMessage(e.message || 'OTP request नहीं जा सकी।', true); }
+        finally { if (button) { button.disabled = false; button.textContent = 'WhatsApp OTP दोबारा Request करें'; } }
+      }
+      function openProfileVerify() {
+        if (!user || user.mobileVerified) return;
+        hideVerifyNudge(); openNav();
+        const box = document.getElementById('profVerifyBox');
+        if (box) box.classList.remove('hidden');
+        requestProfileOtp();
+      }
+      document.getElementById('profRequestOtpBtn')?.addEventListener('click', requestProfileOtp);
+      document.getElementById('profVerifyOtpBtn')?.addEventListener('click', async function () {
+        const otp = (document.getElementById('profOtpInput')?.value || '').replace(/\D/g, '');
+        if (!/^\d{6}$/.test(otp)) { setProfileVerifyMessage('6-digit OTP डालें।', true); return; }
+        const button = this; button.disabled = true; button.textContent = 'Verify हो रहा है…';
+        try {
+          const s = loadSession() || {};
+          const res = await fetch('/api/verify-spin-otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mobile: user.mobile, otp, sessionToken: s.sessionToken || '' }) });
+          const out = await res.json().catch(() => ({}));
+          if (!res.ok || !out.ok) throw new Error(out.error === 'wrong-otp' ? 'OTP गलत है।' : (out.message || 'OTP verify नहीं हुआ।'));
+          user.mobileVerified = true;
+          const old = loadSession() || {}; saveSession({ ...old, mobileVerified: true });
+          document.getElementById('profVerifyBox')?.classList.add('hidden');
+          updateTokenUI();
+          alert('✅ नंबर सफलतापूर्वक verify हो गया।');
+        } catch (e) { setProfileVerifyMessage(e.message || 'OTP verify नहीं हुआ।', true); }
+        finally { button.disabled = false; button.textContent = 'OTP Verify करें'; }
+      });
       if (closeSideNav) closeSideNav.addEventListener('click', closeNav);
       if (navOverlay) navOverlay.addEventListener('click', closeNav);
       document.addEventListener('keydown', (e) => {
@@ -885,8 +997,16 @@
 
       function loadSession() {
         try {
-          const session = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
-          if (session && session.pin) { localStorage.removeItem(SESSION_KEY); return null; }
+          const primary = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
+          const persistent = JSON.parse(localStorage.getItem(PERSIST_SESSION_KEY) || 'null');
+          // Spin page se kabhi incomplete save ho jaye to token wala saved login choose karo.
+          const session = (primary && primary.mobile && primary.sessionToken) ? primary
+            : ((persistent && persistent.mobile && persistent.sessionToken) ? persistent : (primary || persistent));
+          if (session && session.pin) delete session.pin;
+          if (session && session.mobile && session.sessionToken) {
+            localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+            localStorage.setItem(PERSIST_SESSION_KEY, JSON.stringify(session));
+          }
           return session;
         } catch (e) { return null; }
       }
@@ -895,8 +1015,9 @@
         const next = { ...prev, ...data };
         delete next.pin;
         localStorage.setItem(SESSION_KEY, JSON.stringify(next));
+        localStorage.setItem(PERSIST_SESSION_KEY, JSON.stringify(next));
       }
-      function clearSession() { localStorage.removeItem(SESSION_KEY); }
+      function clearSession() { localStorage.removeItem(SESSION_KEY); localStorage.removeItem(PERSIST_SESSION_KEY); }
 
       let user = null;
 
@@ -974,6 +1095,8 @@
       });
 
       function updateTokenUI() {
+        if (guestLoginBtn) guestLoginBtn.classList.toggle('hidden', !!user);
+        refreshVerifyNudge();
         const tokens = user ? (user.adTokens || 0) : 0;
         const spins = user ? (user.spinBalance || 0) : 0;
         const canClaim = user ? !!user.canClaimAdToken : false;
@@ -986,7 +1109,7 @@
           claimBtn.disabled = false;
           claimBtn.classList.add('claimable');
           claimBtn.textContent = 'Login & Claim AD Token';
-          claimMsg.textContent = 'Profile se login karke daily 1 AD Token claim karo';
+          claimMsg.textContent = '';
         } else if (canClaim) {
           claimBtn.disabled = false;
           claimBtn.classList.add('claimable');
@@ -1012,7 +1135,7 @@
               verify.textContent = 'Verify';
               verify.title = 'Mobile OTP verify karein';
               verify.style.cssText = 'margin-left:7px;padding:3px 8px;border-radius:999px;border:1px solid #ef4444;background:linear-gradient(135deg,#ef4444,#991b1b);color:#fff;font-size:10px;font-weight:800;cursor:pointer;vertical-align:middle;box-shadow:0 3px 9px rgba(185,28,28,.3)';
-              verify.addEventListener('click', function(){ location.href = '/book-now?verify=1'; });
+              verify.addEventListener('click', openProfileVerify);
               mobileShow.appendChild(verify);
             }
           }
@@ -1056,44 +1179,15 @@
               const label = h.prize || ('₹' + h.discount + ' OFF');
               const code = h.couponId || ('AD' + (h.discount != null ? h.discount : i));
               const st = h.couponStatus || 'active';
-              const canApply = st === 'active' && (h.walletValue > 0 || Number(h.discount) > 0 || /₹\s*\d+/.test(String(h.prize || '')));
+              const expiry = h.expiresAt ? new Date(h.expiresAt) : null;
+              const expired = expiry && expiry.getTime() < Date.now();
+              const expiryLabel = expiry && !isNaN(expiry) ? expiry.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Not set';
               return '<div class="coupon-sticker">' +
-                '<div class="flex justify-between items-start gap-2"><span class="code">' + label + '</span><span class="text-[10px] text-primary/80 uppercase">' + st + '</span></div>' +
+                '<div class="flex justify-between items-start gap-2"><span class="code">' + label + '</span><span class="text-[10px] text-primary/80 uppercase">' + (expired ? 'expired' : st) + '</span></div>' +
                 '<p class="text-[11px] text-on-surface-variant mt-1">Code: <b class="text-primary">' + code + '</b></p>' +
-                '<button type="button" class="coupon-apply" data-code="' + code + '" data-label="' + String(label).replace(/"/g, '') + '"' + (canApply ? '' : ' disabled') + '>' +
-                (canApply ? '💰 Wallet me daalo' : (st === 'active' ? 'Value nahi' : 'Used')) + '</button></div>';
+                '<p class="text-[10px] mt-2 ' + (expired ? 'text-red-300' : 'text-primary/80') + '">⏳ ' + (expired ? 'Expired: ' : 'Valid till: ') + expiryLabel + '</p>' +
+                '<p class="text-[10px] text-on-surface-variant mt-1">Order/Studio service par use hoga · Wallet me add nahi hoga</p></div>';
             }).join('');
-            hist.querySelectorAll('.coupon-apply').forEach(btn => {
-              btn.addEventListener('click', async function () {
-                if (btn.disabled) return;
-                const code = btn.getAttribute('data-code');
-                const s = loadSession();
-                if (!s || !s.mobile) { alert('Login required'); return; }
-                btn.disabled = true;
-                btn.textContent = '…';
-                try {
-                  const res = await fetch('/api/wallet/apply-coupon', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ sessionToken: s.sessionToken || '', couponId: code })
-                  });
-                  const data = await res.json();
-                  if (data.ok) {
-                    user = { ...user, walletBalance: data.walletBalance, walletHistory: data.walletHistory, history: data.history || user.history };
-                    updateTokenUI();
-                    alert(data.message || 'Wallet me add ho gaya!');
-                  } else {
-                    btn.disabled = false;
-                    btn.textContent = '💰 Wallet me daalo';
-                    alert(data.message || 'Fail');
-                  }
-                } catch (e) {
-                  btn.disabled = false;
-                  btn.textContent = '💰 Wallet me daalo';
-                  alert('Network error');
-                }
-              });
-            });
           } else {
             hist.innerHTML = '<p class="text-xs opacity-70">No active coupons — spin to win!</p>';
           }
@@ -1111,6 +1205,10 @@
       async function restoreUser() {
         const s = loadSession();
         if (!s || !s.mobile || !s.sessionToken) { user = null; updateTokenUI(); return; }
+        // Page khulte hi browser ka valid saved login dikhao. Network response aane tak
+        // user ko galti se guest/login screen par kabhi mat bhejo.
+        user = { ...s, adTokens: Number(s.adTokens || 0), spinBalance: Number(s.spinBalance || 0) };
+        updateTokenUI();
         try {
           const res = await fetch('/api/restore-session', {
             method: 'POST',
@@ -1121,8 +1219,9 @@
           if (data.ok) {
             user = data;
             saveSession({ mobile: data.mobile, sessionToken: s.sessionToken, name: data.name, id: data.id });
-          } else user = null;
-        } catch (e) { user = null; }
+          }
+          // Failed restore par bhi browser session rakhenge; logout sirf user khud karega.
+        } catch (e) { /* offline/network me bhi saved login bana rahe */ }
         updateTokenUI();
       }
 
@@ -1246,6 +1345,14 @@
         e.stopPropagation();
         claimToken();
       });
+      document.getElementById('homeAddSpinBtn')?.addEventListener('click', function () {
+        if (!user) { openLoginPanel('Pehle login karein, phir spin add hoga'); return; }
+        if ((user.adTokens || 0) < 10) {
+          document.getElementById('homeClaimMsg').textContent = 'Spin add karne ke liye 10 AD Tokens chahiye.';
+          return;
+        }
+        exchangeTokens();
+      });
       document.getElementById('profClaimBtn')?.addEventListener('click', claimToken);
       document.getElementById('profExchangeBtn')?.addEventListener('click', exchangeTokens);
 
@@ -1285,20 +1392,44 @@
       const spinForm = document.getElementById('spinCodeForm');
       const spinInput = document.getElementById('spinCode');
       const resultMsg = document.getElementById('codeResult');
-      spinForm.addEventListener('submit', (e) => {
+      function openSpinReadyPopup() {
+        const popup = document.getElementById('spinReadyPopup');
+        if (!popup) return;
+        popup.classList.remove('hidden'); popup.classList.add('flex');
+      }
+      function closeSpinReadyPopup() {
+        const popup = document.getElementById('spinReadyPopup');
+        if (!popup) return;
+        popup.classList.add('hidden'); popup.classList.remove('flex');
+      }
+      function openSpinRoller() { window.location.href = '/spin'; }
+      document.getElementById('spinReadyGo')?.addEventListener('click', openSpinRoller);
+      document.getElementById('spinReadyLater')?.addEventListener('click', closeSpinReadyPopup);
+      document.getElementById('profSpinNowBtn')?.addEventListener('click', openSpinRoller);
+      spinForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const code = spinInput.value.trim().toUpperCase();
         resultMsg.classList.remove('hidden', 'text-error', 'text-primary');
-        if (code === 'GOLD24' || code === 'DIAMOND') {
-          resultMsg.textContent = '✓ Code accepted! Full wheel page pe use karo.';
-          resultMsg.classList.add('text-primary');
-        } else if (!code) {
-          resultMsg.textContent = 'Code enter karo ya roller pe click karo.';
-          resultMsg.classList.add('text-error');
-        } else {
-          resultMsg.textContent = 'Code wheel page (/book-now) pe verify hoga.';
-          resultMsg.classList.add('text-primary');
-        }
+        const session = loadSession() || {};
+        if (!session.sessionToken) { openLoginPanel('Spin code claim karne ke liye login karein'); return; }
+        if (!/^[A-Z0-9]{6}$/.test(code)) { resultMsg.textContent = '6-character spin code daalein.'; resultMsg.classList.add('text-error'); return; }
+        const button = spinForm.querySelector('button[type="submit"]');
+        button.disabled = true; button.textContent = 'Checking…';
+        try {
+          const res = await fetch('/api/redeem-code', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, sessionToken: session.sessionToken }) });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || !data.ok) {
+            const msg = data.error === 'used' ? 'Ye spin code pehle use ho chuka hai.' : data.error === 'not-found' ? 'Spin code galat hai.' : (data.message || 'Code claim nahi hua.');
+            throw new Error(msg);
+          }
+          user = { ...user, spinBalance: Number(data.spinBalance || ((user && user.spinBalance) || 0) + 1) };
+          saveSession({ spinBalance: user.spinBalance });
+          updateTokenUI(); spinInput.value = '';
+          resultMsg.textContent = data.message || 'Spin claim ho gaya!'; resultMsg.classList.add('text-primary');
+          openSpinReadyPopup();
+        } catch (err) {
+          resultMsg.textContent = err.message || 'Code claim nahi hua.'; resultMsg.classList.add('text-error');
+        } finally { button.disabled = false; button.textContent = 'Verify Code'; }
       });
 
       // Current Deals: admin se save kiye hue photo, text aur link load karke
@@ -1399,7 +1530,13 @@
         track.addEventListener('mouseleave', pauseThenResume);
       }
 
-      restoreUser();
+      restoreUser().then(function () {
+        // Spin result se aane par account ka profile panel seedha kholo.
+        if (new URLSearchParams(window.location.search).get('profile') !== '1') return;
+        if (user) openNav();
+        else openLoginPanel('Profile dekhne ke liye login karein');
+        window.history.replaceState({}, '', '/');
+      });
 
       // Hero SECTION side background slideshow (admin: 4–6 photos + duration)
       (async function initHeroSideBg() {
@@ -1571,12 +1708,35 @@
           segs.appendChild(label);
         });
         let rot = 0;
+        let spinning = false;
         function tick() {
           rot += 0.35; // slow continuous
           wheel.style.transform = 'rotate(' + rot + 'deg)';
           requestAnimationFrame(tick);
         }
         requestAnimationFrame(tick);
+        document.getElementById('homeRealWheelLink')?.addEventListener('click', async function () { window.location.href='/spin'; return; /* legacy in-page spin code below is intentionally unreachable */
+          const hint = document.getElementById('homeSpinHint');
+          const session = typeof loadSession === 'function' ? loadSession() : null;
+          if (spinning) return;
+          if (!session || !session.sessionToken) { if (typeof openLoginPanel === 'function') openLoginPanel('Roller spin karne ke liye login karein'); return; }
+          if (!window.user || Number(window.user.spinBalance || 0) < 1) { if (hint) hint.textContent = 'Pehle spin code claim karein ya 10 AD tokens se Add Spin karein.'; return; }
+          spinning = true;
+          if (hint) hint.textContent = 'Roller ghoom raha hai…';
+          try {
+            const res = await fetch('/api/use-spin', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ sessionToken:session.sessionToken }) });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.ok) throw new Error(data.message || 'Spin nahi ho paya');
+            const prize = data.prize || {};
+            const label = String(prize.label || 'Good Luck');
+            const target = HOME_LW_PRIZES.findIndex(p => p.val === label.split(' ')[0]);
+            const idx = target >= 0 ? target : Math.floor(Math.random() * HOME_LW_PRIZES.length);
+            rot += 1440 + (360 - (idx * HOME_LW_SEG + HOME_LW_SEG / 2 + HOME_LW_OFFSET));
+            wheel.style.transition = 'transform 4.5s cubic-bezier(.16,.8,.12,1)';
+            wheel.style.transform = 'rotate(' + rot + 'deg)';
+            setTimeout(function(){ wheel.style.transition=''; if(hint)hint.textContent='🎉 '+label+' मिला! Coupon code: '+(data.couponCode||'—'); alert('Congratulations! '+label+'\nCoupon code: '+(data.couponCode||'—')); location.reload(); }, 4700);
+          } catch (err) { if (hint) hint.textContent = err.message || 'Spin nahi ho paya'; spinning=false; }
+        });
       })();
     });
   </script>
@@ -1586,6 +1746,16 @@
 document.addEventListener('DOMContentLoaded', function () {
   document.querySelectorAll('#bookings a[href*="service="]').forEach(function (a) {
     a.style.cursor = 'pointer';
+    var cta = Array.from(a.querySelectorAll('div')).find(function(el){ return el.textContent.trim().indexOf('Book Now') === 0; });
+    if (cta) {
+      cta.classList.add('booking-cta');
+      if (!a.querySelector('.booking-offer')) {
+        var offer = document.createElement('div');
+        offer.className = 'booking-offer';
+        offer.textContent = '20% Discount';
+        cta.parentNode.insertBefore(offer, cta);
+      }
+    }
     a.addEventListener('click', function (e) {
       // allow normal navigation; if prevented elsewhere, force it
       var href = a.getAttribute('href');
@@ -1602,6 +1772,66 @@ document.addEventListener('DOMContentLoaded', function () {
   console.log('[Aditya] Book cards linked:', document.querySelectorAll('#bookings a[href*="service="]').length);
 });
 </script>
+<script>
+// Private in-page notification centre. Admin order/status messages are loaded
+// only for the logged-in customer, never from another customer's history.
+(function () {
+  const overlay = document.getElementById('notificationOverlay');
+  const list = document.getElementById('notificationList');
+  const buttons = Array.from(document.querySelectorAll('[data-notification-button]'));
+  function escText(value) { return String(value == null ? '' : value); }
+  function formatTime(value) { try { return new Date(value).toLocaleString('en-IN'); } catch (e) { return ''; } }
+  function sessionForNotifs() { try { return typeof loadSession === 'function' ? loadSession() : null; } catch (e) { return null; } }
+  function setBadge(count) {
+    buttons.forEach(function (button) {
+      const old = button.querySelector('.notif-count'); if (old) old.remove();
+      if (!count) return;
+      const badge = document.createElement('span'); badge.className = 'notif-count absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center z-20';
+      badge.textContent = count > 9 ? '9+' : String(count); button.appendChild(badge);
+    });
+  }
+  async function loadNotifications() {
+    const session = sessionForNotifs();
+    if (!session || !session.sessionToken) {
+      list.innerHTML = '<p class="text-sm text-on-surface-variant p-2">Notifications dekhne ke liye login karein.</p>';
+      setBadge(0); return;
+    }
+    try {
+      const res = await fetch('/api/my-notifications', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionToken: session.sessionToken }) });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error('load');
+      const items = Array.isArray(data.items) ? data.items : [];
+      setBadge(items.length);
+      if (!items.length) { list.innerHTML = '<div class="rounded-2xl p-5 text-center border border-primary/20 bg-black/20"><div class="text-3xl">✨</div><p class="text-sm text-on-surface-variant mt-2">Abhi koi notification nahi hai.</p></div>'; return; }
+      list.innerHTML = '';
+      const personal = items.filter(item => !!item.mobile);
+      const studio = items.filter(item => !item.mobile);
+      function heading(text, color) { const h=document.createElement('p'); h.className='text-[10px] uppercase tracking-[.2em] font-extrabold px-1 mt-1'; h.style.color=color; h.textContent=text; list.appendChild(h); }
+      function addCards(group, isPersonal) { group.forEach(function (item) {
+        const card = document.createElement('article'); card.className = 'rounded-2xl border p-4';
+        card.style.cssText = isPersonal ? 'border-color:rgba(34,211,238,.7);background:linear-gradient(135deg,rgba(8,47,73,.88),rgba(76,29,149,.48));box-shadow:0 0 20px rgba(34,211,238,.24)' : 'border-color:rgba(212,175,55,.5);background:linear-gradient(135deg,rgba(75,54,9,.55),rgba(75,25,90,.32));box-shadow:0 0 17px rgba(212,175,55,.16)';
+        const chip = document.createElement('span'); chip.className='inline-block text-[9px] font-extrabold uppercase tracking-wider px-2 py-1 rounded-full mb-2'; chip.style.cssText=isPersonal?'background:#22d3ee;color:#082f49;box-shadow:0 0 12px rgba(34,211,238,.8)':'background:#d4af37;color:#221a05;box-shadow:0 0 12px rgba(212,175,55,.7)'; chip.textContent=isPersonal?'👤 Personal Alert':'📣 Studio Update';
+        const title = document.createElement('b'); title.className = 'block text-sm text-white'; title.textContent = escText(item.title || 'Aditya Studio');
+        const body = document.createElement('p'); body.className = 'text-xs text-on-surface-variant mt-1 leading-relaxed'; body.textContent = escText(item.body || '');
+        const at = document.createElement('p'); at.className = 'text-[10px] text-white/55 mt-3'; at.textContent = '🕒 ' + formatTime(item.at);
+        card.append(chip, title, body, at); list.appendChild(card);
+      }); }
+      if (personal.length) { heading('💎 Aapke personal alerts', '#67e8f9'); addCards(personal, true); }
+      if (studio.length) { heading('✨ Studio announcements', '#f7d76e'); addCards(studio, false); }
+    } catch (e) {
+      list.innerHTML = '<p class="text-sm text-error p-2">Notifications load nahi hui. Dobara try karein.</p>';
+    }
+  }
+  buttons.forEach(function (button) { button.addEventListener('click', function () { overlay.classList.remove('hidden'); loadNotifications(); }); });
+  document.getElementById('closeNotifications').addEventListener('click', function () { overlay.classList.add('hidden'); });
+  overlay.addEventListener('click', function (event) { if (event.target === overlay) overlay.classList.add('hidden'); });
+  setInterval(function () { if (!overlay.classList.contains('hidden')) loadNotifications(); }, 60000);
+})();
+</script>
 
+<script>
+// Safe usage analytics: only page and clicked control name; never typed form values or payment details.
+(function(){const K='aditya_studio_session_v1',P='aditya_studio_persistent_login_v2';function s(){try{return JSON.parse(localStorage.getItem(K)||localStorage.getItem(P)||'null')}catch(e){return null}}function send(action){const x=s();if(!x||!x.sessionToken)return;fetch('/api/activity',{method:'POST',headers:{'Content-Type':'application/json'},keepalive:true,body:JSON.stringify({sessionToken:x.sessionToken,page:location.pathname,action:action||'heartbeat'})}).catch(()=>{})}send('page_view');setInterval(()=>{if(!document.hidden)send('heartbeat')},30000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)send('page_return')});document.addEventListener('click',e=>{const el=e.target.closest('a,button');if(!el)return;const text=(el.getAttribute('aria-label')||el.textContent||'button').replace(/\s+/g,' ').trim().slice(0,55);if(text&&!/pin|utr|payment screenshot/i.test(text))send('click '+text)});})();
+</script>
 </body>
 </html>

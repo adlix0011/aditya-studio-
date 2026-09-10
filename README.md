@@ -8,7 +8,11 @@
 
 ## Admin Panel
 - URL: http://localhost:8000/admin
-- Password: ADlix08
+- Admin password: `run.bat` start hote waqt aapse poochega. Is password ko kisi code file ya public README mein na likhein.
+
+## SMS OTP
+- `run.bat` pehli baar SMS Gateway URL aur API key poochega aur local hidden settings file mein save karega. Agli baar details dobara nahi poochi jayengi.
+- Customer profile mein **SMS OTP भेजें** dabakar 6-digit OTP receive aur verify karega. OTP 5 minute valid hai.
 
 ## Pages
 - Home: /
