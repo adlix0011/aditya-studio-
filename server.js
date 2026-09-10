@@ -306,6 +306,13 @@ function sessionAccount(req, body, accounts) {
   return accounts.find(a => String(a.mobile) === row.mobile) || null;
 }
 restoreSessions();
+function requestNetworkKey(req) {
+  // Render/Cloudflare proxy ka real visitor IP prefer karo; local mode me socket IP.
+  const forwarded = String(req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+  const ip = (forwarded || String(req.socket.remoteAddress || 'unknown')).replace(/^::ffff:/, '');
+  // Plain IP store nahi karte — sirf one-way comparison key store hoti hai.
+  return crypto.createHash('sha256').update('aditya-studio-registration-network:v1:' + ip).digest('hex');
+}
 function clientKey(req, mobile) { return String(req.socket.remoteAddress || 'unknown') + ':' + String(mobile || ''); }
 function rateLimited(req, mobile, limit, windowMs) {
   const key = clientKey(req, mobile), now = Date.now();
@@ -1829,9 +1836,21 @@ function computeOrderFees(subtotal, settingsFees) {
       if (!/^[A-Za-z ]{2,}$/.test(name) || !/^[6-9]\d{9}$/.test(mobile) || !/^\d{4}$/.test(pin)) return sendJSON(res, 400, { ok: false, error: 'invalid' });
       const accounts = loadAccounts();
       if (accounts.find(a => a.mobile === mobile)) return sendJSON(res, 409, { ok: false, error: 'exists' });
+      const registrationNetworkKey = requestNetworkKey(req);
+      const registrationsFromNetwork = accounts.filter(a => a.registrationNetworkKey === registrationNetworkKey).length;
+      if (registrationsFromNetwork >= 2) {
+        const settings = loadSettings();
+        return sendJSON(res, 429, {
+          ok: false,
+          error: 'network-registration-limit',
+          message: 'Is network se 2 registrations ho chuke hain. Naya account banwane ke liye WhatsApp Help par baat karein.',
+          helpWhatsapp: String(settings.helpWhatsapp || '').replace(/\D/g, '')
+        });
+      }
       const id = nextCustomerId(accounts);
       const acc = {
         id, name, mobile, village: String(body.village || '').trim(),
+        registrationNetworkKey,
         pin: hashPin(pin), createdAt: new Date().toISOString(), visitCount: 1, lastVisitAt: new Date().toISOString(),
         pinResetRequested: false, freeSpinUsed: false, mobileVerified: false, history: [], totalSpend: 0,
         adTokens: 0, spinBalance: 1, lastAdTokenClaim: '',
