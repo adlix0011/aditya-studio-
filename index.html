@@ -1173,7 +1173,9 @@
           const addr = [user.village, user.address].filter(Boolean).join(', ') || 'Not saved yet';
           document.getElementById('profAddressLine').textContent = 'Address: ' + addr;
           const hist = document.getElementById('profHistory');
-          const coupons = (user.history || []).filter(h => (h.prize || h.discount != null) && !['used','wallet_credited','accepted','deleted'].includes(h.couponStatus || 'active'));
+          const coupons = (user.history || []).filter(h => (h.prize || h.discount != null)
+            && !['used','wallet_credited','accepted','deleted','not_winner'].includes(h.couponStatus || 'active')
+            && (!h.expiresAt || new Date(h.expiresAt).getTime() >= Date.now()));
           if (coupons.length) {
             hist.innerHTML = coupons.slice(0, 12).map((h, i) => {
               const label = h.prize || ('₹' + h.discount + ' OFF');
