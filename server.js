@@ -3296,20 +3296,25 @@ function proofCard(o){return '<div style="margin-top:10px;padding:11px;backgroun
 function card(o){
   var rejected=['rejected','cancelled'].indexOf(String(o.status||'').toLowerCase())>=0;
   var accepted=!rejected&&['processing','pending',''].indexOf(String(o.status||'').toLowerCase())<0;
-  return '<div class="msg-card" style="'+(rejected?'border-color:rgba(239,68,68,.5)':'')+'"><div class="msg-text"><b>'+esc(o.orderId)+'</b> · '+esc(o.frameTitle||'')+' ('+esc(o.size)+')'
-    +(rejected?' <span style="color:#f87171;font-weight:700">REJECTED</span>':'')
-    +(o.adminAlert?'<br><span style="display:inline-block;margin-top:7px;padding:5px 9px;border-radius:999px;background:#7c2d12;color:#fde68a;font-weight:800">🔔 NEW ORDER — payment proof check karein</span>':'')
-    +'<br>👤 '+esc(o.name)+' · '+esc(o.mobile)+' · Total ₹'+(o.finalAmount||0)+(o.amountDue!=null?(' · Due ₹'+o.amountDue):'')+(o.walletPaid?(' · Wallet ₹'+o.walletPaid):'')
-    +(o.qualityLabel?'<br>🖨️ Quality: '+esc(o.qualityLabel)+(o.qualityExtra?(' (+₹'+o.qualityExtra+')'):''):'')
-    +(o.colourName?'<br>🎨 Colour: '+esc(o.colourName):'')
-    +(o.orientation?'<br>↔️ Orientation: '+esc(o.orientation):'')
-    +'<br>📍 '+esc(o.address||'')+(o.village?' · गाँव: '+esc(o.village):'')+(o.district?' · जिला: '+esc(o.district):'')+(o.state?' · राज्य: '+esc(o.state):'')+(o.pincode?' · PIN: '+esc(o.pincode):'')
-    +(o.note?'<br>📝 '+esc(o.note):'')
-    +'<br>💳 <b>'+esc(o.paymentStatus||'unpaid')+'</b> · Status: <b>'+esc(o.status||'processing')+'</b>'
-    +(o.platformFee!=null?'<br>Fees: platform ₹'+(o.platformFee||0)+' · delivery ₹'+(o.deliveryFee||0):'')
-    +(o.trackingNumber?'<br>🔖 '+esc(o.trackingNumber):'')+(o.adminNote?'<br>📌 '+esc(o.adminNote):'')
+  var name=esc(o.name||'Customer'), pay=esc(o.paymentStatus||'unpaid'), status=esc(o.status||'processing');
+  return '<div class="msg-card" style="padding:15px;'+(rejected?'border-color:rgba(239,68,68,.65);background:linear-gradient(135deg,#291014,#170c0e)':'background:linear-gradient(135deg,#201b16,#120f0d)')+'">'
+    +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;border-bottom:1px solid rgba(250,204,21,.22);padding-bottom:11px">'
+      +'<div style="min-width:0"><div style="font-size:20px;line-height:1.15;font-weight:900;background:linear-gradient(90deg,#fde68a,#f59e0b,#fb7185);-webkit-background-clip:text;background-clip:text;color:transparent;word-break:break-word">👤 '+name+'</div>'
+      +'<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap"><span style="padding:4px 8px;border-radius:999px;background:#172554;border:1px solid #38bdf8;color:#bae6fd;font-size:11px;font-weight:800">ID: '+esc(o.orderId)+'</span><span style="padding:4px 8px;border-radius:999px;background:#3f1d2e;border:1px solid #fb7185;color:#fecdd3;font-size:11px;font-weight:800">'+status+'</span></div></div>'
+      +(o.adminAlert?'<span style="flex:0 0 auto;padding:6px 8px;border-radius:9px;background:#7f1d1d;color:#fef08a;font-size:10px;font-weight:900;box-shadow:0 0 14px rgba(239,68,68,.35)">🔔 NEW</span>':'')
+    +'</div>'
+    +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:8px;margin-top:11px">'
+      +'<div style="padding:9px;border-radius:10px;background:linear-gradient(135deg,#102c3c,#10212f);border:1px solid rgba(34,211,238,.35)"><small style="display:block;color:#67e8f9;font-weight:800">📞 CONTACT</small><b style="color:#e0f2fe">'+esc(o.mobile||'—')+'</b></div>'
+      +'<div style="padding:9px;border-radius:10px;background:linear-gradient(135deg,#30240e,#21170a);border:1px solid rgba(250,204,21,.35)"><small style="display:block;color:#fcd34d;font-weight:800">💰 ORDER TOTAL</small><b style="color:#fef3c7">₹'+(o.finalAmount||0)+'</b>'+(o.amountDue!=null?'<span style="font-size:11px;color:#fde68a"> · Due ₹'+o.amountDue+'</span>':'')+'</div>'
+      +'<div style="padding:9px;border-radius:10px;background:linear-gradient(135deg,#29143b,#1c1028);border:1px solid rgba(192,132,252,.35)"><small style="display:block;color:#d8b4fe;font-weight:800">🖼️ FRAME</small><b style="color:#f3e8ff">'+esc(o.frameTitle||'Photo Frame')+'</b><span style="display:block;font-size:11px;color:#e9d5ff">'+esc(o.size||'—')+'</span></div>'
+      +'<div style="padding:9px;border-radius:10px;background:linear-gradient(135deg,#123523,#102319);border:1px solid rgba(74,222,128,.35)"><small style="display:block;color:#86efac;font-weight:800">💳 PAYMENT</small><b style="color:#dcfce7">'+pay+'</b>'+(o.walletPaid?'<span style="font-size:11px;color:#bbf7d0"> · Wallet ₹'+o.walletPaid+'</span>':'')+'</div>'
+    +'</div>'
+    +'<div style="margin-top:9px;padding:10px;border-radius:10px;background:#15110e;border-left:3px solid #fb7185"><b style="color:#fda4af;font-size:11px">📍 DELIVERY ADDRESS</b><div style="margin-top:3px;color:#e7e5e4">'+esc(o.address||'—')+(o.village?' · '+esc(o.village):'')+(o.district?' · '+esc(o.district):'')+(o.state?' · '+esc(o.state):'')+(o.pincode?' · PIN '+esc(o.pincode):'')+'</div></div>'
+    +'<div style="margin-top:9px;padding:10px;border-radius:10px;background:#13130f;border-left:3px solid #38bdf8"><b style="color:#7dd3fc;font-size:11px">🖼️ FRAME DETAILS</b><div style="margin-top:3px;color:#d6d3d1">'+(o.orientation?'Orientation: '+esc(o.orientation)+' · ':'')+(o.qualityLabel?'Quality: '+esc(o.qualityLabel)+(o.qualityExtra?' (+₹'+o.qualityExtra+')':'')+' · ':'')+(o.colourName?'Colour: '+esc(o.colourName)+' · ':'')+'Display: '+esc(o.size||'—')+'</div></div>'
+    +(o.note?'<div style="margin-top:9px;padding:9px;border-radius:9px;background:#2e220b;color:#fde68a">📝 <b>Customer note:</b> '+esc(o.note)+'</div>':'')
+    +(o.trackingNumber?'<div style="margin-top:9px;color:#c4b5fd">🔖 Track: <b>'+esc(o.trackingNumber)+'</b></div>':'')+(o.adminNote?'<div style="margin-top:7px;color:#fca5a5">📌 Studio note: '+esc(o.adminNote)+'</div>':'')
     + proofCard(o)
-    +'<br><span class="muted">'+esc(fmt(o.createdAt))+'</span></div>'
+    +'<div style="margin-top:10px;color:#a8a29e;font-size:11px">🕒 '+esc(fmt(o.createdAt))+'</div>'
     +(rejected
       ?'<div style="margin-top:12px;padding:12px;border:1px dashed rgba(212,175,55,.55);border-radius:10px"><b style="color:#D4AF37">🗃️ Recovery Order</b><div class="muted" style="margin:6px 0 10px">Reason: '+esc(o.adminNote||'Not recorded')+'</div><button class="gen-btn" onclick="restoreOrder(\\''+esc(o.orderId)+'\\')">↩️ Recover Order</button></div>'
       :'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px" id="start-'+esc(o.orderId)+'">'
