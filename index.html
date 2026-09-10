@@ -428,7 +428,14 @@
       <input id="profMobile" class="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 text-on-surface text-sm" placeholder="Mobile" maxlength="10" type="tel"/>
       <input id="profPin" class="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 text-on-surface text-sm" placeholder="PIN" maxlength="4" type="password"/>
       <button type="button" id="profLoginBtn" class="w-full bg-gradient-gold text-on-primary font-label-md text-label-md py-3 rounded-lg">Login</button>
-      <p class="text-xs text-on-surface-variant">Naya account? <a href="/book-now?mode=register" class="text-primary underline">Studio page se register</a></p>
+      <a href="/book-now?mode=register" class="w-full rounded-xl px-3 py-3 text-center text-sm font-extrabold text-white border border-cyan-100/70 bg-gradient-to-r from-fuchsia-600 via-violet-600 to-cyan-500 shadow-[0_0_18px_rgba(34,211,238,.42)]">✨ New Registration करें</a>
+      <button type="button" id="profForgotPinBtn" class="w-full rounded-xl px-3 py-2.5 text-xs font-extrabold text-[#321b00] border border-yellow-100/70 bg-gradient-to-r from-yellow-300 via-amber-400 to-orange-400 shadow-[0_0_15px_rgba(251,191,36,.35)]">🔐 PIN Reset करें</button>
+      <div id="profResetArea" class="hidden rounded-xl border border-orange-300/50 bg-black/20 p-2.5 space-y-2">
+        <p class="text-[11px] text-yellow-100">OTP aur naya 4-digit PIN डालें</p>
+        <input id="profResetOtp" inputmode="numeric" maxlength="6" placeholder="6-digit OTP" class="w-full rounded-lg border border-yellow-300/40 bg-black/30 px-3 py-2 text-center tracking-[.25em] text-yellow-100 outline-none"/>
+        <input id="profResetPin" inputmode="numeric" maxlength="4" placeholder="New 4-digit PIN" class="w-full rounded-lg border border-yellow-300/40 bg-black/30 px-3 py-2 text-center tracking-[.25em] text-yellow-100 outline-none"/>
+        <button type="button" id="profResetConfirmBtn" class="w-full rounded-lg bg-gradient-to-r from-green-500 to-emerald-400 py-2 text-xs font-extrabold text-[#082515]">✅ Set New PIN</button>
+      </div>
       <p id="profLoginErr" class="text-error text-xs hidden"></p>
     </div>
 
@@ -1251,6 +1258,38 @@
           err.textContent = 'Network error';
           err.classList.remove('hidden');
         }
+      });
+
+      document.getElementById('profForgotPinBtn')?.addEventListener('click', async () => {
+        const mobile = (document.getElementById('profMobile')?.value || '').replace(/\D/g, '');
+        const err = document.getElementById('profLoginErr');
+        if (!/^[6-9]\d{9}$/.test(mobile)) { err.textContent = 'PIN reset ke liye apna registered 10-digit mobile number daalein.'; err.classList.remove('hidden'); return; }
+        const button = document.getElementById('profForgotPinBtn'); button.disabled = true; button.textContent = 'OTP Request हो रहा है…';
+        try {
+          const res = await fetch('/api/request-pin-reset-otp', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ mobile }) });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || !data.ok) throw new Error(data.message || 'OTP request nahi ho saka');
+          document.getElementById('profResetArea')?.classList.remove('hidden');
+          err.textContent = '✅ OTP भेज दिया गया है। OTP aur naya PIN नीचे डालें।'; err.className = 'text-green-300 text-xs';
+          document.getElementById('profResetOtp')?.focus();
+        } catch (e) { err.textContent = e.message || 'OTP request fail'; err.className = 'text-error text-xs'; }
+        finally { button.disabled = false; button.textContent = '🔐 PIN Reset करें'; }
+      });
+      document.getElementById('profResetConfirmBtn')?.addEventListener('click', async () => {
+        const mobile = (document.getElementById('profMobile')?.value || '').replace(/\D/g, '');
+        const otp = (document.getElementById('profResetOtp')?.value || '').replace(/\D/g, '');
+        const newPin = (document.getElementById('profResetPin')?.value || '').replace(/\D/g, '');
+        const err = document.getElementById('profLoginErr');
+        if (!/^[6-9]\d{9}$/.test(mobile) || !/^\d{6}$/.test(otp) || !/^\d{4}$/.test(newPin)) { err.textContent = 'Mobile, 6-digit OTP aur naya 4-digit PIN sahi daalein.'; err.className = 'text-error text-xs'; return; }
+        const button = document.getElementById('profResetConfirmBtn'); button.disabled = true; button.textContent = 'PIN save हो रहा है…';
+        try {
+          const res = await fetch('/api/reset-pin-with-otp', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ mobile, otp, newPin }) });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || !data.ok) throw new Error(data.message || 'PIN reset fail');
+          document.getElementById('profPin').value = ''; document.getElementById('profResetArea')?.classList.add('hidden');
+          err.textContent = '✅ New PIN set ho gaya. Ab login karein.'; err.className = 'text-green-300 text-xs';
+        } catch (e) { err.textContent = e.message || 'PIN reset fail'; err.className = 'text-error text-xs'; }
+        finally { button.disabled = false; button.textContent = '✅ Set New PIN'; }
       });
 
       document.getElementById('profLogoutBtn').addEventListener('click', () => {
