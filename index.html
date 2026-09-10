@@ -992,8 +992,10 @@
           const res = await fetch('/api/verify-spin-otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mobile: user.mobile, otp, sessionToken: s.sessionToken || '' }) });
           const out = await res.json().catch(() => ({}));
           if (!res.ok || !out.ok) throw new Error(out.error === 'wrong-otp' ? 'OTP गलत है।' : (out.message || 'OTP verify नहीं हुआ।'));
-          user.mobileVerified = true;
-          const old = loadSession() || {}; saveSession({ ...old, mobileVerified: true });
+          // Registration ke baad old browser session na mile tab bhi verify response
+          // naya secure session deta hai — user ko dobara Login nahi karna padega.
+          user = { ...(user || {}), ...out, mobileVerified: true, sessionToken: out.sessionToken || ((loadSession() || {}).sessionToken || '') };
+          const old = loadSession() || {}; saveSession({ ...old, ...user, mobileVerified: true, sessionToken: user.sessionToken });
           document.getElementById('profVerifyBox')?.classList.add('hidden');
           updateTokenUI();
           alert('✅ नंबर सफलतापूर्वक verify हो गया।');

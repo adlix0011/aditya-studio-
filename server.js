@@ -1729,9 +1729,12 @@ function computeOrderFees(subtotal, settingsFees) {
       if (rateLimited(req, mobile + ':verify-otp', 5, 15 * 60 * 1000)) return sendJSON(res, 429, { ok: false, error: 'too-many-attempts', message: 'OTP attempts limit ho gaye. 15 minute baad try karein.' });
       const accounts = loadAccounts();
       const acc = sessionAccount(req, body, accounts);
-      if (!acc || String(acc.mobile) !== mobile) return sendJSON(res, 401, { ok: false, error: 'auth', message: 'Login required' });
       const list = loadOtpRequests();
       const row = list.find(r => r.mobile === mobile && !r.verified && r.purpose === 'mobile_verify');
+      // Naye registration me session kabhi browser se miss ho jaye to bhi wahi
+      // one-time OTP ownership prove karta hai. Isliye valid OTP ko direct verify
+      // karne dein aur naya session return karein; request/resend phir bhi login-only hai.
+      if ((!acc || String(acc.mobile) !== mobile) && !row) return sendJSON(res, 401, { ok: false, error: 'auth', message: 'OTP request nahi mila. Pehle login karke OTP request karein.' });
       if (!row) return sendJSON(res, 400, { ok: false, error: 'no-request' });
       // Admin-panel mobile verification OTP user verify kare tabhi close hoga.
       // Isliye is flow me time ke basis par OTP ko reject/delete nahi karte.
@@ -1742,8 +1745,10 @@ function computeOrderFees(subtotal, settingsFees) {
       row.verified = true;
       row.verifiedAt = new Date().toISOString();
       saveOtpRequests(list);
-      acc.mobileVerified = true; saveAccounts(accounts);
-      return sendJSON(res, 200, { ok: true });
+      const verifiedAccount = acc && String(acc.mobile) === mobile ? acc : accounts.find(a => String(a.mobile) === mobile);
+      if (!verifiedAccount) return sendJSON(res, 404, { ok: false, error: 'not-found' });
+      verifiedAccount.mobileVerified = true; saveAccounts(accounts);
+      return sendJSON(res, 200, { ok: true, ...accountPublicPayload(verifiedAccount), sessionToken: issueSession(verifiedAccount) });
     } catch (e) {
       return sendJSON(res, 500, { ok: false, error: 'server-error' });
     }
