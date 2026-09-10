@@ -471,12 +471,12 @@
 
       <div id="profVerifyBox" class="hidden rounded-2xl border border-yellow-300/60 p-3" style="background:linear-gradient(135deg,#3c2b0c,#191208);box-shadow:0 0 18px rgba(250,204,21,.18)">
         <p class="font-bold text-yellow-200 text-sm">📲 नंबर Verify करें</p>
-        <p id="profVerifyMsg" class="mt-1 text-[11px] leading-4 text-yellow-50/75">WhatsApp OTP के लिए Request करें।</p>
-        <button type="button" id="profRequestOtpBtn" class="mt-3 w-full rounded-xl bg-gradient-to-r from-yellow-300 to-amber-500 px-3 py-2.5 text-xs font-extrabold text-[#321b00]">WhatsApp OTP Request करें</button>
-        <div id="profOtpArea" class="hidden mt-3 gap-2">
+        <p id="profVerifyMsg" class="mt-1 text-[11px] leading-4 text-yellow-50/75">OTP मिला है तो नीचे डालकर direct verify करें। नया OTP चाहिए तो Request button दबाएँ।</p>
+        <div id="profOtpArea" class="mt-3 grid gap-2">
           <input id="profOtpInput" inputmode="numeric" maxlength="6" placeholder="6-digit OTP" class="w-full rounded-xl border border-yellow-300/50 bg-black/35 px-3 py-2.5 text-center tracking-[.35em] text-yellow-100 outline-none"/>
           <button type="button" id="profVerifyOtpBtn" class="w-full rounded-xl border border-green-300 bg-gradient-to-r from-green-500 to-emerald-400 px-3 py-2.5 text-xs font-extrabold text-[#082515]">OTP Verify करें</button>
         </div>
+        <button type="button" id="profRequestOtpBtn" class="mt-3 w-full rounded-xl bg-gradient-to-r from-yellow-300 to-amber-500 px-3 py-2.5 text-xs font-extrabold text-[#321b00]">WhatsApp OTP Request करें</button>
       </div>
 
       <div class="grid grid-cols-2 gap-2">
@@ -969,7 +969,7 @@
         hideVerifyNudge(); openNav();
         const box = document.getElementById('profVerifyBox');
         if (box) box.classList.remove('hidden');
-        requestProfileOtp();
+        document.getElementById('profOtpInput')?.focus();
       }
       document.getElementById('profRequestOtpBtn')?.addEventListener('click', requestProfileOtp);
       document.getElementById('profVerifyOtpBtn')?.addEventListener('click', async function () {
