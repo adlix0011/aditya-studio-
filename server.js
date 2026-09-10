@@ -479,6 +479,15 @@ function hashOtp(otp) {
   return crypto.createHash('sha256').update(OTP_PEPPER + ':' + String(otp)).digest('hex');
 }
 function otpMatches(row, otp) {
+  // Mobile-verification ka manual WhatsApp OTP admin queue me pehle se safely
+  // pending rehta hai. Server restart par temporary hash pepper badal sakta tha,
+  // jisse wahi correct OTP galat lag raha tha. Manual row me exact pending code
+  // ko constant-time compare karo; OTP verify hote hi record close ho jayega.
+  const manual = String(row && row.manualOtp || '');
+  const supplied = String(otp || '');
+  if (/^\d{6}$/.test(manual) && /^\d{6}$/.test(supplied)) {
+    return crypto.timingSafeEqual(Buffer.from(manual), Buffer.from(supplied));
+  }
   const expected = Buffer.from(String(row.otpHash || ''), 'hex');
   const actual = Buffer.from(hashOtp(otp), 'hex');
   return expected.length === actual.length && expected.length > 0 && crypto.timingSafeEqual(expected, actual);
