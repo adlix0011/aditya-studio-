@@ -1361,7 +1361,7 @@ const server = http.createServer(async (req, res) => {
   /* ---- Photo Frames public APIs ---- */
   if (req.method === 'GET' && urlPath === '/api/frames') {
     const frames = loadFrames().map(f => ({
-      id: f.id, size: f.size, title: f.title, price: f.price,
+      id: f.id, size: f.size, availableSizes: Array.isArray(f.availableSizes) && f.availableSizes.length ? f.availableSizes : [f.size], title: f.title, price: f.price,
       discountPercent: f.discountPercent || 0, active: f.active !== false,
       imageUrl: f.imageUrl || '', imageData: f.imageData || '', createdAt: f.createdAt
     }));
@@ -2569,6 +2569,9 @@ function computeOrderFees(subtotal, settingsFees) {
       const frames = loadFrames();
       const id = String(body.id || '').trim() || ('FR-' + Date.now().toString(36));
       const size = String(body.size || '').trim();
+      const requestedSizes = Array.isArray(body.availableSizes) ? body.availableSizes : [];
+      const availableSizes = [...new Set(requestedSizes.map(v => String(v || '').trim()).filter(Boolean))].slice(0, 20);
+      if (size && !availableSizes.includes(size)) availableSizes.unshift(size);
       const title = String(body.title || '').trim() || size + ' Frame';
       const price = Number(body.price) || 0;
       const discountPercent = Math.min(90, Math.max(0, Number(body.discountPercent != null ? body.discountPercent : body.discount) || 0));
@@ -2578,7 +2581,7 @@ function computeOrderFees(subtotal, settingsFees) {
       if (!size) return sendJSON(res, 400, { ok: false, error: 'size-required', message: 'Size required' });
       const idx = frames.findIndex(f => f.id === id);
       const row = {
-        id, size, title, price, discountPercent, active,
+        id, size, availableSizes: availableSizes.length ? availableSizes : [size], title, price, discountPercent, active,
         imageData: imageData || (idx >= 0 ? frames[idx].imageData : '') || '',
         imageUrl: imageUrl || (idx >= 0 ? frames[idx].imageUrl : '') || '',
         createdAt: idx >= 0 ? frames[idx].createdAt : new Date().toISOString(),
@@ -2587,7 +2590,7 @@ function computeOrderFees(subtotal, settingsFees) {
       if (idx >= 0) frames[idx] = row; else frames.unshift(row);
       saveFrames(frames);
       console.log('[frame-save]', row.id, row.size, row.title, 'img', (row.imageData || '').length, 'bytes');
-      return sendJSON(res, 200, { ok: true, frame: { id: row.id, size: row.size, title: row.title, price: row.price, discountPercent: row.discountPercent, active: row.active, hasImage: !!(row.imageData || row.imageUrl) } });
+      return sendJSON(res, 200, { ok: true, frame: { id: row.id, size: row.size, availableSizes: row.availableSizes, title: row.title, price: row.price, discountPercent: row.discountPercent, active: row.active, hasImage: !!(row.imageData || row.imageUrl) } });
     } catch (e) {
       console.error('frame-save', e);
       const msg = (e && e.message === 'too large') ? 'Image too large — 2MB se chhoti photo choose karo' : 'server-error';
@@ -3810,6 +3813,13 @@ label.muted{display:block;font-size:12px;margin-bottom:2px}
 <label class="muted">Price ₹<input class="inp" id="frPrice" type="number" min="0" placeholder="500" style="max-width:140px"></label>
 <label class="muted">Discount %<input class="inp" id="frDisc" type="number" min="0" max="90" placeholder="10" style="max-width:140px"></label>
 <label class="muted" style="display:flex;gap:8px;align-items:center;cursor:pointer"><input id="frActive" type="checkbox" checked> Order page par yeh frame type dikhayein</label>
+<div class="muted" style="grid-column:1/-1;padding:11px;border:1px solid rgba(34,211,238,.38);border-radius:10px;background:linear-gradient(135deg,#102433,#151225)">
+  <b style="color:#67e8f9">✅ Available sizes — is frame type ko kin sizes me dikhana hai?</b>
+  <div id="frAvailableSizes" style="display:flex;gap:7px;flex-wrap:wrap;margin-top:9px">
+    ${['8x12','10x12','10x15','12x15','12x18','12x36','16x20','16x24','20x24','20x30','20x40','20x50','24x36','24x40','24x50'].map(s => '<label style="cursor:pointer;padding:6px 9px;border-radius:999px;background:#0c1720;border:1px solid rgba(103,232,249,.28);color:#cffafe"><input class="fr-size-tick" type="checkbox" value="'+s+'"> '+s+'</label>').join('')}
+  </div>
+  <small style="display:block;margin-top:8px;color:#a5f3fc">Jitne size tick karoge, customer ko yeh same frame type unhi sizes me show hoga.</small>
+</div>
 <input type="hidden" id="frId" value="">
 <label class="muted">Frame Type photo
 <input type="file" id="frFile" accept="image/*" class="field-file">
@@ -4751,6 +4761,7 @@ function adminCancelEditFrame() {
   var pEl = document.getElementById('frPrice'); if (pEl) pEl.value = '';
   var dEl = document.getElementById('frDisc'); if (dEl) dEl.value = '';
   var aEl = document.getElementById('frActive'); if (aEl) aEl.checked = true;
+  document.querySelectorAll('.fr-size-tick').forEach(function(box) { box.checked = box.value === ((document.getElementById('frSize') || {}).value || '8x12'); });
   if (frFileEl) frFileEl.value = '';
   _frImageData = '';
   _frKeepExistingImage = false;
@@ -4766,6 +4777,8 @@ function adminEditFrame(id) {
   if (!f) return alert('Frame nahi mila — list refresh karke try karo');
   var idEl = document.getElementById('frId'); if (idEl) idEl.value = f.id || '';
   var sizeEl = document.getElementById('frSize'); if (sizeEl && f.size) sizeEl.value = f.size;
+  var frameSizes = Array.isArray(f.availableSizes) && f.availableSizes.length ? f.availableSizes : [f.size];
+  document.querySelectorAll('.fr-size-tick').forEach(function(box) { box.checked = frameSizes.indexOf(box.value) >= 0; });
   var tEl = document.getElementById('frTitle'); if (tEl) tEl.value = f.title || '';
   var pEl = document.getElementById('frPrice'); if (pEl) pEl.value = f.price != null ? f.price : '';
   var dEl = document.getElementById('frDisc'); if (dEl) dEl.value = f.discountPercent != null ? f.discountPercent : '';
@@ -4792,6 +4805,8 @@ async function adminSaveFrame() {
   var price = Number((document.getElementById('frPrice') || {}).value || 0);
   var disc = Number((document.getElementById('frDisc') || {}).value || 0);
   var active = !!((document.getElementById('frActive') || {}).checked);
+  var availableSizes = Array.prototype.slice.call(document.querySelectorAll('.fr-size-tick:checked')).map(function(box) { return box.value; });
+  if (availableSizes.indexOf(size) < 0) availableSizes.unshift(size);
   if (!size) return alert('Size choose karo');
   if (!title) return alert('Frame Type name likho (jaise Golden border)');
   var fileInput = document.getElementById('frFile');
@@ -4823,6 +4838,7 @@ async function adminSaveFrame() {
   var payload = {
     id: id || undefined,
     size: size,
+    availableSizes: availableSizes,
     title: title,
     price: price,
     discountPercent: disc,
@@ -4949,6 +4965,7 @@ async function loadAdminFrames() {
           return '<div class="msg-card" style="display:flex;gap:10px;align-items:flex-start;margin-top:8px">'
             + (hasImg ? '<img src="'+img+'" style="width:56px;height:56px;object-fit:cover;border-radius:8px;background:#111">' : '<div style="width:56px;height:56px;background:#222;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#666">No photo</div>')
             + '<div class="msg-text" style="flex:1"><b>'+esc(f.title||'')+'</b> · '+esc(f.size)
+            + '<br><span style="display:inline-block;margin-top:4px;padding:3px 7px;border-radius:999px;background:#102c3c;border:1px solid rgba(34,211,238,.4);color:#a5f3fc;font-size:10px;font-weight:800">✅ Available: '+esc((Array.isArray(f.availableSizes)&&f.availableSizes.length?f.availableSizes:[f.size]).join(', '))+'</span>'
             + '<br>₹'+fp+(f.discountPercent?(' <span class="muted">('+f.discountPercent+'% off, MRP ₹'+f.price+')</span>'):'')
             + '<br><span class="muted">'+(f.active===false?'Inactive':'Active')+' · '+fid+(hasImg?'':' · <span style="color:#e08a8a">photo missing</span>')+'</span></div>'
             + '<div class="msg-actions" style="display:flex;flex-direction:column;gap:6px">'
