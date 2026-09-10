@@ -361,7 +361,10 @@ function updatePrice() {
 function renderTypes() {
   const box = document.getElementById("types-box");
   if (!box || !selected) return;
-  const types = allFrames.filter(f => f.size === selected.size);
+  const types = allFrames.filter(f => {
+    const sizes = Array.isArray(f.availableSizes) && f.availableSizes.length ? f.availableSizes : [f.size];
+    return sizes.includes(selected.size);
+  });
   box.innerHTML = types.map(t => {
     const active = String(t.id) === String(selected.id);
     const img = t.image
