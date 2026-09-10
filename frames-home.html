@@ -1079,7 +1079,7 @@ async function loadFrames() {
 }
 
 function renderSizeFilter() {
-  const sizes = [...new Set(allFrames.map(f => f.size).filter(Boolean))]
+  const sizes = [...new Set(allFrames.flatMap(f => frameAvailableSizes(f)).filter(Boolean))]
     .sort((a, b) => sizeArea(a) - sizeArea(b));
   const el = document.getElementById("size-filter");
   if (!el) return;
@@ -1134,6 +1134,11 @@ function sizeArea(sizeStr) {
   return short * long;
 }
 
+function frameAvailableSizes(frame) {
+  return Array.isArray(frame && frame.availableSizes) && frame.availableSizes.length
+    ? frame.availableSizes : [frame && frame.size].filter(Boolean);
+}
+
 function frameRating(frame) {
   // Real user ratings only — filhal 0 (jab users rate kare tab average dikhega)
   const r = frame && frame.rating != null ? Number(frame.rating) : 0;
@@ -1184,7 +1189,9 @@ function buildFramePreview(frameImg, photoUrl, opts) {
 
 function renderFrames(filterSize = null) {
   const grid = document.getElementById("frames-grid");
-  let list = allFrames.slice();
+  // Same uploaded frame type multiple selected sizes me available ho sakta hai.
+  // Har selected size ke liye ek display card banta hai.
+  let list = allFrames.flatMap(f => frameAvailableSizes(f).map(size => Object.assign({}, f, { size: size })));
   if (filterSize) list = list.filter(f => f.size === filterSize);
 
   // Same size ke multiple frame types ek hi card me group honge. Customer card kholkar
