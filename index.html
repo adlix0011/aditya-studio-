@@ -381,7 +381,7 @@
         <a class="text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md hover:backdrop-blur-2xl hover:bg-surface/60 rounded-sm px-1" href="#portfolio">Portfolio</a>
         <a class="text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md hover:backdrop-blur-2xl hover:bg-surface/60 rounded-sm px-1" href="#gift-shop">Gift Shop</a>
         <a class="text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md hover:backdrop-blur-2xl hover:bg-surface/60 rounded-sm px-1" href="/frames">Photo Frames</a>
-        <a class="text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md hover:backdrop-blur-2xl hover:bg-surface/60 rounded-sm px-1" href="#bookings">Bookings</a>
+        <a class="text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md hover:backdrop-blur-2xl hover:bg-surface/60 rounded-sm px-1" href="#more-services">More Services</a>
         <a class="text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md hover:backdrop-blur-2xl hover:bg-surface/60 rounded-sm px-1" href="#galleries">Galleries</a>
       </nav>
       <div class="header-actions flex items-center gap-4">
@@ -704,8 +704,9 @@
       </a>
     </section>
 
-    <!-- Booking Cards -->
-    <section class="flex flex-col gap-8" id="bookings">
+    <!-- Service cards stay in source for admin editing, but are intentionally hidden.
+         Customers can only reach the booking page through the single More button below. -->
+    <section class="hidden" id="bookings" aria-hidden="true">
       <div class="flex items-center justify-between">
         <h2 class="font-headline-md text-headline-md text-on-surface">Book Your Session</h2>
         <a class="text-primary font-label-md text-label-md hover:underline decoration-primary underline-offset-4" href="/book?service=wedding">View All Packages</a>
@@ -792,6 +793,13 @@
           </div>
         </a>
       </div>
+    </section>
+
+    <section id="more-services" class="glass-panel rounded-3xl border border-primary/35 px-6 py-7 text-center shadow-[0_0_28px_rgba(212,175,55,.12)]" style="background:linear-gradient(135deg,#251b0a,#17100b 55%,#24112a)">
+      <p class="text-[10px] uppercase tracking-[.22em] text-primary/80 font-bold">Photography &amp; Bookings</p>
+      <h2 class="mt-2 text-xl font-black text-yellow-100">Aur services dekhni hain?</h2>
+      <p class="mt-2 text-sm text-on-surface-variant">Wedding, birthday, event aur studio packages ek hi jagah dekhein.</p>
+      <a href="/book?service=wedding" class="inline-flex mt-5 items-center justify-center gap-2 rounded-xl border border-cyan-100/60 bg-gradient-to-r from-fuchsia-600 via-violet-600 to-cyan-500 px-6 py-3 text-sm font-extrabold text-white shadow-[0_0_18px_rgba(34,211,238,.35)]">✨ More Services <span>→</span></a>
     </section>
 
     <!-- Live Spin Roller + AD Token -->
