@@ -1168,6 +1168,7 @@
         <div class="err">4 अंकों का PIN डालें</div>
       </div>
       <button type="submit" class="btn">अकाउंट बनाएं → फ्री स्पिन पाएं</button>
+      <p id="networkLimitMsg" style="display:none;margin:10px 0 0;text-align:center;font-size:12px;font-weight:700;color:#fecaca">This network already has 2 registered accounts.</p>
       <a id="networkHelpBtn" href="#" target="_blank" rel="noopener" style="display:none;margin-top:10px;padding:12px;border-radius:12px;text-align:center;text-decoration:none;background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;font-weight:900;box-shadow:0 0 16px rgba(37,211,102,.35)">💬 WhatsApp Help — नया registration request करें</a>
       <p style="text-align:center;margin-top:14px;font-size:13px;color:var(--muted);">
         पहले से अकाउंट है?
@@ -2003,6 +2004,10 @@ if (gotoNewCustomerBtn) {
 registerForm.addEventListener('submit', async (e)=>{
   e.preventDefault();
   setAuthError('');
+  const networkLimitMsg = document.getElementById('networkLimitMsg');
+  if(networkLimitMsg) networkLimitMsg.style.display = 'none';
+  const networkHelpBtn = document.getElementById('networkHelpBtn');
+  if(networkHelpBtn) networkHelpBtn.style.display = 'none';
   let ok = true;
   const name = document.getElementById('rName').value.trim();
   const mobile = document.getElementById('rMobile').value.trim();
@@ -2028,7 +2033,7 @@ registerForm.addEventListener('submit', async (e)=>{
       if(out.error === 'network-registration-limit'){
         const number = String(out.helpWhatsapp || '').replace(/\D/g,'');
         if(help && number){ help.href='https://wa.me/91'+number+'?text='+encodeURIComponent('Namaste, is network se 2 registrations ho chuke hain. Mujhe naya Aditya Studio account register karwana hai.'); help.style.display='block'; }
-        setAuthError(out.message || 'Is network ka registration limit complete ho gaya hai. WhatsApp Help par baat karein.');
+        if(networkLimitMsg) { networkLimitMsg.textContent = out.message || 'This network already has 2 registered accounts.'; networkLimitMsg.style.display='block'; }
       } else if(help) help.style.display='none';
       if(out.error === 'exists') setAuthError('ये नंबर पहले से रजिस्टर है — पुराना कस्टमर से लॉगिन करें');
       else if(out.error !== 'network-registration-limit') setAuthError('अकाउंट नहीं बन पाया, दोबारा कोशिश करें');
