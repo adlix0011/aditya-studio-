@@ -1942,7 +1942,11 @@ document.addEventListener('DOMContentLoaded', function () {
   buttons.forEach(function (button) { button.addEventListener('click', function () { overlay.classList.remove('hidden'); loadNotifications(); }); });
   document.getElementById('closeNotifications').addEventListener('click', function () { overlay.classList.add('hidden'); });
   overlay.addEventListener('click', function (event) { if (event.target === overlay) overlay.classList.add('hidden'); });
-  setInterval(function () { if (!overlay.classList.contains('hidden')) loadNotifications(); }, 60000);
+  // Bell badge ko popup kholne par hi nahi, background me bhi update rakho.
+  // Isse admin ka naya alert aate hi bell par count dikhega.
+  loadNotifications();
+  setInterval(loadNotifications, 15000);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) loadNotifications(); });
 })();
 </script>
 
