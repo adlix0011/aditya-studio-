@@ -3713,7 +3713,21 @@ if (new URLSearchParams(location.search).get('mode') === 'register') {
   if (authCard) authCard.style.display = 'block';
   tabRegister.click();
 } else {
-  tryRestoreSession();
+  tryRestoreSession().then(function(){
+    // Add Money / coupon ka Verify button yahan seedha OTP field kholta hai.
+    if(new URLSearchParams(location.search).get('verify') !== 'mobile') return;
+    if(currentAccount){
+      openProfileModal();
+      var verifyBox = document.getElementById('profileVerifyBox');
+      var otpInput = document.getElementById('profileOtpInput');
+      if(verifyBox) verifyBox.style.display = 'block';
+      if(otpInput) setTimeout(function(){ otpInput.focus(); }, 150);
+    } else {
+      if(authCard) authCard.style.display = 'block';
+      tabLogin.click();
+      setAuthError('📱 OTP verify karne ke liye apna mobile login karein.');
+    }
+  });
 }
 // Register form: Name me sirf A-Z/spaces, mobile aur PIN me sirf numbers.
 document.getElementById('rName')?.addEventListener('input', function(){ this.value = this.value.replace(/[^A-Za-z ]/g, ''); });
