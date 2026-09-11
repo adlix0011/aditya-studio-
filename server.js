@@ -1770,13 +1770,15 @@ function computeOrderFees(subtotal, settingsFees) {
       list = list.filter(r => keepPendingOtpForAdmin(r, now));
       const existing = list.find(r => r.mobile === mobile && !r.verified && r.purpose === 'mobile_verify');
       // Admin WhatsApp OTP ko baar-baar request karne par naya OTP mat banao.
-      // Wahi pending 6-digit OTP 5 minute tak admin panel me rahega.
+      // Wahi OTP rehta hai, lekin har click par admin queue aur Telegram alert
+      // refresh hota hai so the studio cannot miss the customer's request.
       if (existing && existing.manualOtp) {
+        existing.delivery = 'whatsapp_manual';
+        existing.requestedAt = new Date().toISOString();
+        existing.lastRequestedAt = existing.requestedAt;
+        saveOtpRequests(list.slice(0, 100));
         void sendTelegramAlert('WhatsApp OTP Requested Again', 'Customer: ' + (acc.name || 'Customer') + '\nUser ID: ' + (acc.id || '—') + '\nMobile: ' + mobile + '\nAction: OTP admin panel me available hai; wahin se WhatsApp par bhejein.');
-        return sendJSON(res, 200, { ok: true, alreadyVerified: false, delivery: 'whatsapp_manual', alreadyPending: true, expiresInSeconds: Math.max(0, Math.floor((new Date(existing.expiresAt).getTime() - now) / 1000)) });
-      }
-      if (existing && now - new Date(existing.createdAt || 0).getTime() < OTP_RESEND_COOLDOWN_MS) {
-        return sendJSON(res, 429, { ok: false, error: 'resend-too-soon', message: 'OTP dobara bhejne ke liye 1 minute rukhein.' });
+        return sendJSON(res, 200, { ok: true, requestId: existing.requestId, alreadyVerified: false, delivery: 'whatsapp_manual', alreadyPending: true, expiresInSeconds: Math.max(0, Math.floor((new Date(existing.expiresAt).getTime() - now) / 1000)) });
       }
       const otp = generateOtp();
       const requestId = 'otp-' + mobile + '-' + now;
@@ -1795,7 +1797,7 @@ function computeOrderFees(subtotal, settingsFees) {
       recordAuthFailure(req, mobile + ':otp');
       console.log('OTP request created for:', mobile, requestId, delivery);
       void sendTelegramAlert('WhatsApp OTP Request', 'Customer: ' + (acc.name || 'Customer') + '\nUser ID: ' + (acc.id || '—') + '\nMobile: ' + mobile + '\nAction: OTP admin panel me available hai; wahin se WhatsApp par bhejein.');
-      return sendJSON(res, 200, { ok: true, alreadyVerified: false, delivery, expiresInSeconds: Math.floor(OTP_TTL_MS / 1000) });
+      return sendJSON(res, 200, { ok: true, requestId, alreadyVerified: false, delivery, expiresInSeconds: Math.floor(OTP_TTL_MS / 1000) });
     } catch (e) {
       console.error('request-spin-otp', e);
       const status = e && e.code === 'sms-not-configured' ? 503 : 502;
