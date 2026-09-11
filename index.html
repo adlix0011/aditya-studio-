@@ -593,7 +593,7 @@
     <section class="relative w-screen left-1/2 -translate-x-1/2 min-h-[614px] flex items-center justify-center -mt-10 overflow-hidden shadow-2xl" id="portfolio">
       <!-- Side-visible background slideshow (admin: Hero Side Background) -->
       <div class="absolute inset-0 z-0 bg-background" id="heroSideBg">
-        <div class="bg-slide active" style="background-image:url('https://images.unsplash.com/photo-1519741497674-611481863552?w=1600&q=80')"></div>
+        <div class="bg-slide active" data-hero-boot="1" style="background-image:url('__HERO_SIDE_BG_BOOT_URL__');background-position:__HERO_SIDE_BG_BOOT_X__% __HERO_SIDE_BG_BOOT_Y__%;--hero-scale:__HERO_SIDE_BG_BOOT_ZOOM__"></div>
         <div class="absolute inset-0 pointer-events-none"
              style="background: linear-gradient(105deg, rgba(22,19,11,.92) 0%, rgba(22,19,11,.55) 42%, rgba(22,19,11,.25) 70%, rgba(22,19,11,.45) 100%);"></div>
       </div>
@@ -1644,9 +1644,11 @@
         if (!urls.length) return; // keep default single slide
         // rebuild slides
         const veil = box.querySelector('div[style*="linear-gradient"]');
-        box.querySelectorAll('.bg-slide').forEach(el => el.remove());
+        const bootSlide = box.querySelector('.bg-slide[data-hero-boot="1"]');
+        box.querySelectorAll('.bg-slide').forEach(el => { if (el !== bootSlide) el.remove(); });
         urls.forEach((item, i) => {
-          const d = document.createElement('div');
+          // Reuse the server-rendered first image: no white/default flash.
+          const d = (i === 0 && bootSlide) ? bootSlide : document.createElement('div');
           d.className = 'bg-slide' + (i === 0 ? ' active' : '');
           d.style.backgroundImage = 'url("' + String(item.url).replace(/"/g, '\\"') + '")';
           d.style.backgroundPosition = item.x + '% ' + item.y + '%';
