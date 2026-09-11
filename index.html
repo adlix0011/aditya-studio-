@@ -451,10 +451,10 @@
         <p class="text-[11px] text-on-surface-variant mt-1 relative z-[1]">Orders me use kar sakte ho</p>
         <p id="profWalletPending" class="hidden relative z-[1] mt-2 text-[11px] font-bold text-sky-200/55 wallet-pending-pulse">⏳ ₹<span id="profWalletPendingBal">0</span> recharge pending · Admin verification baaki hai</p>
         <div id="profWalletPromo" class="hidden mt-2 rounded-lg border border-fuchsia-300/40 bg-fuchsia-950/25 px-2 py-1.5 text-[10px] text-fuchsia-100 relative z-[1]"></div>
-        <div class="mt-3 flex gap-2 relative z-[1]">
-          <input id="profWalletCode" class="flex-1 bg-surface border border-outline-variant rounded-lg px-2 py-1.5 text-on-surface text-xs" placeholder="Wallet code" maxlength="12"/>
-          <button type="button" id="profWalletRedeemBtn" class="px-3 py-1.5 rounded-lg bg-gradient-gold text-on-primary text-xs font-semibold">Redeem</button>
+        <div id="profWalletCodeArea" class="hidden mt-3 relative z-[1]">
+          <input id="profWalletCode" class="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 text-on-surface text-xs" placeholder="Wallet code daalein" maxlength="12"/>
         </div>
+        <button type="button" id="profWalletRedeemBtn" class="w-full mt-3 relative z-[1] px-3 py-2 rounded-lg bg-gradient-gold text-on-primary text-xs font-extrabold">🎟️ Redeem</button>
         <p id="profWalletMsg" class="text-[11px] mt-1 relative z-[1] hidden"></p>
       </div>
 
@@ -468,7 +468,7 @@
           </label>
           <div class="min-w-0 flex-1">
             <p class="truncate text-base font-black tracking-wide bg-gradient-to-r from-yellow-200 via-amber-400 to-pink-400 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(251,191,36,.65)]" id="profName">—</p>
-            <p class="mt-0.5 inline-flex rounded-full border border-amber-300/45 bg-gradient-to-r from-amber-500/20 via-yellow-300/15 to-orange-500/20 px-2 py-0.5 text-[10px] font-extrabold tracking-[.08em] text-yellow-200 shadow-[0_0_10px_rgba(251,191,36,.18)]" id="profLevelName">Bronze Member</p>
+            <p class="hidden" id="profLevelName"></p>
             <p class="text-on-surface-variant text-xs" id="profMobileShow">—</p>
           </div>
           <div class="hidden" id="profLevelIcon">★</div>
@@ -1442,8 +1442,16 @@
         const s = loadSession();
         const code = (document.getElementById('profWalletCode')?.value || '').trim().toUpperCase();
         const msg = document.getElementById('profWalletMsg');
+        const codeArea = document.getElementById('profWalletCodeArea');
+        const redeemBtn = document.getElementById('profWalletRedeemBtn');
         if (!s || !s.mobile) { openNav(); return; }
-        if (!code) { msg.textContent = 'Code daalo'; msg.classList.remove('hidden'); msg.className = 'text-[11px] mt-1 text-error'; return; }
+        if (!codeArea || codeArea.classList.contains('hidden')) {
+          codeArea?.classList.remove('hidden');
+          if(redeemBtn) redeemBtn.textContent = '✓ Redeem Now';
+          document.getElementById('profWalletCode')?.focus();
+          return;
+        }
+        if (!code) { msg.textContent = 'Wallet code daalein'; msg.classList.remove('hidden'); msg.className = 'text-[11px] mt-1 text-error'; return; }
         try {
           const res = await fetch('/api/wallet/redeem-code', {
             method: 'POST',
@@ -1458,6 +1466,8 @@
             msg.textContent = data.message;
             msg.className = 'text-[11px] mt-1 text-primary';
             document.getElementById('profWalletCode').value = '';
+            codeArea?.classList.add('hidden');
+            if(redeemBtn) redeemBtn.textContent = '🎟️ Redeem';
           } else {
             msg.textContent = data.message || 'Fail';
             msg.className = 'text-[11px] mt-1 text-error';
