@@ -801,6 +801,8 @@ function defaultSettings() {
     // Current Deals carousel: admin enables this after saving custom cards.
     homeDealsEnabled: false,
     homeDealsDurationSec: 20,
+    // Optional anti-spam protection. When enabled, one network can create only 2 accounts.
+    registrationNetworkLimitEnabled: false,
     // Colorful CTA button on the Register/Login landing page.
     loginPromo: {
       text: '🎀 Premium Photo Frames देखें / Order करें →',
@@ -866,6 +868,7 @@ function loadSettings() {
     offerImages: data.offerImages || defaults.offerImages,
     homeDealsEnabled: data.homeDealsEnabled === true,
     homeDealsDurationSec: Math.max(8, Math.min(60, Number(data.homeDealsDurationSec) || defaults.homeDealsDurationSec)),
+    registrationNetworkLimitEnabled: data.registrationNetworkLimitEnabled === true,
     loginPromo: { ...defaults.loginPromo, ...(data.loginPromo || {}) },
     heroIntro: { ...defaults.heroIntro, ...(data.heroIntro || {}) },
     frames3dPhotos: Array.isArray(data.frames3dPhotos) ? data.frames3dPhotos : defaults.frames3dPhotos,
@@ -1258,8 +1261,22 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && (urlPath === '/' || urlPath === '/index.html')) {
     fs.readFile(INDEX_HTML_FILE, (err, data) => {
       if (err) { res.writeHead(404); return res.end('index.html missing'); }
+      // Send the first configured hero image in the initial HTML. This avoids
+      // showing a temporary/default background while the browser fetches settings.
+      const settings = loadSettings();
+      const first = (settings.heroSideBgPhotos || [])[0] || {};
+      const rawUrl = typeof first === 'string' ? first : String(first.url || '');
+      const safeUrl = rawUrl.replace(/["'<>]/g, '');
+      const x = Math.max(0, Math.min(100, Number((first && first.positionX) ?? 50)));
+      const y = Math.max(0, Math.min(100, Number((first && first.positionY) ?? 50)));
+      const zoom = Math.max(1, Math.min(2.5, Number((first && first.zoom) || 1)));
+      const html = data.toString('utf8')
+        .replace(/__HERO_SIDE_BG_BOOT_URL__/g, safeUrl)
+        .replace(/__HERO_SIDE_BG_BOOT_X__/g, String(x))
+        .replace(/__HERO_SIDE_BG_BOOT_Y__/g, String(y))
+        .replace(/__HERO_SIDE_BG_BOOT_ZOOM__/g, String(zoom));
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store, max-age=0' });
-      serveLiveHtml(res, data);
+      serveLiveHtml(res, html);
     });
     return;
   }
@@ -1916,13 +1933,13 @@ function computeOrderFees(subtotal, settingsFees) {
       if (accounts.find(a => a.mobile === mobile)) return sendJSON(res, 409, { ok: false, error: 'exists' });
       const registrationNetworkKey = requestNetworkKey(req);
       const registrationsFromNetwork = accounts.filter(a => a.registrationNetworkKey === registrationNetworkKey).length;
-      if (registrationsFromNetwork >= 2) {
-        const settings = loadSettings();
+      const registrationSettings = loadSettings();
+      if (registrationSettings.registrationNetworkLimitEnabled && registrationsFromNetwork >= 2) {
         return sendJSON(res, 429, {
           ok: false,
           error: 'network-registration-limit',
-          message: 'Is network se 2 registrations ho chuke hain. Naya account banwane ke liye WhatsApp Help par baat karein.',
-          helpWhatsapp: String(settings.helpWhatsapp || '').replace(/\D/g, '')
+          message: 'This network already has 2 registered accounts.',
+          helpWhatsapp: String(registrationSettings.helpWhatsapp || '').replace(/\D/g, '')
         });
       }
       const id = nextCustomerId(accounts);
@@ -2779,6 +2796,20 @@ function computeOrderFees(subtotal, settingsFees) {
     res.writeHead(302, { Location: '/admin?telegram=' + (ok ? 'ok' : 'fail') }); return res.end();
   }
 
+  if (req.method === 'POST' && urlPath === '/admin/save-registration-limit') {
+    try {
+      const body = await readFormBody(req);
+      const settings = loadSettings();
+      settings.registrationNetworkLimitEnabled = String(body.registrationNetworkLimitEnabled || '') === 'on';
+      saveSettings(settings);
+      res.writeHead(302, { Location: '/admin?registration-limit=saved#sec-registration-limit' });
+      return res.end();
+    } catch (e) {
+      res.writeHead(302, { Location: '/admin?registration-limit=fail#sec-registration-limit' });
+      return res.end();
+    }
+  }
+
   if (req.method === 'POST' && urlPath === '/admin/send-notification') {
     try {
       const body = await readFormBody(req);
@@ -3037,7 +3068,10 @@ function computeOrderFees(subtotal, settingsFees) {
       if (!items.length) return sendJSON(res, 400, { ok: false, error: 'no-items' });
       const mapped = items.slice(0, 6).map((it, i) => ({
         url: String(it.url || it.dataUrl || '').slice(0, 2.5e6),
-        title: String(it.title || ('BG ' + (i + 1))).slice(0, 80)
+        title: String(it.title || ('BG ' + (i + 1))).slice(0, 80),
+        positionX: Math.max(0, Math.min(100, Number(it.positionX ?? 50))),
+        positionY: Math.max(0, Math.min(100, Number(it.positionY ?? 50))),
+        zoom: Math.max(1, Math.min(2.5, Number(it.zoom || 1)))
       })).filter(x => x.url);
       if (!mapped.length) return sendJSON(res, 400, { ok: false, error: 'invalid' });
       if (body.replace === true || body.replace === 'true') {
@@ -3058,6 +3092,24 @@ function computeOrderFees(subtotal, settingsFees) {
       console.error('hero-side-bg-upload', e);
       return sendJSON(res, 500, { ok: false, error: 'server-error' });
     }
+  }
+  // Per-photo crop: controls exactly what is visible behind the home hero.
+  if (req.method === 'POST' && urlPath === '/admin/hero-side-bg-adjust') {
+    try {
+      const body = await readBody(req, 1e5);
+      const index = Number(body.index);
+      const cur = loadSettings();
+      const list = Array.isArray(cur.heroSideBgPhotos) ? cur.heroSideBgPhotos : [];
+      if (!Number.isInteger(index) || !list[index]) return sendJSON(res, 404, { ok:false, error:'not-found' });
+      const old = typeof list[index] === 'string' ? { url:list[index] } : list[index];
+      list[index] = { ...old,
+        positionX: Math.max(0, Math.min(100, Number(body.positionX ?? old.positionX ?? 50))),
+        positionY: Math.max(0, Math.min(100, Number(body.positionY ?? old.positionY ?? 50))),
+        zoom: Math.max(1, Math.min(2.5, Number(body.zoom ?? old.zoom ?? 1)))
+      };
+      cur.heroSideBgPhotos = list; saveSettings(cur);
+      return sendJSON(res, 200, { ok:true, photo:list[index] });
+    } catch (e) { return sendJSON(res, 500, { ok:false, error:'server-error' }); }
   }
   if (req.method === 'POST' && urlPath === '/admin/hero-side-bg-duration') {
     try {
@@ -3737,6 +3789,7 @@ label.muted{display:block;font-size:12px;margin-bottom:2px}
   <a class="nav-link" href="#sec-home-frame">🖼️ Home 3D Frame (5 photos)</a>
   <a class="nav-link" href="#sec-book">📷 Book Cards</a>
   <a class="nav-link" href="#sec-otp">📱 OTP / PIN</a>
+  <a class="nav-link" href="#sec-registration-limit">🛡️ Registration Limit</a>
   <a class="nav-link" href="#sec-codes">🎫 Spin Codes</a>
   <a class="nav-link" href="#sec-customers">👥 Customers</a>
   <a class="nav-link" href="#sec-notif">🔔 Notifications</a>
@@ -3950,7 +4003,16 @@ ${(function(){
   return list.map((p,i)=>{
     const u = typeof p === 'string' ? p : (p&&p.url)||'';
     if (!u) return '';
-    return '<img src="'+esc(u)+'" alt="#'+(i+1)+'" style="width:100px;height:64px;object-fit:cover;border-radius:8px;border:1px solid rgba(212,175,55,.45)"/>';
+    const x = Math.max(0, Math.min(100, Number((p&&p.positionX) ?? 50)));
+    const y = Math.max(0, Math.min(100, Number((p&&p.positionY) ?? 50)));
+    const z = Math.max(1, Math.min(2.5, Number((p&&p.zoom) || 1)));
+    return '<div style="width:220px;border:1px solid rgba(212,175,55,.4);border-radius:9px;padding:7px;background:#15120b">'
+      + '<div style="height:126px;border-radius:6px;overflow:hidden;outline:1px solid rgba(125,211,252,.5)"><div style="height:126px;background-image:url(\''+esc(u).replace(/'/g,'%27')+'\');background-size:cover;background-position:'+x+'% '+y+'%;transform:scale('+z+');transform-origin:'+x+'% '+y+'%"></div></div>'
+      + '<div style="font-size:11px;color:#f2ca50;margin-top:8px">#'+(i+1)+' · Home hero ka same crop</div>'
+      + '<label class="muted" style="display:block;font-size:10px">Left / Right <input type="range" id="heroBgX'+i+'" min="0" max="100" value="'+x+'"></label>'
+      + '<label class="muted" style="display:block;font-size:10px">Up / Down <input type="range" id="heroBgY'+i+'" min="0" max="100" value="'+y+'"></label>'
+      + '<label class="muted" style="display:block;font-size:10px">Zoom <input type="range" id="heroBgZ'+i+'" min="100" max="250" value="'+Math.round(z*100)+'"></label>'
+      + '<button type="button" onclick="adminSaveHeroBgCrop('+i+')" style="margin-top:6px;width:100%;padding:6px;border:1px solid #38bdf8;border-radius:6px;background:#0c2636;color:#bae6fd;font-weight:700;cursor:pointer">✥ Save Photo Adjustment</button></div>';
   }).join('');
 })()}
 </div>
@@ -4039,6 +4101,18 @@ document.querySelectorAll('.book-up-btn').forEach(function(btn){
 <div id="otpLiveBox">${otpCards}</div>
 <h2 id="h2Pin" style="margin-top:20px">⚠️ PIN Reset <span class="badge">${pendingResets.length}</span></h2>
 <div id="pinLiveBox">${resetCards}</div>
+</section>
+
+<section class="panel" id="sec-registration-limit">
+<h2>🛡️ Registration Limit</h2>
+<p class="sub">Spam registration se bachne ke liye ek network se account banane ki limit control karein.</p>
+<form method="POST" action="/admin/save-registration-limit" style="margin-top:14px">
+  <label style="display:flex;align-items:center;gap:12px;padding:14px;border:1px solid ${settings.registrationNetworkLimitEnabled ? '#22c55e' : '#6b7280'};border-radius:12px;background:${settings.registrationNetworkLimitEnabled ? 'rgba(34,197,94,.10)' : 'rgba(107,114,128,.08)'};cursor:pointer">
+    <input type="checkbox" name="registrationNetworkLimitEnabled" ${settings.registrationNetworkLimitEnabled ? 'checked' : ''} style="width:21px;height:21px;accent-color:#22c55e">
+    <span><b style="color:${settings.registrationNetworkLimitEnabled ? '#86efac' : '#f3f4f6'}">${settings.registrationNetworkLimitEnabled ? 'ON — Protection active' : 'OFF — No account limit'}</b><br><span class="muted">ON karne par ek network se maximum <b>2 accounts</b> hi register honge.</span></span>
+  </label>
+  <button class="gen-btn" type="submit" style="margin-top:12px;background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff">💾 Save Registration Setting</button>
+</form>
 </section>
 
 <section class="panel" id="sec-codes">
@@ -4666,6 +4740,20 @@ async function adminSaveHeroBgDuration() {
   var st = document.getElementById('heroBgStatus');
   if (st) st.textContent = data.ok ? ('Duration: ' + data.durationSec + 's saved') : 'Fail';
 }
+async function adminSaveHeroBgCrop(index) {
+  var x = Number((document.getElementById('heroBgX' + index) || {}).value || 50);
+  var y = Number((document.getElementById('heroBgY' + index) || {}).value || 50);
+  var zoom = Number((document.getElementById('heroBgZ' + index) || {}).value || 100) / 100;
+  var status = document.getElementById('heroBgStatus');
+  if (status) status.textContent = 'Photo ' + (index + 1) + ' adjustment save ho raha hai…';
+  try {
+    var res = await fetch('/admin/hero-side-bg-adjust', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ index:index, positionX:x, positionY:y, zoom:zoom }) });
+    var data = await res.json();
+    if (!data.ok) throw new Error('Save fail');
+    if (status) status.textContent = '✅ Photo ' + (index + 1) + ' crop saved — Home page par same view dikhega.';
+    setTimeout(function(){ location.reload(); }, 450);
+  } catch (e) { if (status) status.textContent = 'Adjustment save nahi hua'; }
+}
 async function adminClearHeroSideBg() {
   if (!confirm('Hero BG photos clear?')) return;
   var res = await fetch('/admin/hero-side-bg-clear', { method: 'POST', credentials: 'same-origin' });
@@ -5209,6 +5297,7 @@ var ADMIN_SECTIONS = [
   { id: 'sec-home-frame', label: 'Home 3D Frame' },
   { id: 'sec-book', label: 'Book Cards' },
   { id: 'sec-otp', label: 'OTP / PIN' },
+  { id: 'sec-registration-limit', label: 'Registration Limit' },
   { id: 'sec-codes', label: 'Spin Codes' },
   { id: 'sec-customers', label: 'Customers' },
   { id: 'sec-notif', label: 'Notifications' },

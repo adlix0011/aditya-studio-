@@ -1168,6 +1168,7 @@
         <div class="err">4 अंकों का PIN डालें</div>
       </div>
       <button type="submit" class="btn">अकाउंट बनाएं → फ्री स्पिन पाएं</button>
+      <p id="networkLimitMsg" style="display:none;margin:10px 0 0;text-align:center;font-size:12px;font-weight:700;color:#fecaca">This network already has 2 registered accounts.</p>
       <a id="networkHelpBtn" href="#" target="_blank" rel="noopener" style="display:none;margin-top:10px;padding:12px;border-radius:12px;text-align:center;text-decoration:none;background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;font-weight:900;box-shadow:0 0 16px rgba(37,211,102,.35)">💬 WhatsApp Help — नया registration request करें</a>
       <p style="text-align:center;margin-top:14px;font-size:13px;color:var(--muted);">
         पहले से अकाउंट है?
@@ -1435,7 +1436,7 @@
       <span>₹10</span><span>₹20</span><span>₹30</span><span>₹50</span>
       <span>₹100</span><span>₹500</span><span>₹1000</span><span>🖼️ Frame</span>
     </div>
-    <button type="button" class="claim-spin-btn" id="claimFreeSpinBtn">🎡 अभी स्पिन करें</button>
+    <button type="button" class="claim-spin-btn" id="claimFreeSpinBtn" onclick="return openWelcomeWheel()">🎡 अभी स्पिन करें</button>
     <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;justify-content:center">
       <button type="button" class="btn-secondary" id="freeSkipBtn" style="flex:1;min-width:120px">Skip — बाद में</button>
       <a href="/" class="btn-secondary" id="freeHomeBtn" style="flex:1;min-width:120px;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center">🏠 Home</a>
@@ -1645,6 +1646,9 @@ function buildLandingWheel(){
 }
 buildLandingWheel();
 
+// Landing wheel ka delayed register-popup timer. Registration complete hote hi
+// ise cancel karna zaroori hai, warna 5 second baad welcome screen overwrite ho jaati hai.
+let landingAuthTimer = null;
 lwSpinBtn.addEventListener('click', ()=>{
   if(lwSpinning) return;
   lwSpinning = true;
@@ -1697,7 +1701,10 @@ lwSpinBtn.addEventListener('click', ()=>{
   }
   requestAnimationFrame(tickLoop);
 
-  setTimeout(()=>{
+  if(landingAuthTimer) clearTimeout(landingAuthTimer);
+  landingAuthTimer = setTimeout(()=>{
+    landingAuthTimer = null;
+    if(window.__welcomeSpinActive) return;
     lwSpinning = false;
     playWinDing();
     lwSpinBtn.disabled = false;
@@ -1795,6 +1802,9 @@ function clearSession() {
 
 function enterDashboard(){
   try {
+    // Welcome gift visible ho to koi restore/timer/dashboard refresh us screen ko
+    // automatically replace nahi kar sakta. User hi Spin, Skip ya Home choose karega.
+    if(window.__welcomeSpinActive) return;
     if(authCard) authCard.style.display = 'none';
     if(wheelSection) wheelSection.style.display = 'none';
     if(codeCard) codeCard.style.display = 'none';
@@ -2003,6 +2013,10 @@ if (gotoNewCustomerBtn) {
 registerForm.addEventListener('submit', async (e)=>{
   e.preventDefault();
   setAuthError('');
+  const networkLimitMsg = document.getElementById('networkLimitMsg');
+  if(networkLimitMsg) networkLimitMsg.style.display = 'none';
+  const networkHelpBtn = document.getElementById('networkHelpBtn');
+  if(networkHelpBtn) networkHelpBtn.style.display = 'none';
   let ok = true;
   const name = document.getElementById('rName').value.trim();
   const mobile = document.getElementById('rMobile').value.trim();
@@ -2028,7 +2042,7 @@ registerForm.addEventListener('submit', async (e)=>{
       if(out.error === 'network-registration-limit'){
         const number = String(out.helpWhatsapp || '').replace(/\D/g,'');
         if(help && number){ help.href='https://wa.me/91'+number+'?text='+encodeURIComponent('Namaste, is network se 2 registrations ho chuke hain. Mujhe naya Aditya Studio account register karwana hai.'); help.style.display='block'; }
-        setAuthError(out.message || 'Is network ka registration limit complete ho gaya hai. WhatsApp Help par baat karein.');
+        if(networkLimitMsg) { networkLimitMsg.textContent = out.message || 'This network already has 2 registered accounts.'; networkLimitMsg.style.display='block'; }
       } else if(help) help.style.display='none';
       if(out.error === 'exists') setAuthError('ये नंबर पहले से रजिस्टर है — पुराना कस्टमर से लॉगिन करें');
       else if(out.error !== 'network-registration-limit') setAuthError('अकाउंट नहीं बन पाया, दोबारा कोशिश करें');
@@ -2044,9 +2058,16 @@ registerForm.addEventListener('submit', async (e)=>{
     };
     saveSession(currentAccount, pin);
     registerForm.reset();
+    // Landing wheel ka purana 5-second timer ab welcome screen ko band nahi karega.
+    window.__welcomeSpinActive = true;
+    if(landingAuthTimer) { clearTimeout(landingAuthTimer); landingAuthTimer = null; }
+    lwSpinning = false;
+    // Register mode ka URL refresh/return par form ko phir se na khole.
+    try { window.history.replaceState({}, document.title, window.location.pathname); } catch(ignore) {}
     // First registration ka welcome gift seedha claim screen par dikhega.
-    if(currentAccount.freeSpinUsed === false) showFreeSpinOffer();
-    else enterDashboard();
+    if(currentAccount.freeSpinUsed === false) {
+      showFreeSpinOffer();
+    } else enterDashboard();
   }catch(err){
     btn.disabled = false; btn.textContent = 'अकाउंट बनाएं → फ्री स्पिन पाएं';
     setAuthError('सर्वर से जुड़ नहीं पाया');
@@ -2096,6 +2117,7 @@ loginForm.addEventListener('submit', async (e)=>{
 });
 
 logoutBtn.addEventListener('click', ()=>{
+  window.__welcomeSpinActive = false;
   currentAccount = null;
   clearSession();
   dashboardCard.style.display = 'none';
@@ -2152,6 +2174,19 @@ const claimFreeSpinBtn = document.getElementById('claimFreeSpinBtn');
 const freeSpinBtn = document.getElementById('freeSpinBtn');
 const freeWheelEl = document.getElementById('freeWheel');
 
+// Background timer/session refresh welcome card ko hide kare to turant restore karo.
+// Spin, Skip aur Home pe flag pehle false hota hai, isliye user action block nahi hoga.
+if (freeSpinOffer && typeof MutationObserver !== 'undefined') {
+  new MutationObserver(function(){
+    if (!window.__welcomeSpinActive) return;
+    if (window.getComputedStyle(freeSpinOffer).display === 'none') {
+      freeSpinOffer.style.display = 'block';
+      if (authCard) authCard.style.display = 'none';
+      if (dashboardCard) dashboardCard.style.display = 'none';
+    }
+  }).observe(freeSpinOffer, { attributes:true, attributeFilter:['style','class'] });
+}
+
 function buildFreeWheel(){
   const segs = document.getElementById('freeSegments');
   if(!segs) return;
@@ -2180,6 +2215,7 @@ function buildFreeWheel(){
 function showFreeSpinOffer(){
   try {
     if(!freeSpinOffer){ enterDashboard(); return; }
+    window.__welcomeSpinActive = true;
     authCard.style.display = 'none';
     dashboardCard.style.display = 'none';
     codeCard.style.display = 'none';
@@ -2215,6 +2251,7 @@ function showFreeSpinOffer(){
 }
 
 document.getElementById('freeSkipBtn') && document.getElementById('freeSkipBtn').addEventListener('click', function(){
+  window.__welcomeSpinActive = false;
   if(freeSpinOffer) freeSpinOffer.style.display = 'none';
   enterDashboard();
 });
@@ -2223,12 +2260,29 @@ document.getElementById('freeWheelSkipBtn') && document.getElementById('freeWhee
   enterDashboard();
 });
 
-if(claimFreeSpinBtn){
-  claimFreeSpinBtn.addEventListener('click', async ()=>{
-    // Welcome reward also uses the main roller; do not show a second legacy wheel.
-    window.location.assign('/spin');
-  });
+function openWelcomeWheel(){
+  try {
+    // New registration claim always opens the dedicated colourful welcome roller.
+    if(freeSpinOffer) freeSpinOffer.style.display = 'none';
+    window.__welcomeSpinActive = false;
+    if(authCard) authCard.style.display = 'none';
+    if(dashboardCard) dashboardCard.style.display = 'none';
+    if(codeCard) codeCard.style.display = 'none';
+    if(wheelSection) wheelSection.style.display = 'none';
+    freeHasSpun = false;
+    buildFreeWheel();
+    if(freeSpinBtn){ freeSpinBtn.disabled = false; freeSpinBtn.textContent = 'SPIN'; }
+    const left = document.getElementById('freeSpinsLeft');
+    if(left) left.textContent = '1';
+    if(freeWheelSection){
+      freeWheelSection.style.display = 'block';
+      freeWheelSection.scrollIntoView({behavior:'smooth', block:'start'});
+    }
+    showSpinVerifyUI(false);
+  } catch(e) { console.error('openWelcomeWheel', e); }
+  return false;
 }
+window.openWelcomeWheel = openWelcomeWheel;
 
 
 /* ===== Spin mobile verify (Admin WhatsApp OTP) ===== */
@@ -3543,7 +3597,22 @@ function hasFreeSpinLeft(){
 async function goToFreeSpin(){
   if(!currentAccount){ alert('पहले लॉगिन करें'); return; }
   if(currentAccount.freeSpinUsed){ alert('Free spin pehle use ho chuki hai'); return; }
-  window.location.assign('/spin');
+  hideSpinNudge();
+  closeProfileModal && closeProfileModal();
+  if(dashboardCard) dashboardCard.style.display = 'none';
+  if(codeCard) codeCard.style.display = 'none';
+  if(wheelSection) wheelSection.style.display = 'none';
+  if(freeSpinOffer) freeSpinOffer.style.display = 'none';
+  freeHasSpun = false;
+  if(typeof buildFreeWheel === 'function') buildFreeWheel();
+  if(freeSpinBtn){ freeSpinBtn.disabled = false; freeSpinBtn.textContent = 'SPIN'; }
+  var left = document.getElementById('freeSpinsLeft');
+  if(left) left.textContent = '1';
+  if(freeWheelSection){
+    freeWheelSection.style.display = 'block';
+    freeWheelSection.scrollIntoView({ behavior:'smooth', block:'start' });
+  }
+  showSpinVerifyUI(false);
 }
 function showSpinNudge(){
   if(!hasFreeSpinLeft()) return;

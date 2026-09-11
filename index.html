@@ -156,12 +156,12 @@
       background-size: cover;
       background-position: center;
       opacity: 0;
-      transform: scale(1.06);
+      transform: scale(calc(var(--hero-scale, 1) + .06));
       transition: opacity 1.2s ease, transform 6s ease-out;
     }
     .bg-slide.active {
       opacity: 1;
-      transform: scale(1);
+      transform: scale(var(--hero-scale, 1));
     }
     @keyframes pulse-ring {
       0% { transform: scale(0.8); opacity: 0.5; }
@@ -381,7 +381,7 @@
         <a class="text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md hover:backdrop-blur-2xl hover:bg-surface/60 rounded-sm px-1" href="#portfolio">Portfolio</a>
         <a class="text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md hover:backdrop-blur-2xl hover:bg-surface/60 rounded-sm px-1" href="#gift-shop">Gift Shop</a>
         <a class="text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md hover:backdrop-blur-2xl hover:bg-surface/60 rounded-sm px-1" href="/frames">Photo Frames</a>
-        <a class="text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md hover:backdrop-blur-2xl hover:bg-surface/60 rounded-sm px-1" href="#bookings">Bookings</a>
+        <a class="text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md hover:backdrop-blur-2xl hover:bg-surface/60 rounded-sm px-1" href="#more-services">More Services</a>
         <a class="text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md hover:backdrop-blur-2xl hover:bg-surface/60 rounded-sm px-1" href="#galleries">Galleries</a>
       </nav>
       <div class="header-actions flex items-center gap-4">
@@ -449,6 +449,7 @@
           <button type="button" id="profAddMoneyBtn" class="rounded-lg text-white text-xs font-bold border border-sky-200/30 shadow-[0_4px_12px_rgba(2,132,199,.35)] px-3 py-2" style="background:linear-gradient(135deg,#38bdf8,#0284c7)">＋ Add Money</button>
         </div>
         <p class="text-[11px] text-on-surface-variant mt-1 relative z-[1]">Orders me use kar sakte ho</p>
+        <p id="profWalletPending" class="hidden relative z-[1] mt-2 text-[11px] font-bold text-sky-200/55 wallet-pending-pulse">⏳ ₹<span id="profWalletPendingBal">0</span> recharge pending · Admin verification baaki hai</p>
         <div id="profWalletPromo" class="hidden mt-2 rounded-lg border border-fuchsia-300/40 bg-fuchsia-950/25 px-2 py-1.5 text-[10px] text-fuchsia-100 relative z-[1]"></div>
         <div class="mt-3 flex gap-2 relative z-[1]">
           <input id="profWalletCode" class="flex-1 bg-surface border border-outline-variant rounded-lg px-2 py-1.5 text-on-surface text-xs" placeholder="Wallet code" maxlength="12"/>
@@ -536,6 +537,8 @@
     .profile-coupons-btn{background:linear-gradient(135deg,#8b2be2,#5b21b6)}
     .profile-wallet-btn{background:linear-gradient(135deg,#0891b2,#0369a1)}
     .profile-rewards-btn{background:linear-gradient(135deg,#d97706,#b45309)}
+    .wallet-pending-pulse{animation:walletPendingPulse 1.7s ease-in-out infinite}
+    @keyframes walletPendingPulse{0%,100%{opacity:.38;filter:drop-shadow(0 0 0 transparent)}50%{opacity:.84;filter:drop-shadow(0 0 8px rgba(56,189,248,.55))}}
     .coupon-sticker {
       position: relative;
       border-radius: 12px;
@@ -590,7 +593,7 @@
     <section class="relative w-screen left-1/2 -translate-x-1/2 min-h-[614px] flex items-center justify-center -mt-10 overflow-hidden shadow-2xl" id="portfolio">
       <!-- Side-visible background slideshow (admin: Hero Side Background) -->
       <div class="absolute inset-0 z-0 bg-background" id="heroSideBg">
-        <div class="bg-slide active" style="background-image:url('https://images.unsplash.com/photo-1519741497674-611481863552?w=1600&q=80')"></div>
+        <div class="bg-slide active" data-hero-boot="1" style="background-image:url('__HERO_SIDE_BG_BOOT_URL__');background-position:__HERO_SIDE_BG_BOOT_X__% __HERO_SIDE_BG_BOOT_Y__%;--hero-scale:__HERO_SIDE_BG_BOOT_ZOOM__"></div>
         <div class="absolute inset-0 pointer-events-none"
              style="background: linear-gradient(105deg, rgba(22,19,11,.92) 0%, rgba(22,19,11,.55) 42%, rgba(22,19,11,.25) 70%, rgba(22,19,11,.45) 100%);"></div>
       </div>
@@ -704,7 +707,7 @@
       </a>
     </section>
 
-    <!-- Booking Cards -->
+    <!-- Service booking cards -->
     <section class="flex flex-col gap-8" id="bookings">
       <div class="flex items-center justify-between">
         <h2 class="font-headline-md text-headline-md text-on-surface">Book Your Session</h2>
@@ -792,6 +795,13 @@
           </div>
         </a>
       </div>
+    </section>
+
+    <section id="more-services" class="glass-panel rounded-3xl border border-primary/35 px-6 py-7 text-center shadow-[0_0_28px_rgba(212,175,55,.12)]" style="background:linear-gradient(135deg,#251b0a,#17100b 55%,#24112a)">
+      <p class="text-[10px] uppercase tracking-[.22em] text-primary/80 font-bold">Photography &amp; Bookings</p>
+      <h2 class="mt-2 text-xl font-black text-yellow-100">Aur services dekhni hain?</h2>
+      <p class="mt-2 text-sm text-on-surface-variant">Wedding, birthday, event aur studio packages ek hi jagah dekhein.</p>
+      <a href="https://aditya-studio.onrender.com/spin" class="inline-flex mt-5 items-center justify-center gap-2 rounded-xl border border-cyan-100/60 bg-gradient-to-r from-fuchsia-600 via-violet-600 to-cyan-500 px-6 py-3 text-sm font-extrabold text-white shadow-[0_0_18px_rgba(34,211,238,.35)]">🎡 Open Spin Roller <span>→</span></a>
     </section>
 
     <!-- Live Spin Roller + AD Token -->
@@ -1172,6 +1182,12 @@
           document.getElementById('profFreeSpin').textContent = user.freeSpinUsed ? 'Used' : 'Available';
           const wBal = Number(user.walletBalance) || 0;
           document.getElementById('profWalletBal').textContent = wBal;
+          const pendingBal = Number(user.walletPendingBalance) || 0;
+          const pendingLine = document.getElementById('profWalletPending');
+          if (pendingLine) {
+            pendingLine.classList.toggle('hidden', pendingBal <= 0);
+            document.getElementById('profWalletPendingBal').textContent = pendingBal;
+          }
           loadProfilePhoto();
           const wHistBox = document.getElementById('profWalletHist');
           const wHist = user.walletHistory || [];
@@ -1622,17 +1638,21 @@
           const res = await fetch('/api/settings');
           const data = await res.json();
           const st = data.settings || {};
-          urls = (st.heroSideBgPhotos || []).map(p => (typeof p === 'string' ? p : p.url)).filter(Boolean).slice(0, 6);
+          urls = (st.heroSideBgPhotos || []).map(p => typeof p === 'string' ? { url:p, x:50, y:50, zoom:1 } : { url:p.url, x:Number(p.positionX ?? 50), y:Number(p.positionY ?? 50), zoom:Math.max(1, Number(p.zoom || 1)) }).filter(p => p.url).slice(0, 6);
           durationMs = Math.max(2000, Math.min(20000, (Number(st.heroSideBgDurationSec) || 5) * 1000));
         } catch (e) {}
         if (!urls.length) return; // keep default single slide
         // rebuild slides
         const veil = box.querySelector('div[style*="linear-gradient"]');
-        box.querySelectorAll('.bg-slide').forEach(el => el.remove());
-        urls.forEach((u, i) => {
-          const d = document.createElement('div');
+        const bootSlide = box.querySelector('.bg-slide[data-hero-boot="1"]');
+        box.querySelectorAll('.bg-slide').forEach(el => { if (el !== bootSlide) el.remove(); });
+        urls.forEach((item, i) => {
+          // Reuse the server-rendered first image: no white/default flash.
+          const d = (i === 0 && bootSlide) ? bootSlide : document.createElement('div');
           d.className = 'bg-slide' + (i === 0 ? ' active' : '');
-          d.style.backgroundImage = 'url("' + String(u).replace(/"/g, '\\"') + '")';
+          d.style.backgroundImage = 'url("' + String(item.url).replace(/"/g, '\\"') + '")';
+          d.style.backgroundPosition = item.x + '% ' + item.y + '%';
+          d.style.setProperty('--hero-scale', item.zoom);
           box.insertBefore(d, veil || null);
         });
         if (urls.length < 2) return;

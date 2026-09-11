@@ -469,8 +469,8 @@
     <img class="bg" id="heroImg" src="https://images.unsplash.com/photo-1583939003579-730e91a76fbf?auto=format&fit=crop&w=1600&q=90" alt="" />
     <div class="wash"></div>
     <div class="hero-top">
-      <a href="#" onclick="setService('wedding');return false;">Studio</a>
-      <span>Book session</span>
+      <a href="/" onclick="if(history.length > 1){history.back();return false;}">← Back</a>
+      <a href="/">⌂ Home</a>
     </div>
     <div class="hero-body">
       <span class="service-pill" id="heroPill">Wedding couple</span>
@@ -562,7 +562,7 @@
         <p class="slip-thanks">Thank you — team jaldi confirm karegi.</p>
       </div>
       <div class="slip-actions">
-        <button type="button" class="gold-btn span2" onclick="downloadSlip()">Download</button>
+        <button type="button" class="gold-btn span2" onclick="downloadSlip()">⬇ Download PNG</button>
         <button type="button" class="ghost-btn" onclick="shareSlip()">Share</button>
         <button type="button" class="ghost-btn" onclick="copySlip()">Copy</button>
       </div>
@@ -813,13 +813,54 @@
     }
 
     function downloadSlip() {
-      var blob = new Blob([bookingText()], { type: "text/plain;charset=utf-8" });
-      var a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = "aditya-studio-" + ((lastBooking && lastBooking.name) || "booking").toLowerCase().replace(/[^a-z0-9]+/g, "-") + ".txt";
-      a.click();
-      URL.revokeObjectURL(a.href);
-      toast("Booking saved as text");
+      if (!lastBooking) return toast("Pehle booking submit karo", true);
+      var b = lastBooking, W = 1080, pad = 70, y = 0;
+      var rows = [
+        ["CUSTOMER NAME", b.name], ["MOBILE NUMBER", b.mobile],
+        ["EVENT DATE", formatDate(b.eventDate)], ["LOCATION", b.location || "—"],
+        ["COVERAGE", b.needs.map(needLabel).join(" · ")], ["CAMERA PREFERENCE", b.cameras.map(cameraLabel).join(" · ")],
+        ["QUANTITY", "Photo x" + b.qtyPhoto + "   Video x" + b.qtyVideo + "   Drone x" + b.qtyDrone],
+        ["WORK STYLE", workLabel(b.workPref)], ["NOTE", b.needNote || "—"], ["EXTRA REQUIREMENT", b.requirements || "—"]
+      ];
+      var measure = document.createElement("canvas").getContext("2d");
+      measure.font = "600 25px Arial";
+      function wrap(text, width) {
+        var words = String(text || "—").split(/\s+/), lines = [], line = "";
+        words.forEach(function(word) { var next = line ? line + " " + word : word; if (measure.measureText(next).width > width && line) { lines.push(line); line = word; } else line = next; });
+        if (line) lines.push(line); return lines;
+      }
+      var prepared = rows.map(function(r) { return [r[0], wrap(r[1], W - pad * 2 - 285)]; });
+      var bodyHeight = prepared.reduce(function(total, r) { return total + Math.max(72, r[1].length * 34 + 32); }, 0);
+      var H = 390 + bodyHeight + 160, canvas = document.createElement("canvas");
+      canvas.width = W; canvas.height = H; var ctx = canvas.getContext("2d");
+      var bg = ctx.createLinearGradient(0, 0, W, H); bg.addColorStop(0, "#100d08"); bg.addColorStop(.5, "#231707"); bg.addColorStop(1, "#101528");
+      ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = "#cba43a"; ctx.lineWidth = 3; ctx.strokeRect(18, 18, W - 36, H - 36);
+      var glow = ctx.createRadialGradient(W / 2, 120, 10, W / 2, 120, 500); glow.addColorStop(0, "rgba(255,211,83,.32)"); glow.addColorStop(1, "rgba(255,211,83,0)"); ctx.fillStyle = glow; ctx.fillRect(0, 0, W, 360);
+      ctx.textAlign = "center"; ctx.fillStyle = "#f9d766"; ctx.font = "800 20px Arial"; ctx.fillText("✦  PREMIUM BOOKING RECEIPT  ✦", W / 2, 75);
+      // Centered Aditya Studio wordmark — no separate AS circle/placeholder.
+      var logoGlow = ctx.createLinearGradient(W * .22, 0, W * .78, 0);
+      logoGlow.addColorStop(0, "#ffcf55"); logoGlow.addColorStop(.48, "#fff0a8"); logoGlow.addColorStop(1, "#ff84c1");
+      ctx.save(); ctx.shadowColor = "rgba(255,191,65,.62)"; ctx.shadowBlur = 22;
+      ctx.fillStyle = logoGlow; ctx.font = "bold italic 76px Georgia"; ctx.fillText("Aditya Studio", W / 2, 155); ctx.restore();
+      ctx.fillStyle = "#71e7ff"; ctx.font = "800 18px Arial"; ctx.fillText("✦  PHOTOGRAPHY   •   VIDEO   •   MEMORIES  ✦", W / 2, 194);
+      ctx.strokeStyle = "rgba(255,126,191,.7)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(W / 2 - 210, 211); ctx.lineTo(W / 2 + 210, 211); ctx.stroke();
+      ctx.fillStyle = "#d8b753"; ctx.font = "700 18px Arial"; ctx.fillText(b.id, W / 2, 242);
+      ctx.strokeStyle = "rgba(236,194,72,.55)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(pad, 280); ctx.lineTo(W - pad, 280); ctx.stroke();
+      ctx.fillStyle = "#fff0bd"; ctx.font = "italic bold 36px Georgia"; ctx.fillText(b.serviceTitle, W / 2, 335);
+      y = 385; ctx.textAlign = "left";
+      prepared.forEach(function(row, index) {
+        var height = Math.max(72, row[1].length * 34 + 32);
+        ctx.fillStyle = index % 2 ? "rgba(255,255,255,.025)" : "rgba(236,194,72,.055)"; ctx.fillRect(pad, y, W - pad * 2, height);
+        ctx.fillStyle = "#d5ae48"; ctx.font = "800 17px Arial"; ctx.fillText(row[0], pad + 22, y + 31);
+        ctx.fillStyle = "#72e6ff"; ctx.font = "600 25px Arial"; row[1].forEach(function(line, n) { ctx.fillText(line, pad + 285, y + 34 + n * 34); });
+        ctx.strokeStyle = "rgba(218,179,65,.35)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(pad, y + height); ctx.lineTo(W - pad, y + height); ctx.stroke(); y += height;
+      });
+      ctx.textAlign = "center"; ctx.fillStyle = "#f3cf67"; ctx.font = "600 19px Arial"; ctx.fillText("Thank you! Aditya Studio team aapse jaldi confirm karegi.", W / 2, H - 82);
+      ctx.fillStyle = "#918267"; ctx.font = "16px Arial"; ctx.fillText("Professional booking confirmation • Keep this receipt safe", W / 2, H - 48);
+      var a = document.createElement("a"); a.href = canvas.toDataURL("image/png");
+      a.download = "aditya-studio-booking-" + String(b.id).toLowerCase() + ".png"; a.click();
+      toast("Professional booking image download ho gayi!");
     }
 
     function resetAll() {
