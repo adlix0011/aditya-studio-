@@ -3037,7 +3037,10 @@ function computeOrderFees(subtotal, settingsFees) {
       if (!items.length) return sendJSON(res, 400, { ok: false, error: 'no-items' });
       const mapped = items.slice(0, 6).map((it, i) => ({
         url: String(it.url || it.dataUrl || '').slice(0, 2.5e6),
-        title: String(it.title || ('BG ' + (i + 1))).slice(0, 80)
+        title: String(it.title || ('BG ' + (i + 1))).slice(0, 80),
+        positionX: Math.max(0, Math.min(100, Number(it.positionX ?? 50))),
+        positionY: Math.max(0, Math.min(100, Number(it.positionY ?? 50))),
+        zoom: Math.max(1, Math.min(2.5, Number(it.zoom || 1)))
       })).filter(x => x.url);
       if (!mapped.length) return sendJSON(res, 400, { ok: false, error: 'invalid' });
       if (body.replace === true || body.replace === 'true') {
@@ -3058,6 +3061,24 @@ function computeOrderFees(subtotal, settingsFees) {
       console.error('hero-side-bg-upload', e);
       return sendJSON(res, 500, { ok: false, error: 'server-error' });
     }
+  }
+  // Per-photo crop: controls exactly what is visible behind the home hero.
+  if (req.method === 'POST' && urlPath === '/admin/hero-side-bg-adjust') {
+    try {
+      const body = await readBody(req, 1e5);
+      const index = Number(body.index);
+      const cur = loadSettings();
+      const list = Array.isArray(cur.heroSideBgPhotos) ? cur.heroSideBgPhotos : [];
+      if (!Number.isInteger(index) || !list[index]) return sendJSON(res, 404, { ok:false, error:'not-found' });
+      const old = typeof list[index] === 'string' ? { url:list[index] } : list[index];
+      list[index] = { ...old,
+        positionX: Math.max(0, Math.min(100, Number(body.positionX ?? old.positionX ?? 50))),
+        positionY: Math.max(0, Math.min(100, Number(body.positionY ?? old.positionY ?? 50))),
+        zoom: Math.max(1, Math.min(2.5, Number(body.zoom ?? old.zoom ?? 1)))
+      };
+      cur.heroSideBgPhotos = list; saveSettings(cur);
+      return sendJSON(res, 200, { ok:true, photo:list[index] });
+    } catch (e) { return sendJSON(res, 500, { ok:false, error:'server-error' }); }
   }
   if (req.method === 'POST' && urlPath === '/admin/hero-side-bg-duration') {
     try {
@@ -3950,7 +3971,16 @@ ${(function(){
   return list.map((p,i)=>{
     const u = typeof p === 'string' ? p : (p&&p.url)||'';
     if (!u) return '';
-    return '<img src="'+esc(u)+'" alt="#'+(i+1)+'" style="width:100px;height:64px;object-fit:cover;border-radius:8px;border:1px solid rgba(212,175,55,.45)"/>';
+    const x = Math.max(0, Math.min(100, Number((p&&p.positionX) ?? 50)));
+    const y = Math.max(0, Math.min(100, Number((p&&p.positionY) ?? 50)));
+    const z = Math.max(1, Math.min(2.5, Number((p&&p.zoom) || 1)));
+    return '<div style="width:220px;border:1px solid rgba(212,175,55,.4);border-radius:9px;padding:7px;background:#15120b">'
+      + '<div style="height:126px;border-radius:6px;overflow:hidden;outline:1px solid rgba(125,211,252,.5)"><div style="height:126px;background-image:url(\''+esc(u).replace(/'/g,'%27')+'\');background-size:cover;background-position:'+x+'% '+y+'%;transform:scale('+z+');transform-origin:'+x+'% '+y+'%"></div></div>'
+      + '<div style="font-size:11px;color:#f2ca50;margin-top:8px">#'+(i+1)+' · Home hero ka same crop</div>'
+      + '<label class="muted" style="display:block;font-size:10px">Left / Right <input type="range" id="heroBgX'+i+'" min="0" max="100" value="'+x+'"></label>'
+      + '<label class="muted" style="display:block;font-size:10px">Up / Down <input type="range" id="heroBgY'+i+'" min="0" max="100" value="'+y+'"></label>'
+      + '<label class="muted" style="display:block;font-size:10px">Zoom <input type="range" id="heroBgZ'+i+'" min="100" max="250" value="'+Math.round(z*100)+'"></label>'
+      + '<button type="button" onclick="adminSaveHeroBgCrop('+i+')" style="margin-top:6px;width:100%;padding:6px;border:1px solid #38bdf8;border-radius:6px;background:#0c2636;color:#bae6fd;font-weight:700;cursor:pointer">✥ Save Photo Adjustment</button></div>';
   }).join('');
 })()}
 </div>
@@ -4665,6 +4695,20 @@ async function adminSaveHeroBgDuration() {
   var data = await res.json();
   var st = document.getElementById('heroBgStatus');
   if (st) st.textContent = data.ok ? ('Duration: ' + data.durationSec + 's saved') : 'Fail';
+}
+async function adminSaveHeroBgCrop(index) {
+  var x = Number((document.getElementById('heroBgX' + index) || {}).value || 50);
+  var y = Number((document.getElementById('heroBgY' + index) || {}).value || 50);
+  var zoom = Number((document.getElementById('heroBgZ' + index) || {}).value || 100) / 100;
+  var status = document.getElementById('heroBgStatus');
+  if (status) status.textContent = 'Photo ' + (index + 1) + ' adjustment save ho raha hai…';
+  try {
+    var res = await fetch('/admin/hero-side-bg-adjust', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ index:index, positionX:x, positionY:y, zoom:zoom }) });
+    var data = await res.json();
+    if (!data.ok) throw new Error('Save fail');
+    if (status) status.textContent = '✅ Photo ' + (index + 1) + ' crop saved — Home page par same view dikhega.';
+    setTimeout(function(){ location.reload(); }, 450);
+  } catch (e) { if (status) status.textContent = 'Adjustment save nahi hua'; }
 }
 async function adminClearHeroSideBg() {
   if (!confirm('Hero BG photos clear?')) return;
