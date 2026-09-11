@@ -1938,18 +1938,23 @@ document.addEventListener('DOMContentLoaded', function () {
       list.innerHTML = '';
       const personal = items.filter(item => !!item.mobile);
       const studio = items.filter(item => !item.mobile);
-      function heading(text, color) { const h=document.createElement('p'); h.className='text-[10px] uppercase tracking-[.2em] font-extrabold px-1 mt-1'; h.style.color=color; h.textContent=text; list.appendChild(h); }
+      function heading(text, color) {
+        const h=document.createElement('div');
+        h.className='px-1 mt-1 mb-2 text-sm font-black tracking-wide';
+        h.style.cssText='color:'+color+';text-shadow:0 0 14px '+color+'80';
+        h.textContent=text; list.appendChild(h);
+      }
       function addCards(group, isPersonal) { group.forEach(function (item) {
-        const card = document.createElement('article'); card.className = 'rounded-2xl border p-4';
-        card.style.cssText = isPersonal ? 'border-color:rgba(34,211,238,.7);background:linear-gradient(135deg,rgba(8,47,73,.88),rgba(76,29,149,.48));box-shadow:0 0 20px rgba(34,211,238,.24)' : 'border-color:rgba(212,175,55,.5);background:linear-gradient(135deg,rgba(75,54,9,.55),rgba(75,25,90,.32));box-shadow:0 0 17px rgba(212,175,55,.16)';
-        const chip = document.createElement('span'); chip.className='inline-block text-[9px] font-extrabold uppercase tracking-wider px-2 py-1 rounded-full mb-2'; chip.style.cssText=isPersonal?'background:#22d3ee;color:#082f49;box-shadow:0 0 12px rgba(34,211,238,.8)':'background:#d4af37;color:#221a05;box-shadow:0 0 12px rgba(212,175,55,.7)'; chip.textContent=isPersonal?'👤 Personal Alert':'📣 Studio Update';
-        const title = document.createElement('b'); title.className = 'block text-sm text-white'; title.textContent = escText(item.title || 'Aditya Studio');
-        const body = document.createElement('p'); body.className = 'text-xs text-on-surface-variant mt-1 leading-relaxed'; body.textContent = escText(item.body || '');
-        const at = document.createElement('p'); at.className = 'text-[10px] text-white/55 mt-3'; at.textContent = '🕒 ' + formatTime(item.at);
-        card.append(chip, title, body, at); list.appendChild(card);
+        const card = document.createElement('article'); card.className = 'rounded-2xl border p-4 relative overflow-hidden';
+        card.style.cssText = isPersonal ? 'border-color:rgba(34,211,238,.75);background:linear-gradient(135deg,rgba(8,47,73,.94),rgba(76,29,149,.72),rgba(190,24,93,.36));box-shadow:0 0 24px rgba(34,211,238,.25)' : 'border-color:rgba(244,114,182,.6);background:linear-gradient(135deg,rgba(67,20,45,.88),rgba(66,35,104,.72),rgba(6,78,99,.58));box-shadow:0 0 20px rgba(236,72,153,.18)';
+        const icon = document.createElement('span'); icon.className='inline-flex items-center justify-center w-8 h-8 rounded-xl mr-2 align-middle'; icon.style.cssText=isPersonal?'background:linear-gradient(135deg,#22d3ee,#2563eb);box-shadow:0 0 14px rgba(34,211,238,.65)':'background:linear-gradient(135deg,#fb7185,#a855f7,#38bdf8);box-shadow:0 0 14px rgba(168,85,247,.62)'; icon.textContent=isPersonal?'💌':'✨';
+        const title = document.createElement('b'); title.className = 'align-middle text-base font-black'; title.style.cssText=isPersonal?'color:#a5f3fc;text-shadow:0 0 12px rgba(34,211,238,.55)':'color:#f9a8d4;text-shadow:0 0 12px rgba(244,114,182,.52)'; title.textContent = escText(item.title || 'Aditya Studio');
+        const body = document.createElement('p'); body.className = 'text-sm text-white/85 mt-3 leading-relaxed'; body.textContent = escText(item.body || '');
+        const at = document.createElement('p'); at.className = 'text-[10px] text-cyan-100/70 mt-3 font-semibold'; at.textContent = '◷ ' + formatTime(item.at);
+        card.append(icon, title, body, at); list.appendChild(card);
       }); }
-      if (personal.length) { heading('💎 Aapke personal alerts', '#67e8f9'); addCards(personal, true); }
-      if (studio.length) { heading('✨ Studio announcements', '#f7d76e'); addCards(studio, false); }
+      if (personal.length) { heading('💎 आपके लिए खास संदेश', '#67e8f9'); addCards(personal, true); }
+      if (studio.length) { heading('🌈 नया क्या है — देखिए!', '#f9a8d4'); addCards(studio, false); }
     } catch (e) {
       list.innerHTML = '<p class="text-sm text-error p-2">Notifications load nahi hui. Dobara try karein.</p>';
     }
