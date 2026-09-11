@@ -1935,7 +1935,7 @@ function computeOrderFees(subtotal, settingsFees) {
         return sendJSON(res, 429, {
           ok: false,
           error: 'network-registration-limit',
-          message: 'Is network se 2 registrations ho chuke hain. Naya account banwane ke liye WhatsApp Help par baat karein.',
+          message: 'This network already has 2 registered accounts.',
           helpWhatsapp: String(settings.helpWhatsapp || '').replace(/\D/g, '')
         });
       }
