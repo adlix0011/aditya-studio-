@@ -1436,7 +1436,13 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req, 30000);
       const accounts = loadAccounts();
       const account = sessionAccount(req, body, accounts);
-      if (!account) return sendJSON(res, 401, { ok: false, error: 'auth', message: 'Login required' });
+      // Studio announcements public hain; purana/expired browser session ho to
+      // bhi bell blank ya error na dikhaye. Sirf personal alerts valid session
+      // ke saath hi return honge.
+      if (!account) {
+        const studioItems = loadNotifs().filter(n => !n.mobile).slice(0, 30);
+        return sendJSON(res, 200, { ok: true, items: studioItems, guest: true });
+      }
       const mobile = String(account.mobile || '');
       const items = loadNotifs().filter(n => !n.mobile || String(n.mobile) === mobile).slice(0, 30);
       return sendJSON(res, 200, { ok: true, items });
