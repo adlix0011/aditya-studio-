@@ -1258,8 +1258,22 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && (urlPath === '/' || urlPath === '/index.html')) {
     fs.readFile(INDEX_HTML_FILE, (err, data) => {
       if (err) { res.writeHead(404); return res.end('index.html missing'); }
+      // Send the first configured hero image in the initial HTML. This avoids
+      // showing a temporary/default background while the browser fetches settings.
+      const settings = loadSettings();
+      const first = (settings.heroSideBgPhotos || [])[0] || {};
+      const rawUrl = typeof first === 'string' ? first : String(first.url || '');
+      const safeUrl = rawUrl.replace(/["'<>]/g, '');
+      const x = Math.max(0, Math.min(100, Number((first && first.positionX) ?? 50)));
+      const y = Math.max(0, Math.min(100, Number((first && first.positionY) ?? 50)));
+      const zoom = Math.max(1, Math.min(2.5, Number((first && first.zoom) || 1)));
+      const html = data.toString('utf8')
+        .replace(/__HERO_SIDE_BG_BOOT_URL__/g, safeUrl)
+        .replace(/__HERO_SIDE_BG_BOOT_X__/g, String(x))
+        .replace(/__HERO_SIDE_BG_BOOT_Y__/g, String(y))
+        .replace(/__HERO_SIDE_BG_BOOT_ZOOM__/g, String(zoom));
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store, max-age=0' });
-      serveLiveHtml(res, data);
+      serveLiveHtml(res, html);
     });
     return;
   }
