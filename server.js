@@ -40,15 +40,21 @@ function r2Ready() {
   return !!(R2_BUCKET && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY && /^https:\/\//i.test(R2_ENDPOINT));
 }
 function telegramReady() { return !!(TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID); }
+let telegramAlertStatus = { configured: telegramReady(), ok: null, at: null, error: '' };
 async function sendTelegramAlert(title, details) {
-  if (!telegramReady()) return false;
+  if (!telegramReady()) {
+    telegramAlertStatus = { configured: false, ok: false, at: new Date().toISOString(), error: 'TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID missing in this server environment' };
+    return false;
+  }
   const text = '🔔 *Aditya Studio Alert*\n\n*' + String(title || 'Update').replace(/[\\*_`]/g, '') + '*\n' + String(details || '').replace(/[\\*_`]/g, '').slice(0, 3500);
   try {
     const response = await fetch('https://api.telegram.org/bot' + TELEGRAM_BOT_TOKEN + '/sendMessage', {
       method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ chat_id:TELEGRAM_CHAT_ID, text, parse_mode:'Markdown' })
     });
-    return response.ok;
-  } catch (e) { console.error('telegram alert failed:', e.message); return false; }
+    const ok = response.ok;
+    telegramAlertStatus = { configured: true, ok, at: new Date().toISOString(), error: ok ? '' : ('Telegram HTTP ' + response.status) };
+    return ok;
+  } catch (e) { telegramAlertStatus = { configured: true, ok: false, at: new Date().toISOString(), error: e.message || 'Network error' }; console.error('telegram alert failed:', e.message); return false; }
 }
 function awsEncode(value) {
   return encodeURIComponent(String(value)).replace(/[!'()*]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase());
@@ -4082,6 +4088,7 @@ document.querySelectorAll('.book-up-btn').forEach(function(btn){
 <button class="gen-btn" type="submit">✨ Send Notification</button>
 </form>
 <form method="POST" action="/admin/telegram-test" style="margin-top:10px"><button type="submit" class="gen-btn" style="background:linear-gradient(135deg,#38bdf8,#2563eb);color:white">✈️ Send Telegram Test Alert</button><span class="muted" style="margin-left:8px">Bot token aur chat ID environment settings me set hone chahiye.</span></form>
+<div style="margin-top:9px;padding:8px 10px;border-radius:9px;border:1px solid ${telegramAlertStatus.ok === false ? '#ef4444' : (telegramAlertStatus.configured ? '#22c55e' : '#f59e0b')};color:${telegramAlertStatus.ok === false ? '#fecaca' : (telegramAlertStatus.configured ? '#bbf7d0' : '#fde68a')};font-size:12px">Telegram: ${telegramAlertStatus.configured ? (telegramAlertStatus.ok === false ? 'Alert failed' : 'Configured') : 'Not configured'}${telegramAlertStatus.at ? (' · Last check: ' + esc(fmtDate(telegramAlertStatus.at))) : ''}${telegramAlertStatus.error ? (' · ' + esc(telegramAlertStatus.error)) : ''}</div>
 <div class="lbl" style="margin-top:16px">Active notifications</div>
 <div id="adminNotifList">${notifAdminCards}</div>
 </section>
