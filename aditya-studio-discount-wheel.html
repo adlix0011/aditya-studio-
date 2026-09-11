@@ -2049,9 +2049,19 @@ registerForm.addEventListener('submit', async (e)=>{
     };
     saveSession(currentAccount, pin);
     registerForm.reset();
+    // Register mode ka URL refresh/return par form ko phir se na khole.
+    try { window.history.replaceState({}, document.title, window.location.pathname); } catch(ignore) {}
     // First registration ka welcome gift seedha claim screen par dikhega.
-    if(currentAccount.freeSpinUsed === false) showFreeSpinOffer();
-    else enterDashboard();
+    if(currentAccount.freeSpinUsed === false) {
+      showFreeSpinOffer();
+      // Kisi purane browser/CSS me welcome card hide reh jaye to user ko register
+      // page par atkaane ke bajay dashboard khol do.
+      window.setTimeout(function(){
+        var offerVisible = freeSpinOffer && window.getComputedStyle(freeSpinOffer).display !== 'none';
+        var dashVisible = dashboardCard && window.getComputedStyle(dashboardCard).display !== 'none';
+        if(!offerVisible && !dashVisible) enterDashboard();
+      }, 350);
+    } else enterDashboard();
   }catch(err){
     btn.disabled = false; btn.textContent = 'अकाउंट बनाएं → फ्री स्पिन पाएं';
     setAuthError('सर्वर से जुड़ नहीं पाया');
