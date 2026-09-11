@@ -1926,13 +1926,10 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
   async function loadNotifications() {
-    const session = sessionForNotifs();
-    if (!session || !session.sessionToken) {
-      list.innerHTML = '<p class="text-sm text-on-surface-variant p-2">Notifications dekhne ke liye login karein.</p>';
-      setBadge(0); return;
-    }
+    const session = sessionForNotifs() || {};
     try {
-      const res = await fetch('/api/my-notifications', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionToken: session.sessionToken }) });
+      // Login token purana ho tab bhi server studio announcements return karta hai.
+      const res = await fetch('/api/my-notifications', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionToken: session.sessionToken || '' }) });
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error('load');
       const items = Array.isArray(data.items) ? data.items : [];
