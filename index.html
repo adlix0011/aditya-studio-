@@ -156,12 +156,12 @@
       background-size: cover;
       background-position: center;
       opacity: 0;
-      transform: scale(1.06);
+      transform: scale(calc(var(--hero-scale, 1) + .06));
       transition: opacity 1.2s ease, transform 6s ease-out;
     }
     .bg-slide.active {
       opacity: 1;
-      transform: scale(1);
+      transform: scale(var(--hero-scale, 1));
     }
     @keyframes pulse-ring {
       0% { transform: scale(0.8); opacity: 0.5; }
@@ -1638,17 +1638,19 @@
           const res = await fetch('/api/settings');
           const data = await res.json();
           const st = data.settings || {};
-          urls = (st.heroSideBgPhotos || []).map(p => (typeof p === 'string' ? p : p.url)).filter(Boolean).slice(0, 6);
+          urls = (st.heroSideBgPhotos || []).map(p => typeof p === 'string' ? { url:p, x:50, y:50, zoom:1 } : { url:p.url, x:Number(p.positionX ?? 50), y:Number(p.positionY ?? 50), zoom:Math.max(1, Number(p.zoom || 1)) }).filter(p => p.url).slice(0, 6);
           durationMs = Math.max(2000, Math.min(20000, (Number(st.heroSideBgDurationSec) || 5) * 1000));
         } catch (e) {}
         if (!urls.length) return; // keep default single slide
         // rebuild slides
         const veil = box.querySelector('div[style*="linear-gradient"]');
         box.querySelectorAll('.bg-slide').forEach(el => el.remove());
-        urls.forEach((u, i) => {
+        urls.forEach((item, i) => {
           const d = document.createElement('div');
           d.className = 'bg-slide' + (i === 0 ? ' active' : '');
-          d.style.backgroundImage = 'url("' + String(u).replace(/"/g, '\\"') + '")';
+          d.style.backgroundImage = 'url("' + String(item.url).replace(/"/g, '\\"') + '")';
+          d.style.backgroundPosition = item.x + '% ' + item.y + '%';
+          d.style.setProperty('--hero-scale', item.zoom);
           box.insertBefore(d, veil || null);
         });
         if (urls.length < 2) return;
