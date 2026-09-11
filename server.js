@@ -1715,8 +1715,11 @@ function computeOrderFees(subtotal, settingsFees) {
       if (!/^[6-9]\d{9}$/.test(mobile)) return sendJSON(res, 400, { ok: false, error: 'invalid-mobile' });
       if (rateLimited(req, mobile + ':otp', 3, 15 * 60 * 1000)) return sendJSON(res, 429, { ok: false, error: 'too-many-attempts', message: 'OTP requests limit ho gaye. 15 minute baad try karein.' });
       const accounts = loadAccounts();
-      const acc = sessionAccount(req, body, accounts);
-      if (!acc || String(acc.mobile) !== mobile) return sendJSON(res, 401, { ok: false, error: 'auth', message: 'Login required' });
+      // Registration ke baad browser session miss ho sakta hai. Registered mobile
+      // ko direct OTP request karne dein; verification par naya session milta hai.
+      const loggedIn = sessionAccount(req, body, accounts);
+      const acc = (loggedIn && String(loggedIn.mobile) === mobile) ? loggedIn : accounts.find(a => String(a.mobile) === mobile);
+      if (!acc) return sendJSON(res, 401, { ok: false, error: 'auth', message: 'Yeh mobile register nahi hai. Pehle account banayein.' });
       if (acc.mobileVerified) return sendJSON(res, 200, { ok: true, alreadyVerified: true });
       let list = loadOtpRequests();
       const now = Date.now();
