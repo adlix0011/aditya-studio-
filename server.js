@@ -801,6 +801,8 @@ function defaultSettings() {
     // Current Deals carousel: admin enables this after saving custom cards.
     homeDealsEnabled: false,
     homeDealsDurationSec: 20,
+    // Optional anti-spam protection. When enabled, one network can create only 2 accounts.
+    registrationNetworkLimitEnabled: false,
     // Colorful CTA button on the Register/Login landing page.
     loginPromo: {
       text: '🎀 Premium Photo Frames देखें / Order करें →',
@@ -866,6 +868,7 @@ function loadSettings() {
     offerImages: data.offerImages || defaults.offerImages,
     homeDealsEnabled: data.homeDealsEnabled === true,
     homeDealsDurationSec: Math.max(8, Math.min(60, Number(data.homeDealsDurationSec) || defaults.homeDealsDurationSec)),
+    registrationNetworkLimitEnabled: data.registrationNetworkLimitEnabled === true,
     loginPromo: { ...defaults.loginPromo, ...(data.loginPromo || {}) },
     heroIntro: { ...defaults.heroIntro, ...(data.heroIntro || {}) },
     frames3dPhotos: Array.isArray(data.frames3dPhotos) ? data.frames3dPhotos : defaults.frames3dPhotos,
@@ -1930,13 +1933,13 @@ function computeOrderFees(subtotal, settingsFees) {
       if (accounts.find(a => a.mobile === mobile)) return sendJSON(res, 409, { ok: false, error: 'exists' });
       const registrationNetworkKey = requestNetworkKey(req);
       const registrationsFromNetwork = accounts.filter(a => a.registrationNetworkKey === registrationNetworkKey).length;
-      if (registrationsFromNetwork >= 2) {
-        const settings = loadSettings();
+      const registrationSettings = loadSettings();
+      if (registrationSettings.registrationNetworkLimitEnabled && registrationsFromNetwork >= 2) {
         return sendJSON(res, 429, {
           ok: false,
           error: 'network-registration-limit',
           message: 'This network already has 2 registered accounts.',
-          helpWhatsapp: String(settings.helpWhatsapp || '').replace(/\D/g, '')
+          helpWhatsapp: String(registrationSettings.helpWhatsapp || '').replace(/\D/g, '')
         });
       }
       const id = nextCustomerId(accounts);
@@ -2791,6 +2794,20 @@ function computeOrderFees(subtotal, settingsFees) {
   if (req.method === 'POST' && urlPath === '/admin/telegram-test') {
     const ok = await sendTelegramAlert('Telegram Test सफल', 'Aditya Studio bot connected hai. Ab new order, wallet recharge aur important admin alerts yahan aayenge.');
     res.writeHead(302, { Location: '/admin?telegram=' + (ok ? 'ok' : 'fail') }); return res.end();
+  }
+
+  if (req.method === 'POST' && urlPath === '/admin/save-registration-limit') {
+    try {
+      const body = await readFormBody(req);
+      const settings = loadSettings();
+      settings.registrationNetworkLimitEnabled = String(body.registrationNetworkLimitEnabled || '') === 'on';
+      saveSettings(settings);
+      res.writeHead(302, { Location: '/admin?registration-limit=saved#sec-registration-limit' });
+      return res.end();
+    } catch (e) {
+      res.writeHead(302, { Location: '/admin?registration-limit=fail#sec-registration-limit' });
+      return res.end();
+    }
   }
 
   if (req.method === 'POST' && urlPath === '/admin/send-notification') {
@@ -3772,6 +3789,7 @@ label.muted{display:block;font-size:12px;margin-bottom:2px}
   <a class="nav-link" href="#sec-home-frame">🖼️ Home 3D Frame (5 photos)</a>
   <a class="nav-link" href="#sec-book">📷 Book Cards</a>
   <a class="nav-link" href="#sec-otp">📱 OTP / PIN</a>
+  <a class="nav-link" href="#sec-registration-limit">🛡️ Registration Limit</a>
   <a class="nav-link" href="#sec-codes">🎫 Spin Codes</a>
   <a class="nav-link" href="#sec-customers">👥 Customers</a>
   <a class="nav-link" href="#sec-notif">🔔 Notifications</a>
@@ -4083,6 +4101,18 @@ document.querySelectorAll('.book-up-btn').forEach(function(btn){
 <div id="otpLiveBox">${otpCards}</div>
 <h2 id="h2Pin" style="margin-top:20px">⚠️ PIN Reset <span class="badge">${pendingResets.length}</span></h2>
 <div id="pinLiveBox">${resetCards}</div>
+</section>
+
+<section class="panel" id="sec-registration-limit">
+<h2>🛡️ Registration Limit</h2>
+<p class="sub">Spam registration se bachne ke liye ek network se account banane ki limit control karein.</p>
+<form method="POST" action="/admin/save-registration-limit" style="margin-top:14px">
+  <label style="display:flex;align-items:center;gap:12px;padding:14px;border:1px solid ${settings.registrationNetworkLimitEnabled ? '#22c55e' : '#6b7280'};border-radius:12px;background:${settings.registrationNetworkLimitEnabled ? 'rgba(34,197,94,.10)' : 'rgba(107,114,128,.08)'};cursor:pointer">
+    <input type="checkbox" name="registrationNetworkLimitEnabled" ${settings.registrationNetworkLimitEnabled ? 'checked' : ''} style="width:21px;height:21px;accent-color:#22c55e">
+    <span><b style="color:${settings.registrationNetworkLimitEnabled ? '#86efac' : '#f3f4f6'}">${settings.registrationNetworkLimitEnabled ? 'ON — Protection active' : 'OFF — No account limit'}</b><br><span class="muted">ON karne par ek network se maximum <b>2 accounts</b> hi register honge.</span></span>
+  </label>
+  <button class="gen-btn" type="submit" style="margin-top:12px;background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff">💾 Save Registration Setting</button>
+</form>
 </section>
 
 <section class="panel" id="sec-codes">
@@ -5267,6 +5297,7 @@ var ADMIN_SECTIONS = [
   { id: 'sec-home-frame', label: 'Home 3D Frame' },
   { id: 'sec-book', label: 'Book Cards' },
   { id: 'sec-otp', label: 'OTP / PIN' },
+  { id: 'sec-registration-limit', label: 'Registration Limit' },
   { id: 'sec-codes', label: 'Spin Codes' },
   { id: 'sec-customers', label: 'Customers' },
   { id: 'sec-notif', label: 'Notifications' },
