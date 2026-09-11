@@ -1802,6 +1802,9 @@ function clearSession() {
 
 function enterDashboard(){
   try {
+    // Welcome gift visible ho to koi restore/timer/dashboard refresh us screen ko
+    // automatically replace nahi kar sakta. User hi Spin, Skip ya Home choose karega.
+    if(window.__welcomeSpinActive) return;
     if(authCard) authCard.style.display = 'none';
     if(wheelSection) wheelSection.style.display = 'none';
     if(codeCard) codeCard.style.display = 'none';
