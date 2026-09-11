@@ -1311,8 +1311,9 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (req.method === 'GET' && (urlPath === '/spin' || urlPath === '/spin-roller')) {
-    // `/spin` is the one real, customized roller.  The small standalone
+  if (req.method === 'GET' && (urlPath === '/spin' || urlPath === '/spin-roller' || urlPath === '/roller-spin')) {
+    // `/roller-spin` is the separate named entry point for the real custom roller.
+    // The small standalone
     // spin-roller.html was only a temporary/demo wheel and must not be shown.
     // Is page par registration/welcome-spin state live reload se break hota hai,
     // isliye sirf yahan global auto-refresh snippet inject nahi karte.
