@@ -1156,7 +1156,14 @@
           const mobileShow = document.getElementById('profMobileShow');
           if (mobileShow) {
             mobileShow.textContent = user.mobile || '';
-            if (!user.mobileVerified) {
+            if (user.mobileVerified) {
+              const verifiedTick = document.createElement('span');
+              verifiedTick.textContent = '✓';
+              verifiedTick.title = 'Verified mobile number';
+              verifiedTick.setAttribute('aria-label', 'Verified mobile number');
+              verifiedTick.style.cssText = 'display:inline-block;margin-left:6px;width:17px;height:17px;line-height:17px;text-align:center;border-radius:50%;background:#1d9bf0;color:#fff;font:900 12px Arial;vertical-align:middle;box-shadow:0 0 9px rgba(29,155,240,.7)';
+              mobileShow.appendChild(verifiedTick);
+            } else {
               const verify = document.createElement('button');
               verify.type = 'button';
               verify.textContent = 'Verify';
