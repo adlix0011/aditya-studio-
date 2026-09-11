@@ -1268,8 +1268,10 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === 'GET' && (urlPath === '/spin' || urlPath === '/spin-roller')) {
-    fs.readFile(SPIN_ROLLER_HTML_FILE, (err, data) => {
-      if (err) { res.writeHead(404); return res.end('Spin roller page missing'); }
+    // `/spin` is the one real, customized roller.  The small standalone
+    // spin-roller.html was only a temporary/demo wheel and must not be shown.
+    fs.readFile(BOOK_NOW_HTML_FILE, (err, data) => {
+      if (err) { res.writeHead(404); return res.end('Main spin roller page missing'); }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store, max-age=0' });
       serveLiveHtml(res, data);
     });
@@ -1764,6 +1766,7 @@ function computeOrderFees(subtotal, settingsFees) {
       // Admin WhatsApp OTP ko baar-baar request karne par naya OTP mat banao.
       // Wahi pending 6-digit OTP 5 minute tak admin panel me rahega.
       if (existing && existing.manualOtp) {
+        void sendTelegramAlert('WhatsApp OTP Requested Again', 'Customer: ' + (acc.name || 'Customer') + '\nUser ID: ' + (acc.id || '—') + '\nMobile: ' + mobile + '\nAction: OTP admin panel me available hai; wahin se WhatsApp par bhejein.');
         return sendJSON(res, 200, { ok: true, alreadyVerified: false, delivery: 'whatsapp_manual', alreadyPending: true, expiresInSeconds: Math.max(0, Math.floor((new Date(existing.expiresAt).getTime() - now) / 1000)) });
       }
       if (existing && now - new Date(existing.createdAt || 0).getTime() < OTP_RESEND_COOLDOWN_MS) {
@@ -1771,26 +1774,21 @@ function computeOrderFees(subtotal, settingsFees) {
       }
       const otp = generateOtp();
       const requestId = 'otp-' + mobile + '-' + now;
-      // Gateway set ho to direct SMS bhejo. Local/admin mode me request ko
-      // fail na karo — admin panel se WhatsApp par OTP bheja ja sakega.
-      let sms = {}, delivery = 'whatsapp_manual';
-      try {
-        sms = await sendOtpSms(mobile, otp, requestId);
-        delivery = 'sms';
-      } catch (sendErr) {
-        console.warn('OTP gateway unavailable; keeping request for admin WhatsApp:', sendErr.code || sendErr.message);
-      }
+      // This button specifically asks the studio admin to send OTP on WhatsApp.
+      // Do not silently switch to SMS: the request must stay visible in admin.
+      const sms = {}, delivery = 'whatsapp_manual';
       if (existing) list = list.filter(r => r !== existing);
       list.unshift({
         mobile, name: acc.name || '', id: acc.id || '', otpHash: hashOtp(otp), requestId,
         smsId: sms.sms_id || sms.id || '', createdAt: new Date().toISOString(),
         expiresAt: new Date(now + MOBILE_VERIFY_OTP_TTL_MS).toISOString(), attempts: 0, verified: false, purpose: 'mobile_verify',
         // Sirf password-protected admin panel me manual WhatsApp send ke liye.
-        manualOtp: delivery === 'whatsapp_manual' ? otp : '', delivery
+        manualOtp: otp, delivery
       });
       saveOtpRequests(list.slice(0, 100));
       recordAuthFailure(req, mobile + ':otp');
       console.log('OTP request created for:', mobile, requestId, delivery);
+      void sendTelegramAlert('WhatsApp OTP Request', 'Customer: ' + (acc.name || 'Customer') + '\nUser ID: ' + (acc.id || '—') + '\nMobile: ' + mobile + '\nAction: OTP admin panel me available hai; wahin se WhatsApp par bhejein.');
       return sendJSON(res, 200, { ok: true, alreadyVerified: false, delivery, expiresInSeconds: Math.floor(OTP_TTL_MS / 1000) });
     } catch (e) {
       console.error('request-spin-otp', e);
