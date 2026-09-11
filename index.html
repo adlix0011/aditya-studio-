@@ -801,7 +801,7 @@
       <p class="text-[10px] uppercase tracking-[.22em] text-primary/80 font-bold">Photography &amp; Bookings</p>
       <h2 class="mt-2 text-xl font-black text-yellow-100">Aur services dekhni hain?</h2>
       <p class="mt-2 text-sm text-on-surface-variant">Wedding, birthday, event aur studio packages ek hi jagah dekhein.</p>
-      <a href="https://aditya-studio.onrender.com/spin" class="inline-flex mt-5 items-center justify-center gap-2 rounded-xl border border-cyan-100/60 bg-gradient-to-r from-fuchsia-600 via-violet-600 to-cyan-500 px-6 py-3 text-sm font-extrabold text-white shadow-[0_0_18px_rgba(34,211,238,.35)]">🎡 Open Spin Roller <span>→</span></a>
+      <a href="/roller-spin" class="inline-flex mt-5 items-center justify-center gap-2 rounded-xl border border-cyan-100/60 bg-gradient-to-r from-fuchsia-600 via-violet-600 to-cyan-500 px-6 py-3 text-sm font-extrabold text-white shadow-[0_0_18px_rgba(34,211,238,.35)]">🎡 Open Roller Spin <span>→</span></a>
     </section>
 
     <!-- Live Spin Roller + AD Token -->
@@ -1529,7 +1529,7 @@
         if (!popup) return;
         popup.classList.add('hidden'); popup.classList.remove('flex');
       }
-      function openSpinRoller() { window.location.href = '/spin'; }
+      function openSpinRoller() { window.location.href = '/roller-spin'; }
       document.getElementById('spinReadyGo')?.addEventListener('click', openSpinRoller);
       document.getElementById('spinReadyLater')?.addEventListener('click', closeSpinReadyPopup);
       document.getElementById('profSpinNowBtn')?.addEventListener('click', openSpinRoller);
@@ -1849,7 +1849,7 @@
           requestAnimationFrame(tick);
         }
         requestAnimationFrame(tick);
-        document.getElementById('homeRealWheelLink')?.addEventListener('click', async function () { window.location.href='/spin'; return; /* legacy in-page spin code below is intentionally unreachable */
+        document.getElementById('homeRealWheelLink')?.addEventListener('click', async function () { window.location.href='/roller-spin'; return; /* legacy in-page spin code below is intentionally unreachable */
           const hint = document.getElementById('homeSpinHint');
           const session = typeof loadSession === 'function' ? loadSession() : null;
           if (spinning) return;
