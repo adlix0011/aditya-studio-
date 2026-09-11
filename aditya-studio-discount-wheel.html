@@ -1436,7 +1436,7 @@
       <span>₹10</span><span>₹20</span><span>₹30</span><span>₹50</span>
       <span>₹100</span><span>₹500</span><span>₹1000</span><span>🖼️ Frame</span>
     </div>
-    <button type="button" class="claim-spin-btn" id="claimFreeSpinBtn">🎡 अभी स्पिन करें</button>
+    <button type="button" class="claim-spin-btn" id="claimFreeSpinBtn" onclick="return openWelcomeWheel()">🎡 अभी स्पिन करें</button>
     <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;justify-content:center">
       <button type="button" class="btn-secondary" id="freeSkipBtn" style="flex:1;min-width:120px">Skip — बाद में</button>
       <a href="/" class="btn-secondary" id="freeHomeBtn" style="flex:1;min-width:120px;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center">🏠 Home</a>
@@ -2054,13 +2054,6 @@ registerForm.addEventListener('submit', async (e)=>{
     // First registration ka welcome gift seedha claim screen par dikhega.
     if(currentAccount.freeSpinUsed === false) {
       showFreeSpinOffer();
-      // Kisi purane browser/CSS me welcome card hide reh jaye to user ko register
-      // page par atkaane ke bajay dashboard khol do.
-      window.setTimeout(function(){
-        var offerVisible = freeSpinOffer && window.getComputedStyle(freeSpinOffer).display !== 'none';
-        var dashVisible = dashboardCard && window.getComputedStyle(dashboardCard).display !== 'none';
-        if(!offerVisible && !dashVisible) enterDashboard();
-      }, 350);
     } else enterDashboard();
   }catch(err){
     btn.disabled = false; btn.textContent = 'अकाउंट बनाएं → फ्री स्पिन पाएं';
@@ -2238,20 +2231,30 @@ document.getElementById('freeWheelSkipBtn') && document.getElementById('freeWhee
   enterDashboard();
 });
 
-if(claimFreeSpinBtn){
-  claimFreeSpinBtn.addEventListener('click', async ()=>{
-    // New registration claim opens the dedicated colourful welcome roller.
-    freeSpinOffer.style.display = 'none';
+function openWelcomeWheel(){
+  try {
+    // New registration claim always opens the dedicated colourful welcome roller.
+    if(freeSpinOffer) freeSpinOffer.style.display = 'none';
+    if(authCard) authCard.style.display = 'none';
+    if(dashboardCard) dashboardCard.style.display = 'none';
+    if(codeCard) codeCard.style.display = 'none';
+    if(wheelSection) wheelSection.style.display = 'none';
     freeHasSpun = false;
     buildFreeWheel();
-    freeSpinBtn.disabled = false;
-    freeSpinBtn.textContent = 'SPIN';
+    if(freeSpinBtn){ freeSpinBtn.disabled = false; freeSpinBtn.textContent = 'SPIN'; }
     const left = document.getElementById('freeSpinsLeft');
     if(left) left.textContent = '1';
-    freeWheelSection.style.display = 'block';
+    if(freeWheelSection){
+      freeWheelSection.style.display = 'block';
+      freeWheelSection.scrollIntoView({behavior:'smooth', block:'start'});
+    }
     showSpinVerifyUI(false);
-    freeWheelSection.scrollIntoView({behavior:'smooth', block:'start'});
-  });
+  } catch(e) { console.error('openWelcomeWheel', e); }
+  return false;
+}
+window.openWelcomeWheel = openWelcomeWheel;
+if(claimFreeSpinBtn){
+  claimFreeSpinBtn.addEventListener('click', function(e){ e.preventDefault(); openWelcomeWheel(); });
 }
 
 
