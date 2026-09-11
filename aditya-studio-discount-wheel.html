@@ -2225,8 +2225,17 @@ document.getElementById('freeWheelSkipBtn') && document.getElementById('freeWhee
 
 if(claimFreeSpinBtn){
   claimFreeSpinBtn.addEventListener('click', async ()=>{
-    // Welcome reward also uses the main roller; do not show a second legacy wheel.
-    window.location.assign('/spin');
+    // New registration claim opens the dedicated colourful welcome roller.
+    freeSpinOffer.style.display = 'none';
+    freeHasSpun = false;
+    buildFreeWheel();
+    freeSpinBtn.disabled = false;
+    freeSpinBtn.textContent = 'SPIN';
+    const left = document.getElementById('freeSpinsLeft');
+    if(left) left.textContent = '1';
+    freeWheelSection.style.display = 'block';
+    showSpinVerifyUI(false);
+    freeWheelSection.scrollIntoView({behavior:'smooth', block:'start'});
   });
 }
 
@@ -3543,7 +3552,22 @@ function hasFreeSpinLeft(){
 async function goToFreeSpin(){
   if(!currentAccount){ alert('पहले लॉगिन करें'); return; }
   if(currentAccount.freeSpinUsed){ alert('Free spin pehle use ho chuki hai'); return; }
-  window.location.assign('/spin');
+  hideSpinNudge();
+  closeProfileModal && closeProfileModal();
+  if(dashboardCard) dashboardCard.style.display = 'none';
+  if(codeCard) codeCard.style.display = 'none';
+  if(wheelSection) wheelSection.style.display = 'none';
+  if(freeSpinOffer) freeSpinOffer.style.display = 'none';
+  freeHasSpun = false;
+  if(typeof buildFreeWheel === 'function') buildFreeWheel();
+  if(freeSpinBtn){ freeSpinBtn.disabled = false; freeSpinBtn.textContent = 'SPIN'; }
+  var left = document.getElementById('freeSpinsLeft');
+  if(left) left.textContent = '1';
+  if(freeWheelSection){
+    freeWheelSection.style.display = 'block';
+    freeWheelSection.scrollIntoView({ behavior:'smooth', block:'start' });
+  }
+  showSpinVerifyUI(false);
 }
 function showSpinNudge(){
   if(!hasFreeSpinLeft()) return;
