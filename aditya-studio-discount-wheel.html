@@ -1566,6 +1566,8 @@ const LW_OFFSET = -20; // so segment-0 center is exactly at top (0deg)
 let lwSpinning = false;
 let lwRotation = 0;
 let lwAudioCtx = null;
+// A new registration must never be replaced by a late saved-session response.
+let authFlowStarted = false;
 
 function getLwAudio(){
   if(!lwAudioCtx){
@@ -1651,6 +1653,7 @@ buildLandingWheel();
 let landingAuthTimer = null;
 lwSpinBtn.addEventListener('click', ()=>{
   if(lwSpinning) return;
+  authFlowStarted = true;
   lwSpinning = true;
   lwSpinBtn.disabled = true;
   getLwAudio();
@@ -1916,6 +1919,7 @@ function renderHistory(){
 
 
 async function tryRestoreSession() {
+  if (authFlowStarted || window.__welcomeSpinActive) return false;
   const s = loadSession();
   if (!s || !s.mobile) return false;
   // Turant landing hide — refresh pe spin page flash na ho
@@ -1923,6 +1927,7 @@ async function tryRestoreSession() {
   if(authCard) authCard.style.display = 'none';
 
   function softLogin(extra){
+    if (authFlowStarted || window.__welcomeSpinActive) return false;
     currentAccount = Object.assign({
       id: s.id || '',
       name: s.name || '',
@@ -2012,6 +2017,7 @@ if (gotoNewCustomerBtn) {
 
 registerForm.addEventListener('submit', async (e)=>{
   e.preventDefault();
+  authFlowStarted = true;
   setAuthError('');
   const networkLimitMsg = document.getElementById('networkLimitMsg');
   if(networkLimitMsg) networkLimitMsg.style.display = 'none';
