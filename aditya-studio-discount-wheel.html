@@ -2225,17 +2225,8 @@ document.getElementById('freeWheelSkipBtn') && document.getElementById('freeWhee
 
 if(claimFreeSpinBtn){
   claimFreeSpinBtn.addEventListener('click', async ()=>{
-    freeSpinOffer.style.display = 'none';
-    freeHasSpun = false;
-    buildFreeWheel();
-    freeSpinBtn.disabled = false;
-    freeSpinBtn.textContent = 'SPIN';
-    const left = document.getElementById('freeSpinsLeft');
-    if(left) left.textContent = '1';
-    freeWheelSection.style.display = 'block';
-    // Welcome free spin — no OTP
-    showSpinVerifyUI(false);
-    freeWheelSection.scrollIntoView({behavior:'smooth', block:'start'});
+    // Welcome reward also uses the main roller; do not show a second legacy wheel.
+    window.location.assign('/spin');
   });
 }
 
@@ -2647,19 +2638,9 @@ codeForm.addEventListener('submit', async (e)=>{
     return;
   }
 
-  tierBadge.textContent = currentTier.label;
-  custIdBadge.textContent = 'कस्टमर ID: ' + currentAccount.id;
-  wheelGreeting.textContent = 'बधाई हो, ' + currentAccount.name + '!';
-  buildWheel(currentTier);
-
-  codeCard.style.display = 'none';
-  wheelSection.style.display = 'block';
-  document.body.classList.remove('step-code');
-  document.body.classList.add('step-wheel');
-  spinBtn.disabled = false;
-  spinBtn.textContent = 'SPIN';
-  if(document.getElementById('fwSpinsLeft')) document.getElementById('fwSpinsLeft').textContent = '1';
-  wheelSection.scrollIntoView({behavior:'smooth', block:'start'});
+  // The old in-page wheel is retired.  Always open the single, live roller page.
+  // Keeping one entry point prevents a customer from landing on a stale/dummy wheel.
+  window.location.assign('/spin');
 });
 
 spinBtn.addEventListener('click', async ()=>{
@@ -3435,26 +3416,8 @@ document.addEventListener('click', function notifUnlockOnce(){
         if(wa) wa.value = out.amount;
         if(dashboardCard) dashboardCard.style.display='none';
         if(codeCard) codeCard.style.display='none';
-        if(wheelSection){
-          document.body.classList.add('step-wheel');
-          document.body.classList.add('step-app');
-          wheelSection.style.display='block';
-          hasSpun = false;
-          if(typeof buildWheel === 'function') buildWheel(currentTier);
-          var tg = document.getElementById('wheelGreeting');
-          if(tg) tg.textContent = '₹' + out.amount + ' · ' + (out.tier || '') + ' tier — SPIN करें!';
-          var tb = document.getElementById('tierBadge');
-          if(tb) tb.textContent = (out.tier || '') + ' · ₹' + out.amount;
-          var cid = document.getElementById('custIdBadge');
-          if(cid) cid.textContent = currentAccount.id;
-          var sb = document.getElementById('spinBtn');
-          if(sb){ sb.disabled = false; sb.textContent = 'SPIN'; }
-          hasSpun = false;
-          if(typeof fwHasSpun !== 'undefined') fwHasSpun = false;
-          wheelSection.scrollIntoView({behavior:'smooth', block:'start'});
-        } else {
-          if(err) err.textContent = 'Wheel section nahi mili — page refresh karein';
-        }
+        // A claimed code must lead to the same main roller, never the legacy wheel.
+        window.location.assign('/spin');
       }catch(ex){
         if(btn){ btn.disabled=false; btn.textContent='कोड वेरिफ़ाई → स्पिन'; }
         if(err) err.textContent='सर्वर से जुड़ नहीं पाया';
@@ -3580,23 +3543,7 @@ function hasFreeSpinLeft(){
 async function goToFreeSpin(){
   if(!currentAccount){ alert('पहले लॉगिन करें'); return; }
   if(currentAccount.freeSpinUsed){ alert('Free spin pehle use ho chuki hai'); return; }
-  hideSpinNudge();
-  closeProfileModal && closeProfileModal();
-  if(dashboardCard) dashboardCard.style.display = 'none';
-  if(codeCard) codeCard.style.display = 'none';
-  if(wheelSection) wheelSection.style.display = 'none';
-  if(freeSpinOffer) freeSpinOffer.style.display = 'none';
-  freeHasSpun = false;
-  if(typeof buildFreeWheel === 'function') buildFreeWheel();
-  if(freeSpinBtn){ freeSpinBtn.disabled = false; freeSpinBtn.textContent = 'SPIN'; }
-  var left = document.getElementById('freeSpinsLeft');
-  if(left) left.textContent = '1';
-  if(freeWheelSection){
-    freeWheelSection.style.display = 'block';
-    freeWheelSection.scrollIntoView({ behavior:'smooth', block:'start' });
-  }
-  // Free spin — no OTP at register / spin time
-  if(typeof showSpinVerifyUI === 'function') showSpinVerifyUI(false);
+  window.location.assign('/spin');
 }
 function showSpinNudge(){
   if(!hasFreeSpinLeft()) return;
