@@ -449,6 +449,7 @@
           <button type="button" id="profAddMoneyBtn" class="rounded-lg text-white text-xs font-bold border border-sky-200/30 shadow-[0_4px_12px_rgba(2,132,199,.35)] px-3 py-2" style="background:linear-gradient(135deg,#38bdf8,#0284c7)">＋ Add Money</button>
         </div>
         <p class="text-[11px] text-on-surface-variant mt-1 relative z-[1]">Orders me use kar sakte ho</p>
+        <div id="profWalletPromo" class="hidden mt-2 rounded-lg border border-fuchsia-300/40 bg-fuchsia-950/25 px-2 py-1.5 text-[10px] text-fuchsia-100 relative z-[1]"></div>
         <div class="mt-3 flex gap-2 relative z-[1]">
           <input id="profWalletCode" class="flex-1 bg-surface border border-outline-variant rounded-lg px-2 py-1.5 text-on-surface text-xs" placeholder="Wallet code" maxlength="12"/>
           <button type="button" id="profWalletRedeemBtn" class="px-3 py-1.5 rounded-lg bg-gradient-gold text-on-primary text-xs font-semibold">Redeem</button>
@@ -1201,11 +1202,17 @@
                 '<div class="flex justify-between items-start gap-2"><span class="code">' + label + '</span><span class="text-[10px] text-primary/80 uppercase">' + (expired ? 'expired' : st) + '</span></div>' +
                 '<p class="text-[11px] text-on-surface-variant mt-1">Code: <b class="text-primary">' + code + '</b></p>' +
                 '<p class="text-[10px] mt-2 ' + (expired ? 'text-red-300' : 'text-primary/80') + '">⏳ ' + (expired ? 'Expired: ' : 'Valid till: ') + expiryLabel + '</p>' +
-                '<p class="text-[10px] text-on-surface-variant mt-1">Order/Studio service par use hoga · Wallet me add nahi hoga</p></div>';
+                '<button type="button" class="coupon-apply" data-coupon-id="' + code + '">💰 Wallet me add karein</button><p class="text-[10px] text-on-surface-variant mt-2">Wallet credit 30 din tak valid rahega</p></div>';
             }).join('');
           } else {
             hist.innerHTML = '<p class="text-xs opacity-70">No active coupons — spin to win!</p>';
           }
+          const promoBox = document.getElementById('profWalletPromo');
+          const promoCredits = user.promoWalletCredits || [];
+          if (promoCredits.length) {
+            promoBox.classList.remove('hidden');
+            promoBox.innerHTML = '⏳ Promo wallet: ' + promoCredits.map(function(p) { return '₹' + p.amount + ' · valid till ' + new Date(p.expiresAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }); }).join('<br>');
+          } else { promoBox.classList.add('hidden'); promoBox.textContent = ''; }
           const pClaim = document.getElementById('profClaimBtn');
           pClaim.disabled = !canClaim;
           pClaim.textContent = canClaim ? 'Claim Daily AD Token' : 'Already claimed today';
@@ -1433,6 +1440,26 @@
           msg.textContent = 'Network error';
           msg.className = 'text-[11px] mt-1 text-error';
           msg.classList.remove('hidden');
+        }
+      });
+
+      document.getElementById('profHistory')?.addEventListener('click', async function (event) {
+        const button = event.target.closest('.coupon-apply');
+        if (!button || button.disabled) return;
+        const session = loadSession() || {};
+        const couponId = button.getAttribute('data-coupon-id');
+        if (!session.sessionToken || !couponId) return;
+        button.disabled = true; button.textContent = 'Adding…';
+        try {
+          const res = await fetch('/api/wallet/apply-coupon', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionToken: session.sessionToken, couponId }) });
+          const data = await res.json().catch(function () { return {}; });
+          if (!res.ok || !data.ok) throw new Error(data.message || 'Wallet credit nahi ho saka');
+          user = { ...(user || {}), walletBalance: data.walletBalance, walletHistory: data.walletHistory, history: data.history, promoWalletCredits: data.promoWalletCredits };
+          updateTokenUI();
+          alert('✅ ' + data.message + '\n⏳ Yeh promo credit 30 din tak valid hai.');
+        } catch (error) {
+          button.disabled = false; button.textContent = '💰 Wallet me add karein';
+          alert(error.message || 'Wallet credit nahi ho saka');
         }
       });
 

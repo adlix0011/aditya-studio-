@@ -1019,17 +1019,49 @@ function ensureWallet(acc) {
   if (!Array.isArray(acc.walletHistory)) acc.walletHistory = [];
   return acc;
 }
+// Promo/coupon money is valid for 30 days. Recharge money is deliberately
+// never included here, so it can never disappear due to this expiry rule.
+function expireWalletPromos(acc) {
+  ensureWallet(acc);
+  let changed = false;
+  const now = Date.now();
+  for (const item of acc.walletHistory) {
+    const left = Math.max(0, Number(item.promoRemaining) || 0);
+    if (!left || !item.expiresAt || new Date(item.expiresAt).getTime() > now) continue;
+    const removed = Math.min(Math.max(0, Number(acc.walletBalance) || 0), left);
+    acc.walletBalance = Math.max(0, Number(acc.walletBalance) - removed);
+    item.promoRemaining = 0;
+    item.expiredAt = new Date().toISOString();
+    acc.walletHistory.unshift({ id: walletHistoryId(), type: 'expired', amount: left, balanceAfter: acc.walletBalance, reason: 'Promo wallet credit expired after 30 days', source: 'coupon_expiry', ref: item.ref || item.couponId || '', timestamp: item.expiredAt });
+    changed = true;
+  }
+  return changed;
+}
+function activePromoWallet(acc) {
+  expireWalletPromos(acc);
+  return (acc.walletHistory || []).filter(item => item.expiresAt && Number(item.promoRemaining) > 0 && new Date(item.expiresAt).getTime() > Date.now()).map(item => ({ amount: Number(item.promoRemaining), expiresAt: item.expiresAt, reason: item.reason || 'Promo credit' }));
+}
 function walletHistoryId() {
   return 'WH-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
 }
 /** Credit/debit wallet. amount > 0. Returns entry or null if debit fails. */
 function walletTxn(acc, type, amount, meta) {
   ensureWallet(acc);
+  expireWalletPromos(acc);
   amount = Math.round(Number(amount) || 0);
   if (amount <= 0) return null;
   if (type === 'debit' && acc.walletBalance < amount) return null;
   if (type === 'credit') acc.walletBalance += amount;
-  else acc.walletBalance -= amount;
+  else {
+    let left = amount;
+    for (const promo of acc.walletHistory.filter(item => item.expiresAt && Number(item.promoRemaining) > 0 && new Date(item.expiresAt).getTime() > Date.now())) {
+      const used = Math.min(left, Number(promo.promoRemaining) || 0);
+      promo.promoRemaining -= used;
+      left -= used;
+      if (!left) break;
+    }
+    acc.walletBalance -= amount;
+  }
   const entry = {
     id: walletHistoryId(),
     type: type === 'debit' ? 'debit' : 'credit',
@@ -1043,6 +1075,7 @@ function walletTxn(acc, type, amount, meta) {
     byAdmin: !!(meta && meta.byAdmin),
     timestamp: new Date().toISOString()
   };
+  if (type === 'credit' && meta && meta.expiresAt) { entry.expiresAt = meta.expiresAt; entry.promoRemaining = amount; }
   acc.walletHistory.unshift(entry);
   if (acc.walletHistory.length > 200) acc.walletHistory = acc.walletHistory.slice(0, 200);
   return entry;
@@ -1061,6 +1094,7 @@ function couponRupeeValue(h) {
 
 function accountPublicPayload(acc) {
   ensureWallet(acc);
+  expireWalletPromos(acc);
   return {
     ok: true,
     id: acc.id,
@@ -1076,6 +1110,7 @@ function accountPublicPayload(acc) {
     walletBalance: acc.walletBalance || 0,
     walletPendingBalance: acc.walletPendingBalance || 0,
     walletHistory: (acc.walletHistory || []).slice(0, 30),
+    promoWalletCredits: activePromoWallet(acc),
     ...publicTokenFields(acc)
   };
 }
@@ -2001,11 +2036,10 @@ function computeOrderFees(subtotal, settingsFees) {
   }
 
   /* ===== Wallet APIs ===== */
-  // Coupons are discounts/services only; they must never be converted into
-  // withdrawable or spendable wallet money.
+  // A winning promo coupon can be converted once into wallet credit.
+  // It remains spendable for 30 days, after which only that unused promo
+  // portion is removed automatically.
   if (req.method === 'POST' && urlPath === '/api/wallet/apply-coupon') {
-    return sendJSON(res, 410, { ok: false, error: 'coupon-wallet-disabled', message: 'Coupon wallet me add nahi hota. Order ya studio service par use karein.' });
-    /* legacy implementation retained below for compatibility reference
     try {
       const body = await readBody(req);
       const couponId = String(body.couponId || '').trim();
@@ -2034,7 +2068,8 @@ function computeOrderFees(subtotal, settingsFees) {
         reason: 'Coupon → Wallet: ' + (entry.prize || ('₹' + rupees)),
         source: 'coupon',
         ref: couponId,
-        couponId
+        couponId,
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
       });
       entry.couponStatus = 'wallet_credited';
       entry.walletCreditedAt = new Date().toISOString();
@@ -2046,13 +2081,13 @@ function computeOrderFees(subtotal, settingsFees) {
         credited: rupees,
         walletBalance: acc.walletBalance,
         walletHistory: (acc.walletHistory || []).slice(0, 30),
-        history: publicHistory(acc)
+        history: publicHistory(acc),
+        promoWalletCredits: activePromoWallet(acc)
       });
     } catch (e) {
       console.error('wallet/apply-coupon', e);
       return sendJSON(res, 500, { ok: false, error: 'server-error' });
     }
-    */
   }
 
   // Redeem admin-issued wallet code (codes.json with type wallet / walletAmount)
