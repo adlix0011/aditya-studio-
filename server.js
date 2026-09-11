@@ -1222,9 +1222,12 @@ const LIVE_SYNC_SNIPPET = `<script>(function(){
   var scrollKey='aditya_live_scroll:'+location.pathname+location.search;
   try{var saved=Number(sessionStorage.getItem(scrollKey)||0);if(saved){setTimeout(function(){window.scrollTo(0,saved);sessionStorage.removeItem(scrollKey);},60)}}catch(e){}
   function editing(){var el=document.activeElement;return !!(el&&/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName));}
-  function apply(){if(editing()){queued=true;return;}try{sessionStorage.setItem(scrollKey,String(window.scrollY||0))}catch(e){}window.dispatchEvent(new CustomEvent('aditya:live-update'));setTimeout(function(){location.reload()},120);}
+  // Registration ke welcome gift / free-spin screen par reload bilkul nahi hona chahiye.
+  // Account save hote hi revision change hota hai; reload se welcome screen skip ho jaati thi.
+  function welcomeSpinOpen(){var offer=document.getElementById('freeSpinOffer');return !!(window.__welcomeSpinActive||(offer&&getComputedStyle(offer).display!=='none'));}
+  function apply(){if(editing()||welcomeSpinOpen()){queued=true;return;}try{sessionStorage.setItem(scrollKey,String(window.scrollY||0))}catch(e){}window.dispatchEvent(new CustomEvent('aditya:live-update'));setTimeout(function(){location.reload()},120);}
   function check(){fetch('/api/live-revision',{cache:'no-store'}).then(function(r){return r.json()}).then(function(d){if(!d||!d.ok)return;if(!revision){revision=d.revision;return;}if(revision!==d.revision){revision=d.revision;apply();}}).catch(function(){});}
-  document.addEventListener('focusout',function(){if(queued){queued=false;setTimeout(check,300)}});
+  document.addEventListener('focusout',function(){if(queued&&!welcomeSpinOpen()){queued=false;setTimeout(check,300)}});
   setTimeout(check,1200);timer=setInterval(check,12000);
 })();</script>`;
 function serveLiveHtml(res, data) {
