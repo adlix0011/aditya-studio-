@@ -834,7 +834,10 @@
               Verify Code
             </button>
           </form>
-          <p class="mt-4 text-sm font-label-md hidden" id="codeResult" role="status"></p>
+          <div class="mt-4 hidden items-center gap-3" id="codeVerifyAlert" role="status">
+            <p class="text-sm font-label-md text-sky-200" id="codeResult"></p>
+            <button type="button" id="codeMobileVerifyBtn" class="shrink-0 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-blue-500/25">✓ Verify</button>
+          </div>
         </div>
         <div class="flex flex-col items-center gap-4">
           <button type="button" class="home-lw-link" title="Tap to spin" id="homeRealWheelLink" aria-label="Spin the reward wheel" style="background:transparent;border:0;padding:0;cursor:pointer">
@@ -1482,6 +1485,23 @@
       const spinForm = document.getElementById('spinCodeForm');
       const spinInput = document.getElementById('spinCode');
       const resultMsg = document.getElementById('codeResult');
+      const codeVerifyAlert = document.getElementById('codeVerifyAlert');
+      const codeMobileVerifyBtn = document.getElementById('codeMobileVerifyBtn');
+      function showCodeVerifyAlert() {
+        resultMsg.textContent = '📱 Mobile no. verify please';
+        resultMsg.classList.remove('text-error', 'text-primary');
+        resultMsg.classList.add('text-sky-200');
+        codeVerifyAlert?.classList.remove('hidden');
+        codeVerifyAlert?.classList.add('flex');
+      }
+      function hideCodeVerifyAlert() {
+        codeVerifyAlert?.classList.add('hidden');
+        codeVerifyAlert?.classList.remove('flex');
+      }
+      codeMobileVerifyBtn?.addEventListener('click', function () {
+        if (user && !user.mobileVerified) { openProfileVerify(); return; }
+        openLoginPanel('📱 OTP verify karne ke liye mobile login karein');
+      });
       function openSpinReadyPopup() {
         const popup = document.getElementById('spinReadyPopup');
         if (!popup) return;
@@ -1499,10 +1519,13 @@
       spinForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const code = spinInput.value.trim().toUpperCase();
-        resultMsg.classList.remove('hidden', 'text-error', 'text-primary');
+        hideCodeVerifyAlert();
+        codeMobileVerifyBtn?.classList.remove('hidden');
+        resultMsg.classList.remove('text-error', 'text-primary', 'text-sky-200');
         const session = loadSession() || {};
-        if (!session.sessionToken) { openLoginPanel('Spin code claim karne ke liye login karein'); return; }
-        if (!/^[A-Z0-9]{6}$/.test(code)) { resultMsg.textContent = '6-character spin code daalein.'; resultMsg.classList.add('text-error'); return; }
+        const mobileVerified = !!(session.mobileVerified || (user && user.mobileVerified));
+        if (!session.sessionToken || !mobileVerified) { showCodeVerifyAlert(); return; }
+        if (!/^[A-Z0-9]{6}$/.test(code)) { resultMsg.textContent = '6-character spin code daalein.'; resultMsg.classList.add('text-error'); codeMobileVerifyBtn?.classList.add('hidden'); codeVerifyAlert?.classList.remove('hidden'); codeVerifyAlert?.classList.add('flex'); return; }
         const button = spinForm.querySelector('button[type="submit"]');
         button.disabled = true; button.textContent = 'Checking…';
         try {
@@ -1515,10 +1538,10 @@
           user = { ...user, spinBalance: Number(data.spinBalance || ((user && user.spinBalance) || 0) + 1) };
           saveSession({ spinBalance: user.spinBalance });
           updateTokenUI(); spinInput.value = '';
-          resultMsg.textContent = data.message || 'Spin claim ho gaya!'; resultMsg.classList.add('text-primary');
+          resultMsg.textContent = data.message || 'Spin claim ho gaya!'; resultMsg.classList.add('text-primary'); codeVerifyAlert?.classList.remove('hidden'); codeVerifyAlert?.classList.add('flex'); codeMobileVerifyBtn?.classList.add('hidden');
           openSpinReadyPopup();
         } catch (err) {
-          resultMsg.textContent = err.message || 'Code claim nahi hua.'; resultMsg.classList.add('text-error');
+          resultMsg.textContent = err.message || 'Code claim nahi hua.'; resultMsg.classList.add('text-error'); codeVerifyAlert?.classList.remove('hidden'); codeVerifyAlert?.classList.add('flex'); codeMobileVerifyBtn?.classList.add('hidden');
         } finally { button.disabled = false; button.textContent = 'Verify Code'; }
       });
 
