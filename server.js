@@ -1268,8 +1268,10 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === 'GET' && (urlPath === '/spin' || urlPath === '/spin-roller')) {
-    fs.readFile(SPIN_ROLLER_HTML_FILE, (err, data) => {
-      if (err) { res.writeHead(404); return res.end('Spin roller page missing'); }
+    // `/spin` is the one real, customized roller.  The small standalone
+    // spin-roller.html was only a temporary/demo wheel and must not be shown.
+    fs.readFile(BOOK_NOW_HTML_FILE, (err, data) => {
+      if (err) { res.writeHead(404); return res.end('Main spin roller page missing'); }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store, max-age=0' });
       serveLiveHtml(res, data);
     });
