@@ -1898,7 +1898,18 @@ document.addEventListener('DOMContentLoaded', function () {
   const buttons = Array.from(document.querySelectorAll('[data-notification-button]'));
   function escText(value) { return String(value == null ? '' : value); }
   function formatTime(value) { try { return new Date(value).toLocaleString('en-IN'); } catch (e) { return ''; } }
-  function sessionForNotifs() { try { return typeof loadSession === 'function' ? loadSession() : null; } catch (e) { return null; } }
+  // Yeh script main login script ke scope ke bahar hai, isliye yahan session
+  // localStorage se directly padho. Pehle loadSession visible na hone se bell
+  // hamesha user ko guest samajh rahi thi.
+  function sessionForNotifs() {
+    try {
+      if (typeof loadSession === 'function') return loadSession();
+      const primary = JSON.parse(localStorage.getItem('aditya_studio_session_v1') || 'null');
+      const persistent = JSON.parse(localStorage.getItem('aditya_studio_persistent_login_v2') || 'null');
+      return (primary && primary.mobile && primary.sessionToken) ? primary
+        : ((persistent && persistent.mobile && persistent.sessionToken) ? persistent : (primary || persistent));
+    } catch (e) { return null; }
+  }
   function setBadge(count) {
     buttons.forEach(function (button) {
       const old = button.querySelector('.notif-count'); if (old) old.remove();
