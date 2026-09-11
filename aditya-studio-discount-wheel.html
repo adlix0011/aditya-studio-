@@ -2117,6 +2117,7 @@ loginForm.addEventListener('submit', async (e)=>{
 });
 
 logoutBtn.addEventListener('click', ()=>{
+  window.__welcomeSpinActive = false;
   currentAccount = null;
   clearSession();
   dashboardCard.style.display = 'none';
@@ -2172,6 +2173,19 @@ const freeWheelSection = document.getElementById('freeWheelSection');
 const claimFreeSpinBtn = document.getElementById('claimFreeSpinBtn');
 const freeSpinBtn = document.getElementById('freeSpinBtn');
 const freeWheelEl = document.getElementById('freeWheel');
+
+// Background timer/session refresh welcome card ko hide kare to turant restore karo.
+// Spin, Skip aur Home pe flag pehle false hota hai, isliye user action block nahi hoga.
+if (freeSpinOffer && typeof MutationObserver !== 'undefined') {
+  new MutationObserver(function(){
+    if (!window.__welcomeSpinActive) return;
+    if (window.getComputedStyle(freeSpinOffer).display === 'none') {
+      freeSpinOffer.style.display = 'block';
+      if (authCard) authCard.style.display = 'none';
+      if (dashboardCard) dashboardCard.style.display = 'none';
+    }
+  }).observe(freeSpinOffer, { attributes:true, attributeFilter:['style','class'] });
+}
 
 function buildFreeWheel(){
   const segs = document.getElementById('freeSegments');
