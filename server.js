@@ -300,7 +300,15 @@ function saveSessions() {
 }
 function issueSession(acc) {
   const token = crypto.randomBytes(32).toString('base64url');
-  sessions.set(token, { mobile: String(acc.mobile), expiresAt: Date.now() + SESSION_TTL_MS });
+  const expiresAt = Date.now() + SESSION_TTL_MS;
+  sessions.set(token, { mobile: String(acc.mobile), expiresAt });
+  // Render restart ke baad sessions.json hamesha available nahi hoti. Token ka
+  // hash account record me bhi rakho, taaki logged-in customer ka wallet/coupon
+  // session restart ke baad bhi bina dobara login maange chale.
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+  const old = Array.isArray(acc.sessionTokens) ? acc.sessionTokens : [];
+  acc.sessionTokens = old.filter(row => row && Number(row.expiresAt) > Date.now()).slice(-4);
+  acc.sessionTokens.push({ tokenHash, expiresAt });
   saveSessions();
   return token;
 }
@@ -308,8 +316,18 @@ function sessionAccount(req, body, accounts) {
   const bearer = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
   const token = String((body && body.sessionToken) || bearer || '');
   const row = sessions.get(token);
-  if (!row || row.expiresAt < Date.now()) { if (row) { sessions.delete(token); saveSessions(); } return null; }
-  return accounts.find(a => String(a.mobile) === row.mobile) || null;
+  if (row && row.expiresAt >= Date.now()) return accounts.find(a => String(a.mobile) === row.mobile) || null;
+  if (row) { sessions.delete(token); saveSessions(); }
+  // Durable fallback for a server restart: only the SHA-256 hash is stored.
+  if (!token) return null;
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+  const acc = accounts.find(a => Array.isArray(a.sessionTokens) && a.sessionTokens.some(s => s && s.tokenHash === tokenHash && Number(s.expiresAt) >= Date.now()));
+  if (acc) {
+    const saved = acc.sessionTokens.find(s => s && s.tokenHash === tokenHash);
+    sessions.set(token, { mobile: String(acc.mobile), expiresAt: Number(saved.expiresAt) });
+    return acc;
+  }
+  return null;
 }
 restoreSessions();
 function requestNetworkKey(req) {
@@ -1858,8 +1876,10 @@ function computeOrderFees(subtotal, settingsFees) {
       saveOtpRequests(list);
       const verifiedAccount = acc && String(acc.mobile) === mobile ? acc : accounts.find(a => String(a.mobile) === mobile);
       if (!verifiedAccount) return sendJSON(res, 404, { ok: false, error: 'not-found' });
-      verifiedAccount.mobileVerified = true; saveAccounts(accounts);
-      return sendJSON(res, 200, { ok: true, ...accountPublicPayload(verifiedAccount), sessionToken: issueSession(verifiedAccount) });
+      verifiedAccount.mobileVerified = true;
+      const verifiedSessionToken = issueSession(verifiedAccount);
+      saveAccounts(accounts);
+      return sendJSON(res, 200, { ok: true, ...accountPublicPayload(verifiedAccount), sessionToken: verifiedSessionToken });
     } catch (e) {
       return sendJSON(res, 500, { ok: false, error: 'server-error' });
     }
@@ -1961,14 +1981,15 @@ function computeOrderFees(subtotal, settingsFees) {
         walletBalance: 0, walletHistory: []
       };
       accounts.push(acc);
-      saveAccounts(accounts);
       // Naye register user ki verification request admin WhatsApp OTP list me seedha aaye.
       const now = Date.now(), otp = generateOtp(), requestId = 'otp-' + mobile + '-' + now;
       let otpList = loadOtpRequests().filter(r => keepPendingOtpForAdmin(r, now));
       otpList.unshift({ mobile, name: acc.name || '', id: acc.id || '', otpHash: hashOtp(otp), requestId, smsId:'', createdAt:new Date().toISOString(), expiresAt:new Date(now + MOBILE_VERIFY_OTP_TTL_MS).toISOString(), attempts:0, verified:false, purpose:'mobile_verify', manualOtp:otp, delivery:'whatsapp_manual' });
       saveOtpRequests(otpList.slice(0,100));
       void sendTelegramAlert('New User Registered', 'Customer: ' + (acc.name || 'Customer') + '\nUser ID: ' + id + '\nMobile: ' + mobile + (acc.village ? ('\nVillage: ' + acc.village) : '') + '\nVerification: Pending');
-      return sendJSON(res, 200, { ...accountPublicPayload(acc), sessionToken: issueSession(acc), otpRequested:true });
+      const registrationSessionToken = issueSession(acc);
+      saveAccounts(accounts);
+      return sendJSON(res, 200, { ...accountPublicPayload(acc), sessionToken: registrationSessionToken, otpRequested:true });
     } catch (e) {
       return sendJSON(res, 500, { ok: false, error: 'save-failed' });
     }
@@ -1987,12 +2008,13 @@ function computeOrderFees(subtotal, settingsFees) {
       clearAuthFailures(req, mobile);
       acc.visitCount = (acc.visitCount || 0) + 1;
       acc.lastVisitAt = new Date().toISOString();
+      const loginSessionToken = issueSession(acc);
       saveAccounts(accounts);
       // Legacy registrations ke liye bhi OTP queue recover ho jaye.
       ensureAdminWhatsAppOtp(acc);
       // PIN aur OTP kabhi alert me nahi jaate; sirf successful login ki detail bhejte hain.
       void sendTelegramAlert('Customer Login', 'Customer: ' + (acc.name || 'Customer') + '\nUser ID: ' + (acc.id || '—') + '\nMobile: ' + acc.mobile + '\nVisits: ' + acc.visitCount + '\nTime: ' + new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }));
-      return sendJSON(res, 200, { ...accountPublicPayload(acc), sessionToken: issueSession(acc) });
+      return sendJSON(res, 200, { ...accountPublicPayload(acc), sessionToken: loginSessionToken });
     } catch (e) {
       return sendJSON(res, 400, { ok: false, error: 'bad-request' });
     }
