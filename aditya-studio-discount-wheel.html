@@ -3705,6 +3705,8 @@ function refreshFreeSpinUI(){
 
 
 loadBookImages();
+const isRollerSpinPage = location.pathname === '/roller-spin';
+if (isRollerSpinPage) document.title = 'Roller Spin — Aditya Studio';
 if (new URLSearchParams(location.search).get('mode') === 'register') {
   clearSession();
   currentAccount = null;
@@ -3714,6 +3716,11 @@ if (new URLSearchParams(location.search).get('mode') === 'register') {
   tabRegister.click();
 } else {
   tryRestoreSession().then(function(){
+    // Named Roller Spin page par direct colourful roller hi khulega.
+    if(isRollerSpinPage && currentAccount){
+      setTimeout(function(){ openWelcomeWheel(); }, 120);
+      return;
+    }
     // Add Money / coupon ka Verify button yahan seedha OTP field kholta hai.
     if(new URLSearchParams(location.search).get('verify') !== 'mobile') return;
     if(currentAccount){
