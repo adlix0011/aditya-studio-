@@ -1646,6 +1646,9 @@ function buildLandingWheel(){
 }
 buildLandingWheel();
 
+// Landing wheel ka delayed register-popup timer. Registration complete hote hi
+// ise cancel karna zaroori hai, warna 5 second baad welcome screen overwrite ho jaati hai.
+let landingAuthTimer = null;
 lwSpinBtn.addEventListener('click', ()=>{
   if(lwSpinning) return;
   lwSpinning = true;
@@ -1698,7 +1701,10 @@ lwSpinBtn.addEventListener('click', ()=>{
   }
   requestAnimationFrame(tickLoop);
 
-  setTimeout(()=>{
+  if(landingAuthTimer) clearTimeout(landingAuthTimer);
+  landingAuthTimer = setTimeout(()=>{
+    landingAuthTimer = null;
+    if(window.__welcomeSpinActive) return;
     lwSpinning = false;
     playWinDing();
     lwSpinBtn.disabled = false;
@@ -2049,6 +2055,10 @@ registerForm.addEventListener('submit', async (e)=>{
     };
     saveSession(currentAccount, pin);
     registerForm.reset();
+    // Landing wheel ka purana 5-second timer ab welcome screen ko band nahi karega.
+    window.__welcomeSpinActive = true;
+    if(landingAuthTimer) { clearTimeout(landingAuthTimer); landingAuthTimer = null; }
+    lwSpinning = false;
     // Register mode ka URL refresh/return par form ko phir se na khole.
     try { window.history.replaceState({}, document.title, window.location.pathname); } catch(ignore) {}
     // First registration ka welcome gift seedha claim screen par dikhega.
@@ -2188,6 +2198,7 @@ function buildFreeWheel(){
 function showFreeSpinOffer(){
   try {
     if(!freeSpinOffer){ enterDashboard(); return; }
+    window.__welcomeSpinActive = true;
     authCard.style.display = 'none';
     dashboardCard.style.display = 'none';
     codeCard.style.display = 'none';
@@ -2223,6 +2234,7 @@ function showFreeSpinOffer(){
 }
 
 document.getElementById('freeSkipBtn') && document.getElementById('freeSkipBtn').addEventListener('click', function(){
+  window.__welcomeSpinActive = false;
   if(freeSpinOffer) freeSpinOffer.style.display = 'none';
   enterDashboard();
 });
@@ -2235,6 +2247,7 @@ function openWelcomeWheel(){
   try {
     // New registration claim always opens the dedicated colourful welcome roller.
     if(freeSpinOffer) freeSpinOffer.style.display = 'none';
+    window.__welcomeSpinActive = false;
     if(authCard) authCard.style.display = 'none';
     if(dashboardCard) dashboardCard.style.display = 'none';
     if(codeCard) codeCard.style.display = 'none';
