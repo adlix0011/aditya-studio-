@@ -449,6 +449,7 @@
           <button type="button" id="profAddMoneyBtn" class="rounded-lg text-white text-xs font-bold border border-sky-200/30 shadow-[0_4px_12px_rgba(2,132,199,.35)] px-3 py-2" style="background:linear-gradient(135deg,#38bdf8,#0284c7)">＋ Add Money</button>
         </div>
         <p class="text-[11px] text-on-surface-variant mt-1 relative z-[1]">Orders me use kar sakte ho</p>
+        <p id="profWalletPending" class="hidden relative z-[1] mt-2 text-[11px] font-bold text-sky-200/55 wallet-pending-pulse">⏳ ₹<span id="profWalletPendingBal">0</span> recharge pending · Admin verification baaki hai</p>
         <div id="profWalletPromo" class="hidden mt-2 rounded-lg border border-fuchsia-300/40 bg-fuchsia-950/25 px-2 py-1.5 text-[10px] text-fuchsia-100 relative z-[1]"></div>
         <div class="mt-3 flex gap-2 relative z-[1]">
           <input id="profWalletCode" class="flex-1 bg-surface border border-outline-variant rounded-lg px-2 py-1.5 text-on-surface text-xs" placeholder="Wallet code" maxlength="12"/>
@@ -536,6 +537,8 @@
     .profile-coupons-btn{background:linear-gradient(135deg,#8b2be2,#5b21b6)}
     .profile-wallet-btn{background:linear-gradient(135deg,#0891b2,#0369a1)}
     .profile-rewards-btn{background:linear-gradient(135deg,#d97706,#b45309)}
+    .wallet-pending-pulse{animation:walletPendingPulse 1.7s ease-in-out infinite}
+    @keyframes walletPendingPulse{0%,100%{opacity:.38;filter:drop-shadow(0 0 0 transparent)}50%{opacity:.84;filter:drop-shadow(0 0 8px rgba(56,189,248,.55))}}
     .coupon-sticker {
       position: relative;
       border-radius: 12px;
@@ -1180,6 +1183,12 @@
           document.getElementById('profFreeSpin').textContent = user.freeSpinUsed ? 'Used' : 'Available';
           const wBal = Number(user.walletBalance) || 0;
           document.getElementById('profWalletBal').textContent = wBal;
+          const pendingBal = Number(user.walletPendingBalance) || 0;
+          const pendingLine = document.getElementById('profWalletPending');
+          if (pendingLine) {
+            pendingLine.classList.toggle('hidden', pendingBal <= 0);
+            document.getElementById('profWalletPendingBal').textContent = pendingBal;
+          }
           loadProfilePhoto();
           const wHistBox = document.getElementById('profWalletHist');
           const wHist = user.walletHistory || [];
