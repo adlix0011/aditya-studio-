@@ -838,9 +838,13 @@
       ctx.strokeStyle = "#cba43a"; ctx.lineWidth = 3; ctx.strokeRect(18, 18, W - 36, H - 36);
       var glow = ctx.createRadialGradient(W / 2, 120, 10, W / 2, 120, 500); glow.addColorStop(0, "rgba(255,211,83,.32)"); glow.addColorStop(1, "rgba(255,211,83,0)"); ctx.fillStyle = glow; ctx.fillRect(0, 0, W, 360);
       ctx.textAlign = "center"; ctx.fillStyle = "#f9d766"; ctx.font = "800 20px Arial"; ctx.fillText("✦  PREMIUM BOOKING RECEIPT  ✦", W / 2, 75);
-      ctx.beginPath(); ctx.arc(W / 2 - 215, 152, 42, 0, Math.PI * 2); ctx.fillStyle = "#e7bd48"; ctx.fill(); ctx.fillStyle = "#171109"; ctx.font = "900 32px Georgia"; ctx.fillText("AS", W / 2 - 215, 163);
-      ctx.fillStyle = "#ffe28a"; ctx.font = "bold italic 68px Georgia"; ctx.fillText("Aditya Studio", W / 2 + 45, 155);
-      ctx.fillStyle = "#9ee9ff"; ctx.font = "700 18px Arial"; ctx.fillText("PHOTOGRAPHY  •  VIDEO  •  MEMORIES", W / 2 + 45, 190);
+      // Centered Aditya Studio wordmark — no separate AS circle/placeholder.
+      var logoGlow = ctx.createLinearGradient(W * .22, 0, W * .78, 0);
+      logoGlow.addColorStop(0, "#ffcf55"); logoGlow.addColorStop(.48, "#fff0a8"); logoGlow.addColorStop(1, "#ff84c1");
+      ctx.save(); ctx.shadowColor = "rgba(255,191,65,.62)"; ctx.shadowBlur = 22;
+      ctx.fillStyle = logoGlow; ctx.font = "bold italic 76px Georgia"; ctx.fillText("Aditya Studio", W / 2, 155); ctx.restore();
+      ctx.fillStyle = "#71e7ff"; ctx.font = "800 18px Arial"; ctx.fillText("✦  PHOTOGRAPHY   •   VIDEO   •   MEMORIES  ✦", W / 2, 194);
+      ctx.strokeStyle = "rgba(255,126,191,.7)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(W / 2 - 210, 211); ctx.lineTo(W / 2 + 210, 211); ctx.stroke();
       ctx.fillStyle = "#d8b753"; ctx.font = "700 18px Arial"; ctx.fillText(b.id, W / 2, 242);
       ctx.strokeStyle = "rgba(236,194,72,.55)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(pad, 280); ctx.lineTo(W - pad, 280); ctx.stroke();
       ctx.fillStyle = "#fff0bd"; ctx.font = "italic bold 36px Georgia"; ctx.fillText(b.serviceTitle, W / 2, 335);
