@@ -1356,7 +1356,11 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && (urlPath === '/add-money' || urlPath === '/add-money.html')) {
     fs.readFile(ADD_MONEY_HTML_FILE, (err, data) => {
       if (err) { res.writeHead(404); return res.end('add-money.html missing'); }
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); serveLiveHtml(res, data);
+      // Wallet recharge is only available after the customer's mobile is verified.
+      // Keep the page open and show a clear verification action instead of an abrupt login redirect.
+      const mobileGate = `if(!session||!session.sessionToken||!session.mobileVerified){document.addEventListener('DOMContentLoaded',function(){var form=document.getElementById('topupForm');if(!form)return;form.style.display='none';var gate=document.createElement('div');gate.id='mobileVerifyGate';gate.style.cssText='display:flex;align-items:center;gap:10px;margin:12px 0;padding:11px 12px;border:1px solid #38bdf8;border-radius:12px;background:rgba(14,116,144,.18);color:#bae6fd;font:700 13px Arial';gate.innerHTML='<span style="flex:1">📱 Mobile no. verify please</span><button type="button" style="border:0;border-radius:8px;background:#2563eb;color:#fff;padding:8px 13px;font-weight:800;cursor:pointer">✓ Verify</button>';form.parentNode.insertBefore(gate,form);gate.querySelector('button').onclick=function(){location.href='/spin';};});}`;
+      const gatedHtml = data.toString().replace("if(!session||!session.sessionToken){location.href='/book-now?auth=login'}", mobileGate);
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); serveLiveHtml(res, gatedHtml);
     });
     return;
   }
