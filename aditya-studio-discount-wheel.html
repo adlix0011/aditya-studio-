@@ -1328,6 +1328,7 @@
         </div>
         <div class="note" id="codeAmountHint" style="margin-bottom:8px;">कोड डालते ही amount auto detect होगा — अलग से पैसे डालने की ज़रूरत नहीं</div>
         <div class="auth-error" id="homeCodeError"></div>
+        <div id="homeVerifyRow" style="display:none;align-items:center;gap:9px;margin:8px 0;padding:9px 10px;border:1px solid #38bdf8;border-radius:10px;background:rgba(14,116,144,.18);color:#bae6fd;font-size:12px;font-weight:700;"><span style="flex:1">📱 Mobile no. verify please</span><button type="button" id="homeVerifyBtn" style="margin:0;width:auto;padding:7px 12px;background:#2563eb;color:#fff;border:0;border-radius:8px;font-weight:800;cursor:pointer">✓ Verify</button></div>
         <button type="submit" class="btn">कोड वेरिफ़ाई → स्पिन</button>
         <button type="button" class="btn-secondary" id="btnCloseAmount">बंद करें</button>
       </form>
@@ -3152,7 +3153,16 @@ function openProfileModal(){
   if(!m || !currentAccount) return;
   document.getElementById('prName').textContent = currentAccount.name || '—';
   document.getElementById('prId').textContent = currentAccount.id || '—';
-  document.getElementById('prMobile').textContent = currentAccount.mobile || '—';
+  var mobileEl = document.getElementById('prMobile');
+  if(mobileEl){
+    mobileEl.textContent = currentAccount.mobile || '—';
+    if(currentAccount.mobileVerified){
+      var tick=document.createElement('span');
+      tick.textContent=' ✓'; tick.title='Verified mobile';
+      tick.style.cssText='display:inline-block;margin-left:5px;color:#fff;background:#1d9bf0;border-radius:50%;width:17px;height:17px;line-height:17px;text-align:center;font:bold 12px Arial;vertical-align:middle';
+      mobileEl.appendChild(tick);
+    }
+  }
   document.getElementById('prVillage').textContent = currentAccount.village || '—';
   var prV = document.getElementById('prVerified');
   var vBox = document.getElementById('profileVerifyBox');
@@ -3409,6 +3419,19 @@ document.addEventListener('click', function notifUnlockOnce(){
   var openBtn = document.getElementById('btnOpenCode');
   var closeAmt = document.getElementById('btnCloseAmount');
   var panel = document.getElementById('amountPanel');
+  var verifyRow = document.getElementById('homeVerifyRow');
+  var verifyBtn = document.getElementById('homeVerifyBtn');
+  function showVerifyNeed(){ if(verifyRow) verifyRow.style.display='flex'; }
+  function openVerifyFlow(){
+    if(currentAccount){
+      if(typeof openProfileModal === 'function') openProfileModal();
+      var box=document.getElementById('profileVerifyBox'); if(box) box.style.display='block';
+      return;
+    }
+    if(authCard){ authCard.style.display='block'; tabLogin.click(); authCard.scrollIntoView({behavior:'smooth',block:'start'}); }
+    setAuthError('📱 Mobile number login karke OTP verify karein.');
+  }
+  if(verifyBtn) verifyBtn.addEventListener('click', openVerifyFlow);
   if(openBtn && panel){
     openBtn.addEventListener('click', function(){
       panel.classList.add('show');
@@ -3425,7 +3448,8 @@ document.addEventListener('click', function notifUnlockOnce(){
       e.preventDefault();
       var err = document.getElementById('homeCodeError');
       if(err) err.textContent = '';
-      if(!currentAccount){ if(err) err.textContent='पहले लॉगिन करें'; return; }
+      if(!currentAccount){ if(err) err.textContent='📱 Mobile no. verify please'; showVerifyNeed(); return; }
+      if(!currentAccount.mobileVerified){ if(err) err.textContent='📱 Mobile no. verify please'; showVerifyNeed(); return; }
       var code = (document.getElementById('homeSpinCode').value || '').trim().toUpperCase();
       if(code.length < 4){ if(err) err.textContent='सही कोड डालें'; return; }
       var btn = form.querySelector('button[type="submit"]');
