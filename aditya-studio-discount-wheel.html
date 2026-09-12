@@ -1477,7 +1477,7 @@
         <div class="auth-error" id="spinVerifyError" style="display:none;margin-top:8px;"></div>
       </div>
       <button class="fw-spin-btn" id="freeSpinBtn">SPIN</button>
-      <div class="fw-spins-left">⚡ <span id="freeSpinsLeft">1</span> Free Spin</div>
+      <div class="fw-spins-left">⚡ <span id="freeSpinsLeft">0</span> <span id="freeSpinLabel">Spin</span></div>
       <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;justify-content:center">
         <button type="button" class="btn-secondary" id="freeWheelSkipBtn" style="flex:1;min-width:120px">Skip</button>
         <a href="/" class="btn-secondary" style="flex:1;min-width:120px;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center">🏠 Home</a>
@@ -2181,6 +2181,21 @@ const claimFreeSpinBtn = document.getElementById('claimFreeSpinBtn');
 const freeSpinBtn = document.getElementById('freeSpinBtn');
 const freeWheelEl = document.getElementById('freeWheel');
 
+// Welcome roller hamesha account ki real free-spin status dikhata hai.
+// Purane static "1 Free Spin" text ki wajah se used/na-available spin bhi 1 dikh rahi thi.
+function refreshFreeWheelAvailability(){
+  const available = !!(currentAccount && currentAccount.freeSpinUsed === false);
+  const left = document.getElementById('freeSpinsLeft');
+  const label = document.getElementById('freeSpinLabel');
+  if(left) left.textContent = available ? '1' : '0';
+  if(label) label.textContent = available ? 'Free Spin' : 'Spin';
+  if(freeSpinBtn){
+    freeSpinBtn.disabled = !available;
+    freeSpinBtn.textContent = available ? 'SPIN' : 'NO SPIN AVAILABLE';
+  }
+  return available;
+}
+
 // Background timer/session refresh welcome card ko hide kare to turant restore karo.
 // Spin, Skip aur Home pe flag pehle false hota hai, isliye user action block nahi hoga.
 if (freeSpinOffer && typeof MutationObserver !== 'undefined') {
@@ -2230,9 +2245,12 @@ function showFreeSpinOffer(){
     if(freeWheelSection) freeWheelSection.style.display = 'none';
     document.body.classList.add('step-app');
     document.body.classList.remove('step-code','step-wheel');
+    const freeSpinAvailable = refreshFreeWheelAvailability();
     const msg = document.getElementById('freeOfferMsg');
     if(msg && currentAccount){
-      msg.innerHTML = (currentAccount.name || 'Customer') + ', आपको <b>1 फ्री स्पिन</b> मिल गया! 🎉';
+      msg.innerHTML = freeSpinAvailable
+        ? (currentAccount.name || 'Customer') + ', आपको <b>1 फ्री स्पिन</b> मिल गया! 🎉'
+        : (currentAccount.name || 'Customer') + ', आपके पास अभी <b>0 Spin</b> है।';
     }
     freeSpinOffer.style.display = 'block';
     setTimeout(function(){ freeSpinOffer.scrollIntoView({behavior:'smooth', block:'start'}); }, 80);
@@ -2278,9 +2296,7 @@ function openWelcomeWheel(){
     if(wheelSection) wheelSection.style.display = 'none';
     freeHasSpun = false;
     buildFreeWheel();
-    if(freeSpinBtn){ freeSpinBtn.disabled = false; freeSpinBtn.textContent = 'SPIN'; }
-    const left = document.getElementById('freeSpinsLeft');
-    if(left) left.textContent = '1';
+    refreshFreeWheelAvailability();
     if(freeWheelSection){
       freeWheelSection.style.display = 'block';
       freeWheelSection.scrollIntoView({behavior:'smooth', block:'start'});
@@ -2406,7 +2422,7 @@ if(verifySpinOtpBtn){
 
 if(freeSpinBtn){
   freeSpinBtn.addEventListener('click', async ()=>{
-    if(freeHasSpun) return;
+    if(freeHasSpun || !refreshFreeWheelAvailability()) return;
     // Welcome free spin — OTP skip (direct spin after register)
     showSpinVerifyUI(false);
     freeSpinBtn.disabled = true;
@@ -2446,8 +2462,7 @@ if(freeSpinBtn){
     freeSpinBtn.textContent = 'SPIN';
     getFwAudio && getFwAudio();
     playFwStart && playFwStart();
-    const left = document.getElementById('freeSpinsLeft');
-    if(left) left.textContent = '0';
+    refreshFreeWheelAvailability();
 
     let idx = FREE_PRIZES.findIndex(function(p){
       if(assigned.type === 'frame') return p.type === 'frame';
@@ -3635,9 +3650,7 @@ async function goToFreeSpin(){
   if(freeSpinOffer) freeSpinOffer.style.display = 'none';
   freeHasSpun = false;
   if(typeof buildFreeWheel === 'function') buildFreeWheel();
-  if(freeSpinBtn){ freeSpinBtn.disabled = false; freeSpinBtn.textContent = 'SPIN'; }
-  var left = document.getElementById('freeSpinsLeft');
-  if(left) left.textContent = '1';
+  refreshFreeWheelAvailability();
   if(freeWheelSection){
     freeWheelSection.style.display = 'block';
     freeWheelSection.scrollIntoView({ behavior:'smooth', block:'start' });
