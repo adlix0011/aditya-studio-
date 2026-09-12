@@ -78,6 +78,9 @@ function r2PresignedUrl(method, objectKey, expiresSeconds) {
     'X-Amz-Expires': String(Math.max(60, Math.min(Number(expiresSeconds) || 600, 900))),
     'X-Amz-SignedHeaders': 'host'
   };
+  // R2 GET responses are static image files. Let browsers reuse them rather
+  // than downloading the same photo on every home-page visit.
+  if (String(method).toUpperCase() === 'GET') query['response-cache-control'] = 'public, max-age=31536000, immutable';
   const canonicalQuery = Object.keys(query).sort().map(k => awsEncode(k) + '=' + awsEncode(query[k])).join('&');
   const canonicalHeaders = 'host:' + endpoint.host + '\n';
   const canonicalRequest = [method, canonicalUri, canonicalQuery, canonicalHeaders, 'host', 'UNSIGNED-PAYLOAD'].join('\n');
@@ -92,6 +95,59 @@ function r2PresignedUrl(method, objectKey, expiresSeconds) {
 function isSafeR2PhotoKey(key, mobile) {
   const safeMobile = String(mobile || '').replace(/\D/g, '');
   return new RegExp('^customer-photos/' + safeMobile + '/[a-zA-Z0-9._-]+\\.(jpg|jpeg|png|webp)$', 'i').test(String(key || ''));
+}
+function isSafeAdminR2ImageKey(key) {
+  return /^studio-images\/(banner|deal|frame3d|home-frame|hero-bg|book)\/[a-zA-Z0-9._-]+\.(jpg|jpeg|png|webp)$/i.test(String(key || ''));
+}
+function mediaUrl(value) {
+  const raw = String(value || '');
+  if (raw.startsWith('r2:') && r2Ready()) {
+    const key = raw.slice(3);
+    if (isSafeAdminR2ImageKey(key) || /^customer-photos\//.test(key)) {
+      try { return r2PresignedUrl('GET', key, 900); } catch (e) { return ''; }
+    }
+  }
+  return raw;
+}
+function storedMediaValue(value) {
+  const raw = String(value || '');
+  if (raw.startsWith('r2:')) return raw;
+  try {
+    const url = new URL(raw);
+    const marker = '/studio-images/';
+    const at = url.pathname.indexOf(marker);
+    if (at >= 0) {
+      const key = decodeURIComponent(url.pathname.slice(at + 1));
+      if (isSafeAdminR2ImageKey(key)) return 'r2:' + key;
+    }
+  } catch (e) {}
+  return raw;
+}
+function publicSettings(settings) {
+  const out = JSON.parse(JSON.stringify(settings || {}));
+  const mapItems = list => (Array.isArray(list) ? list : []).map(item => {
+    if (typeof item === 'string') return mediaUrl(item);
+    if (item && typeof item === 'object') return { ...item, url: mediaUrl(item.url) };
+    return item;
+  });
+  out.offerImages = mapItems(out.offerImages);
+  out.frames3dPhotos = mapItems(out.frames3dPhotos);
+  out.homeHeroFramePhotos = mapItems(out.homeHeroFramePhotos);
+  out.heroSideBgPhotos = mapItems(out.heroSideBgPhotos);
+  out.bookImages = Object.fromEntries(Object.entries(out.bookImages || {}).map(([k, v]) => [k, mediaUrl(v)]));
+  return out;
+}
+async function moveDataImageToR2(value, group) {
+  const raw = String(value || '');
+  const match = raw.match(/^data:(image\/(?:jpeg|jpg|png|webp));base64,([a-z0-9+/=\s]+)$/i);
+  if (!match) return raw;
+  const bytes = Buffer.from(match[2].replace(/\s/g, ''), 'base64');
+  if (!bytes.length || bytes.length > 3 * 1024 * 1024) return raw;
+  const ext = ({ 'image/jpeg':'jpg', 'image/jpg':'jpg', 'image/png':'png', 'image/webp':'webp' })[match[1].toLowerCase()];
+  const key = 'studio-images/' + group + '/' + Date.now() + '-' + crypto.randomBytes(10).toString('hex') + '.' + ext;
+  const put = await fetch(r2PresignedUrl('PUT', key, 900), { method:'PUT', headers:{ 'Content-Type':match[1], 'Cache-Control':'public, max-age=31536000, immutable' }, body:bytes });
+  if (!put.ok) throw new Error('R2 HTTP ' + put.status);
+  return 'r2:' + key;
 }
 
 function resolveDataDir() {
@@ -1233,8 +1289,8 @@ function esc(t) {
 function fmtDate(d) {
   try { return d ? new Date(d).toLocaleString('en-IN') : '—'; } catch (e) { return '—'; }
 }
-// Har customer page me add hone wala lightweight live-sync. Page tabhi reload hota
-// hai jab server data sach me badla ho; typing/select ke waqt reload hold rehta hai.
+// Legacy live-sync: full-page reloads consume unnecessary bandwidth. Customer
+// pages now use their small targeted APIs instead of receiving this script.
 const LIVE_SYNC_SNIPPET = `<script>(function(){
   var revision='', queued=false, timer=null;
   var scrollKey='aditya_live_scroll:'+location.pathname+location.search;
@@ -1248,9 +1304,9 @@ const LIVE_SYNC_SNIPPET = `<script>(function(){
   document.addEventListener('focusout',function(){if(queued&&!welcomeSpinOpen()){queued=false;setTimeout(check,300)}});
   setTimeout(check,1200);timer=setInterval(check,12000);
 })();</script>`;
-function serveLiveHtml(res, data) {
+function serveLiveHtml(res, data, includeLiveSync) {
   const html = Buffer.isBuffer(data) ? data.toString('utf8') : String(data || '');
-  res.end(html.replace(/<\/body>/i, LIVE_SYNC_SNIPPET + '</body>'));
+  res.end(includeLiveSync ? html.replace(/<\/body>/i, LIVE_SYNC_SNIPPET + '</body>') : html);
 }
 function liveRevision() {
   // Activity heartbeat ko jaanbujhkar include nahi karte, warna har visitor ke
@@ -1286,10 +1342,10 @@ const server = http.createServer(async (req, res) => {
       // showing a temporary/default background while the browser fetches settings.
       const settings = loadSettings();
       const first = (settings.heroSideBgPhotos || [])[0] || {};
-      const rawUrl = typeof first === 'string' ? first : String(first.url || '');
+      const rawUrl = mediaUrl(typeof first === 'string' ? first : String(first.url || ''));
       const safeUrl = rawUrl.replace(/["'<>]/g, '');
       const heroFrameFirst = (settings.homeHeroFramePhotos || [])[0] || '';
-      const heroFrameRawUrl = typeof heroFrameFirst === 'string' ? heroFrameFirst : String(heroFrameFirst.url || '');
+      const heroFrameRawUrl = mediaUrl(typeof heroFrameFirst === 'string' ? heroFrameFirst : String(heroFrameFirst.url || ''));
       const heroFrameUrl = heroFrameRawUrl.replace(/["'<>]/g, '');
       const x = Math.max(0, Math.min(100, Number((first && first.positionX) ?? 50)));
       const y = Math.max(0, Math.min(100, Number((first && first.positionY) ?? 50)));
@@ -1300,7 +1356,7 @@ const server = http.createServer(async (req, res) => {
         .replace(/__HERO_SIDE_BG_BOOT_Y__/g, String(y))
         .replace(/__HERO_SIDE_BG_BOOT_ZOOM__/g, String(zoom))
         .replace(/__HERO_FRAME_BOOT_URL__/g, heroFrameUrl);
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store, max-age=0' });
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' });
       serveLiveHtml(res, html);
     });
     return;
@@ -1429,7 +1485,60 @@ const server = http.createServer(async (req, res) => {
     return sendJSON(res, 200, { ok: true, revision: liveRevision() });
   }
   if (req.method === 'GET' && urlPath === '/api/settings') {
-    return sendJSON(res, 200, { ok: true, settings: loadSettings() });
+    res.setHeader('Cache-Control', 'public, max-age=120, stale-while-revalidate=600');
+    return sendJSON(res, 200, { ok: true, settings: publicSettings(loadSettings()) });
+  }
+
+  // Admin images are uploaded by the browser directly to R2. Render only signs
+  // a short-lived URL; it never receives or serves the photo bytes.
+  if (req.method === 'POST' && urlPath === '/admin/r2-image-upload') {
+    try {
+      if (!r2Ready()) return sendJSON(res, 503, { ok:false, error:'r2-not-configured', message:'Cloud image storage configured nahi hai' });
+      const body = await readBody(req, 20000);
+      const group = String(body.group || '').trim().toLowerCase();
+      const type = String(body.contentType || '').toLowerCase();
+      const validGroups = ['banner','deal','frame3d','home-frame','hero-bg','book'];
+      const ext = ({ 'image/jpeg':'jpg', 'image/jpg':'jpg', 'image/png':'png', 'image/webp':'webp' })[type];
+      if (!validGroups.includes(group) || !ext) return sendJSON(res, 400, { ok:false, error:'invalid-image' });
+      const key = 'studio-images/' + group + '/' + Date.now() + '-' + crypto.randomBytes(10).toString('hex') + '.' + ext;
+      return sendJSON(res, 200, { ok:true, key, value:'r2:' + key, uploadUrl:r2PresignedUrl('PUT', key, 900), expiresIn:900 });
+    } catch (e) {
+      console.error('admin r2 image presign', e.message);
+      return sendJSON(res, 500, { ok:false, error:'r2-upload-error' });
+    }
+  }
+
+  // One-time migration for older admin images that were stored inside settings
+  // as base64 and therefore made every Render response unnecessarily large.
+  if (req.method === 'POST' && urlPath === '/admin/migrate-images-to-r2') {
+    try {
+      if (!r2Ready()) return sendJSON(res, 503, { ok:false, error:'r2-not-configured', message:'Pehle Cloudflare R2 configure karein' });
+      const settings = loadSettings(); let moved = 0;
+      async function migrateList(list, group) {
+        if (!Array.isArray(list)) return list;
+        const next = [];
+        for (const item of list) {
+          if (typeof item === 'string') { const v = await moveDataImageToR2(item, group); if (v !== item) moved++; next.push(v); }
+          else if (item && typeof item === 'object') { const v = await moveDataImageToR2(item.url, group); if (v !== item.url) moved++; next.push({ ...item, url:v }); }
+          else next.push(item);
+        }
+        return next;
+      }
+      settings.offerImages = await migrateList(settings.offerImages, 'banner');
+      settings.frames3dPhotos = await migrateList(settings.frames3dPhotos, 'frame3d');
+      settings.homeHeroFramePhotos = await migrateList(settings.homeHeroFramePhotos, 'home-frame');
+      settings.heroSideBgPhotos = await migrateList(settings.heroSideBgPhotos, 'hero-bg');
+      settings.bookImages = settings.bookImages || {};
+      for (const key of ['wedding','birthday','personal','reel','event','other']) {
+        const old = settings.bookImages[key]; const value = await moveDataImageToR2(old, 'book');
+        if (value !== old) moved++; settings.bookImages[key] = value;
+      }
+      saveSettings(settings);
+      return sendJSON(res, 200, { ok:true, moved });
+    } catch (e) {
+      console.error('migrate images to r2', e.message);
+      return sendJSON(res, 500, { ok:false, error:'migration-failed', message:'Migration complete nahi hui; photos safe hain.' });
+    }
   }
   if (req.method === 'GET' && urlPath === '/api/notifications') {
     return sendJSON(res, 200, { ok: true, items: loadNotifs() });
@@ -2542,6 +2651,16 @@ function computeOrderFees(subtotal, settingsFees) {
     } catch (e) { return sendJSON(res, 400, { ok: false }); }
   }
 
+  // Admin-only: clear the OTP queue. This never changes customer accounts or verification status.
+  if (req.method === 'POST' && urlPath === '/admin/otp-clear') {
+    if (!isAdminAuthed(req)) return requireAdminAuth(req, res);
+    try {
+      const before = loadOtpRequests();
+      saveOtpRequests([]);
+      return sendJSON(res, 200, { ok: true, removed: before.length });
+    } catch (e) { return sendJSON(res, 400, { ok: false }); }
+  }
+
   if (req.method === 'GET' && urlPath === '/admin/backup') {
     const payload = { version: 1, exportedAt: new Date().toISOString(), accounts: loadAccounts(), codes: loadCodes(), settings: loadSettings() };
     const body = JSON.stringify(payload, null, 2);
@@ -2963,7 +3082,7 @@ function computeOrderFees(subtotal, settingsFees) {
     try {
       const body = await readBody(req, 28e6);
       const items = (Array.isArray(body.items) ? body.items : []).slice(0, 12).map((it, i) => ({
-        url: String(it.url || '').slice(0, 2.5e6),
+        url: storedMediaValue(it.url).slice(0, 2.5e6),
         title: String(it.title || ('Deal ' + (i + 1))).trim().slice(0, 80),
         sub: String(it.sub || '').trim().slice(0, 160),
         link: String(it.link || '').trim().slice(0, 300),
@@ -3200,7 +3319,7 @@ function computeOrderFees(subtotal, settingsFees) {
       const allowed = ['wedding', 'birthday', 'personal', 'reel', 'event', 'other'];
       if (!allowed.includes(key)) return sendJSON(res, 400, { ok: false, error: 'invalid-key' });
       const url = String(body.url || body.dataUrl || '').slice(0, 2.5e6);
-      if (!url || !url.startsWith('data:image/')) return sendJSON(res, 400, { ok: false, error: 'invalid-image' });
+      if (!url || (!url.startsWith('data:image/') && !(url.startsWith('r2:') && isSafeAdminR2ImageKey(url.slice(3))))) return sendJSON(res, 400, { ok: false, error: 'invalid-image' });
       const cur = loadSettings();
       cur.bookImages = cur.bookImages || {};
       cur.bookImages[key] = url;
@@ -3606,8 +3725,9 @@ loadOrdersPage();setInterval(loadOrdersPage,20000);
   if (req.method === 'GET' && urlPath === '/admin') {
     const accounts = loadAccounts().slice().reverse();
     const settings = loadSettings();
+    const settingsView = publicSettings(settings);
     const adminHidden = (settings.adminUi && settings.adminUi.hidden) || {};
-    const bi = settings.bookImages || {};
+    const bi = settingsView.bookImages || {};
     const pendingResets = accounts.filter(a => a.pinResetRequested);
     const pendingOtps = loadOtpRequests().filter(r => !r.verified);
     const codes = loadCodes().slice().reverse();
@@ -4003,6 +4123,11 @@ label.muted{display:block;font-size:12px;margin-bottom:2px}
 <button class="gen-btn" type="button" onclick="adminUploadBanners()">📤 Upload (jitni select ki)</button>
 <p id="bannerUploadStatus" class="muted"></p>
 </div>
+<div style="margin-top:4px;padding:12px;border:1px solid rgba(34,211,238,.38);border-radius:10px;background:#102433">
+<b style="color:#67e8f9">☁️ Cloud storage migration</b><p class="muted" style="margin:6px 0">Purani embedded photos ko ek baar Cloudflare R2 par move karein. Iske baad photos Render bandwidth use nahi karengi.</p>
+<button type="button" class="gen-btn" style="background:#0e7490" onclick="adminMigrateImagesToR2()">☁️ Move existing photos to cloud</button>
+<span id="r2MigrateStatus" class="muted" style="margin-left:8px"></span>
+</div>
 </section>
 
 <section class="panel" id="sec-home-deals">
@@ -4015,7 +4140,7 @@ label.muted{display:block;font-size:12px;margin-bottom:2px}
 </div>
 <div id="homeDealsEditor"></div>
 <p id="homeDealsStatus" class="muted"></p>
-<script>window.__HOME_DEALS__=${JSON.stringify(settings.offerImages || []).replace(/</g, '\\u003c')};</script>
+<script>window.__HOME_DEALS__=${JSON.stringify(settingsView.offerImages || []).replace(/</g, '\\u003c')};</script>
 </section>
 
 <section class="panel" id="sec-login-promo">
@@ -4056,7 +4181,7 @@ label.muted{display:block;font-size:12px;margin-bottom:2px}
 <p class="muted">Abhi: <b>${(settings.heroSideBgPhotos||[]).length}</b> / 6 · Duration: <b>${settings.heroSideBgDurationSec||5}</b>s</p>
 <div style="display:flex;flex-wrap:wrap;gap:10px;margin:12px 0">
 ${(function(){
-  const list = settings.heroSideBgPhotos || [];
+  const list = settingsView.heroSideBgPhotos || [];
   if (!list.length) return '<span class="muted">Abhi koi photo nahi — neeche se upload karo</span>';
   return list.map((p,i)=>{
     const u = typeof p === 'string' ? p : (p&&p.url)||'';
@@ -4094,7 +4219,7 @@ ${(function(){
 <p class="muted" style="margin-bottom:12px">Abhi saved: <b id="homeFrameCount">${(settings.homeHeroFramePhotos||[]).length}</b> / 5</p>
 <div id="homeFramePreview" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px">
 ${(function(){
-  const list = settings.homeHeroFramePhotos || [];
+  const list = settingsView.homeHeroFramePhotos || [];
   if (!list.length) return '<span class="muted">Abhi koi photo nahi — neeche se 5 tak upload karo</span>';
   return list.map((p,i) => {
     const u = (typeof p === 'string' ? p : (p && p.url)) || '';
@@ -4155,7 +4280,11 @@ document.querySelectorAll('.book-up-btn').forEach(function(btn){
 </section>
 
 <section class="panel" id="sec-otp">
-<h2 id="h2Otp">📱 Spin OTP <span class="badge">${pendingOtps.length}</span></h2>
+<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+<h2 id="h2Otp" style="margin:0">📱 Spin OTP <span class="badge">${pendingOtps.length}</span></h2>
+<button type="button" class="gen-btn" style="background:#7f1d1d;color:#fecaca;border:1px solid #ef4444" onclick="adminClearOtps()">🧹 Clear all OTP requests</button>
+</div>
+<p class="muted" style="margin:8px 0 12px">Isse sirf OTP request list clean hogi; customer accounts delete nahi honge.</p>
 <div id="otpLiveBox">${otpCards}</div>
 <h2 id="h2Pin" style="margin-top:20px">⚠️ PIN Reset <span class="badge">${pendingResets.length}</span></h2>
 <div id="pinLiveBox">${resetCards}</div>
@@ -4507,6 +4636,25 @@ async function pollLive() {
   }
 }
 
+async function adminClearOtps() {
+  if (!confirm('Sabhi pending OTP requests clean ho jayengi.\\nCustomer accounts par koi asar nahi hoga. Continue?')) return;
+  try {
+    var res = await fetch('/admin/otp-clear', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    var data = await res.json();
+    if (!res.ok || !data.ok) throw new Error('clear failed');
+    renderOtps([]);
+    setCount('cntOtp', 0);
+    var otpHeading = document.getElementById('h2Otp');
+    if (otpHeading) otpHeading.innerHTML = '📱 Spin OTP <span class="badge">0</span>';
+    alert((data.removed || 0) + ' OTP request(s) clean ho gaye.');
+  } catch (e) {
+    alert('OTP requests clean nahi ho paaye. Dobara try karein.');
+  }
+}
+
 // Unlock audio on first click (browser policy)
 document.addEventListener('click', function once() {
   try {
@@ -4534,13 +4682,8 @@ async function adminUploadBanners() {
     for (var i = 0; i < files.length; i++) {
       var f = files[i];
       if (f.size > 2.2e6) { alert(f.name + ' 2MB se chhoti rakho'); return; }
-      var dataUrl = await new Promise(function(resolve, reject) {
-        var r = new FileReader();
-        r.onload = function() { resolve(r.result); };
-        r.onerror = reject;
-        r.readAsDataURL(f);
-      });
-      items.push({ url: dataUrl, title: title, sub: sub });
+      var dataUrl = await compressImageFile(f, 1400, 0.80);
+      items.push({ url: await uploadAdminImageToR2(dataUrl, 'banner'), title: title, sub: sub });
     }
     var res = await fetch('/admin/banner-upload', {
       method: 'POST', credentials: 'same-origin',
@@ -4555,6 +4698,23 @@ async function adminUploadBanners() {
   } catch (e) {
     status.textContent = 'Error';
     alert('Network error');
+  }
+}
+
+async function adminMigrateImagesToR2() {
+  if (!confirm('Purani embedded photos Cloudflare R2 par move hongi. Iske baad page lightweight hoga. Continue?')) return;
+  var status = document.getElementById('r2MigrateStatus');
+  if (status) status.textContent = 'Photos cloud par move ho rahi hain…';
+  try {
+    var res = await fetch('/admin/migrate-images-to-r2', { method:'POST', credentials:'same-origin' });
+    var data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.message || data.error || 'Migration fail');
+    if (status) status.textContent = '✅ ' + data.moved + ' photo(s) R2 par move ho gayi.';
+    alert(data.moved + ' existing photo(s) cloud par move ho gayi. Page reload ho raha hai.');
+    location.reload();
+  } catch (e) {
+    if (status) status.textContent = '❌ ' + (e.message || 'Migration fail');
+    alert('Cloud migration fail hui. R2 configuration check karein.');
   }
 }
 
@@ -4607,7 +4767,7 @@ async function adminDealImage(input, index) {
   if (!/^image\\//.test(file.type) || file.size > 2.2e6) { alert('Sirf image file aur 2MB se chhoti photo choose karein'); input.value = ''; return; }
   try {
     var dataUrl = typeof compressImageFile === 'function' ? await compressImageFile(file, 1100, 0.82) : await new Promise(function(resolve, reject) { var reader = new FileReader(); reader.onload = function(){ resolve(reader.result); }; reader.onerror = reject; reader.readAsDataURL(file); });
-    _homeDeals[index].url = dataUrl;
+    _homeDeals[index].url = await uploadAdminImageToR2(dataUrl, 'deal');
     var preview = document.getElementById('dealPreview' + index);
     if (preview) preview.innerHTML = '<img src="' + dealText(dataUrl) + '" style="width:100%;height:110px;object-fit:cover;border-radius:9px;border:1px solid #6b5522">';
   } catch (e) { alert('Photo process nahi ho paayi — doosri photo try karein'); }
@@ -4646,13 +4806,8 @@ async function adminUpload3dPhotos() {
     for (var i = 0; i < files.length; i++) {
       var f = files[i];
       if (f.size > 2.2e6) { alert(f.name + ' 2MB se chhoti rakho'); return; }
-      var dataUrl = await new Promise(function(resolve, reject) {
-        var r = new FileReader();
-        r.onload = function() { resolve(r.result); };
-        r.onerror = reject;
-        r.readAsDataURL(f);
-      });
-      items.push({ url: dataUrl, title: f.name });
+      var dataUrl = await compressImageFile(f, 1400, 0.80);
+      items.push({ url: await uploadAdminImageToR2(dataUrl, 'frame3d'), title: f.name });
     }
     var res = await fetch('/admin/frames3d-upload', {
       method: 'POST', credentials: 'same-origin',
@@ -4717,6 +4872,18 @@ function compressImageFile(file, maxW, quality) {
     r.readAsDataURL(file);
   });
 }
+async function uploadAdminImageToR2(dataUrl, group) {
+  var blob = await fetch(dataUrl).then(function(r) { return r.blob(); });
+  var signRes = await fetch('/admin/r2-image-upload', {
+    method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ group: group, contentType: blob.type || 'image/jpeg' })
+  });
+  var signed = await signRes.json();
+  if (!signRes.ok || !signed.ok) throw new Error(signed.message || signed.error || 'Cloud upload link fail');
+  var put = await fetch(signed.uploadUrl, { method: 'PUT', headers: { 'Content-Type': blob.type || 'image/jpeg' }, body: blob });
+  if (!put.ok) throw new Error('Cloud photo upload fail (HTTP ' + put.status + ')');
+  return signed.value;
+}
 async function adminUploadHomeFrame() {
   var input = document.getElementById('homeFrameFiles');
   var status = document.getElementById('homeFrameStatus');
@@ -4730,7 +4897,7 @@ async function adminUploadHomeFrame() {
     for (var i = 0; i < files.length; i++) {
       status.textContent = 'Photo ' + (i+1) + '/' + files.length + '…';
       var dataUrl = await compressImageFile(files[i], 1200, 0.82);
-      items.push({ url: dataUrl, title: files[i].name || ('Photo ' + (i+1)) });
+      items.push({ url: await uploadAdminImageToR2(dataUrl, 'home-frame'), title: files[i].name || ('Photo ' + (i+1)) });
     }
     var res = await fetch('/admin/home-hero-frame-upload', {
       method: 'POST', credentials: 'same-origin',
@@ -4772,7 +4939,7 @@ async function adminUploadHeroSideBg() {
     for (var i = 0; i < files.length; i++) {
       status.textContent = 'Photo ' + (i+1) + '/' + files.length + '…';
       var dataUrl = await compressImageFile(files[i], 1400, 0.8);
-      items.push({ url: dataUrl, title: files[i].name });
+      items.push({ url: await uploadAdminImageToR2(dataUrl, 'hero-bg'), title: files[i].name });
     }
     var res = await fetch('/admin/hero-side-bg-upload', {
       method: 'POST', credentials: 'same-origin',
@@ -4846,7 +5013,7 @@ async function adminUploadBookImage(key) {
     var res = await fetch('/admin/book-image-upload', {
       method: 'POST', credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key: key, url: dataUrl })
+      body: JSON.stringify({ key: key, url: await uploadAdminImageToR2(dataUrl, 'book') })
     });
     var data = await res.json();
     if (!data.ok) {
