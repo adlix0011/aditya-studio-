@@ -5624,6 +5624,30 @@ function adminShowAllSections() {
   alert('All sections visible');
 }
 
+// Save/delete ke baad admin page ko hamesha usi jagah wapas laao jahan admin
+// kaam kar raha tha. Native form submits aur JS reload dono pagehide se cover hote hain.
+(function keepAdminScrollPosition(){
+  var key = 'aditya_admin_scroll_position_v1';
+  function save(){
+    try { sessionStorage.setItem(key, JSON.stringify({ y: window.scrollY || window.pageYOffset || 0, at: Date.now() })); } catch (e) {}
+  }
+  function restore(){
+    try {
+      var row = JSON.parse(sessionStorage.getItem(key) || 'null');
+      if (!row || !Number.isFinite(Number(row.y)) || Date.now() - Number(row.at || 0) > 10 * 60 * 1000) return;
+      sessionStorage.removeItem(key);
+      requestAnimationFrame(function(){ requestAnimationFrame(function(){ window.scrollTo(0, Number(row.y)); }); });
+    } catch (e) {}
+  }
+  window.addEventListener('pagehide', save);
+  document.addEventListener('submit', save, true);
+  document.addEventListener('click', function(e){
+    var link = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+    if (link && !String(link.getAttribute('href') || '').startsWith('#')) { try { sessionStorage.removeItem(key); } catch (_) {} }
+  });
+  restore();
+})();
+
 adminInitUi();
 
 
