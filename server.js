@@ -1288,6 +1288,9 @@ const server = http.createServer(async (req, res) => {
       const first = (settings.heroSideBgPhotos || [])[0] || {};
       const rawUrl = typeof first === 'string' ? first : String(first.url || '');
       const safeUrl = rawUrl.replace(/["'<>]/g, '');
+      const heroFrameFirst = (settings.homeHeroFramePhotos || [])[0] || '';
+      const heroFrameRawUrl = typeof heroFrameFirst === 'string' ? heroFrameFirst : String(heroFrameFirst.url || '');
+      const heroFrameUrl = heroFrameRawUrl.replace(/["'<>]/g, '');
       const x = Math.max(0, Math.min(100, Number((first && first.positionX) ?? 50)));
       const y = Math.max(0, Math.min(100, Number((first && first.positionY) ?? 50)));
       const zoom = Math.max(1, Math.min(2.5, Number((first && first.zoom) || 1)));
@@ -1295,7 +1298,8 @@ const server = http.createServer(async (req, res) => {
         .replace(/__HERO_SIDE_BG_BOOT_URL__/g, safeUrl)
         .replace(/__HERO_SIDE_BG_BOOT_X__/g, String(x))
         .replace(/__HERO_SIDE_BG_BOOT_Y__/g, String(y))
-        .replace(/__HERO_SIDE_BG_BOOT_ZOOM__/g, String(zoom));
+        .replace(/__HERO_SIDE_BG_BOOT_ZOOM__/g, String(zoom))
+        .replace(/__HERO_FRAME_BOOT_URL__/g, heroFrameUrl);
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store, max-age=0' });
       serveLiveHtml(res, html);
     });
