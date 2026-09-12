@@ -1485,7 +1485,9 @@ const server = http.createServer(async (req, res) => {
     return sendJSON(res, 200, { ok: true, revision: liveRevision() });
   }
   if (req.method === 'GET' && urlPath === '/api/settings') {
-    res.setHeader('Cache-Control', 'public, max-age=120, stale-while-revalidate=600');
+    // Keep settings short-cached: image bytes remain cached in R2, while admin
+    // crop/text changes become visible to customers quickly after refresh.
+    res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
     return sendJSON(res, 200, { ok: true, settings: publicSettings(loadSettings()) });
   }
 
@@ -4190,11 +4192,11 @@ ${(function(){
     const y = Math.max(0, Math.min(100, Number((p&&p.positionY) ?? 50)));
     const z = Math.max(1, Math.min(2.5, Number((p&&p.zoom) || 1)));
     return '<div style="width:220px;border:1px solid rgba(212,175,55,.4);border-radius:9px;padding:7px;background:#15120b">'
-      + '<div style="height:126px;border-radius:6px;overflow:hidden;outline:1px solid rgba(125,211,252,.5)"><div style="height:126px;background-image:url(\''+esc(u).replace(/'/g,'%27')+'\');background-size:cover;background-position:'+x+'% '+y+'%;transform:scale('+z+');transform-origin:'+x+'% '+y+'%"></div></div>'
+      + '<div style="height:126px;border-radius:6px;overflow:hidden;outline:1px solid rgba(125,211,252,.5);position:relative;background:#111"><div id="heroBgPreview'+i+'" style="position:absolute;inset:0;background-image:url(\''+esc(u).replace(/'/g,'%27')+'\');background-size:cover;background-position:'+x+'% '+y+'%;transform:scale('+z+');transform-origin:center"></div></div>'
       + '<div style="font-size:11px;color:#f2ca50;margin-top:8px">#'+(i+1)+' · Home hero ka same crop</div>'
-      + '<label class="muted" style="display:block;font-size:10px">Left / Right <input type="range" id="heroBgX'+i+'" min="0" max="100" value="'+x+'"></label>'
-      + '<label class="muted" style="display:block;font-size:10px">Up / Down <input type="range" id="heroBgY'+i+'" min="0" max="100" value="'+y+'"></label>'
-      + '<label class="muted" style="display:block;font-size:10px">Zoom <input type="range" id="heroBgZ'+i+'" min="100" max="250" value="'+Math.round(z*100)+'"></label>'
+      + '<label class="muted" style="display:block;font-size:10px">Left / Right <b id="heroBgXVal'+i+'">'+x+'%</b><input type="range" id="heroBgX'+i+'" min="0" max="100" value="'+x+'" oninput="adminPreviewHeroBgCrop('+i+')"></label>'
+      + '<label class="muted" style="display:block;font-size:10px">Up / Down <b id="heroBgYVal'+i+'">'+y+'%</b><input type="range" id="heroBgY'+i+'" min="0" max="100" value="'+y+'" oninput="adminPreviewHeroBgCrop('+i+')"></label>'
+      + '<label class="muted" style="display:block;font-size:10px">Zoom <b id="heroBgZVal'+i+'">'+Math.round(z*100)+'%</b><input type="range" id="heroBgZ'+i+'" min="100" max="250" value="'+Math.round(z*100)+'" oninput="adminPreviewHeroBgCrop('+i+')"></label>'
       + '<button type="button" onclick="adminSaveHeroBgCrop('+i+')" style="margin-top:6px;width:100%;padding:6px;border:1px solid #38bdf8;border-radius:6px;background:#0c2636;color:#bae6fd;font-weight:700;cursor:pointer">✥ Save Photo Adjustment</button></div>';
   }).join('');
 })()}
@@ -4968,6 +4970,20 @@ async function adminSaveHeroBgDuration() {
   var st = document.getElementById('heroBgStatus');
   if (st) st.textContent = data.ok ? ('Duration: ' + data.durationSec + 's saved') : 'Fail';
 }
+function adminPreviewHeroBgCrop(index) {
+  var x = Number((document.getElementById('heroBgX' + index) || {}).value || 50);
+  var y = Number((document.getElementById('heroBgY' + index) || {}).value || 50);
+  var zoom = Number((document.getElementById('heroBgZ' + index) || {}).value || 100) / 100;
+  var preview = document.getElementById('heroBgPreview' + index);
+  if (preview) {
+    preview.style.backgroundPosition = x + '% ' + y + '%';
+    preview.style.transform = 'scale(' + zoom + ')';
+  }
+  var xv = document.getElementById('heroBgXVal' + index), yv = document.getElementById('heroBgYVal' + index), zv = document.getElementById('heroBgZVal' + index);
+  if (xv) xv.textContent = Math.round(x) + '%';
+  if (yv) yv.textContent = Math.round(y) + '%';
+  if (zv) zv.textContent = Math.round(zoom * 100) + '%';
+}
 async function adminSaveHeroBgCrop(index) {
   var x = Number((document.getElementById('heroBgX' + index) || {}).value || 50);
   var y = Number((document.getElementById('heroBgY' + index) || {}).value || 50);
@@ -4978,8 +4994,8 @@ async function adminSaveHeroBgCrop(index) {
     var res = await fetch('/admin/hero-side-bg-adjust', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ index:index, positionX:x, positionY:y, zoom:zoom }) });
     var data = await res.json();
     if (!data.ok) throw new Error('Save fail');
-    if (status) status.textContent = '✅ Photo ' + (index + 1) + ' crop saved — Home page par same view dikhega.';
-    setTimeout(function(){ location.reload(); }, 450);
+    adminPreviewHeroBgCrop(index);
+    if (status) status.textContent = '✅ Photo ' + (index + 1) + ' adjustment saved — Home page refresh par same view dikhega.';
   } catch (e) { if (status) status.textContent = 'Adjustment save nahi hua'; }
 }
 async function adminClearHeroSideBg() {
