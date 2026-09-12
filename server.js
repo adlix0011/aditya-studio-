@@ -3276,6 +3276,22 @@ function computeOrderFees(subtotal, settingsFees) {
     }
   }
 
+  // Admin-only cleanup for test registrations. Verified customers are never included.
+  if (req.method === 'POST' && urlPath === '/admin/delete-unverified-accounts') {
+    try {
+      const accounts = loadAccounts();
+      const kept = accounts.filter(a => !!a.mobileVerified);
+      const removed = accounts.length - kept.length;
+      if (removed) saveAccounts(kept);
+      console.log('Unverified test accounts deleted:', removed);
+      res.writeHead(302, { Location: '/admin?cleanup=' + removed + '#sec-customers' });
+      return res.end();
+    } catch (e) {
+      res.writeHead(302, { Location: '/admin?cleanup=fail#sec-customers' });
+      return res.end();
+    }
+  }
+
   if (req.method === 'POST' && urlPath === '/admin/verify-account') {
     try {
       const body = await readFormBody(req);
@@ -4177,6 +4193,9 @@ document.querySelectorAll('.book-up-btn').forEach(function(btn){
 
 <section class="panel" id="sec-customers">
 <h2>👥 Customers <span class="badge">${accounts.length}</span></h2>
+<form method="POST" action="/admin/delete-unverified-accounts" style="margin:0 0 12px" onsubmit="return confirm('Sab unverified test accounts delete honge. Verified accounts safe rahenge. Continue?')">
+<button type="submit" style="padding:9px 13px;border-radius:8px;border:1px solid #7f1d1d;background:#5a1a1a;color:#fecaca;font-weight:800;cursor:pointer">🧹 Remove all unverified test accounts (${accounts.filter(a => !a.mobileVerified).length})</button>
+</form>
 <input id="search" type="search" placeholder="Search name / mobile / ID…" oninput="filterAcc(this.value)">
 <div id="accList">${rows}</div>
 </section>
