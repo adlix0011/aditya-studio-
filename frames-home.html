@@ -865,6 +865,14 @@ tailwind.config = {
           </div>
         </div>
 
+        <label id="wallet-payment-option" class="hidden cursor-pointer rounded-DEFAULT border border-cyan-300/45 bg-cyan-950/25 p-3" style="box-shadow:0 0 16px rgba(34,211,238,.13)">
+          <span class="flex items-center gap-3">
+            <input id="use-wallet-check" type="checkbox" class="h-5 w-5 accent-cyan-400"/>
+            <span class="flex-1"><b class="block text-cyan-100">💳 Wallet se pay karein</b><span class="text-xs text-cyan-100/70">Available: ₹<span id="wallet-pay-balance">0</span> · pehle wallet balance use hoga</span></span>
+          </span>
+          <span id="wallet-pay-summary" class="hidden mt-2 text-xs font-bold text-cyan-200"></span>
+        </label>
+
         <button id="pay-order-btn" type="button" class="w-full py-3 bg-secondary text-on-secondary font-body-lg text-body-lg rounded-DEFAULT hover:bg-secondary-fixed transition-colors gallery-shadow">
           Pay Total Amount
         </button>
@@ -1499,6 +1507,35 @@ function frameFinalPrice(frame) {
 
 const ADDR_KEY = "aditya_studio_saved_address";
 
+function currentOrderTotal() {
+  const base = frameFinalPrice(selectedFrame).finalPrice;
+  return base + (Number(selectedQuality.extra) || 0);
+}
+function walletPaymentInfo(total) {
+  const selected = !!document.getElementById("use-wallet-check")?.checked;
+  const balance = Math.max(0, Number((framesUser && framesUser.walletBalance) || 0));
+  const walletPaid = selected ? Math.min(balance, total) : 0;
+  return { selected, balance, walletPaid, due: Math.max(0, total - walletPaid) };
+}
+function refreshWalletPaymentUI(total) {
+  const option = document.getElementById("wallet-payment-option");
+  const check = document.getElementById("use-wallet-check");
+  const balance = Math.max(0, Number((framesUser && framesUser.walletBalance) || 0));
+  if (!option || !check) return { selected:false, walletPaid:0, due:total };
+  option.classList.toggle("hidden", balance <= 0);
+  if (balance <= 0) { check.checked = false; return { selected:false, walletPaid:0, due:total }; }
+  document.getElementById("wallet-pay-balance").textContent = String(balance);
+  const info = walletPaymentInfo(total);
+  const summary = document.getElementById("wallet-pay-summary");
+  if (summary) {
+    summary.classList.toggle("hidden", !info.selected);
+    summary.textContent = info.due > 0 ? ("Wallet ₹" + info.walletPaid + " use hoga · UPI se ₹" + info.due + " pay karein") : ("✅ Poora ₹" + info.walletPaid + " wallet se pay hoga — UPI ki zarurat nahi");
+  }
+  document.getElementById("qr-amount-label").textContent = formatPrice(info.due);
+  document.getElementById("pay-order-btn").textContent = info.due > 0 ? (info.walletPaid ? "Pay Remaining ₹" + info.due : "Pay Total Amount") : "✅ Wallet se Submit Order";
+  return info;
+}
+
 function loadSavedAddress() {
   try {
     return JSON.parse(localStorage.getItem(ADDR_KEY) || "null");
@@ -1531,7 +1568,7 @@ function fillAddressForm(data) {
 function showPaymentSection() {
   const { price, discount, finalPrice } = frameFinalPrice(selectedFrame);
   const extra = Number(selectedQuality.extra) || 0;
-  const total = finalPrice + extra;
+  const total = currentOrderTotal();
   const dims = displayDims(selectedFrame.size);
   document.getElementById("op-mrp").textContent = formatPrice(price) + (extra ? " + " + formatPrice(extra) + " (" + selectedQuality.label + ")" : "");
   document.getElementById("op-disc").textContent = discount > 0 ? (discount + "% OFF (−" + formatPrice(price - finalPrice) + ")") : "No discount";
@@ -1553,7 +1590,8 @@ function showPaymentSection() {
   document.getElementById("paid-claim-btn").disabled = false;
   document.getElementById("paid-claim-btn").textContent = "Maine Pay Kar Diya";
   document.getElementById("saved-address-badge").classList.remove("hidden");
-  document.getElementById("order-flow-hint").textContent = "Ab Pay Total Amount dabao → QR scan → Submit";
+  const walletInfo = refreshWalletPaymentUI(total);
+  document.getElementById("order-flow-hint").textContent = walletInfo.selected && walletInfo.due <= 0 ? "Wallet balance se poora payment hoga → Submit Order dabayein" : "Payment option choose karein → QR pay → Submit";
   paymentClaimed = false;
 }
 
@@ -1651,8 +1689,24 @@ document.getElementById("save-address-btn").addEventListener("click", () => {
   document.getElementById("payment-section").scrollIntoView({ behavior: "smooth", block: "nearest" });
 });
 
+document.getElementById("use-wallet-check")?.addEventListener("change", function () {
+  const info = refreshWalletPaymentUI(currentOrderTotal());
+  document.getElementById("qr-pay-box").classList.add("hidden");
+  document.getElementById("submit-order-btn").classList.add("hidden");
+  document.getElementById("pay-order-btn").classList.remove("hidden");
+  paymentClaimed = false;
+  document.getElementById("order-flow-hint").textContent = info.selected && info.due <= 0 ? "Wallet balance se poora payment hoga → Submit Order dabayein" : "Payment option choose karein → QR pay → Submit";
+});
+
 document.getElementById("pay-order-btn").addEventListener("click", () => {
   if (!validateOrderForm()) return;
+  const walletInfo = walletPaymentInfo(currentOrderTotal());
+  if (walletInfo.selected && walletInfo.due <= 0) {
+    document.getElementById("pay-order-btn").classList.add("hidden");
+    document.getElementById("submit-order-btn").classList.remove("hidden");
+    document.getElementById("order-flow-hint").textContent = "✅ Poora payment wallet se hoga. Submit Order dabayein.";
+    return;
+  }
   document.getElementById("qr-pay-box").classList.remove("hidden");
   document.getElementById("pay-order-btn").classList.add("hidden");
   document.getElementById("order-flow-hint").textContent = "QR scan karke pay karo, phir “Maine Pay Kar Diya” dabao.";
@@ -1706,18 +1760,20 @@ document.getElementById("pay-ss").addEventListener("change", async function(e) {
 document.getElementById("submit-order-btn").addEventListener("click", async () => {
   const form = validateOrderForm();
   if (!form) return;
-  if (!paymentClaimed) {
+  const walletInfo = walletPaymentInfo(currentOrderTotal());
+  const needsUpiPayment = !walletInfo.selected || walletInfo.due > 0;
+  if (needsUpiPayment && !paymentClaimed) {
     document.getElementById("order-error").textContent = "Pehle Pay karke QR se payment claim karo.";
     document.getElementById("order-error").classList.remove("hidden");
     return;
   }
   const utr = String((document.getElementById("pay-utr") || {}).value || "").trim();
-  if (utr.length < 6) {
+  if (needsUpiPayment && utr.length < 6) {
     document.getElementById("order-error").textContent = "UTR / UPI transaction ID likho (kam se kam 6 character).";
     document.getElementById("order-error").classList.remove("hidden");
     return;
   }
-  if (!payScreenshotData) {
+  if (needsUpiPayment && !payScreenshotData) {
     document.getElementById("order-error").textContent = "Payment screenshot upload karo.";
     document.getElementById("order-error").classList.remove("hidden");
     return;
@@ -1744,10 +1800,10 @@ document.getElementById("submit-order-btn").addEventListener("click", async () =
         ? ("Photo crop: zoom " + Math.round((photoZoom || 1) * 100) + "% · pan " +
            Math.round((photoPanX || 0.5) * 100) + "%x " + Math.round((photoPanY || 0.5) * 100) + "%y")
         : "",
-      "Payment claimed · UTR: " + utr
+      walletInfo.selected ? ("Wallet payment: ₹" + walletInfo.walletPaid) : "",
+      needsUpiPayment ? ("UPI payment claimed · UTR: " + utr) : "Paid fully via wallet"
     ].filter(Boolean).join(" | ");
 
-    const useWallet = !!(framesUser && Number(framesUser.walletBalance) > 0);
     const res = await fetch("/api/frame-order", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1761,12 +1817,12 @@ document.getElementById("submit-order-btn").addEventListener("click", async () =
         state: form.state,
         pincode: form.pincode,
         note: fullNote,
-        paymentClaimed: true,
-        utr: utr,
-        paymentScreenshot: payScreenshotData,
+        paymentClaimed: needsUpiPayment && paymentClaimed,
+        utr: needsUpiPayment ? utr : "",
+        paymentScreenshot: needsUpiPayment ? payScreenshotData : "",
       customerPhoto: "",
       customerPhotoKey: customerPhotoKey || "",
-        useWallet,
+        useWallet: walletInfo.selected,
         sessionToken: (frLoadSession() || {}).sessionToken || ""
       })
     });
