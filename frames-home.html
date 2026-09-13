@@ -587,6 +587,10 @@ tailwind.config = {
           <p class="font-medium text-on-surface group-hover:text-secondary transition-colors">Upload Your Photo</p>
           <input accept="image/*" class="hidden" id="main-upload" type="file"/>
         </div>
+        <div id="upload-progress-box" class="hidden mt-3 max-w-md mx-auto text-left">
+          <div class="flex justify-between text-xs mb-1"><span id="upload-progress-label">Photo ready kar rahe hain…</span><b id="upload-progress-value">0%</b></div>
+          <div class="h-2 rounded-full overflow-hidden" style="background:#2a2418"><div id="upload-progress-bar" class="h-full rounded-full transition-all duration-200" style="width:0%;background:linear-gradient(90deg,#22c55e,#38bdf8)"></div></div>
+        </div>
 
         <!-- Upload ke baad yahin live 3D preview aur controls aayenge -->
         <div id="uploaded-photo-flow" class="hidden mt-5 text-left">
@@ -1038,11 +1042,27 @@ function showToast(msg, ms = 3500) {
   t.textContent = msg;
   t.classList.remove("hidden");
   setTimeout(() => t.classList.add("hidden"), ms);
+  try { const A=window.AudioContext||window.webkitAudioContext, c=new A(), o=c.createOscillator(), g=c.createGain(); o.frequency.value=740; g.gain.setValueAtTime(.035,c.currentTime); g.gain.exponentialRampToValueAtTime(.001,c.currentTime+.14); o.connect(g); g.connect(c.destination); o.start(); o.stop(c.currentTime+.15); } catch (e) {}
+}
+
+function setUploadProgress(percent, label) {
+  const box=document.getElementById('upload-progress-box'), bar=document.getElementById('upload-progress-bar'), value=document.getElementById('upload-progress-value'), text=document.getElementById('upload-progress-label');
+  const p=Math.max(0,Math.min(100,Math.round(Number(percent)||0)));
+  if(box) box.classList.remove('hidden'); if(bar) bar.style.width=p+'%'; if(value) value.textContent=p+'%'; if(text&&label) text.textContent=label;
 }
 
 // ========== Load frames from API ==========
 async function loadFrames() {
   const grid = document.getElementById("frames-grid");
+  const cacheKey = 'aditya_frame_cards_cache_v2';
+  let hadCache = false;
+  try {
+    const cached = JSON.parse(sessionStorage.getItem(cacheKey) || 'null');
+    if (Array.isArray(cached) && cached.length) {
+      allFrames = cached.filter(f => f.active !== false && f.showOnFramePage !== false && f.manualUnavailable !== true && Number(f.stockQuantity == null ? 1 : f.stockQuantity) > 0).map(f => ({ ...f, discount:Number(f.discountPercent)||0, image:f.imageUrl||'' }));
+      hadCache = true; renderSizeFilter(); renderFrames();
+    }
+  } catch (e) {}
   try {
     const res = await fetch("/api/frames");
     const data = await res.json();
@@ -1052,8 +1072,9 @@ async function loadFrames() {
       discount: Number(f.discountPercent) || 0,
       image: f.imageData || f.imageUrl || ""
     }));
+    try { sessionStorage.setItem(cacheKey, JSON.stringify(list.map(f => ({ ...f, imageData:'', imageUrl:f.imageUrl || '' })))); } catch (e) {}
   } catch (e) {
-    allFrames = [];
+    if (!hadCache) allFrames = [];
   }
 
   // Never show demo / seeded frames — only real admin uploads
@@ -2456,6 +2477,7 @@ async function ensureCustomerPhotoInR2() {
     throw new Error("Photo upload ke liye pehle apne account se login karein.");
   }
   let compactDataUrl = userPhotoDataUrl;
+  setUploadProgress(5, 'Photo compress ho rahi hai…');
   if (userPhotoFile) compactDataUrl = await compressImage(userPhotoFile, 1600, 0.8);
   const photoBlob = await (await fetch(compactDataUrl)).blob();
   if (!photoBlob.size || photoBlob.size > 4 * 1024 * 1024) {
@@ -2475,10 +2497,11 @@ async function ensureCustomerPhotoInR2() {
     throw new Error(ticket.message || "Photo upload prepare nahi ho paya.");
   }
   try {
-    const uploadRes = await fetch(ticket.uploadUrl, {
-      method: "PUT",
-      headers: { "Content-Type": photoBlob.type || "image/jpeg" },
-      body: photoBlob
+    setUploadProgress(12, 'Cloud par upload ho raha hai…');
+    const uploadRes = await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest(); xhr.open('PUT', ticket.uploadUrl, true); xhr.setRequestHeader('Content-Type', photoBlob.type || 'image/jpeg');
+      xhr.upload.onprogress = ev => { if (ev.lengthComputable) setUploadProgress(12 + (ev.loaded / ev.total) * 85, 'Cloud par upload ho raha hai…'); };
+      xhr.onload = () => resolve({ ok: xhr.status >= 200 && xhr.status < 300 }); xhr.onerror = () => reject(new Error('Direct upload failed')); xhr.send(photoBlob);
     });
     if (!uploadRes.ok) throw new Error("Direct upload failed");
     userPhotoR2Key = ticket.key;
@@ -2494,6 +2517,8 @@ async function ensureCustomerPhotoInR2() {
     if (!backupRes.ok || !backup.ok || !backup.key) throw new Error(backup.message || "Photo Cloud storage me upload nahi ho payi. Dobara try karein.");
     userPhotoR2Key = backup.key;
   }
+  setUploadProgress(100, '✓ Photo cloud par safe save ho gayi');
+  showToast('✓ Photo upload complete');
   try { sessionStorage.setItem("as_user_photo_r2_key", userPhotoR2Key); } catch (e) {}
   return userPhotoR2Key;
 }
@@ -2513,7 +2538,10 @@ mainUploadInput.addEventListener("change", (e) => {
   userPhotoR2Key = null;
   try { sessionStorage.removeItem("as_user_photo_r2_key"); } catch (err) {}
   const reader = new FileReader();
+  setUploadProgress(0, 'Photo read ho rahi hai…');
+  reader.onprogress = (ev) => { if (ev.lengthComputable) setUploadProgress((ev.loaded / ev.total) * 100, 'Photo ready ho rahi hai…'); };
   reader.onload = (ev) => {
+    setUploadProgress(100, '✓ Photo ready — preview khul raha hai');
     userPhotoDataUrl = ev.target.result;
     photoZoom = 1;
     photoPanX = 0.5;
