@@ -1047,7 +1047,7 @@ async function loadFrames() {
     const res = await fetch("/api/frames");
     const data = await res.json();
     const list = Array.isArray(data) ? data : (data.frames || []);
-    allFrames = list.filter(f => f.active !== false).map(f => ({
+    allFrames = list.filter(f => f.active !== false && f.showOnFramePage !== false && f.manualUnavailable !== true && Number(f.stockQuantity == null ? 1 : f.stockQuantity) > 0).map(f => ({
       ...f,
       discount: Number(f.discountPercent) || 0,
       image: f.imageData || f.imageUrl || ""
@@ -1147,6 +1147,10 @@ function frameAvailableSizes(frame) {
     ? frame.availableSizes : [frame && frame.size].filter(Boolean);
 }
 
+function frameCanBook(frame) {
+  return !!frame && frame.active !== false && frame.showInBooking !== false && frame.manualUnavailable !== true && Number(frame.stockQuantity == null ? 1 : frame.stockQuantity) > 0;
+}
+
 function frameRating(frame) {
   // Real user ratings only — filhal 0 (jab users rate kare tab average dikhega)
   const r = frame && frame.rating != null ? Number(frame.rating) : 0;
@@ -1236,6 +1240,8 @@ function renderFrames(filterSize = null) {
     const price = Number(frame.price) || 0;
     const discount = Number(frame.discount) || 0;
     const finalPrice = discount > 0 ? Math.round(price * (1 - discount / 100)) : price;
+    const stock = Math.max(0, Math.floor(Number(frame.stockQuantity == null ? 1 : frame.stockQuantity)));
+    const tags = Array.isArray(frame.frameTags) ? frame.frameTags.filter(Boolean).slice(0, 3) : [];
     // Pura frame dikhe aur photo har selected size ke exact ratio me auto-fit ho.
     const isPortrait = dims.h >= dims.w;
     const frameRatio = dims.w + " / " + dims.h;
@@ -1254,6 +1260,7 @@ function renderFrames(filterSize = null) {
       </div>
       <div class="p-4 flex flex-col gap-1">
         <h4 class="font-headline-sm leading-tight text-lg mb-1"><span style="color:#f3cd63">${frame.title ? frame.title : "Premium Frame"}</span> <span class="text-sm font-bold" style="color:#63d7ff">${dims.label} · ${orientLabel}</span></h4>
+        <div class="flex flex-wrap gap-1"><span class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background:#103c26;color:#bbf7d0">🟢 ${stock} available</span>${tags.map(tag => `<span class="text-[10px] px-2 py-0.5 rounded-full" style="background:#30240e;color:#fde68a">🏷️ ${String(tag).replace(/[&<>"']/g,'')}</span>`).join('')}</div>
         <div class="mt-1 flex items-baseline gap-2 flex-wrap">
           <span class="text-secondary text-xl font-bold">${formatPrice(finalPrice)}</span>
           ${discount > 0 ? `<span class="price-strike text-on-surface-variant text-sm">${formatPrice(price)}</span>` : ""}
@@ -1319,7 +1326,7 @@ function getFrameSamples(frame) {
 
 // Same size ke saare admin frames = frame types (har ek apni photo)
 function getFrameTypesForSize(size) {
-  const list = allFrames.filter(f => f.size === size && f.active !== false);
+  const list = allFrames.filter(f => frameAvailableSizes(f).includes(size) && frameCanBook(f));
   if (list.length) return list;
   return selectedFrame ? [selectedFrame] : [];
 }

@@ -362,7 +362,7 @@ function renderTypes() {
   if (!box || !selected) return;
   const types = allFrames.filter(f => {
     const sizes = Array.isArray(f.availableSizes) && f.availableSizes.length ? f.availableSizes : [f.size];
-    return sizes.includes(selected.size);
+    return sizes.includes(selected.size) && f.showInBooking !== false && f.manualUnavailable !== true && Number(f.stockQuantity == null ? 1 : f.stockQuantity) > 0;
   });
   box.innerHTML = types.map(t => {
     const active = String(t.id) === String(selected.id);
@@ -422,7 +422,7 @@ async function load() {
     const res = await fetch("/api/frames");
     const data = await res.json();
     const list = (data.frames || data || []);
-    allFrames = (Array.isArray(list) ? list : []).filter(f => f.active !== false).map(f => ({
+    allFrames = (Array.isArray(list) ? list : []).filter(f => f.active !== false && f.showOnFramePage !== false && f.manualUnavailable !== true && Number(f.stockQuantity == null ? 1 : f.stockQuantity) > 0).map(f => ({
       ...f,
       discount: Number(f.discountPercent) || 0,
       image: f.imageData || f.imageUrl || ""

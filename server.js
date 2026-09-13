@@ -1572,6 +1572,11 @@ const server = http.createServer(async (req, res) => {
     const frames = loadFrames().map(f => ({
       id: f.id, size: f.size, availableSizes: Array.isArray(f.availableSizes) && f.availableSizes.length ? f.availableSizes : [f.size], title: f.title, price: f.price,
       discountPercent: f.discountPercent || 0, active: f.active !== false,
+      stockQuantity: Number.isFinite(Number(f.stockQuantity)) ? Math.max(0, Math.floor(Number(f.stockQuantity))) : 1,
+      manualUnavailable: f.manualUnavailable === true,
+      showOnFramePage: f.showOnFramePage !== false,
+      showInBooking: f.showInBooking !== false,
+      frameTags: Array.isArray(f.frameTags) ? f.frameTags : [],
       imageUrl: f.imageUrl || '', imageData: f.imageData || '', createdAt: f.createdAt
     }));
     return sendJSON(res, 200, { ok: true, frames });
@@ -1708,6 +1713,10 @@ function computeOrderFees(subtotal, settingsFees) {
           active: true
         };
       }
+      const frameStock = Number.isFinite(Number(frame.stockQuantity)) ? Math.max(0, Math.floor(Number(frame.stockQuantity))) : 1;
+      if (frame.manualUnavailable === true || frameStock <= 0 || frame.showInBooking === false) {
+        return sendJSON(res, 409, { ok: false, error: 'frame-unavailable', message: 'Yeh frame abhi available nahi hai. Dusra frame choose karein.' });
+      }
       const price = Number(frame.price) || 0;
       const disc = Number(frame.discountPercent) || 0;
       const qualityExtra = Math.max(0, Number(body.qualityExtra) || 0);
@@ -1798,6 +1807,11 @@ function computeOrderFees(subtotal, settingsFees) {
         deliveryDate: '', deliveryTime: '', adminNote: '',
         createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
       };
+      const storedFrameIndex = frames.findIndex(f => String(f.id) === String(frame.id));
+      if (storedFrameIndex >= 0) {
+        frames[storedFrameIndex] = Object.assign({}, frames[storedFrameIndex], { stockQuantity: Math.max(0, frameStock - 1), updatedAt: new Date().toISOString() });
+        saveFrames(frames);
+      }
       orders.unshift(order);
       saveFrameOrders(orders);
       // customer notification
@@ -2800,12 +2814,18 @@ function computeOrderFees(subtotal, settingsFees) {
       const price = Number(body.price) || 0;
       const discountPercent = Math.min(90, Math.max(0, Number(body.discountPercent != null ? body.discountPercent : body.discount) || 0));
       const active = body.active !== false && body.active !== 'false';
+      const stockQuantity = Math.max(0, Math.floor(Number(body.stockQuantity) || 0));
+      const manualUnavailable = body.manualUnavailable === true || body.manualUnavailable === 'true';
+      const showOnFramePage = body.showOnFramePage !== false && body.showOnFramePage !== 'false';
+      const showInBooking = body.showInBooking !== false && body.showInBooking !== 'false';
+      const frameTags = [...new Set((Array.isArray(body.frameTags) ? body.frameTags : String(body.frameTags || '').split(',')).map(v => String(v || '').trim().slice(0, 30)).filter(Boolean))].slice(0, 8);
       const imageData = String(body.imageData || '').slice(0, 4e6); // ~4MB base64 cap
       const imageUrl = String(body.imageUrl || '').trim();
       if (!size) return sendJSON(res, 400, { ok: false, error: 'size-required', message: 'Size required' });
       const idx = frames.findIndex(f => f.id === id);
       const row = {
         id, size, availableSizes: availableSizes.length ? availableSizes : [size], title, price, discountPercent, active,
+        stockQuantity, manualUnavailable, showOnFramePage, showInBooking, frameTags,
         imageData: imageData || (idx >= 0 ? frames[idx].imageData : '') || '',
         imageUrl: imageUrl || (idx >= 0 ? frames[idx].imageUrl : '') || '',
         createdAt: idx >= 0 ? frames[idx].createdAt : new Date().toISOString(),
@@ -4090,6 +4110,13 @@ label.muted{display:block;font-size:12px;margin-bottom:2px}
 <label class="muted">Price ₹<input class="inp" id="frPrice" type="number" min="0" placeholder="500" style="max-width:140px"></label>
 <label class="muted">Discount %<input class="inp" id="frDisc" type="number" min="0" max="90" placeholder="10" style="max-width:140px"></label>
 <label class="muted" style="display:flex;gap:8px;align-items:center;cursor:pointer"><input id="frActive" type="checkbox" checked> Order page par yeh frame type dikhayein</label>
+<label class="muted">Available pieces<input class="inp" id="frStock" type="number" min="0" step="1" value="1" style="max-width:140px"><small>Booking hone par 1 automatically kam hoga. 0 = Not Available.</small></label>
+<label class="muted">Frame tags <input class="inp" id="frTags" placeholder="Premium, Golden, Wedding"><small>Comma se alag tags. Customer ko filter/pehchan ke liye dikhenge.</small></label>
+<div class="muted" style="grid-column:1/-1;display:flex;gap:14px;flex-wrap:wrap;padding:10px;border:1px solid rgba(245,212,93,.25);border-radius:10px">
+  <label style="cursor:pointer"><input id="frManualUnavailable" type="checkbox"> 🔴 Manually Not Available</label>
+  <label style="cursor:pointer"><input id="frShowPage" type="checkbox" checked> 🖼️ Frame page par dikhayein</label>
+  <label style="cursor:pointer"><input id="frShowBooking" type="checkbox" checked> 🧾 Booking ke frame type options me dikhayein</label>
+</div>
 <div class="muted" style="grid-column:1/-1;padding:11px;border:1px solid rgba(34,211,238,.38);border-radius:10px;background:linear-gradient(135deg,#102433,#151225)">
   <b style="color:#67e8f9">✅ Available sizes — is frame type ko kin sizes me dikhana hai?</b>
   <div id="frAvailableSizes" style="display:flex;gap:7px;flex-wrap:wrap;margin-top:9px">
@@ -5138,6 +5165,11 @@ function adminCancelEditFrame() {
   var pEl = document.getElementById('frPrice'); if (pEl) pEl.value = '';
   var dEl = document.getElementById('frDisc'); if (dEl) dEl.value = '';
   var aEl = document.getElementById('frActive'); if (aEl) aEl.checked = true;
+  var stockEl = document.getElementById('frStock'); if (stockEl) stockEl.value = 1;
+  var tagsEl = document.getElementById('frTags'); if (tagsEl) tagsEl.value = '';
+  var manualEl = document.getElementById('frManualUnavailable'); if (manualEl) manualEl.checked = false;
+  var pageEl = document.getElementById('frShowPage'); if (pageEl) pageEl.checked = true;
+  var bookingEl = document.getElementById('frShowBooking'); if (bookingEl) bookingEl.checked = true;
   document.querySelectorAll('.fr-size-tick').forEach(function(box) { box.checked = box.value === ((document.getElementById('frSize') || {}).value || '8x12'); });
   if (frFileEl) frFileEl.value = '';
   _frImageData = '';
@@ -5160,6 +5192,11 @@ function adminEditFrame(id) {
   var pEl = document.getElementById('frPrice'); if (pEl) pEl.value = f.price != null ? f.price : '';
   var dEl = document.getElementById('frDisc'); if (dEl) dEl.value = f.discountPercent != null ? f.discountPercent : '';
   var aEl = document.getElementById('frActive'); if (aEl) aEl.checked = f.active !== false;
+  var stockEl = document.getElementById('frStock'); if (stockEl) stockEl.value = Number.isFinite(Number(f.stockQuantity)) ? Math.max(0, Math.floor(Number(f.stockQuantity))) : 1;
+  var tagsEl = document.getElementById('frTags'); if (tagsEl) tagsEl.value = Array.isArray(f.frameTags) ? f.frameTags.join(', ') : '';
+  var manualEl = document.getElementById('frManualUnavailable'); if (manualEl) manualEl.checked = f.manualUnavailable === true;
+  var pageEl = document.getElementById('frShowPage'); if (pageEl) pageEl.checked = f.showOnFramePage !== false;
+  var bookingEl = document.getElementById('frShowBooking'); if (bookingEl) bookingEl.checked = f.showInBooking !== false;
   if (frFileEl) frFileEl.value = '';
   _frImageData = '';
   var existing = f.imageData || f.imageUrl || '';
@@ -5182,6 +5219,11 @@ async function adminSaveFrame() {
   var price = Number((document.getElementById('frPrice') || {}).value || 0);
   var disc = Number((document.getElementById('frDisc') || {}).value || 0);
   var active = !!((document.getElementById('frActive') || {}).checked);
+  var stockQuantity = Math.max(0, Math.floor(Number((document.getElementById('frStock') || {}).value || 0)));
+  var frameTags = String((document.getElementById('frTags') || {}).value || '').split(',').map(function(v){ return v.trim(); }).filter(Boolean);
+  var manualUnavailable = !!((document.getElementById('frManualUnavailable') || {}).checked);
+  var showOnFramePage = !!((document.getElementById('frShowPage') || {}).checked);
+  var showInBooking = !!((document.getElementById('frShowBooking') || {}).checked);
   var availableSizes = Array.prototype.slice.call(document.querySelectorAll('.fr-size-tick:checked')).map(function(box) { return box.value; });
   if (availableSizes.indexOf(size) < 0) availableSizes.unshift(size);
   if (!size) return alert('Size choose karo');
@@ -5219,6 +5261,11 @@ async function adminSaveFrame() {
     title: title,
     price: price,
     discountPercent: disc,
+    stockQuantity: stockQuantity,
+    frameTags: frameTags,
+    manualUnavailable: manualUnavailable,
+    showOnFramePage: showOnFramePage,
+    showInBooking: showInBooking,
     imageData: _frImageData || '',
     active: active
   };
@@ -5339,10 +5386,18 @@ async function loadAdminFrames() {
           var fp = Math.round((Number(f.price)||0) * (1 - (Number(f.discountPercent)||0)/100));
           var hasImg = !!img;
           var fid = esc(f.id);
+          var stock = Number.isFinite(Number(f.stockQuantity)) ? Math.max(0, Math.floor(Number(f.stockQuantity))) : 1;
+          var unavailable = f.manualUnavailable === true || stock <= 0;
+          var stockTag = unavailable
+            ? '<span style="display:inline-block;margin-top:4px;padding:3px 7px;border-radius:999px;background:#4b1616;border:1px solid rgba(248,113,113,.55);color:#fecaca;font-size:10px;font-weight:800">🔴 NOT AVAILABLE'+(f.manualUnavailable === true ? ' · manual' : ' · stock 0')+'</span>'
+            : '<span style="display:inline-block;margin-top:4px;padding:3px 7px;border-radius:999px;background:#103c26;border:1px solid rgba(74,222,128,.48);color:#bbf7d0;font-size:10px;font-weight:800">🟢 '+stock+' piece available</span>';
+          var tags = Array.isArray(f.frameTags) && f.frameTags.length ? '<br><span class="muted">🏷️ '+esc(f.frameTags.join(' · '))+'</span>' : '';
+          var placements = '<br><span class="muted">'+(f.showOnFramePage === false ? '🚫 Frame page hidden' : '🖼️ Frame page')+' · '+(f.showInBooking === false ? '🚫 Booking hidden' : '🧾 Booking types')+'</span>';
           return '<div class="msg-card" style="display:flex;gap:10px;align-items:flex-start;margin-top:8px">'
             + (hasImg ? '<img src="'+img+'" style="width:56px;height:56px;object-fit:cover;border-radius:8px;background:#111">' : '<div style="width:56px;height:56px;background:#222;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#666">No photo</div>')
             + '<div class="msg-text" style="flex:1"><b>'+esc(f.title||'')+'</b> · '+esc(f.size)
             + '<br><span style="display:inline-block;margin-top:4px;padding:3px 7px;border-radius:999px;background:#102c3c;border:1px solid rgba(34,211,238,.4);color:#a5f3fc;font-size:10px;font-weight:800">✅ Available: '+esc((Array.isArray(f.availableSizes)&&f.availableSizes.length?f.availableSizes:[f.size]).join(', '))+'</span>'
+            + '<br>'+stockTag+tags+placements
             + '<br>₹'+fp+(f.discountPercent?(' <span class="muted">('+f.discountPercent+'% off, MRP ₹'+f.price+')</span>'):'')
             + '<br><span class="muted">'+(f.active===false?'Inactive':'Active')+' · '+fid+(hasImg?'':' · <span style="color:#e08a8a">photo missing</span>')+'</span></div>'
             + '<div class="msg-actions" style="display:flex;flex-direction:column;gap:6px">'
