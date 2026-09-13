@@ -998,6 +998,25 @@ const DEMO_FRAME_PRICES = {
   '16x20': 599, '16x24': 699, '20x24': 799, '20x30': 999, '20x40': 1299, '20x50': 1499,
   '24x36': 1399, '24x40': 1599, '24x50': 1899
 };
+// This is a real customer product, not a demo frame. It is created once for
+// existing installations too, so the offer is immediately visible and still
+// fully editable from Admin → Frame Types.
+const PASSPORT_36_PRODUCT = {
+  id: 'passport-36-photos',
+  size: '4x6',
+  availableSizes: ['4x6'],
+  title: '36 Passport Photos',
+  price: 200,
+  discountPercent: 50,
+  active: true,
+  stockQuantity: 999,
+  manualUnavailable: false,
+  showOnFramePage: true,
+  showInBooking: true,
+  featuredRank: -100,
+  productKind: 'passport_sheet',
+  frameTags: ['Passport Photo', '36 Photos', 'Special Offer']
+};
 function seedDemoFrames() {
   const list = Object.keys(DEMO_FRAME_PRICES).map((size, i) => ({
     id: 'demo-' + size,
@@ -1024,16 +1043,28 @@ function loadFrames() {
       return true;
     });
   }
-  if (_cache.frames) return stripDemos(_cache.frames).slice();
+  function addPassportProduct(list) {
+    const rows = stripDemos(list);
+    if (!rows.some(f => String(f.id) === PASSPORT_36_PRODUCT.id)) {
+      rows.unshift(Object.assign({}, PASSPORT_36_PRODUCT, { createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }));
+    }
+    return rows;
+  }
+  if (_cache.frames) {
+    const rows = addPassportProduct(_cache.frames);
+    if (rows.length !== _cache.frames.length) saveFrames(rows);
+    return rows.slice();
+  }
   try {
     if (fs.existsSync(FRAMES_FILE)) {
-      _cache.frames = stripDemos(JSON.parse(fs.readFileSync(FRAMES_FILE, 'utf8')) || []);
+      _cache.frames = addPassportProduct(JSON.parse(fs.readFileSync(FRAMES_FILE, 'utf8')) || []);
+      saveFrames(_cache.frames);
       return _cache.frames.slice();
     }
   } catch (e) {}
-  // No auto-seed dummy frames — only admin-uploaded frames show on site
-  _cache.frames = [];
-  return [];
+  _cache.frames = [Object.assign({}, PASSPORT_36_PRODUCT, { createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() })];
+  saveFrames(_cache.frames);
+  return _cache.frames.slice();
 }
 function saveFrames(list) {
   _cache.frames = (list || []).slice();
@@ -1596,6 +1627,8 @@ const server = http.createServer(async (req, res) => {
       manualUnavailable: f.manualUnavailable === true,
       showOnFramePage: f.showOnFramePage !== false,
       showInBooking: f.showInBooking !== false,
+      featuredRank: Number.isFinite(Number(f.featuredRank)) ? Number(f.featuredRank) : 100,
+      productKind: f.productKind || '',
       frameTags: Array.isArray(f.frameTags) ? f.frameTags : [],
       imageUrl: f.imageUrl || '', imageData: f.imageData || '', createdAt: f.createdAt
     }));
@@ -2867,6 +2900,7 @@ function computeOrderFees(subtotal, settingsFees) {
       const manualUnavailable = body.manualUnavailable === true || body.manualUnavailable === 'true';
       const showOnFramePage = body.showOnFramePage !== false && body.showOnFramePage !== 'false';
       const showInBooking = body.showInBooking !== false && body.showInBooking !== 'false';
+      const featuredRank = Math.max(-999, Math.min(999, Math.round(Number(body.featuredRank) || 100)));
       const frameTags = [...new Set((Array.isArray(body.frameTags) ? body.frameTags : String(body.frameTags || '').split(',')).map(v => String(v || '').trim().slice(0, 30)).filter(Boolean))].slice(0, 8);
       const imageData = String(body.imageData || '').slice(0, 4e6); // ~4MB base64 cap
       const imageUrl = String(body.imageUrl || '').trim();
@@ -2877,7 +2911,8 @@ function computeOrderFees(subtotal, settingsFees) {
       const idx = frames.findIndex(f => f.id === id);
       const row = {
         id, size, availableSizes: availableSizes.length ? availableSizes : [size], title, price, discountPercent, active,
-        stockQuantity, manualUnavailable, showOnFramePage, showInBooking, frameTags,
+        stockQuantity, manualUnavailable, showOnFramePage, showInBooking, featuredRank, frameTags,
+        productKind: idx >= 0 ? (frames[idx].productKind || '') : '',
         imageData: imageData || (idx >= 0 ? frames[idx].imageData : '') || '',
         imageUrl: imageUrl || (idx >= 0 ? frames[idx].imageUrl : '') || '',
         createdAt: idx >= 0 ? frames[idx].createdAt : new Date().toISOString(),
@@ -4161,6 +4196,7 @@ label.muted{display:block;font-size:12px;margin-bottom:2px}
 <label class="muted">Frame Type name<input class="inp" id="frTitle" placeholder="Golden Border / Wooden Classic"></label>
 <label class="muted">Price ₹<input class="inp" id="frPrice" type="number" min="0" placeholder="500" style="max-width:140px"></label>
 <label class="muted">Discount %<input class="inp" id="frDisc" type="number" min="0" max="90" placeholder="10" style="max-width:140px"></label>
+<label class="muted">Display priority<input class="inp" id="frPriority" type="number" min="-999" max="999" value="100" style="max-width:140px"><small>Chhota number = pehle show hoga. 36 Passport Photos ke liye -100 set hai.</small></label>
 <label class="muted" style="display:flex;gap:8px;align-items:center;cursor:pointer"><input id="frActive" type="checkbox" checked> Order page par yeh frame type dikhayein</label>
 <label class="muted">Available pieces<input class="inp" id="frStock" type="number" min="0" step="1" value="1" style="max-width:140px"><small>Booking hone par 1 automatically kam hoga. 0 = Not Available.</small></label>
 <label class="muted">Frame tags <input class="inp" id="frTags" placeholder="Premium, Golden, Wedding"><small>Comma se alag tags. Customer ko filter/pehchan ke liye dikhenge.</small></label>
@@ -5216,6 +5252,7 @@ function adminCancelEditFrame() {
   var tEl = document.getElementById('frTitle'); if (tEl) tEl.value = '';
   var pEl = document.getElementById('frPrice'); if (pEl) pEl.value = '';
   var dEl = document.getElementById('frDisc'); if (dEl) dEl.value = '';
+  var priorityEl = document.getElementById('frPriority'); if (priorityEl) priorityEl.value = 100;
   var aEl = document.getElementById('frActive'); if (aEl) aEl.checked = true;
   var stockEl = document.getElementById('frStock'); if (stockEl) stockEl.value = 1;
   var tagsEl = document.getElementById('frTags'); if (tagsEl) tagsEl.value = '';
@@ -5243,6 +5280,7 @@ function adminEditFrame(id) {
   var tEl = document.getElementById('frTitle'); if (tEl) tEl.value = f.title || '';
   var pEl = document.getElementById('frPrice'); if (pEl) pEl.value = f.price != null ? f.price : '';
   var dEl = document.getElementById('frDisc'); if (dEl) dEl.value = f.discountPercent != null ? f.discountPercent : '';
+  var priorityEl = document.getElementById('frPriority'); if (priorityEl) priorityEl.value = f.featuredRank != null ? f.featuredRank : 100;
   var aEl = document.getElementById('frActive'); if (aEl) aEl.checked = f.active !== false;
   var stockEl = document.getElementById('frStock'); if (stockEl) stockEl.value = Number.isFinite(Number(f.stockQuantity)) ? Math.max(0, Math.floor(Number(f.stockQuantity))) : 1;
   var tagsEl = document.getElementById('frTags'); if (tagsEl) tagsEl.value = Array.isArray(f.frameTags) ? f.frameTags.join(', ') : '';
@@ -5270,6 +5308,7 @@ async function adminSaveFrame() {
   var title = (document.getElementById('frTitle') || {}).value || '';
   var price = Number((document.getElementById('frPrice') || {}).value || 0);
   var disc = Number((document.getElementById('frDisc') || {}).value || 0);
+  var featuredRank = Number((document.getElementById('frPriority') || {}).value || 100);
   var active = !!((document.getElementById('frActive') || {}).checked);
   var stockQuantity = Math.max(0, Math.floor(Number((document.getElementById('frStock') || {}).value || 0)));
   var frameTags = String((document.getElementById('frTags') || {}).value || '').split(',').map(function(v){ return v.trim(); }).filter(Boolean);
@@ -5313,6 +5352,7 @@ async function adminSaveFrame() {
     title: title,
     price: price,
     discountPercent: disc,
+    featuredRank: featuredRank,
     stockQuantity: stockQuantity,
     frameTags: frameTags,
     manualUnavailable: manualUnavailable,
@@ -5813,6 +5853,8 @@ async function hydrateFromMongo() {
       const fr = await mongoDb.collection('meta').findOne({ _id: 'photoFrames' });
       if (fr && Array.isArray(fr.items)) {
         _cache.frames = fr.items.filter(f => f && !String(f.id || '').startsWith('demo-') && f.demo !== true);
+        // Keep the passport offer present after Atlas hydration as well.
+        loadFrames();
       }
       const fo = await mongoDb.collection('meta').findOne({ _id: 'frameOrders' });
       if (fo && Array.isArray(fo.items)) _cache.frameOrders = fo.items;

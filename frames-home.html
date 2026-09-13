@@ -1238,6 +1238,8 @@ function renderFrames(filterSize = null) {
   // Every admin-approved frame gets its own card. Low price first, so the
   // customer sees affordable options before premium/high-price frames.
   list.sort((a, b) => {
+    const rankDiff = (Number(a.featuredRank == null ? 100 : a.featuredRank) || 0) - (Number(b.featuredRank == null ? 100 : b.featuredRank) || 0);
+    if (rankDiff !== 0) return rankDiff;
     const priceDiff = (Number(a.price) || 0) - (Number(b.price) || 0);
     if (priceDiff !== 0) return priceDiff;
     const d = sizeArea(a.size) - sizeArea(b.size);
@@ -1266,9 +1268,11 @@ function renderFrames(filterSize = null) {
     // Pura frame dikhe aur photo har selected size ke exact ratio me auto-fit ho.
     const isPortrait = dims.h >= dims.w;
     const frameRatio = dims.w + " / " + dims.h;
-    const innerHtml = buildFramePreview(frame.image || "", userPhotoDataUrl || "", {
-      insetX: 14, insetY: 15, portrait: isPortrait, ratio: frameRatio, glass: true
-    });
+    const innerHtml = frame.productKind === 'passport_sheet'
+      ? `<div style="width:100%;height:100%;padding:10px;background:linear-gradient(135deg,#f8fafc,#cbd5e1);color:#111827;display:flex;flex-direction:column;gap:7px;box-sizing:border-box"><b style="font-size:12px;text-align:center;letter-spacing:.06em">36 PASSPORT PHOTOS</b><div style="display:grid;grid-template-columns:repeat(6,1fr);gap:3px;flex:1">${Array.from({length:36},()=>userPhotoDataUrl?'<img src="'+userPhotoDataUrl+'" alt="passport photo" style="width:100%;height:100%;min-height:0;object-fit:cover;border:1px solid #94a3b8">':'<span style="display:block;background:linear-gradient(#e2e8f0 48%,#475569 49%);border:1px solid #94a3b8"></span>').join('')}</div><span style="font-size:10px;text-align:center;font-weight:700">6 × 6 sheet · Ready for printing</span></div>`
+      : buildFramePreview(frame.image || "", userPhotoDataUrl || "", {
+          insetX: 14, insetY: 15, portrait: isPortrait, ratio: frameRatio, glass: true
+        });
 
     // Product card — NO Order Now; click opens detail
     return `
@@ -1280,7 +1284,7 @@ function renderFrames(filterSize = null) {
         ${discount > 0 ? `<span class="absolute top-2 left-2 text-[10px] font-label-caps px-2 py-1 rounded-full z-10" style="background:#166534;color:#bbf7d0">${discount}% OFF</span>` : ""}
       </div>
       <div class="p-4 flex flex-col gap-1">
-        <h4 class="font-headline-sm leading-tight text-lg mb-1"><span style="color:#f3cd63">${frame.title ? frame.title : "Premium Frame"}</span> <span class="text-sm font-bold" style="color:#63d7ff">${dims.label} · ${orientLabel}</span></h4>
+        <h4 class="font-headline-sm leading-tight text-lg mb-1"><span style="color:#f3cd63">${frame.title ? frame.title : "Premium Frame"}</span> <span class="text-sm font-bold" style="color:#63d7ff">${frame.productKind === 'passport_sheet' ? '36 copies · 4x6 Sheet' : dims.label + ' · ' + orientLabel}</span></h4>
         <div class="flex flex-wrap gap-1"><span class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background:#103c26;color:#bbf7d0">🟢 ${stock} available</span>${tags.map(tag => `<span class="text-[10px] px-2 py-0.5 rounded-full" style="background:#30240e;color:#fde68a">🏷️ ${String(tag).replace(/[&<>"']/g,'')}</span>`).join('')}</div>
         <div class="mt-1 flex items-baseline gap-2 flex-wrap">
           <span class="text-secondary text-xl font-bold">${formatPrice(finalPrice)}</span>
