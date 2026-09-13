@@ -3396,6 +3396,19 @@ function computeOrderFees(subtotal, settingsFees) {
       return sendJSON(res, 200, { ok:true, photo:list[index] });
     } catch (e) { return sendJSON(res, 500, { ok:false, error:'server-error' }); }
   }
+  if (req.method === 'POST' && urlPath === '/admin/hero-side-bg-delete') {
+    try {
+      const body = await readBody(req, 1e5);
+      const index = Number(body.index);
+      const cur = loadSettings();
+      const list = Array.isArray(cur.heroSideBgPhotos) ? cur.heroSideBgPhotos : [];
+      if (!Number.isInteger(index) || index < 0 || index >= list.length) return sendJSON(res, 404, { ok:false, error:'not-found' });
+      list.splice(index, 1);
+      cur.heroSideBgPhotos = list;
+      saveSettings(cur);
+      return sendJSON(res, 200, { ok:true, count:list.length });
+    } catch (e) { return sendJSON(res, 500, { ok:false, error:'server-error' }); }
+  }
   if (req.method === 'POST' && urlPath === '/admin/hero-side-bg-duration') {
     try {
       const body = await readBody(req, 1e5);
@@ -4321,7 +4334,8 @@ ${(function(){
     const x = Math.max(0, Math.min(100, Number((p&&p.positionX) ?? 50)));
     const y = Math.max(0, Math.min(100, Number((p&&p.positionY) ?? 50)));
     const z = Math.max(1, Math.min(2.5, Number((p&&p.zoom) || 1)));
-    return '<div style="width:220px;border:1px solid rgba(212,175,55,.4);border-radius:9px;padding:7px;background:#15120b">'
+    return '<div style="width:220px;border:1px solid rgba(212,175,55,.4);border-radius:9px;padding:7px;background:#15120b;position:relative">'
+      + '<button type="button" onclick="adminDeleteHeroBg('+i+')" title="Is photo ko remove karo" style="position:absolute;right:5px;top:5px;z-index:3;width:25px;height:25px;border:1px solid #fb7185;border-radius:50%;background:#7f1d1d;color:#fff;font-size:17px;line-height:20px;font-weight:800;cursor:pointer">×</button>'
       + '<div style="height:126px;border-radius:6px;overflow:hidden;outline:1px solid rgba(125,211,252,.5);position:relative;background:#111"><div id="heroBgPreview'+i+'" style="position:absolute;inset:0;background-image:url(\''+esc(u).replace(/'/g,'%27')+'\');background-size:cover;background-position:'+x+'% '+y+'%;transform:scale('+z+');transform-origin:center"></div></div>'
       + '<div style="font-size:11px;color:#f2ca50;margin-top:8px">#'+(i+1)+' · Home hero ka same crop</div>'
       + '<label class="muted" style="display:block;font-size:10px">Left / Right <b id="heroBgXVal'+i+'">'+x+'%</b><input type="range" id="heroBgX'+i+'" min="0" max="100" value="'+x+'" oninput="adminPreviewHeroBgCrop('+i+')"></label>'
@@ -5127,6 +5141,18 @@ async function adminSaveHeroBgCrop(index) {
     adminPreviewHeroBgCrop(index);
     if (status) status.textContent = '✅ Photo ' + (index + 1) + ' adjustment saved — Home page refresh par same view dikhega.';
   } catch (e) { if (status) status.textContent = 'Adjustment save nahi hua'; }
+}
+async function adminDeleteHeroBg(index) {
+  if (!confirm('Photo ' + (index + 1) + ' ko hero background se hatana hai?')) return;
+  var status = document.getElementById('heroBgStatus');
+  if (status) status.textContent = 'Photo remove ho rahi hai…';
+  try {
+    var res = await fetch('/admin/hero-side-bg-delete', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ index:index }) });
+    var data = await res.json();
+    if (!res.ok || !data.ok) throw new Error('Delete fail');
+    location.href = '/admin#sec-hero';
+    location.reload();
+  } catch (e) { if (status) status.textContent = 'Photo remove nahi hui'; }
 }
 async function adminClearHeroSideBg() {
   if (!confirm('Hero BG photos clear?')) return;
