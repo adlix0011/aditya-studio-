@@ -1262,7 +1262,7 @@ function renderFrames(filterSize = null) {
     const aspect = dims.w / dims.h;
     const price = Number(frame.price) || 0;
     const discount = Number(frame.discount) || 0;
-    const finalPrice = discount > 0 ? Math.round(price * (1 - discount / 100)) : price;
+    const finalPrice = discount > 0 ? Math.floor(price * (1 - discount / 100)) : Math.floor(price);
     const stock = Math.max(0, Math.floor(Number(frame.stockQuantity == null ? 1 : frame.stockQuantity)));
     const tags = Array.isArray(frame.frameTags) ? frame.frameTags.filter(Boolean).slice(0, 3) : [];
     // Pura frame dikhe aur photo har selected size ke exact ratio me auto-fit ho.
@@ -1533,7 +1533,7 @@ let paymentClaimed = false;
 function frameFinalPrice(frame) {
   const price = Number(frame.price) || 0;
   const discount = Number(frame.discount != null ? frame.discount : frame.discountPercent) || 0;
-  const finalPrice = discount > 0 ? Math.round(price * (1 - discount / 100)) : price;
+  const finalPrice = discount > 0 ? Math.floor(price * (1 - discount / 100)) : Math.floor(price);
   return { price, discount, finalPrice };
 }
 
@@ -1543,7 +1543,7 @@ function currentOrderTotal() {
   const base = frameFinalPrice(selectedFrame).finalPrice;
   const beforeCoupon = base + (Number(selectedQuality.extra) || 0);
   const couponValue = appliedOrderCoupon ? Math.max(0, Number(appliedOrderCoupon.value) || 0) : 0;
-  return Math.max(0, beforeCoupon - Math.min(beforeCoupon, couponValue));
+  return Math.floor(Math.max(0, beforeCoupon - Math.min(beforeCoupon, couponValue)));
 }
 function walletPaymentInfo(total) {
   const selected = !!document.getElementById("use-wallet-check")?.checked;

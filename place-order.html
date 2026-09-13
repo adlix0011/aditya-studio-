@@ -461,7 +461,7 @@ tailwind.config = {
   function $(id){ return document.getElementById(id); }
   function show(el){ if(el) el.classList.remove("hidden"); }
   function hide(el){ if(el) el.classList.add("hidden"); }
-  function money(n){ n=Number(n)||0; return "₹"+(Math.round(n*100)/100); }
+  function money(n){ n=Math.floor(Number(n)||0); return "₹"+n; }
   function safeParse(s){ try{ return JSON.parse(s); }catch(e){ return null; } }
   function escapeHtml(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
   function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
@@ -630,7 +630,7 @@ tailwind.config = {
   }
   function framePrice(c){
     var mrp=Number(c.mrp!=null?c.mrp:c.price)||0, disc=Number(c.discount)||0;
-    var after=disc>0?mrp-(mrp*disc/100):(Number(c.price)||mrp);
+    var after=disc>0?Math.floor(mrp-(mrp*disc/100)):Math.floor(Number(c.price)||mrp);
     return {mrp:mrp, disc:disc, after:Math.max(0,after)};
   }
 
@@ -646,7 +646,7 @@ tailwind.config = {
     var c=ctx, fp=framePrice(c), qExtra=Number(c.qualityExtra)||0, base=fp.after+qExtra;
     var couponDiscount=activeCoupon?Math.min(base,couponValue(activeCoupon)):0;
     var discountedBase=Math.max(0,base-couponDiscount);
-    var f=calcFees(discountedBase), total=discountedBase+f.platform+f.delivery;
+    var f=calcFees(discountedBase), total=Math.floor(discountedBase+f.platform+f.delivery);
     var name=c.frameName||"Frame", size=c.size||"", quality=c.quality||"Normal";
     var html="";
     html += row("Frame", escapeHtml(name)+(size?" · "+escapeHtml(size):""), "image");

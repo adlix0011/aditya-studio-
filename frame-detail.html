@@ -307,7 +307,7 @@ function displayDims(sizeStr) {
 function framePrice(f) {
   const price = Number(f.price) || 0;
   const discount = Number(f.discount) || 0;
-  const finalPrice = discount > 0 ? Math.round(price * (1 - discount / 100)) : price;
+  const finalPrice = discount > 0 ? Math.floor(price * (1 - discount / 100)) : Math.floor(price);
   return { price, discount, finalPrice };
 }
 

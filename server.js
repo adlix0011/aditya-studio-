@@ -1773,8 +1773,10 @@ function computeOrderFees(subtotal, settingsFees) {
       const price = Number(frame.price) || 0;
       const disc = Number(frame.discountPercent) || 0;
       const qualityExtra = Math.max(0, Number(body.qualityExtra) || 0);
-      const frameAfterDisc = Math.round(price * (1 - disc / 100));
-      const subtotal = frameAfterDisc + qualityExtra;
+      // Payment is always in whole rupees. A fractional discount is rounded
+      // down so customers never see/pay an extra paisa (₹150.5 becomes ₹150).
+      const frameAfterDisc = Math.floor(price * (1 - disc / 100));
+      const subtotal = Math.floor(frameAfterDisc + qualityExtra);
       // Coupon amount is calculated only from the signed-in customer's own
       // active history. Never accept a discount amount supplied by the browser.
       const couponId = String(body.couponId || '').trim();
@@ -1798,7 +1800,7 @@ function computeOrderFees(subtotal, settingsFees) {
       const feeCalc = computeOrderFees(discountedSubtotal, (loadSettings().fees || {}));
       const platformFee = feeCalc.platformFee;
       const deliveryFee = feeCalc.deliveryFee;
-      let finalAmount = discountedSubtotal + platformFee + deliveryFee;
+      let finalAmount = Math.floor(discountedSubtotal + platformFee + deliveryFee);
       const orders = loadFrameOrders();
       const orderId = nextFrameOrderId(orders);
       const useWallet = body.useWallet === true || body.useWallet === 'true';
@@ -1837,7 +1839,7 @@ function computeOrderFees(subtotal, settingsFees) {
       // Wallet pay (partial or full)
       if (useWallet) {
         ensureWallet(account);
-        const want = Math.min(account.walletBalance, finalAmount);
+        const want = Math.min(Math.floor(account.walletBalance), finalAmount);
         if (want > 0) {
           const txn = walletTxn(account, 'debit', want, {
               reason: 'Frame order ' + orderId + ' — ' + (frame.title || frame.size),
@@ -1847,7 +1849,7 @@ function computeOrderFees(subtotal, settingsFees) {
             });
           if (txn) {
             walletPaid = want;
-            finalAmount = finalAmount - walletPaid;
+            finalAmount = Math.max(0, Math.floor(finalAmount - walletPaid));
             saveAccounts(accounts);
             if (finalAmount <= 0) {
               finalAmount = 0;
