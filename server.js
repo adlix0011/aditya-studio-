@@ -5706,8 +5706,14 @@ function adminShowAllSections() {
     try {
       var row = JSON.parse(sessionStorage.getItem(key) || 'null');
       if (!row || !Number.isFinite(Number(row.y)) || Date.now() - Number(row.at || 0) > 10 * 60 * 1000) return;
-      sessionStorage.removeItem(key);
-      requestAnimationFrame(function(){ requestAnimationFrame(function(){ window.scrollTo(0, Number(row.y)); }); });
+      // Admin has images/cards which can finish rendering after this script.
+      // Retry instead of deleting the saved position immediately, otherwise a
+      // first short page would clamp the scroll and send the admin to the top.
+      var y = Number(row.y);
+      [0, 80, 260, 650, 1200].forEach(function(wait){
+        setTimeout(function(){ window.scrollTo(0, y); }, wait);
+      });
+      setTimeout(function(){ try { sessionStorage.removeItem(key); } catch (e) {} }, 1500);
     } catch (e) {}
   }
   window.addEventListener('pagehide', save);
@@ -5717,6 +5723,7 @@ function adminShowAllSections() {
     if (link && !String(link.getAttribute('href') || '').startsWith('#')) { try { sessionStorage.removeItem(key); } catch (_) {} }
   });
   restore();
+  window.addEventListener('load', restore, { once:true });
 })();
 
 adminInitUi();
