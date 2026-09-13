@@ -1533,6 +1533,17 @@ const server = http.createServer(async (req, res) => {
     });
   }
 
+  // Small local previews shown only until a customer uploads their own photo.
+  // Exact allowlist avoids serving arbitrary files from disk.
+  if (req.method === 'GET' && (urlPath === '/assets/default-frame-preview.png' || urlPath === '/assets/default-passport-sheet.png')) {
+    const file = urlPath.endsWith('default-passport-sheet.png') ? DEFAULT_PASSPORT_PREVIEW_FILE : DEFAULT_FRAME_PREVIEW_FILE;
+    return fs.readFile(file, (err, data) => {
+      if (err) { res.writeHead(404); return res.end('Preview image missing'); }
+      res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' });
+      res.end(data);
+    });
+  }
+
   // ---- Public APIs ----
   if (req.method === 'GET' && urlPath === '/api/live-revision') {
     return sendJSON(res, 200, { ok: true, revision: liveRevision() });
@@ -5813,16 +5824,6 @@ function adminShowAllSections() {
     } catch (e) {}
   }
 
-  // Small local previews shown only until a customer uploads their own photo.
-  // Exact allowlist avoids serving arbitrary files from disk.
-  if (req.method === 'GET' && (urlPath === '/assets/default-frame-preview.png' || urlPath === '/assets/default-passport-sheet.png')) {
-    const file = urlPath.endsWith('default-passport-sheet.png') ? DEFAULT_PASSPORT_PREVIEW_FILE : DEFAULT_FRAME_PREVIEW_FILE;
-    return fs.readFile(file, (err, data) => {
-      if (err) { res.writeHead(404); return res.end('Preview image missing'); }
-      res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' });
-      res.end(data);
-    });
-  }
   window.addEventListener('pagehide', save);
   document.addEventListener('submit', save, true);
   document.addEventListener('click', function(e){
