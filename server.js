@@ -216,6 +216,8 @@ const BOOK_SERVICE_HTML_FILE = path.join(__dirname, 'book-service-sample.html');
 const ADD_MONEY_HTML_FILE = path.join(__dirname, 'add-money.html');
 const PHOTO_ADJUST_HTML_FILE = path.join(__dirname, 'photo-adjust.html');
 const PAYMENT_QR_FILE = path.join(__dirname, 'payment-qr.png');
+const DEFAULT_FRAME_PREVIEW_FILE = path.join(__dirname, 'assets', 'default-frame-preview.png');
+const DEFAULT_PASSPORT_PREVIEW_FILE = path.join(__dirname, 'assets', 'default-passport-sheet.png');
 const HTML_FILE = BOOK_NOW_HTML_FILE; // legacy alias
 console.log('[boot] Using data dir:', DATA_DIR);
 
@@ -5809,6 +5811,17 @@ function adminShowAllSections() {
       });
       setTimeout(function(){ try { sessionStorage.removeItem(key); } catch (e) {} }, 1500);
     } catch (e) {}
+  }
+
+  // Small local previews shown only until a customer uploads their own photo.
+  // Exact allowlist avoids serving arbitrary files from disk.
+  if (req.method === 'GET' && (urlPath === '/assets/default-frame-preview.png' || urlPath === '/assets/default-passport-sheet.png')) {
+    const file = urlPath.endsWith('default-passport-sheet.png') ? DEFAULT_PASSPORT_PREVIEW_FILE : DEFAULT_FRAME_PREVIEW_FILE;
+    return fs.readFile(file, (err, data) => {
+      if (err) { res.writeHead(404); return res.end('Preview image missing'); }
+      res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' });
+      res.end(data);
+    });
   }
   window.addEventListener('pagehide', save);
   document.addEventListener('submit', save, true);

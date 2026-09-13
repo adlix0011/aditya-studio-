@@ -267,6 +267,8 @@ loadFdQuality();
 <script>
 const PHOTO_KEY = "as_user_photo";
 let allFrames = [];
+const DEFAULT_FRAME_PREVIEW = "/assets/default-frame-preview.png";
+const DEFAULT_PASSPORT_PREVIEW = "/assets/default-passport-sheet.png";
 let selected = null;
 let userPhoto = null;
 let qualityExtra = 0;
@@ -313,11 +315,13 @@ function framePrice(f) {
 
 function buildPreview(frameImg, photoUrl) {
   if (selected && selected.productKind === 'passport_sheet') {
+    if (!photoUrl) return `<img src="${DEFAULT_PASSPORT_PREVIEW}" alt="36 passport photo sheet" style="width:100%;max-width:420px;margin:0 auto;display:block;object-fit:contain;background:#fff;">`;
     const cells = Array.from({ length: 36 }, () => photoUrl
       ? `<img src="${photoUrl}" alt="passport photo" style="width:100%;height:100%;object-fit:cover;border:1px solid #94a3b8;min-height:0;">`
       : '<span style="display:block;background:linear-gradient(#e2e8f0 48%,#475569 49%);border:1px solid #94a3b8"></span>').join('');
     return `<div style="width:100%;max-width:420px;margin:0 auto;aspect-ratio:2/3;padding:12px;box-sizing:border-box;background:linear-gradient(135deg,#f8fafc,#cbd5e1);color:#111827;display:flex;flex-direction:column;gap:8px"><b style="font-size:14px;text-align:center;letter-spacing:.08em">36 PASSPORT PHOTOS</b><div style="display:grid;grid-template-columns:repeat(6,1fr);gap:4px;flex:1">${cells}</div><span style="font-size:11px;text-align:center;font-weight:700">6 × 6 Sheet · 4 × 6 inch</span></div>`;
   }
+  photoUrl = photoUrl || DEFAULT_FRAME_PREVIEW;
   const dims = displayDims(selected && selected.size);
   const ratio = dims.w + " / " + dims.h;
   // Mobile-safe: width + aspect-ratio only (no height:100% — collapses on mobile)

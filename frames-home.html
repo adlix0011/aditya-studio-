@@ -1002,6 +1002,8 @@ const FRAME_COLORS = [
   "#b8860b","#daa520","#d2691e","#b22222","#8b4513","#a0522d",
   "#cd853f","#d2b48c","#deb887"
 ];
+const DEFAULT_FRAME_PREVIEW = "/assets/default-frame-preview.png";
+const DEFAULT_PASSPORT_PREVIEW = "/assets/default-passport-sheet.png";
 
 function parseSize(sizeStr) {
   const parts = String(sizeStr || "").toLowerCase().split("x").map(n => parseFloat(n));
@@ -1269,8 +1271,8 @@ function renderFrames(filterSize = null) {
     const isPortrait = dims.h >= dims.w;
     const frameRatio = dims.w + " / " + dims.h;
     const innerHtml = frame.productKind === 'passport_sheet'
-      ? `<div style="width:100%;height:100%;padding:10px;background:linear-gradient(135deg,#f8fafc,#cbd5e1);color:#111827;display:flex;flex-direction:column;gap:7px;box-sizing:border-box"><b style="font-size:12px;text-align:center;letter-spacing:.06em">36 PASSPORT PHOTOS</b><div style="display:grid;grid-template-columns:repeat(6,1fr);gap:3px;flex:1">${Array.from({length:36},()=>userPhotoDataUrl?'<img src="'+userPhotoDataUrl+'" alt="passport photo" style="width:100%;height:100%;min-height:0;object-fit:cover;border:1px solid #94a3b8">':'<span style="display:block;background:linear-gradient(#e2e8f0 48%,#475569 49%);border:1px solid #94a3b8"></span>').join('')}</div><span style="font-size:10px;text-align:center;font-weight:700">6 × 6 sheet · Ready for printing</span></div>`
-      : buildFramePreview(frame.image || "", userPhotoDataUrl || "", {
+      ? (userPhotoDataUrl ? `<div style="width:100%;height:100%;padding:10px;background:linear-gradient(135deg,#f8fafc,#cbd5e1);color:#111827;display:flex;flex-direction:column;gap:7px;box-sizing:border-box"><b style="font-size:12px;text-align:center;letter-spacing:.06em">36 PASSPORT PHOTOS</b><div style="display:grid;grid-template-columns:repeat(6,1fr);gap:3px;flex:1">${Array.from({length:36},()=>'<img src="'+userPhotoDataUrl+'" alt="passport photo" style="width:100%;height:100%;min-height:0;object-fit:cover;border:1px solid #94a3b8">').join('')}</div><span style="font-size:10px;text-align:center;font-weight:700">6 × 6 sheet · Ready for printing</span></div>` : `<img src="${DEFAULT_PASSPORT_PREVIEW}" alt="36 passport photo sheet" style="width:100%;height:100%;object-fit:contain;background:#fff;display:block">`)
+      : buildFramePreview(frame.image || "", userPhotoDataUrl || DEFAULT_FRAME_PREVIEW, {
           insetX: 14, insetY: 15, portrait: isPortrait, ratio: frameRatio, glass: true
         });
 
@@ -1345,7 +1347,7 @@ function getFrameSamples(frame) {
   // Admin later: frame.samples = [url,url,url] for 3 angles
   if (frame && Array.isArray(frame.samples) && frame.samples.length) return frame.samples;
   // Center content: user photo if uploaded, else empty (glass). Frame border separate in previewHtml.
-  const base = userPhotoDataUrl || "";
+  const base = userPhotoDataUrl || DEFAULT_FRAME_PREVIEW;
   return [base, base, base];
 }
 
@@ -1443,7 +1445,13 @@ function renderPdSamples() {
   main.style.height = "auto";
   main.style.width = "100%";
   const frameImg = selectedFrame.image || "";
-  const photo = userPhotoDataUrl || "";
+  const photo = userPhotoDataUrl || DEFAULT_FRAME_PREVIEW;
+  if (selectedFrame.productKind === 'passport_sheet' && !userPhotoDataUrl) {
+    main.innerHTML = `<img src="${DEFAULT_PASSPORT_PREVIEW}" alt="36 passport photo sheet" style="width:100%;height:100%;object-fit:contain;background:#fff;display:block">`;
+    const box = document.getElementById("pd-samples");
+    if (box) box.innerHTML = "";
+    return;
+  }
   main.innerHTML = buildFramePreview(frameImg, photo, {
     insetX: 14, insetY: 15, portrait: dims.h >= dims.w, ratio: dims.w + " / " + dims.h, glass: true
   });
@@ -2226,7 +2234,7 @@ function updateThreeFrameSize() {
     three.camera.lookAt(0, 0, 0);
   }
 
-  const src = userPhotoDataUrl || null;
+  const src = userPhotoDataUrl || DEFAULT_FRAME_PREVIEW;
   if (src) {
     makeSharpTexture(src, fw, fh, function (tex) {
       if (!three.photoMesh) return;
