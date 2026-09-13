@@ -329,6 +329,19 @@ tailwind.config = {
       <div id="bill-body" class="space-y-3 font-body-md text-on-surface-variant"></div>
     </section>
 
+    <!-- Logged-in customer's coupon, applied before opening UPI payment -->
+    <section id="coupon-section" class="glass-card rounded-xl p-5 relative hidden">
+      <h3 class="font-label-md text-label-md text-primary-fixed-dim mb-3 uppercase tracking-wider flex items-center gap-2">
+        <span class="material-symbols-outlined text-[18px]">confirmation_number</span> Apply Coupon
+      </h3>
+      <div class="flex gap-2">
+        <input id="coupon-code" class="glass-input min-w-0 flex-1 rounded-lg px-3 py-3 text-sm uppercase" placeholder="Apna coupon code likho" autocomplete="off"/>
+        <button type="button" id="btn-apply-coupon" class="bg-primary-container text-on-primary-container font-bold px-4 rounded-lg">Apply</button>
+      </div>
+      <p id="coupon-status" class="status">Active coupon apply karne par bill aur UPI amount turant kam ho jayega.</p>
+      <p id="coupon-available" class="text-xs text-on-surface-variant/80 mt-2 hidden"></p>
+    </section>
+
     <!-- PAY button (before scanner) -->
     <section id="pay-cta-section" class="hidden">
       <button type="button" id="btn-pay-now" class="btn-pay-now">
@@ -488,7 +501,7 @@ tailwind.config = {
         var res=await fetch("/api/restore-session",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"same-origin",body:JSON.stringify({sessionToken:s.sessionToken})});
         var data=await res.json().catch(function(){return {};});
         if(res.ok&&data&&data.ok){
-          var active={id:data.id||s.id,name:data.name||s.name,mobile:data.mobile||s.mobile,sessionToken:s.sessionToken,village:data.village||s.village||""};
+          var active={id:data.id||s.id,name:data.name||s.name,mobile:data.mobile||s.mobile,sessionToken:s.sessionToken,village:data.village||s.village||"",history:Array.isArray(data.history)?data.history:[]};
           lsSet("aditya_studio_session_v1",JSON.stringify(active));
           lsSet("aditya_studio_persistent_login_v2",JSON.stringify(active));
           return active;
@@ -577,6 +590,29 @@ tailwind.config = {
   var ctx=null;
   var fees={platformFee:10,deliveryFee:40,platformMode:"always",deliveryMode:"always",platformMin:0,deliveryMin:0};
   var proofDataUrl="";
+  var activeCoupon=null;
+
+  function couponValue(c){
+    var n=Number(c&&((c.walletValue!=null)?c.walletValue:c.discount));
+    return Number.isFinite(n)&&n>0?Math.round(n):0;
+  }
+  function findValidCoupon(code){
+    var key=String(code||"").trim().toUpperCase();
+    var session=getSession(), rows=(session&&Array.isArray(session.history))?session.history:[];
+    return rows.find(function(c){
+      var id=String(c.couponId||c.entryId||"").toUpperCase();
+      var expired=c.expiresAt&&new Date(c.expiresAt).getTime()<Date.now();
+      return id===key && (c.couponStatus||"active")==="active" && !expired && couponValue(c)>0;
+    })||null;
+  }
+  function renderAvailableCoupons(){
+    var el=$("coupon-available"), session=getSession(), rows=(session&&Array.isArray(session.history))?session.history:[];
+    if(!el) return;
+    var codes=rows.filter(function(c){ return (c.couponStatus||"active")==="active" && (!c.expiresAt||new Date(c.expiresAt).getTime()>=Date.now()) && couponValue(c)>0; })
+      .map(function(c){ return String(c.couponId||c.entryId||"")+" (₹"+couponValue(c)+")"; }).filter(Boolean);
+    el.textContent=codes.length?"Aapke active coupons: "+codes.join(" · "):"Aapke account me abhi koi active coupon nahi hai.";
+    el.classList.remove("hidden");
+  }
 
   function calcFees(baseAmount){
     var platform=Number(fees.platformFee)||0, delivery=Number(fees.deliveryFee)||0;
@@ -604,7 +640,9 @@ tailwind.config = {
 
   function renderSummary(){
     var c=ctx, fp=framePrice(c), qExtra=Number(c.qualityExtra)||0, base=fp.after+qExtra;
-    var f=calcFees(base), total=base+f.platform+f.delivery;
+    var couponDiscount=activeCoupon?Math.min(base,couponValue(activeCoupon)):0;
+    var discountedBase=Math.max(0,base-couponDiscount);
+    var f=calcFees(discountedBase), total=discountedBase+f.platform+f.delivery;
     var name=c.frameName||"Frame", size=c.size||"", quality=c.quality||"Normal";
     var html="";
     html += row("Frame", escapeHtml(name)+(size?" · "+escapeHtml(size):""), "image");
@@ -621,13 +659,14 @@ tailwind.config = {
     var bill="";
     bill += row("Frame after discount", money(fp.after));
     if(qExtra>0) bill += row("Photo quality", "+"+money(qExtra));
+    if(couponDiscount>0) bill += row("Coupon "+escapeHtml(String(activeCoupon.couponId||activeCoupon.entryId||"")), '<span style="color:#22c55e">−'+money(couponDiscount)+'</span>', "confirmation_number");
     bill += row("Platform fees", f.platform<=0?'<span class="fee-free">FREE</span>':money(f.platform));
     bill += row("Delivery fees", f.delivery<=0?'<span class="fee-free">FREE</span>':'<span style="color:#22c55e">'+money(f.delivery)+'</span>');
     bill += '<div class="flex justify-between items-center pt-4 border-t border-white/10 mt-2">'
       + '<span class="font-headline-md text-lg text-primary-fixed-dim">Total Payable</span>'
       + '<span class="font-headline-lg-mobile text-xl text-primary-container text-glow">'+money(total)+'</span></div>';
     $("bill-body").innerHTML = bill;
-    return {total:total, platform:f.platform, delivery:f.delivery, frameAfter:fp.after, qualityExtra:qExtra, mrp:fp.mrp, discount:fp.disc};
+    return {total:total, platform:f.platform, delivery:f.delivery, frameAfter:fp.after, qualityExtra:qExtra, mrp:fp.mrp, discount:fp.disc, couponDiscount:couponDiscount, couponId:activeCoupon?String(activeCoupon.couponId||activeCoupon.entryId||""):""};
   }
 
   function fillAddrForm(a){
@@ -790,6 +829,7 @@ tailwind.config = {
       frameName: ctx.frameName||"Frame", size: ctx.size||"", quality: ctx.quality||"Normal",
       qualityExtra: bill.qualityExtra, mrp: bill.mrp, discount: bill.discount, framePrice: bill.frameAfter,
       platformFee: bill.platform, deliveryFee: bill.delivery, amount: bill.total, total: bill.total,
+      couponId: bill.couponId,
       name: addr.name, mobile: addr.mobile, phone: addr.mobile, village: addr.village,
       address: addr.address, pincode: addr.pincode, utr: utr,
       paymentProof: proofDataUrl, paymentScreenshot: proofDataUrl,
@@ -801,10 +841,10 @@ tailwind.config = {
     };
       var res=await fetch("/api/orders",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"same-origin",body:JSON.stringify(payload)});
       var data=await res.json().catch(function(){ return {}; });
-      if(!res.ok) throw new Error(data.error||data.message||("HTTP "+res.status));
+      if(!res.ok) throw new Error(data.message||data.error||("HTTP "+res.status));
       CTX_KEYS.forEach(function(k){ lsRemove(k); }); lsRemove(PENDING_KEY);
       var orderNo = data.id||data.orderId||data.trackingNumber||"OK";
-      ["payment-section","pay-cta-section","submit-section","bill-section","summary-section","addr-section","addr-form-section"].forEach(function(id){
+      ["payment-section","pay-cta-section","submit-section","coupon-section","bill-section","summary-section","addr-section","addr-form-section"].forEach(function(id){
         var el=$(id); if(el) hide(el);
       });
       if($("success-order-id")) $("success-order-id").textContent = orderNo;
@@ -878,6 +918,8 @@ tailwind.config = {
         renderSummary();
         show($("summary-section"));
         show($("bill-section"));
+        show($("coupon-section"));
+        renderAvailableCoupons();
         show($("pay-cta-section"));
         hide($("payment-section"));
         hide($("submit-section"));
@@ -890,6 +932,7 @@ tailwind.config = {
         // Amazon style: pehle address, summary baad me
         hide($("summary-section"));
         hide($("bill-section"));
+        hide($("coupon-section"));
         hide($("pay-cta-section"));
         hide($("payment-section"));
         hide($("submit-section"));
@@ -1058,6 +1101,8 @@ tailwind.config = {
   function revealCheckout(){
     show($("summary-section"));
     show($("bill-section"));
+    show($("coupon-section"));
+    renderAvailableCoupons();
     show($("pay-cta-section"));
     hide($("payment-section"));
     hide($("submit-section"));
@@ -1067,6 +1112,7 @@ tailwind.config = {
   function hideCheckout(){
     hide($("summary-section"));
     hide($("bill-section"));
+    hide($("coupon-section"));
     hide($("pay-cta-section"));
     hide($("payment-section"));
     hide($("submit-section"));
@@ -1083,6 +1129,23 @@ tailwind.config = {
       if (sec) sec.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch(e){}
   });
+  if ($("btn-apply-coupon")) {
+    $("btn-apply-coupon").addEventListener("click", function(){
+      var input=$("coupon-code"), status=$("coupon-status"), coupon=findValidCoupon(input&&input.value);
+      if(!coupon){
+        activeCoupon=null;
+        if(status){ status.textContent="❌ Coupon invalid, expire ho gaya, ya pehle use ho chuka hai."; status.className="status err"; }
+      } else {
+        activeCoupon=coupon;
+        if(status){ status.textContent="✅ ₹"+couponValue(coupon)+" coupon apply ho gaya — total amount kam kar diya."; status.className="status ok"; }
+      }
+      var bill=renderSummary();
+      if($("pay-now-amount")) $("pay-now-amount").textContent=money(bill.total);
+      // A coupon changes the payable amount, so invalidate any already-open QR.
+      stopPayTimer(); payWindowOpen=false;
+      hide($("payment-section")); hide($("submit-section")); show($("pay-cta-section"));
+    });
+  }
   $("btn-edit-addr").addEventListener("click", function(){ fillAddrForm(readAddr()); showAddrForm(true); });
   $("btn-cancel-addr").addEventListener("click", function(){
     var a=readAddr(); if(a&&a.name) showAddrSummary(a); else showAddrForm(false);
