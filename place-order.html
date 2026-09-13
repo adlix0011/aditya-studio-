@@ -339,7 +339,7 @@ tailwind.config = {
         <button type="button" id="btn-apply-coupon" class="bg-primary-container text-on-primary-container font-bold px-4 rounded-lg">Apply</button>
       </div>
       <p id="coupon-status" class="status">Active coupon apply karne par bill aur UPI amount turant kam ho jayega.</p>
-      <p id="coupon-available" class="text-xs text-on-surface-variant/80 mt-2 hidden"></p>
+      <div id="coupon-available" class="text-xs text-on-surface-variant/80 mt-3 hidden"></div>
     </section>
 
     <!-- PAY button (before scanner) -->
@@ -608,10 +608,14 @@ tailwind.config = {
   function renderAvailableCoupons(){
     var el=$("coupon-available"), session=getSession(), rows=(session&&Array.isArray(session.history))?session.history:[];
     if(!el) return;
-    var codes=rows.filter(function(c){ return (c.couponStatus||"active")==="active" && (!c.expiresAt||new Date(c.expiresAt).getTime()>=Date.now()) && couponValue(c)>0; })
-      .map(function(c){ return String(c.couponId||c.entryId||"")+" (₹"+couponValue(c)+")"; }).filter(Boolean);
-    el.textContent=codes.length?"Aapke active coupons: "+codes.join(" · "):"Aapke account me abhi koi active coupon nahi hai.";
+    var coupons=rows.filter(function(c){ return (c.couponStatus||"active")==="active" && (!c.expiresAt||new Date(c.expiresAt).getTime()>=Date.now()) && couponValue(c)>0; });
+    if(!coupons.length){ el.textContent="Aapke account me abhi koi active coupon nahi hai."; el.classList.remove("hidden"); return; }
+    el.innerHTML='<p class="mb-2">Aapke active coupons — apna coupon choose karke Apply dabayein:</p>'+coupons.map(function(c){
+      var code=String(c.couponId||c.entryId||"");
+      return '<div class="flex items-center justify-between gap-2 rounded-lg px-3 py-2 mb-2" style="background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.23)"><span class="font-mono text-primary-fixed-dim break-all">'+escapeHtml(code)+' <span class="text-on-surface-variant">(₹'+couponValue(c)+')</span></span><button type="button" data-own-coupon="'+escapeHtml(code)+'" class="shrink-0 rounded-md px-3 py-1.5 font-bold" style="background:#ffd700;color:#281100">Apply</button></div>';
+    }).join('');
     el.classList.remove("hidden");
+    el.querySelectorAll('[data-own-coupon]').forEach(function(btn){ btn.addEventListener('click',function(){ var code=btn.getAttribute('data-own-coupon')||''; var input=$("coupon-code"); if(input) input.value=code; applyCouponCode(code); }); });
   }
 
   function calcFees(baseAmount){
@@ -1129,9 +1133,8 @@ tailwind.config = {
       if (sec) sec.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch(e){}
   });
-  if ($("btn-apply-coupon")) {
-    $("btn-apply-coupon").addEventListener("click", function(){
-      var input=$("coupon-code"), status=$("coupon-status"), coupon=findValidCoupon(input&&input.value);
+  function applyCouponCode(code){
+      var input=$("coupon-code"), status=$("coupon-status"), coupon=findValidCoupon(code);
       if(!coupon){
         activeCoupon=null;
         if(status){ status.textContent="❌ Coupon invalid, expire ho gaya, ya pehle use ho chuka hai."; status.className="status err"; }
@@ -1144,6 +1147,11 @@ tailwind.config = {
       // A coupon changes the payable amount, so invalidate any already-open QR.
       stopPayTimer(); payWindowOpen=false;
       hide($("payment-section")); hide($("submit-section")); show($("pay-cta-section"));
+  }
+  if ($("btn-apply-coupon")) {
+    $("btn-apply-coupon").addEventListener("click", function(){
+      var input=$("coupon-code");
+      applyCouponCode(input&&input.value);
     });
   }
   $("btn-edit-addr").addEventListener("click", function(){ fillAddrForm(readAddr()); showAddrForm(true); });
