@@ -1742,10 +1742,30 @@ function computeOrderFees(subtotal, settingsFees) {
       const qualityExtra = Math.max(0, Number(body.qualityExtra) || 0);
       const frameAfterDisc = Math.round(price * (1 - disc / 100));
       const subtotal = frameAfterDisc + qualityExtra;
-      const feeCalc = computeOrderFees(subtotal, (loadSettings().fees || {}));
+      // Coupon amount is calculated only from the signed-in customer's own
+      // active history. Never accept a discount amount supplied by the browser.
+      const couponId = String(body.couponId || '').trim();
+      let usedCoupon = null;
+      let couponDiscount = 0;
+      if (couponId) {
+        account.history = account.history || [];
+        const entry = account.history.find(h => String(h.couponId || h.entryId || '') === couponId);
+        const status = entry && (entry.couponStatus || 'active');
+        const isExpired = entry && entry.expiresAt && new Date(entry.expiresAt).getTime() < Date.now();
+        if (!entry || status !== 'active' || isExpired) {
+          return sendJSON(res, 400, { ok: false, error: 'invalid-coupon', message: 'Coupon invalid, expired ya already use ho chuka hai' });
+        }
+        couponDiscount = Math.min(subtotal, Math.max(0, couponRupeeValue(entry)));
+        if (couponDiscount <= 0) {
+          return sendJSON(res, 400, { ok: false, error: 'invalid-coupon', message: 'Is coupon me order discount value nahi hai' });
+        }
+        usedCoupon = entry;
+      }
+      const discountedSubtotal = subtotal - couponDiscount;
+      const feeCalc = computeOrderFees(discountedSubtotal, (loadSettings().fees || {}));
       const platformFee = feeCalc.platformFee;
       const deliveryFee = feeCalc.deliveryFee;
-      let finalAmount = subtotal + platformFee + deliveryFee;
+      let finalAmount = discountedSubtotal + platformFee + deliveryFee;
       const orders = loadFrameOrders();
       const orderId = nextFrameOrderId(orders);
       const useWallet = body.useWallet === true || body.useWallet === 'true';
@@ -1810,6 +1830,7 @@ function computeOrderFees(subtotal, settingsFees) {
         orderId, trackingNumber, frameId: frame.id, frameTitle: frame.title || '', size: frame.size,
         price, discountPercent: disc,
         qualityExtra, qualityLabel: String(body.qualityLabel || '').slice(0, 40),
+        couponId: usedCoupon ? couponId : '', couponDiscount,
         platformFee, deliveryFee,
         colourName: String(body.colourName || '').slice(0, 40),
         orientation: String(body.orientation || '').slice(0, 20),
@@ -1832,6 +1853,13 @@ function computeOrderFees(subtotal, settingsFees) {
         frames[storedFrameIndex] = Object.assign({}, frames[storedFrameIndex], { stockQuantity: Math.max(0, frameStock - 1), updatedAt: new Date().toISOString() });
         saveFrames(frames);
       }
+      if (usedCoupon) {
+        usedCoupon.couponStatus = 'used';
+        usedCoupon.usedAt = new Date().toISOString();
+        usedCoupon.usedOrderId = orderId;
+      }
+      // Save coupon use even when wallet was not selected.
+      if (usedCoupon || useWallet) saveAccounts(accounts);
       orders.unshift(order);
       saveFrameOrders(orders);
       // customer notification
@@ -1840,6 +1868,7 @@ function computeOrderFees(subtotal, settingsFees) {
         id: 'n-' + Date.now(),
         title: '📦 Order Received — ' + orderId,
         body: (frame.title || 'Photo Frame') + ' (' + frame.size + ') · Total ₹' + (finalAmount + walletPaid)
+          + (couponDiscount ? (' · Coupon −₹' + couponDiscount) : '')
           + (walletPaid ? (' · Wallet −₹' + walletPaid) : '')
           + (finalAmount > 0 ? (' · Due ₹' + finalAmount) : ' · Paid via Wallet')
           + ' · Status: Processing · Payment: ' + paymentStatus,

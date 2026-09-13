@@ -869,6 +869,12 @@ tailwind.config = {
           </div>
         </div>
 
+        <div id="coupon-payment-option" class="rounded-DEFAULT border border-amber-300/45 bg-amber-950/20 p-3">
+          <p class="text-sm font-bold text-amber-100">🎟️ Coupon code (optional)</p>
+          <div class="flex gap-2 mt-2"><input id="order-coupon-code" class="min-w-0 flex-1 bg-surface border border-outline-variant rounded-DEFAULT px-3 py-2 text-sm text-on-surface uppercase" placeholder="Apna valid coupon code"><button id="apply-order-coupon" type="button" class="px-4 py-2 rounded-DEFAULT bg-amber-400 text-black text-sm font-bold">Apply</button></div>
+          <p id="order-coupon-status" class="text-xs mt-2 text-on-surface-variant">Valid coupon apply karke payment amount kam karein.</p>
+        </div>
+
         <label id="wallet-payment-option" class="hidden cursor-pointer rounded-DEFAULT border border-cyan-300/45 bg-cyan-950/25 p-3" style="box-shadow:0 0 16px rgba(34,211,238,.13)">
           <span class="flex items-center gap-3">
             <input id="use-wallet-check" type="checkbox" class="h-5 w-5 accent-cyan-400"/>
@@ -1531,7 +1537,9 @@ const ADDR_KEY = "aditya_studio_saved_address";
 
 function currentOrderTotal() {
   const base = frameFinalPrice(selectedFrame).finalPrice;
-  return base + (Number(selectedQuality.extra) || 0);
+  const beforeCoupon = base + (Number(selectedQuality.extra) || 0);
+  const couponValue = appliedOrderCoupon ? Math.max(0, Number(appliedOrderCoupon.value) || 0) : 0;
+  return Math.max(0, beforeCoupon - Math.min(beforeCoupon, couponValue));
 }
 function walletPaymentInfo(total) {
   const selected = !!document.getElementById("use-wallet-check")?.checked;
@@ -1590,10 +1598,12 @@ function fillAddressForm(data) {
 function showPaymentSection() {
   const { price, discount, finalPrice } = frameFinalPrice(selectedFrame);
   const extra = Number(selectedQuality.extra) || 0;
+  const beforeCoupon = finalPrice + extra;
+  const couponDiscount = appliedOrderCoupon ? Math.min(beforeCoupon, Math.max(0, Number(appliedOrderCoupon.value) || 0)) : 0;
   const total = currentOrderTotal();
   const dims = displayDims(selectedFrame.size);
   document.getElementById("op-mrp").textContent = formatPrice(price) + (extra ? " + " + formatPrice(extra) + " (" + selectedQuality.label + ")" : "");
-  document.getElementById("op-disc").textContent = discount > 0 ? (discount + "% OFF (−" + formatPrice(price - finalPrice) + ")") : "No discount";
+  document.getElementById("op-disc").textContent = (discount > 0 ? (discount + "% OFF (−" + formatPrice(price - finalPrice) + ")") : "No frame discount") + (couponDiscount ? (" · Coupon −" + formatPrice(couponDiscount)) : "");
   document.getElementById("op-total").textContent = formatPrice(total);
   // Bill amount = actual order total (quality extra included)
   document.getElementById("qr-amount-label").textContent = formatPrice(total);
@@ -1620,6 +1630,7 @@ function showPaymentSection() {
 function openOrderModal() {
   if (!selectedFrame) return;
   paymentClaimed = false;
+  appliedOrderCoupon = null;
   const dims = displayDims(selectedFrame.size);
   const orientLabel = orientation === "horizontal" ? "Horizontal (Landscape)" : "Vertical (Portrait)";
   document.getElementById("order-frame-preview").innerHTML = `
@@ -1638,6 +1649,10 @@ function openOrderModal() {
   document.getElementById("saved-address-badge").classList.add("hidden");
   document.getElementById("save-address-btn").classList.remove("hidden");
   document.getElementById("order-flow-hint").textContent = "Pehle address save karo → phir total payment dikhega";
+  const couponInput = document.getElementById("order-coupon-code");
+  const couponStatus = document.getElementById("order-coupon-status");
+  if (couponInput) couponInput.value = "";
+  if (couponStatus) { couponStatus.textContent = "Valid coupon apply karke payment amount kam karein."; couponStatus.style.color = ""; }
 
   // Agar pehle se address save hai to seedha payment section dikhao
   if (saved && saved.name && saved.mobile && saved.address && saved.pincode) {
@@ -1736,6 +1751,20 @@ document.getElementById("pay-order-btn").addEventListener("click", () => {
 });
 
 let payScreenshotData = "";
+let appliedOrderCoupon = null;
+function validOrderCoupon(code) {
+  const key=String(code||'').trim().toUpperCase();
+  const rows=(framesUser&&framesUser.history)||[];
+  return rows.find(h => String(h.couponId||h.entryId||'').toUpperCase()===key && (h.couponStatus||'active')==='active' && (!h.expiresAt || new Date(h.expiresAt).getTime()>=Date.now()) && Number(h.walletValue||h.discount||0)>0) || null;
+}
+document.getElementById('apply-order-coupon').addEventListener('click', function(){
+  const input=document.getElementById('order-coupon-code'), status=document.getElementById('order-coupon-status');
+  const coupon=validOrderCoupon(input.value);
+  if(!coupon){ appliedOrderCoupon=null; status.textContent='❌ Coupon invalid, expired ya already used hai.'; status.style.color='#fca5a5'; showPaymentSection(); return; }
+  appliedOrderCoupon={ id:String(coupon.couponId||coupon.entryId||''), value:Math.max(0,Math.round(Number(coupon.walletValue||coupon.discount||0))) };
+  status.textContent='✅ ₹'+appliedOrderCoupon.value+' coupon apply ho gaya'; status.style.color='#bbf7d0';
+  showPaymentSection();
+});
 document.getElementById("paid-claim-btn").addEventListener("click", () => {
   paymentClaimed = true;
   const btn = document.getElementById("paid-claim-btn");
@@ -1842,8 +1871,13 @@ document.getElementById("submit-order-btn").addEventListener("click", async () =
         paymentClaimed: needsUpiPayment && paymentClaimed,
         utr: needsUpiPayment ? utr : "",
         paymentScreenshot: needsUpiPayment ? payScreenshotData : "",
-      customerPhoto: "",
-      customerPhotoKey: customerPhotoKey || "",
+        customerPhoto: "",
+        customerPhotoKey: customerPhotoKey || "",
+        couponId: appliedOrderCoupon ? appliedOrderCoupon.id : "",
+        qualityExtra: Number(selectedQuality.extra) || 0,
+        qualityLabel: selectedQuality.label || "Normal",
+        colourName: selectedColour.name || "",
+        orientation: orientLabel,
         useWallet: walletInfo.selected,
         sessionToken: (frLoadSession() || {}).sessionToken || ""
       })
