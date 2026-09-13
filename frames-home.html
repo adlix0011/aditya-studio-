@@ -1208,20 +1208,15 @@ function renderFrames(filterSize = null) {
   let list = allFrames.flatMap(f => frameAvailableSizes(f).map(size => Object.assign({}, f, { size: size })));
   if (filterSize) list = list.filter(f => f.size === filterSize);
 
-  // Same size ke multiple frame types ek hi card me group honge. Customer card kholkar
-  // us size ke sab available types choose karega.
+  // Every admin-approved frame gets its own card. Low price first, so the
+  // customer sees affordable options before premium/high-price frames.
   list.sort((a, b) => {
+    const priceDiff = (Number(a.price) || 0) - (Number(b.price) || 0);
+    if (priceDiff !== 0) return priceDiff;
     const d = sizeArea(a.size) - sizeArea(b.size);
     if (d !== 0) return d;
     return String(a.title || "").localeCompare(String(b.title || ""));
   });
-  const bySize = new Map();
-  list.forEach(frame => {
-    const key = String(frame.size || "—");
-    if (!bySize.has(key)) bySize.set(key, []);
-    bySize.get(key).push(frame);
-  });
-  list = Array.from(bySize.values()).map(group => group[0]);
 
   if (!list.length) {
     grid.innerHTML = `<div class="col-span-full text-center text-on-surface-variant py-12">
@@ -1234,7 +1229,6 @@ function renderFrames(filterSize = null) {
 
   grid.innerHTML = list.map((frame, index) => {
     const size = frame.size || "—";
-    const typeCount = (bySize.get(String(size)) || []).length;
     const dims = displayDims(size);
     const aspect = dims.w / dims.h;
     const price = Number(frame.price) || 0;

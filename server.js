@@ -4114,7 +4114,7 @@ label.muted{display:block;font-size:12px;margin-bottom:2px}
 <label class="muted">Frame tags <input class="inp" id="frTags" placeholder="Premium, Golden, Wedding"><small>Comma se alag tags. Customer ko filter/pehchan ke liye dikhenge.</small></label>
 <div class="muted" style="grid-column:1/-1;display:flex;gap:14px;flex-wrap:wrap;padding:10px;border:1px solid rgba(245,212,93,.25);border-radius:10px">
   <label style="cursor:pointer"><input id="frManualUnavailable" type="checkbox"> 🔴 Manually Not Available</label>
-  <label style="cursor:pointer"><input id="frShowPage" type="checkbox" checked> 🖼️ Frame page par dikhayein</label>
+  <label style="cursor:pointer"><input id="frShowPage" type="checkbox" checked> 🖼️ Frame page par alag product card dikhayein</label>
   <label style="cursor:pointer"><input id="frShowBooking" type="checkbox" checked> 🧾 Booking ke frame type options me dikhayein</label>
 </div>
 <div class="muted" style="grid-column:1/-1;padding:11px;border:1px solid rgba(34,211,238,.38);border-radius:10px;background:linear-gradient(135deg,#102433,#151225)">
