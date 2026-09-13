@@ -62,6 +62,26 @@ function awsEncode(value) {
 function hmacSha256(key, value, encoding) {
   return crypto.createHmac('sha256', key).update(value, 'utf8').digest(encoding);
 }
+// Never trust only a filename or the browser-provided MIME type. Verify the
+// magic bytes before this server forwards/stores an image payload.
+function detectedImageMime(bytes) {
+  if (!Buffer.isBuffer(bytes) || bytes.length < 12) return '';
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg';
+  if (bytes.slice(0, 8).equals(Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]))) return 'image/png';
+  if (bytes.slice(0, 4).toString('ascii') === 'RIFF' && bytes.slice(8, 12).toString('ascii') === 'WEBP') return 'image/webp';
+  return '';
+}
+function isAllowedImageBytes(bytes, claimedType) {
+  const actual = detectedImageMime(bytes);
+  const claimed = String(claimedType || '').toLowerCase().replace('image/jpg', 'image/jpeg');
+  return !!actual && actual === claimed;
+}
+function safeImageDataUrl(value) {
+  const match = /^data:(image\/(?:png|jpe?g|webp));base64,([A-Za-z0-9+/=\s]+)$/i.exec(String(value || ''));
+  if (!match) return null;
+  const bytes = Buffer.from(match[2].replace(/\s/g, ''), 'base64');
+  return isAllowedImageBytes(bytes, match[1]) ? { bytes, type: match[1].toLowerCase().replace('image/jpg', 'image/jpeg') } : null;
+}
 function r2PresignedUrl(method, objectKey, expiresSeconds) {
   if (!r2Ready()) throw new Error('R2 is not configured');
   const endpoint = new URL(R2_ENDPOINT);
@@ -1631,11 +1651,11 @@ const server = http.createServer(async (req, res) => {
       const account = sessionAccount(req, body, loadAccounts());
       if (!account || String(account.mobile) !== mobile) return sendJSON(res, 401, { ok: false, error: 'auth', message: 'Login session valid nahi hai' });
       const dataUrl = String(body.dataUrl || '');
-      const match = /^data:(image\/(?:png|jpe?g|webp));base64,([A-Za-z0-9+/=\s]+)$/i.exec(dataUrl);
-      if (!match) return sendJSON(res, 400, { ok: false, error: 'invalid-image', message: 'Photo format sahi nahi hai' });
-      const bytes = Buffer.from(match[2].replace(/\s/g, ''), 'base64');
+      const safeImage = safeImageDataUrl(dataUrl);
+      if (!safeImage) return sendJSON(res, 400, { ok: false, error: 'invalid-image', message: 'Sirf asli JPG, PNG ya WEBP photo upload karein' });
+      const bytes = safeImage.bytes;
       if (!bytes.length || bytes.length > 4 * 1024 * 1024) return sendJSON(res, 400, { ok: false, error: 'photo-too-large', message: 'Photo 4 MB se chhoti honi chahiye' });
-      const type = match[1].toLowerCase();
+      const type = safeImage.type;
       const ext = ({ 'image/jpeg': 'jpg', 'image/jpg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' })[type];
       const key = 'customer-photos/' + mobile + '/' + Date.now() + '-' + crypto.randomBytes(10).toString('hex') + '.' + ext;
       const put = await fetch(r2PresignedUrl('PUT', key, 600), { method: 'PUT', headers: { 'Content-Type': type }, body: bytes });
@@ -2822,6 +2842,9 @@ function computeOrderFees(subtotal, settingsFees) {
       const imageData = String(body.imageData || '').slice(0, 4e6); // ~4MB base64 cap
       const imageUrl = String(body.imageUrl || '').trim();
       if (!size) return sendJSON(res, 400, { ok: false, error: 'size-required', message: 'Size required' });
+      if (imageData && !safeImageDataUrl(imageData)) {
+        return sendJSON(res, 400, { ok: false, error: 'invalid-image', message: 'Frame photo sirf asli JPG, PNG ya WEBP honi chahiye' });
+      }
       const idx = frames.findIndex(f => f.id === id);
       const row = {
         id, size, availableSizes: availableSizes.length ? availableSizes : [size], title, price, discountPercent, active,
