@@ -71,7 +71,8 @@ async function syncStudioWallet(){
     save();
     // Profile/address/post forms are drafts. A background wallet refresh must
     // never rebuild an open form and erase text the customer is typing.
-    const draftOpen=!!document.querySelector('#addressForm,#broadcastForm,#profileForm,#priceForm,#chatForm');
+    const focused=document.activeElement;
+    const draftOpen=!!document.querySelector('#addressForm,#broadcastForm,#profileForm,#priceForm')||!!focused?.closest('#chatForm');
     if(!draftOpen)render();
   }catch(e){}
 }
