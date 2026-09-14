@@ -4,10 +4,12 @@ const KEY='local-delivery-v1';
 // The account below is replaced from the existing Aditya Studio login session.
 const seed=()=>({users:{me:{name:'Login करें',balance:0}},orders:[],transactions:[]});
 let state;try{state=JSON.parse(localStorage.getItem(KEY))||seed()}catch{state=seed()}
-// Old partial browser data can miss the new signed-in placeholder and used to
-// stop rendering completely. Start clean instead of leaving a blank screen.
-if(!state||typeof state!=='object'||!state.users||!state.users.me){state=seed();try{localStorage.setItem(KEY,JSON.stringify(state))}catch{}}
-let user='me',tab='home',active=null,category='All',query='';
+// Keep saved delivery records across code updates. Reset only truly corrupt
+// storage, never a valid signed-in user's record.
+if(!state||typeof state!=='object'||!state.users||!Object.keys(state.users).length){state=seed();try{localStorage.setItem(KEY,JSON.stringify(state))}catch{}}
+if(!Array.isArray(state.orders))state.orders=[];
+if(!Array.isArray(state.transactions))state.transactions=[];
+let user=state.users.me?'me':Object.keys(state.users)[0],tab='home',active=null,category='All',query='';
 const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),money=n=>'₹'+n.toLocaleString('en-IN'),total=o=>o.items+o.fee;
 const held=id=>DeliveryEngine.holds(state,id),available=id=>DeliveryEngine.available(state,id);
 const mine=o=>o.owner===user||o.provider===user,icons={Groceries:'🥬',Pickup:'📦',Shopping:'🛍️',Other:'✦'},labels={open:'नई मांग',chat:'बातचीत जारी',booked:'बुक हो गया',delivering:'पुष्टि का इंतज़ार',completed:'पूरा हुआ',cancelled:'रद्द'};
@@ -62,9 +64,9 @@ render();
     const account=await response.json();
     if(!response.ok||!account?.ok)return;
     user=String(account.id||'me');
-    state.users={[user]:{name:String(account.name||'User'),balance:Number(account.walletBalance)||0,village:String(account.village||'')}};
+    state.users[user]={...(state.users[user]||{}),name:String(account.name||'User'),phone:String(account.mobile||''),balance:Number(account.walletBalance)||0,village:String(account.village||'')};
     state.transactions=(Array.isArray(account.walletHistory)?account.walletHistory:[]).map(t=>({user,amount:t.type==='debit'?-Number(t.amount||0):Number(t.amount||0),label:t.reason||'Wallet transaction',date:t.timestamp||''}));
-    render();
+    save();render();
   }catch(e){}
 })();
 
