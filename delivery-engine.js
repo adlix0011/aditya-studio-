@@ -18,8 +18,9 @@ const DeliveryEngine=(()=>{
   const owner=o.owner===actor,helper=o.provider===actor,member=owner||helper;
   if(action==='accept'){
    if(o.status!=='open'||owner)fail('यह काम स्वीकार नहीं कर सकते।');
-   o.provider=actor;reserve(s,o);o.status='chat';o.providerDone=false;o.ownerDone=false;o.otp=null;o.cancelBy=null;
-   note(o,'काम स्वीकार हुआ। Customer की ₹'+o.customerHold+' रकम lock है। Helper सामान अपने पैसे से लाएगा; delivery के बाद उसे payment मिलेगा। Customer की booking confirmation बाकी है।');
+   // Customer money is locked at post time. A helper can accept with ₹0.
+   o.provider=actor;if(!(Number(o.customerHold)>0))reserve(s,o);o.status='chat';o.providerDone=false;o.ownerDone=false;o.otp=null;o.cancelBy=null;
+   note(o,'काम स्वीकार हुआ। Customer की ₹'+o.customerHold+' रकम पहले से lock है। Helper सामान अपने पैसे से लाएगा; delivery के बाद उसे payment मिलेगा। Customer की booking confirmation बाकी है।');
   }else if(action==='book'){
    if(!owner||o.status!=='chat'||o.proposal)fail('पहले बातचीत और रकम की सहमति पूरी करें।');
    reserve(s,o);o.status='booked';note(o,'Customer ने booking confirm की। सामान मिलने के बाद ही delivery OTP दें।');
