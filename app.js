@@ -4,6 +4,9 @@ const KEY='local-delivery-v1';
 // The account below is replaced from the existing Aditya Studio login session.
 const seed=()=>({users:{me:{name:'Login करें',balance:0}},orders:[],transactions:[]});
 let state;try{state=JSON.parse(localStorage.getItem(KEY))||seed()}catch{state=seed()}
+// Old partial browser data can miss the new signed-in placeholder and used to
+// stop rendering completely. Start clean instead of leaving a blank screen.
+if(!state||typeof state!=='object'||!state.users||!state.users.me){state=seed();try{localStorage.setItem(KEY,JSON.stringify(state))}catch{}}
 let user='me',tab='home',active=null,category='All',query='';
 const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),money=n=>'₹'+n.toLocaleString('en-IN'),total=o=>o.items+o.fee;
 const held=id=>DeliveryEngine.holds(state,id),available=id=>DeliveryEngine.available(state,id);
