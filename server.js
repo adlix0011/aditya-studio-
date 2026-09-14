@@ -32,7 +32,10 @@ const MOBILE_VERIFY_OTP_TTL_MS = 365 * 24 * 60 * 60 * 1000;
 const OTP_RESEND_COOLDOWN_MS = 60 * 1000;
 const OTP_MAX_ATTEMPTS = 5;
 const OTP_PEPPER = process.env.OTP_SECRET || SMS_GATEWAY_API_KEY || crypto.randomBytes(32).toString('hex');
-const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+// A signed-in customer should stay signed in across normal use, browser
+// restarts and server restarts. Each valid request renews this long-lived
+// token, while the explicit Logout button still clears it from the browser.
+const SESSION_TTL_MS = 365 * 24 * 60 * 60 * 1000;
 const sessions = new Map();
 const authAttempts = new Map();
 
@@ -392,11 +395,32 @@ function issueSession(acc) {
   saveSessions();
   return token;
 }
+function renewSession(acc, token) {
+  const threshold = Date.now() + Math.floor(SESSION_TTL_MS / 2);
+  let changed = false;
+  const live = sessions.get(token);
+  if (live && Number(live.expiresAt) < threshold) {
+    live.expiresAt = Date.now() + SESSION_TTL_MS;
+    changed = true;
+    saveSessions();
+  }
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+  const saved = Array.isArray(acc.sessionTokens) && acc.sessionTokens.find(row => row && row.tokenHash === tokenHash);
+  if (saved && Number(saved.expiresAt) < threshold) {
+    saved.expiresAt = Date.now() + SESSION_TTL_MS;
+    changed = true;
+  }
+  return changed;
+}
 function sessionAccount(req, body, accounts) {
   const bearer = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
   const token = String((body && body.sessionToken) || bearer || '');
   const row = sessions.get(token);
-  if (row && row.expiresAt >= Date.now()) return accounts.find(a => String(a.mobile) === row.mobile) || null;
+  if (row && row.expiresAt >= Date.now()) {
+    const acc = accounts.find(a => String(a.mobile) === row.mobile) || null;
+    if (acc && renewSession(acc, token)) saveAccounts(accounts);
+    return acc;
+  }
   if (row) { sessions.delete(token); saveSessions(); }
   // Durable fallback for a server restart: only the SHA-256 hash is stored.
   if (!token) return null;
@@ -405,6 +429,7 @@ function sessionAccount(req, body, accounts) {
   if (acc) {
     const saved = acc.sessionTokens.find(s => s && s.tokenHash === tokenHash);
     sessions.set(token, { mobile: String(acc.mobile), expiresAt: Number(saved.expiresAt) });
+    if (renewSession(acc, token)) saveAccounts(accounts);
     return acc;
   }
   return null;
