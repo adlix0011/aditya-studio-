@@ -2527,10 +2527,26 @@ function computeOrderFees(subtotal, settingsFees) {
       acc.walletPendingBalance = Math.max(0, Number(acc.walletPendingBalance || 0) - amount);
       if (action === 'approve') {
         topup.status = 'approved'; topup.verifiedAt = new Date().toISOString();
-        walletTxn(acc, 'credit', amount, { reason: 'Recharge approved · ' + id, source: 'wallet_topup', ref: id });
+        const credit = walletTxn(acc, 'credit', amount, { reason: 'Recharge approved · ' + id, source: 'wallet_topup', ref: id });
+        const pending = (acc.walletHistory || []).find(row => row.type === 'pending' && String(row.ref || '') === id);
+        if (pending && credit) {
+          pending.type = 'approved';
+          pending.reason = 'Recharge verified · ' + id;
+          pending.balanceAfter = acc.walletBalance;
+          pending.timestamp = topup.verifiedAt;
+          acc.walletHistory = acc.walletHistory.filter(row => row !== credit && row !== pending);
+          acc.walletHistory.unshift(pending);
+        }
       } else if (action === 'reject') {
         topup.status = 'rejected'; topup.verifiedAt = new Date().toISOString();
-        acc.walletHistory.unshift({ id: walletHistoryId(), type: 'rejected', amount, balanceAfter: acc.walletBalance, reason: 'Recharge rejected · ' + id, source: 'wallet_topup', ref: id, timestamp: new Date().toISOString() });
+        const pending = (acc.walletHistory || []).find(row => row.type === 'pending' && String(row.ref || '') === id);
+        if (pending) {
+          pending.type = 'rejected';
+          pending.reason = 'Recharge rejected · ' + id;
+          pending.timestamp = topup.verifiedAt;
+        } else {
+          acc.walletHistory.unshift({ id: walletHistoryId(), type: 'rejected', amount, balanceAfter: acc.walletBalance, reason: 'Recharge rejected · ' + id, source: 'wallet_topup', ref: id, timestamp: topup.verifiedAt });
+        }
       } else { res.writeHead(302, { Location: '/admin?topup=invalid-action' }); return res.end(); }
       saveWalletTopups(topups); saveAccounts(accounts);
       const notifs = loadNotifs();
