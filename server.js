@@ -1357,9 +1357,23 @@ const LIVE_SYNC_SNIPPET = `<script>(function(){
   document.addEventListener('focusout',function(){if(queued&&!welcomeSpinOpen()){queued=false;setTimeout(check,300)}});
   setTimeout(check,1200);timer=setInterval(check,12000);
 })();</script>`;
+// Mobile app navigation: every customer page gets one fixed bottom bar.
+// Local Delivery already has its own in-app navigation, so it is excluded.
+const STUDIO_BOTTOM_NAV = `<style id="studio-bottom-nav-style">
+  @media (max-width:767px){
+    body{padding-bottom:92px!important}
+    .studio-bottom-nav{position:fixed;left:50%;bottom:max(12px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:9999;display:flex;align-items:stretch;width:min(calc(100vw - 24px),430px);padding:7px;background:rgba(10,12,27,.94);border:1px solid rgba(255,255,255,.18);border-radius:22px;box-shadow:0 12px 32px rgba(0,0,0,.48),0 0 20px rgba(99,102,241,.20);backdrop-filter:blur(18px)}
+    .studio-bottom-nav a{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:52px;border-radius:16px;color:#d8e5ff;text-decoration:none;font:800 10px/1.1 Arial,sans-serif;letter-spacing:.01em}
+    .studio-bottom-nav .studio-bottom-nav-icon{font-size:20px;line-height:1}
+    .studio-bottom-nav a[aria-current="page"]{color:#fff;background:linear-gradient(135deg,#6d28d9,#2563eb 58%,#0891b2);box-shadow:0 4px 13px rgba(79,70,229,.43)}
+  }
+  @media (min-width:768px){.studio-bottom-nav{display:none}}
+</style><nav class="studio-bottom-nav" aria-label="Quick navigation"><a href="/" data-studio-nav="home"><span class="studio-bottom-nav-icon">⌂</span><span>Home</span></a><a href="/my-orders" data-studio-nav="orders"><span class="studio-bottom-nav-icon">▣</span><span>Orders</span></a><a href="/local-delivery.html" data-studio-nav="delivery"><span class="studio-bottom-nav-icon">🚚</span><span>Local Delivery</span></a></nav><script>(function(){var p=location.pathname;var k=p==='/local-delivery.html'?'delivery':(p==='/my-orders'||p==='/my-orders.html'?'orders':'home');var a=document.querySelector('[data-studio-nav="'+k+'"]');if(a)a.setAttribute('aria-current','page');})();</script>`;
 function serveLiveHtml(res, data, includeLiveSync) {
   const html = Buffer.isBuffer(data) ? data.toString('utf8') : String(data || '');
-  res.end(includeLiveSync ? html.replace(/<\/body>/i, LIVE_SYNC_SNIPPET + '</body>') : html);
+  const isLocalDelivery = /<title>\s*Local Delivery\s*<\/title>/i.test(html);
+  const extras = (isLocalDelivery ? '' : STUDIO_BOTTOM_NAV) + (includeLiveSync ? LIVE_SYNC_SNIPPET : '');
+  res.end(extras ? html.replace(/<\/body>/i, extras + '</body>') : html);
 }
 function liveRevision() {
   // Activity heartbeat ko jaanbujhkar include nahi karte, warna har visitor ke
@@ -1385,6 +1399,31 @@ const server = http.createServer(async (req, res) => {
       'Access-Control-Allow-Headers': 'Content-Type'
     });
     return res.end();
+  }
+
+  // Local Delivery is a small client app. Keep its files explicitly allow-listed
+  // so this server never exposes arbitrary files from the project folder.
+  const localDeliveryAssets = new Set([
+    'styles.css', 'mobile-design.css', 'home-design.css', 'profile-page.css', 'delivery-flow.css',
+    'item-icons.js', 'delivery-engine.js', 'app.js', 'request-summary.js', 'home-design.js',
+    'order-items.js', 'post-page.js', 'profile-page.js', 'edit-order.js', 'delivery-flow.js',
+    'post-wallet.js', 'language.js', 'notifications-page.js', 'local-delivery-admin.js', 'local-delivery-admin.css'
+  ]);
+  if (req.method === 'GET' && urlPath === '/local-delivery.html') {
+    return fs.readFile(path.join(__dirname, 'local-delivery.html'), (err, data) => {
+      if (err) { res.writeHead(404); return res.end('Local Delivery page missing'); }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store, max-age=0' });
+      serveLiveHtml(res, data);
+    });
+  }
+  const requestedAsset = urlPath.slice(1);
+  if (req.method === 'GET' && localDeliveryAssets.has(requestedAsset)) {
+    const contentType = requestedAsset.endsWith('.css') ? 'text/css; charset=utf-8' : 'application/javascript; charset=utf-8';
+    return fs.readFile(path.join(__dirname, requestedAsset), (err, data) => {
+      if (err) { res.writeHead(404); return res.end('Local Delivery asset missing'); }
+      res.writeHead(200, { 'Content-Type': contentType, 'Cache-Control': 'public, max-age=300' });
+      res.end(data);
+    });
   }
 
   // New luxury homepage (Artisan Collection)
