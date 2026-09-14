@@ -1263,6 +1263,10 @@ function accountPublicPayload(acc) {
     id: acc.id,
     name: acc.name,
     village: acc.village,
+    address: acc.address || '',
+    district: acc.district || '',
+    pincode: acc.pincode || '',
+    landmark: acc.landmark || '',
     mobile: acc.mobile,
     history: publicHistory(acc),
     mobileVerified: !!acc.mobileVerified,
@@ -2328,6 +2332,29 @@ function computeOrderFees(subtotal, settingsFees) {
       return sendJSON(res, 200, accountPublicPayload(acc));
     } catch (e) {
       return sendJSON(res, 400, { ok: false });
+    }
+  }
+
+  // Saved profile address is shared by the main site and Local Delivery.
+  if (req.method === 'POST' && urlPath === '/api/profile/address') {
+    try {
+      const body = await readBody(req);
+      const accounts = loadAccounts();
+      const acc = sessionAccount(req, body, accounts);
+      if (!acc) return sendJSON(res, 401, { ok:false, message:'Login required' });
+      const address = String(body.address || '').trim().slice(0, 250);
+      const village = String(body.village || '').trim().slice(0, 100);
+      const district = String(body.district || '').trim().slice(0, 100);
+      const pincode = String(body.pincode || '').trim();
+      const landmark = String(body.landmark || '').trim().slice(0, 150);
+      if (!address || !village || !district || !/^[0-9]{6}$/.test(pincode)) {
+        return sendJSON(res, 400, { ok:false, message:'पूरा address, गांव/शहर, जिला और 6 अंकों का पिन कोड जरूरी है' });
+      }
+      Object.assign(acc, { address, village, district, pincode, landmark });
+      saveAccounts(accounts);
+      return sendJSON(res, 200, accountPublicPayload(acc));
+    } catch (e) {
+      return sendJSON(res, 500, { ok:false, message:'पता save नहीं हुआ' });
     }
   }
 
