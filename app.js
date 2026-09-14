@@ -10,10 +10,11 @@ if(!state||typeof state!=='object'||!state.users||!Object.keys(state.users).leng
 if(!Array.isArray(state.orders))state.orders=[];
 if(!Array.isArray(state.transactions))state.transactions=[];
 let user=state.users.me?'me':Object.keys(state.users)[0],tab='home',active=null,category='All',query='';
+try{const raw=localStorage.getItem('aditya_studio_session_v1')||localStorage.getItem('aditya_studio_persistent_login_v2'),session=raw?JSON.parse(raw):null,snapshot=JSON.parse(localStorage.getItem('aditya_studio_wallet_snapshot_v1')||'null');if(session?.mobile&&snapshot?.mobile===session.mobile&&snapshot.id){user=String(snapshot.id);state.users[user]={...(state.users[user]||{}),name:snapshot.name||'User',phone:session.mobile,balance:Number(snapshot.balance)||0,pendingBalance:Number(snapshot.pendingBalance)||0}}}catch{}
 const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),money=n=>'₹'+n.toLocaleString('en-IN'),total=o=>o.items+o.fee;
 const held=id=>DeliveryEngine.holds(state,id),available=id=>Number(state.users[id]?.balance||0);
 const mine=o=>o.owner===user||o.provider===user,icons={Groceries:'🥬',Pickup:'📦',Shopping:'🛍️',Other:'✦'},labels={open:'नई मांग',chat:'बातचीत जारी',booked:'बुक हो गया',delivering:'पुष्टि का इंतज़ार',completed:'पूरा हुआ',cancelled:'रद्द'};
-function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch{toast('Storage is unavailable. Keep this page open to retain this session.')}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(state));const raw=localStorage.getItem('aditya_studio_session_v1')||localStorage.getItem('aditya_studio_persistent_login_v2'),session=raw?JSON.parse(raw):null,u=state.users[user];if(session?.mobile&&u&&user!=='me')localStorage.setItem('aditya_studio_wallet_snapshot_v1',JSON.stringify({id:user,mobile:session.mobile,name:u.name||'',balance:Number(u.balance)||0,pendingBalance:Number(u.pendingBalance)||0,at:Date.now()}))}catch{toast('Storage is unavailable. Keep this page open to retain this session.')}}
 let toastTimer;function toast(text){$('toast').textContent=text;$('toast').style.display='block';clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').style.display='none',4000)}
 function system(o,text){o.messages.push({sender:'system',text,time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})})}
 function go(t){tab=t;active=null;render();if(t==='wallet')syncStudioWallet()}

@@ -203,6 +203,7 @@ const WALLET_TOPUPS_FILE = path.join(DATA_DIR, 'wallet-topups.json');
 const ACTIVITY_FILE = path.join(DATA_DIR, 'user-activity.json');
 const LOCAL_DELIVERY_LOCKS_FILE = path.join(DATA_DIR, 'local-delivery-locks.json');
 const LOCAL_DELIVERY_ORDERS_FILE = path.join(DATA_DIR, 'local-delivery-orders.json');
+const AUTO_BACKUP_DIR = path.join(DATA_DIR, 'auto-backups');
 // Browser login ko server restart ke baad bhi valid rakhne ke liye (7 days).
 const SESSIONS_FILE = path.join(DATA_DIR, 'sessions.json');
 const INDEX_HTML_FILE = path.join(__dirname, 'index.html');
@@ -4057,11 +4058,19 @@ loadOrdersPage();setInterval(loadOrdersPage,20000);
       return pay === 'unpaid' || pay === 'paid_claimed' || pay === 'partial_wallet';
     }).length;
     const ordRejected = frameOrdersAdmin.filter(o => ['rejected', 'cancelled'].includes(String(o.status || '').toLowerCase())).length;
-    const pendingWalletTopups = loadWalletTopups().filter(t => String(t.status || 'pending') === 'pending');
+    const allWalletTopups = loadWalletTopups().slice().sort((a,b) => String(b.verifiedAt || b.createdAt || '').localeCompare(String(a.verifiedAt || a.createdAt || '')));
+    const pendingWalletTopups = allWalletTopups.filter(t => String(t.status || 'pending') === 'pending');
+    const approvedWalletTopups = allWalletTopups.filter(t => String(t.status || '') === 'approved');
+    const rejectedWalletTopups = allWalletTopups.filter(t => String(t.status || '') === 'rejected');
     const walletTopupCards = pendingWalletTopups.map(t => {
       const proof = t.proof ? '<a href="'+esc(t.proof)+'" target="_blank"><img src="'+esc(t.proof)+'" style="width:82px;height:82px;object-fit:cover;border-radius:10px;border:2px solid #38bdf8" title="Open payment screenshot"></a>' : '<span class="muted">Screenshot nahi diya</span>';
       return '<div class="msg-card" style="margin-top:10px;border-color:rgba(56,189,248,.7);background:linear-gradient(135deg,#0c2431,#1b1730);box-shadow:0 0 18px rgba(56,189,248,.15)"><div class="msg-text"><b style="color:#67e8f9">💳 Recharge Pending · ₹'+esc(t.amount)+'</b><br>👤 '+esc(t.name||'Customer')+' · '+esc(t.mobile)+'<br>UTR: <b>'+esc(t.utr||'Screenshot upload')+'</b><br><span class="muted">'+esc(fmtDate(t.createdAt))+'</span><div style="margin-top:9px">'+proof+'</div></div><div class="msg-actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><form method="POST" action="/admin/wallet-topup-action"><input type="hidden" name="id" value="'+esc(t.id)+'"><button class="gen-btn" type="submit" name="action" value="approve" style="background:linear-gradient(135deg,#22c55e,#0f766e);color:#fff;box-shadow:0 0 15px rgba(34,197,94,.35)">✅ Verify & Add ₹'+esc(t.amount)+'</button></form><form method="POST" action="/admin/wallet-topup-action" onsubmit="return confirm(\'Reject this recharge?\')"><input type="hidden" name="id" value="'+esc(t.id)+'"><button type="submit" name="action" value="reject" style="padding:8px 12px;border:0;border-radius:8px;background:#dc2626;color:#fff;font-weight:800;cursor:pointer">❌ Reject</button></form></div></div>';
     }).join('') || '<div class="muted">Abhi koi wallet recharge verification pending nahi hai.</div>';
+    const walletTopupHistoryRows = allWalletTopups.slice(0,200).map(t => {
+      const status=String(t.status||'pending'),color=status==='approved'?'#86efac':status==='rejected'?'#fca5a5':'#fde68a';
+      const label=status==='approved'?'✓ Verified':status==='rejected'?'✕ Rejected':'⏳ Pending';
+      return '<tr><td>'+esc(fmtDate(t.createdAt))+'</td><td>'+esc(t.name||'Customer')+'<br><small>'+esc(t.mobile||'')+'</small></td><td><b>₹'+esc(t.amount)+'</b></td><td style="color:'+color+';font-weight:800">'+label+'</td><td>'+esc(t.utr||'Screenshot')+'</td><td>'+esc(t.verifiedAt?fmtDate(t.verifiedAt):'—')+'</td></tr>';
+    }).join('') || '<tr><td colspan="6" class="muted">Abhi recharge record nahi hai.</td></tr>';
 
     const otpCards = pendingOtps.map(r => {
       const manual = String(r.manualOtp || '');
@@ -4330,6 +4339,9 @@ label.muted{display:block;font-size:12px;margin-bottom:2px}
 <h2 style="color:#67e8f9">💳 Wallet Recharge Verification <span class="badge">${pendingWalletTopups.length}</span></h2>
 <p class="sub">Customer ne paisa add kiya ho to UTR / screenshot check karke green button se wallet me add karein.</p>
 <div id="walletTopupList">${walletTopupCards}</div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin:18px 0 10px"><span class="badge" style="background:#3b2d08;color:#fde68a">⏳ Pending: ${pendingWalletTopups.length}</span><span class="badge" style="background:#123d29;color:#bbf7d0">✓ Verified: ${approvedWalletTopups.length}</span><span class="badge" style="background:#451a1f;color:#fecaca">✕ Rejected: ${rejectedWalletTopups.length}</span></div>
+<h3 style="margin:14px 0 8px;color:#e2e8f0">पूरा Recharge Record</h3>
+<div style="overflow:auto;max-height:420px"><table class="data-table"><thead><tr><th>Date</th><th>Customer</th><th>Amount</th><th>Status</th><th>UTR / Proof</th><th>Verified at</th></tr></thead><tbody>${walletTopupHistoryRows}</tbody></table></div>
 </section>
 
 <section class="panel" id="sec-fees">
@@ -6080,6 +6092,27 @@ async function hydrateFromMongo() {
   }
 }
 
+function createDailyAutomaticBackup() {
+  try {
+    fs.mkdirSync(AUTO_BACKUP_DIR, { recursive: true });
+    const day = new Date().toLocaleDateString('en-CA', { timeZone:'Asia/Kolkata' });
+    const target = path.join(AUTO_BACKUP_DIR, 'aditya-studio-auto-' + day + '.json');
+    if (fs.existsSync(target)) return;
+    const read = file => { try { return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : null; } catch (_) { return null; } };
+    const payload = {
+      version: 1, automatic: true, createdAt: new Date().toISOString(),
+      accounts: read(DATA_FILE), walletTopups: read(WALLET_TOPUPS_FILE),
+      localDeliveryOrders: read(LOCAL_DELIVERY_ORDERS_FILE), localDeliveryLocks: read(LOCAL_DELIVERY_LOCKS_FILE),
+      frameOrders: read(FRAME_ORDERS_FILE), notifications: read(NOTIF_FILE),
+      codes: read(CODES_FILE), settings: read(SETTINGS_FILE)
+    };
+    fs.writeFileSync(target, JSON.stringify(payload, null, 2), 'utf8');
+    const old = fs.readdirSync(AUTO_BACKUP_DIR).filter(f => /^aditya-studio-auto-.*\.json$/.test(f)).sort().reverse().slice(30);
+    old.forEach(file => { try { fs.unlinkSync(path.join(AUTO_BACKUP_DIR, file)); } catch (_) {} });
+    console.log('[backup] Daily backup saved:', target);
+  } catch (e) { console.warn('[backup] Automatic backup failed:', e.message); }
+}
+
 // Server PEHLE start — Mongo baad me background (hang nahi hoga)
 server.listen(PORT, '0.0.0.0', () => {
   console.log('========================================');
@@ -6099,5 +6132,8 @@ server.listen(PORT, '0.0.0.0', () => {
     console.log('DB mode:', useMongo ? 'MongoDB Atlas ✅' : 'JSON files');
   } catch (e) {
     console.error('[boot] DB init error (server already running):', e && e.message ? e.message : e);
+  } finally {
+    createDailyAutomaticBackup();
+    setInterval(createDailyAutomaticBackup, 60 * 60 * 1000);
   }
 })();
