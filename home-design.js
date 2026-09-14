@@ -10,7 +10,7 @@ try{lightTheme=localStorage.getItem('kaamsetu-theme')==='light'}catch{}
 function requirementTime(o){
  if(o.neededBy && String(o.neededBy).trim()){
   const due=new Date(o.neededBy),left=due.getTime()-Date.now();
-  if(!Number.isNaN(due.getTime())){if(left<=0)return 'समय पूरा हुआ';const mins=Math.ceil(left/60000),days=Math.floor(mins/1440),hours=Math.floor((mins%1440)/60),minutes=mins%60;return (days?days+' दिन ':'')+(hours?hours+' घंटे ':'')+(minutes?minutes+' मिनट ':'')+'बाकी'}
+  if(!Number.isNaN(due.getTime())){if(left<=0)return 'समय पूरा हुआ';const secs=Math.max(0,Math.floor(left/1000)),days=Math.floor(secs/86400),hours=Math.floor((secs%86400)/3600),minutes=Math.floor((secs%3600)/60),seconds=secs%60;return (days?days+' दिन ':'')+(hours?hours+' घंटे ':'')+(minutes+' मिनट ')+(seconds+' सेकंड बाकी')}
   return String(o.neededBy).trim();
  }
  const previous=String(o.description||'').match(/(?:^|\n)कब तक चाहिए:\s*([^\n]+)/);
