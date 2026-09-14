@@ -68,7 +68,11 @@ async function syncStudioWallet(){
     state.users[user]={...(state.users[user]||{}),name:String(account.name||'User'),phone:String(account.mobile||''),balance:Number(account.walletBalance)||0,pendingBalance:Number(account.walletPendingBalance)||0,village:String(account.village||''),address:String(account.address||''),district:String(account.district||''),pincode:String(account.pincode||''),landmark:String(account.landmark||'')};
     state.transactions=(Array.isArray(account.walletHistory)?account.walletHistory:[]).map(t=>({user,amount:t.type==='debit'?-Number(t.amount||0):(t.type==='credit'||t.type==='approved'?Number(t.amount||0):0),displayAmount:Number(t.amount||0),status:String(t.type||''),label:t.reason||'Wallet transaction',date:t.timestamp||''}));
     try{const ordersResponse=await fetch('/api/local-delivery/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mobile:session.mobile,sessionToken:session.sessionToken,action:'list'})}),ordersData=await ordersResponse.json();if(ordersResponse.ok&&ordersData.ok)state.orders=Array.isArray(ordersData.orders)?ordersData.orders:state.orders}catch(_){}
-    save();render();
+    save();
+    // Profile/address/post forms are drafts. A background wallet refresh must
+    // never rebuild an open form and erase text the customer is typing.
+    const draftOpen=!!document.querySelector('#addressForm,#broadcastForm,#profileForm,#priceForm');
+    if(!draftOpen)render();
   }catch(e){}
 }
 syncStudioWallet();
