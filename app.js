@@ -71,14 +71,14 @@ async function syncStudioWallet(){
     save();
     // Profile/address/post forms are drafts. A background wallet refresh must
     // never rebuild an open form and erase text the customer is typing.
-    const draftOpen=!!document.querySelector('#addressForm,#broadcastForm,#profileForm,#priceForm');
+    const draftOpen=!!document.querySelector('#addressForm,#broadcastForm,#profileForm,#priceForm,#chatForm');
     if(!draftOpen)render();
   }catch(e){}
 }
 syncStudioWallet();
 window.addEventListener('pageshow',syncStudioWallet);
 window.addEventListener('focus',syncStudioWallet);
-setInterval(()=>{if(!document.hidden)syncStudioWallet()},15000);
+setInterval(()=>{if(!document.hidden)syncStudioWallet()},5000);
 
 document.addEventListener('submit',async e=>{
   if(e.target.id!=='redeemCode')return;
