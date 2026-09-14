@@ -1,12 +1,10 @@
 'use strict';
-const KEY='kaamsetu-demo-v2';
-const seed=()=>({users:{u1:{name:'Ravi Sharma',balance:8000},u2:{name:'Aditya Verma',balance:5000}},orders:[
- {id:'r1',title:'Fresh groceries for home',description:'1 kg tomatoes, 2 kg potatoes, milk and fresh coriander. Please pick up from the local market.',category:'Groceries',items:420,fee:80,area:'Birra market → Siladehi',address:'Near the main chowk, Siladehi',owner:'u2'},
- {id:'r2',title:'Pick up my pharmacy order',description:'Collect my prepaid parcel from the pharmacy. Order reference will be shared in chat.',category:'Pickup',items:0,fee:120,area:'Main road → Birra',address:'House 12, Birra',owner:'u2'},
- {id:'r3',title:'Stationery for tomorrow’s class',description:'Two ruled notebooks, blue pens and an A4 drawing book from the stationery shop.',category:'Shopping',items:180,fee:60,area:'Birra stationery → Siladehi',address:'School road, Siladehi',owner:'u1'}
- ].map(o=>({...o,status:'open',provider:null,messages:[],proposal:null,providerDone:false,ownerDone:false})),transactions:[]});
+const KEY='local-delivery-v1';
+// No sample people, sample money or sample requirements are shown to customers.
+// The account below is replaced from the existing Aditya Studio login session.
+const seed=()=>({users:{me:{name:'Login करें',balance:0}},orders:[],transactions:[]});
 let state;try{state=JSON.parse(localStorage.getItem(KEY))||seed()}catch{state=seed()}
-let user='u1',tab='home',active=null,category='All',query='';
+let user='me',tab='home',active=null,category='All',query='';
 const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),money=n=>'₹'+n.toLocaleString('en-IN'),total=o=>o.items+o.fee;
 const held=id=>DeliveryEngine.holds(state,id),available=id=>DeliveryEngine.available(state,id);
 const mine=o=>o.owner===user||o.provider===user,icons={Groceries:'🥬',Pickup:'📦',Shopping:'🛍️',Other:'✦'},labels={open:'नई मांग',chat:'बातचीत जारी',booked:'बुक हो गया',delivering:'पुष्टि का इंतज़ार',completed:'पूरा हुआ',cancelled:'रद्द'};
@@ -49,6 +47,23 @@ document.addEventListener('submit',e=>{e.preventDefault();const f=e.target,d=new
  if(f.id==='priceForm'&&o&&mine(o)&&o.provider&&!o.ownerDone&&!o.providerDone&&!['completed','cancelled'].includes(o.status)){const items=Number(d.get('items')),fee=Number(d.get('fee'));if(!validMoney(items,fee)){toast('सही रकम पूरे रुपये में भरें।');return}if(items===o.items&&fee===o.fee){toast('सुझाव भेजने से पहले रकम बदलें।');return}o.proposal={items,fee,by:user};system(o,state.users[user].name+' proposed a new total of '+money(items+fee)+'. Other person must agree.');save();render();}
 });
 render();
+
+// Reuse the signed-in Aditya Studio account and its wallet amount. The browser
+// keeps the same session keys that the main website already uses.
+(async function loadStudioAccount(){
+  try{
+    const raw=localStorage.getItem('aditya_studio_session_v1')||localStorage.getItem('aditya_studio_persistent_login_v2');
+    const session=raw?JSON.parse(raw):null;
+    if(!session?.sessionToken)return;
+    const response=await fetch('/api/restore-session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mobile:session.mobile,sessionToken:session.sessionToken})});
+    const account=await response.json();
+    if(!response.ok||!account?.ok)return;
+    user=String(account.id||'me');
+    state.users={[user]:{name:String(account.name||'User'),balance:Number(account.walletBalance)||0,village:String(account.village||'')}};
+    state.transactions=(Array.isArray(account.walletHistory)?account.walletHistory:[]).map(t=>({user,amount:t.type==='debit'?-Number(t.amount||0):Number(t.amount||0),label:t.reason||'Wallet transaction',date:t.timestamp||''}));
+    render();
+  }catch(e){}
+})();
 
 
 
