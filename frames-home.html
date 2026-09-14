@@ -1287,7 +1287,9 @@ function renderFrames(filterSize = null) {
       </div>
       <div class="p-4 flex flex-col gap-1">
         <h4 class="font-headline-sm leading-tight text-lg mb-1"><span style="color:#f3cd63">${frame.title ? frame.title : "Premium Frame"}</span> <span class="text-sm font-bold" style="color:#63d7ff">${frame.productKind === 'passport_sheet' ? '36 copies · 4x6 Sheet' : dims.label + ' · ' + orientLabel}</span></h4>
-        <div class="flex flex-wrap gap-1"><span class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background:#103c26;color:#bbf7d0">🟢 ${stock} available</span>${tags.map(tag => `<span class="text-[10px] px-2 py-0.5 rounded-full" style="background:#30240e;color:#fde68a">🏷️ ${String(tag).replace(/[&<>"']/g,'')}</span>`).join('')}</div>
+        <div class="flex flex-wrap gap-1">${frame.productKind === 'passport_sheet'
+          ? '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background:#103c26;color:#86efac;box-shadow:0 0 12px rgba(74,222,128,.32)">✦ Limited Time Offer</span>'
+          : `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background:#103c26;color:#bbf7d0">🟢 ${stock} available</span>`}${tags.map(tag => `<span class="text-[10px] px-2 py-0.5 rounded-full" style="background:#30240e;color:#fde68a">🏷️ ${String(tag).replace(/[&<>"']/g,'')}</span>`).join('')}</div>
         <div class="mt-1 flex items-baseline gap-2 flex-wrap">
           <span class="text-secondary text-xl font-bold">${formatPrice(finalPrice)}</span>
           ${discount > 0 ? `<span class="price-strike text-on-surface-variant text-sm">${formatPrice(price)}</span>` : ""}
