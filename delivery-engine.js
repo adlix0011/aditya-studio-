@@ -10,8 +10,7 @@ const DeliveryEngine=(()=>{
   const oldCustomer=Number(o.customerHold)||0;
   const oldHelper=Number(o.helperHold)||0;
   if(available(s,o.owner)+oldCustomer<items+fee)fail('Customer के wallet में रकम कम है। पहले पैसे जोड़ें।');
-  if(!o.provider||available(s,o.provider)+oldHelper<items)fail('Delivery करने वाले के wallet में सामान की कीमत जितना deposit नहीं है।');
-  o.customerHold=items+fee;o.helperHold=items;
+  o.customerHold=items+fee;o.helperHold=0;
  }
  function otpCode(){const a=new Uint32Array(1);do{crypto.getRandomValues(a)}while(a[0]>=4294800000);return String(100000+a[0]%900000)}
  function run(s,id,actor,action,data={},now=Date.now()){
@@ -20,7 +19,7 @@ const DeliveryEngine=(()=>{
   if(action==='accept'){
    if(o.status!=='open'||owner)fail('यह काम स्वीकार नहीं कर सकते।');
    o.provider=actor;reserve(s,o);o.status='chat';o.providerDone=false;o.ownerDone=false;o.otp=null;o.cancelBy=null;
-   note(o,'काम स्वीकार हुआ। Customer के ₹'+o.customerHold+' और helper का ₹'+o.helperHold+' deposit lock है। Customer की booking confirmation बाकी है।');
+   note(o,'काम स्वीकार हुआ। Customer की ₹'+o.customerHold+' रकम lock है। Helper सामान अपने पैसे से लाएगा; delivery के बाद उसे payment मिलेगा। Customer की booking confirmation बाकी है।');
   }else if(action==='book'){
    if(!owner||o.status!=='chat'||o.proposal)fail('पहले बातचीत और रकम की सहमति पूरी करें।');
    reserve(s,o);o.status='booked';note(o,'Customer ने booking confirm की। सामान मिलने के बाद ही delivery OTP दें।');
