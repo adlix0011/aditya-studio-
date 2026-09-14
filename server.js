@@ -2791,6 +2791,18 @@ function computeOrderFees(subtotal, settingsFees) {
       return sendJSON(res,200,{ok:true,walletBalance:acc.walletBalance,locked:amount});
     } catch (e) { return sendJSON(res,500,{ok:false,message:'Wallet lock नहीं हुआ'}); }
   }
+  if (req.method === 'POST' && urlPath === '/api/local-delivery/unlock') {
+    try {
+      const body=await readBody(req), accounts=loadAccounts(), acc=sessionAccount(req,body,accounts);
+      if(!acc)return sendJSON(res,401,{ok:false,message:'Login required'});
+      let locks=[];try{locks=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_LOCKS_FILE,'utf8'))||[]}catch(_){}
+      const row=locks.find(x=>x.orderId===String(body.orderId||'')&&x.mobile===acc.mobile&&x.status==='locked');
+      if(!row)return sendJSON(res,404,{ok:false,message:'Locked payment नहीं मिला'});
+      walletTxn(acc,'credit',row.amount,{reason:'Local Delivery cancel refund · '+row.orderId,source:'local_delivery_refund',orderId:row.orderId});
+      row.status='refunded';row.refundedAt=new Date().toISOString();fs.writeFileSync(LOCAL_DELIVERY_LOCKS_FILE,JSON.stringify(locks,null,2));saveAccounts(accounts);
+      return sendJSON(res,200,{ok:true,walletBalance:acc.walletBalance,refunded:row.amount});
+    }catch(e){return sendJSON(res,500,{ok:false,message:'Refund नहीं हुआ'})}
+  }
 
   if (req.method === 'GET' && urlPath === '/admin/local-delivery') {
     const adminDeliveryPage = path.join(__dirname, 'local-delivery-admin.html');
