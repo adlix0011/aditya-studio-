@@ -11,7 +11,7 @@ if(!Array.isArray(state.orders))state.orders=[];
 if(!Array.isArray(state.transactions))state.transactions=[];
 let user=state.users.me?'me':Object.keys(state.users)[0],tab='home',active=null,category='All',query='';
 const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),money=n=>'₹'+n.toLocaleString('en-IN'),total=o=>o.items+o.fee;
-const held=id=>DeliveryEngine.holds(state,id),available=id=>DeliveryEngine.available(state,id);
+const held=id=>DeliveryEngine.holds(state,id),available=id=>Number(state.users[id]?.balance||0);
 const mine=o=>o.owner===user||o.provider===user,icons={Groceries:'🥬',Pickup:'📦',Shopping:'🛍️',Other:'✦'},labels={open:'नई मांग',chat:'बातचीत जारी',booked:'बुक हो गया',delivering:'पुष्टि का इंतज़ार',completed:'पूरा हुआ',cancelled:'रद्द'};
 function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch{toast('Storage is unavailable. Keep this page open to retain this session.')}}
 let toastTimer;function toast(text){$('toast').textContent=text;$('toast').style.display='block';clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').style.display='none',4000)}
