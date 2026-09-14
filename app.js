@@ -66,6 +66,7 @@ render();
     user=String(account.id||'me');
     state.users[user]={...(state.users[user]||{}),name:String(account.name||'User'),phone:String(account.mobile||''),balance:Number(account.walletBalance)||0,village:String(account.village||'')};
     state.transactions=(Array.isArray(account.walletHistory)?account.walletHistory:[]).map(t=>({user,amount:t.type==='debit'?-Number(t.amount||0):Number(t.amount||0),label:t.reason||'Wallet transaction',date:t.timestamp||''}));
+    try{const ordersResponse=await fetch('/api/local-delivery/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mobile:session.mobile,sessionToken:session.sessionToken,action:'list'})}),ordersData=await ordersResponse.json();if(ordersResponse.ok&&ordersData.ok)state.orders=Array.isArray(ordersData.orders)?ordersData.orders:state.orders}catch(_){}
     save();render();
   }catch(e){}
 })();

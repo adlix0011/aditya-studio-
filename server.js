@@ -199,6 +199,7 @@ const EDIT_REQUESTS_FILE = path.join(DATA_DIR, 'edit-requests.json');
 const WALLET_TOPUPS_FILE = path.join(DATA_DIR, 'wallet-topups.json');
 const ACTIVITY_FILE = path.join(DATA_DIR, 'user-activity.json');
 const LOCAL_DELIVERY_LOCKS_FILE = path.join(DATA_DIR, 'local-delivery-locks.json');
+const LOCAL_DELIVERY_ORDERS_FILE = path.join(DATA_DIR, 'local-delivery-orders.json');
 // Browser login ko server restart ke baad bhi valid rakhne ke liye (7 days).
 const SESSIONS_FILE = path.join(DATA_DIR, 'sessions.json');
 const INDEX_HTML_FILE = path.join(__dirname, 'index.html');
@@ -2802,6 +2803,20 @@ function computeOrderFees(subtotal, settingsFees) {
       row.status='refunded';row.refundedAt=new Date().toISOString();fs.writeFileSync(LOCAL_DELIVERY_LOCKS_FILE,JSON.stringify(locks,null,2));saveAccounts(accounts);
       return sendJSON(res,200,{ok:true,walletBalance:acc.walletBalance,refunded:row.amount});
     }catch(e){return sendJSON(res,500,{ok:false,message:'Refund नहीं हुआ'})}
+  }
+  if (req.method === 'POST' && urlPath === '/api/local-delivery/orders') {
+    try {
+      const body=await readBody(req),accounts=loadAccounts(),acc=sessionAccount(req,body,accounts);
+      if(!acc)return sendJSON(res,401,{ok:false,message:'Login required'});
+      let orders=[];try{orders=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_ORDERS_FILE,'utf8'))||[]}catch(_){}
+      if(body.action==='list')return sendJSON(res,200,{ok:true,orders:orders.filter(o=>o.status==='open'||o.ownerMobile===acc.mobile||o.providerMobile===acc.mobile)});
+      if(body.action==='create'){
+        const o=body.order||{}; if(!o.id||!o.title)return sendJSON(res,400,{ok:false,message:'Invalid order'});
+        o.ownerMobile=acc.mobile;o.ownerName=acc.name;o.createdAt=new Date().toISOString();orders.unshift(o);fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));
+        return sendJSON(res,200,{ok:true,order:o});
+      }
+      return sendJSON(res,400,{ok:false,message:'Unknown action'});
+    }catch(e){return sendJSON(res,500,{ok:false,message:'Order save नहीं हुआ'})}
   }
 
   if (req.method === 'GET' && urlPath === '/admin/local-delivery') {
