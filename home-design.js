@@ -38,3 +38,5 @@ render();
 
 
 
+
+setInterval(()=>{if(tab==='home'&&!active&&!document.hidden)render()},1000);
