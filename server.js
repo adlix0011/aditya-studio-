@@ -895,6 +895,15 @@ function saveNotifs(list) {
     mongoSaveNotifs(_cache.notifs).catch(e => console.error('mongo save notifs:', e.message));
   }
 }
+function addNotification(item) {
+  const list = loadNotifs();
+  list.unshift(Object.assign({
+    id: 'n-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+    at: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+  }, item));
+  saveNotifs(list.slice(0, 50));
+}
 function loadUserActivity() {
   try { return fs.existsSync(ACTIVITY_FILE) ? (JSON.parse(fs.readFileSync(ACTIVITY_FILE, 'utf8')) || []) : []; }
   catch (e) { return []; }
@@ -2539,6 +2548,7 @@ function computeOrderFees(subtotal, settingsFees) {
       acc.walletPendingBalance += amount;
       acc.walletHistory.unshift({ id:walletHistoryId(), type:'pending', amount, balanceAfter:acc.walletBalance, reason:'Top-up pending admin verification', source:'wallet_topup', ref:topupId, timestamp:new Date().toISOString() });
       saveWalletTopups(topups); saveAccounts(accounts);
+      addNotification({ title:'💳 Recharge submitted', body:'₹'+amount+' recharge verification के लिए भेज दिया गया है। Verify होने पर wallet में जुड़ जाएगा।', mobile:acc.mobile, kind:'wallet-topup' });
       void sendTelegramAlert('Wallet Recharge Pending', 'Customer: ' + (acc.name || acc.mobile) + ' · ' + acc.mobile + '\nAmount: ₹' + amount + '\nUTR: ' + (utr || 'Screenshot submitted') + '\nTop-up ID: ' + topupId);
       return sendJSON(res, 200, { ok:true, topupId, message:'Payment proof submit हो गया। Admin verify करने के बाद ₹'+amount+' wallet में usable होगा।', walletPendingBalance:acc.walletPendingBalance });
     } catch (e) {
@@ -2882,6 +2892,17 @@ function computeOrderFees(subtotal, settingsFees) {
       if(body.action==='create'){
         const o=body.order||{}; if(!o.id||!o.title)return sendJSON(res,400,{ok:false,message:'Invalid order'});
         o.ownerMobile=acc.mobile;o.ownerName=acc.name;o.createdAt=new Date().toISOString();orders.unshift(o);fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));
+        addNotification({ title:'📣 नई Local Delivery requirement', body:(acc.name||'एक customer')+' ने “'+String(o.title).slice(0,90)+'” पोस्ट किया है। आसपास के सभी लोगों के लिए उपलब्ध है।', kind:'local-delivery-new' });
+        return sendJSON(res,200,{ok:true,order:o});
+      }
+      if(body.action==='accept'){
+        const orderId=String(body.orderId||''); const o=orders.find(x=>String(x.id)===orderId);
+        if(!o)return sendJSON(res,404,{ok:false,message:'Order नहीं मिला'});
+        if(o.ownerMobile===acc.mobile)return sendJSON(res,400,{ok:false,message:'अपना order accept नहीं कर सकते'});
+        if(o.status!=='open')return sendJSON(res,409,{ok:false,message:'यह order पहले accept हो चुका है'});
+        o.status='chat'; o.providerMobile=acc.mobile; o.providerName=acc.name||'Delivery helper'; o.acceptedAt=new Date().toISOString();
+        fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));
+        addNotification({ title:'✅ आपका order accept हो गया', body:(o.providerName||'Delivery helper')+' ने “'+String(o.title).slice(0,90)+'” accept किया है। अब details पर बात करें।', mobile:o.ownerMobile, kind:'local-delivery-accepted', orderId:o.id });
         return sendJSON(res,200,{ok:true,order:o});
       }
       return sendJSON(res,400,{ok:false,message:'Unknown action'});
