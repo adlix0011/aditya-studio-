@@ -67,7 +67,7 @@ async function syncStudioWallet(){
     user=String(account.id||'me');
     state.users[user]={...(state.users[user]||{}),name:String(account.name||'User'),phone:String(account.mobile||''),balance:Number(account.walletBalance)||0,pendingBalance:Number(account.walletPendingBalance)||0,village:String(account.village||''),address:String(account.address||''),district:String(account.district||''),pincode:String(account.pincode||''),landmark:String(account.landmark||'')};
     state.transactions=(Array.isArray(account.walletHistory)?account.walletHistory:[]).map(t=>({user,amount:t.type==='debit'?-Number(t.amount||0):(t.type==='credit'||t.type==='approved'?Number(t.amount||0):0),displayAmount:Number(t.amount||0),status:String(t.type||''),label:t.reason||'Wallet transaction',date:t.timestamp||''}));
-    try{const ordersResponse=await fetch('/api/local-delivery/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mobile:session.mobile,sessionToken:session.sessionToken,action:'list'})}),ordersData=await ordersResponse.json();if(ordersResponse.ok&&ordersData.ok&&Array.isArray(ordersData.orders)){const mobile=String(session.mobile||''),sameMobile=(a,b)=>{const x=String(a||'').replace(/\D/g,'').slice(-10),y=String(b||'').replace(/\D/g,'').slice(-10);return !!x&&x===y};state.orders=ordersData.orders.map(raw=>{const o={...raw};if(sameMobile(o.ownerMobile,mobile))o.owner=user;else if(o.owner===user)o.owner='owner:'+String(o.ownerMobile||o.id);if(sameMobile(o.providerMobile,mobile))o.provider=user;else if(o.provider===user)o.provider='provider:'+String(o.providerMobile||o.id);return o})}}catch(_){}
+    try{const ordersResponse=await fetch('/api/local-delivery/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mobile:session.mobile,sessionToken:session.sessionToken,action:'list'})}),ordersData=await ordersResponse.json();if(ordersResponse.ok&&ordersData.ok&&Array.isArray(ordersData.orders)){const mobile=String(session.mobile||''),sameMobile=(a,b)=>{const x=String(a||'').replace(/\D/g,'').slice(-10),y=String(b||'').replace(/\D/g,'').slice(-10);return !!x&&x===y};state.orders=ordersData.orders.map(raw=>{const o={...raw};if(sameMobile(o.ownerMobile,mobile))o.owner=user;else if(o.owner===user)o.owner='owner:'+String(o.ownerMobile||o.id);if(sameMobile(o.providerMobile,mobile))o.provider=user;else if(o.provider===user)o.provider='provider:'+String(o.providerMobile||o.id);o.messages=(Array.isArray(o.messages)?o.messages:[]).map(m=>{if(m.sender==='system')return m;const mineMessage=sameMobile(m.senderMobile,mobile);return {...m,sender:mineMessage?user:(m.sender||'remote:'+String(m.senderMobile||'message')),senderName:m.senderName||'Customer'}});return o})}}catch(_){}
     save();
     // Profile/address/post forms are drafts. A background wallet refresh must
     // never rebuild an open form and erase text the customer is typing.
@@ -79,7 +79,7 @@ async function syncStudioWallet(){
 syncStudioWallet();
 window.addEventListener('pageshow',syncStudioWallet);
 window.addEventListener('focus',syncStudioWallet);
-setInterval(()=>{if(!document.hidden)syncStudioWallet()},5000);
+setInterval(()=>{if(!document.hidden)syncStudioWallet()},2000);
 
 document.addEventListener('submit',async e=>{
   if(e.target.id!=='redeemCode')return;
