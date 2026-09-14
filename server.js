@@ -198,6 +198,7 @@ const FRAME_ORDERS_FILE = path.join(DATA_DIR, 'frame-orders.json');
 const EDIT_REQUESTS_FILE = path.join(DATA_DIR, 'edit-requests.json');
 const WALLET_TOPUPS_FILE = path.join(DATA_DIR, 'wallet-topups.json');
 const ACTIVITY_FILE = path.join(DATA_DIR, 'user-activity.json');
+const LOCAL_DELIVERY_LOCKS_FILE = path.join(DATA_DIR, 'local-delivery-locks.json');
 // Browser login ko server restart ke baad bhi valid rakhne ke liye (7 days).
 const SESSIONS_FILE = path.join(DATA_DIR, 'sessions.json');
 const INDEX_HTML_FILE = path.join(__dirname, 'index.html');
@@ -2768,6 +2769,27 @@ function computeOrderFees(subtotal, settingsFees) {
   if (urlPath === '/api/customers' || urlPath === '/admin' || urlPath.startsWith('/admin/')) {
     if (!isAdminAuthed(req)) return requireAdminAuth(req, res);
     establishAdminSession(req, res);
+  }
+
+  // Delivery requirement money is deducted from the same Aditya wallet and
+  // recorded as a lock, so profile and Local Delivery always share one balance.
+  if (req.method === 'POST' && urlPath === '/api/local-delivery/lock') {
+    try {
+      const body = await readBody(req), amount = Math.round(Number(body.amount) || 0);
+      if (!amount || amount < 1 || amount > 100000) return sendJSON(res, 400, { ok:false, message:'Invalid lock amount' });
+      const accounts = loadAccounts(), acc = sessionAccount(req, body, accounts);
+      if (!acc) return sendJSON(res, 401, { ok:false, message:'Login required' });
+      let locks=[]; try { locks=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_LOCKS_FILE,'utf8'))||[]; } catch (_) {}
+      const orderId=String(body.orderId||'').trim();
+      if (!orderId) return sendJSON(res,400,{ok:false,message:'Order id required'});
+      const existing=locks.find(x=>x.orderId===orderId&&x.mobile===acc.mobile);
+      if (existing) return sendJSON(res,200,{ok:true,walletBalance:acc.walletBalance,locked:existing.amount});
+      const entry=walletTxn(acc,'debit',amount,{reason:'Local Delivery lock · '+orderId,source:'local_delivery_lock',orderId});
+      if (!entry) return sendJSON(res,400,{ok:false,message:'Wallet में पर्याप्त पैसे नहीं हैं।'});
+      locks.unshift({orderId,mobile:acc.mobile,amount,createdAt:new Date().toISOString(),status:'locked'});
+      fs.writeFileSync(LOCAL_DELIVERY_LOCKS_FILE,JSON.stringify(locks.slice(0,1000),null,2)); saveAccounts(accounts);
+      return sendJSON(res,200,{ok:true,walletBalance:acc.walletBalance,locked:amount});
+    } catch (e) { return sendJSON(res,500,{ok:false,message:'Wallet lock नहीं हुआ'}); }
   }
 
   if (req.method === 'GET' && urlPath === '/admin/local-delivery') {
