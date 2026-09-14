@@ -1,0 +1,11 @@
+/* Expired/closed requests are copied into a fresh post, so their price can be changed without chat approval. */
+(function(){
+ let repostId=null;
+ const expired=o=>{const d=new Date(o?.neededBy||'');return !Number.isNaN(d.getTime())&&d.getTime()<=Date.now()};
+ const eligible=o=>o&&o.owner===user&&(expired(o)||['cancelled','completed','disputed'].includes(o.status));
+ const before=render;
+ render=function(){before();const o=repostId&&state.orders.find(x=>x.id===repostId);if(tab==='post'&&o){const f=document.getElementById('broadcastForm');if(!f)return;const set=(n,v)=>{if(f.elements[n])f.elements[n].value=v||''};set('description',String(o.description||'').split('\n').filter(x=>!x.startsWith('मात्रा:')&&!x.startsWith('कब तक चाहिए:')).join('\n'));set('area',o.area);set('deliveryVillage',o.deliveryVillage);set('district',o.district);set('address',o.address);set('category',o.category);set('items',o.items);set('fee',o.fee);if(typeof restoreOrderItems==='function')restoreOrderItems(f,o);const h=document.querySelector('.post-page h1');if(h)h.textContent='पुराने ऑर्डर को Edit करके Repost करें';const submit=f.querySelector('button[type=submit]');if(submit)submit.textContent='↻ बदलाव के साथ Repost करें';const totalBox=document.getElementById('postTotal');if(totalBox)totalBox.textContent=money(Number(o.items||0)+Number(o.fee||0));return}if(tab==='orders'&&active){const old=state.orders.find(x=>x.id===active);if(eligible(old)&&!document.querySelector('[data-repost-old]'))document.querySelector('.content')?.insertAdjacentHTML('beforeend',`<button class="btn amber" data-repost-old="${old.id}" style="margin:14px 0">↻ Edit करके फिर से Post करें</button>`)} };
+ document.addEventListener('click',e=>{const b=e.target.closest('[data-repost-old]');if(!b)return;e.preventDefault();e.stopImmediatePropagation();const o=state.orders.find(x=>x.id===b.dataset.repostOld);if(!eligible(o))return;repostId=o.id;go('post');window.scrollTo({top:0,behavior:'smooth'})},true);
+ document.addEventListener('submit',e=>{if(e.target.id!=='broadcastForm'||!repostId)return;setTimeout(()=>{if(tab!=='post')repostId=null},0)},true);
+ render();
+})();

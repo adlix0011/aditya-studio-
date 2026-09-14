@@ -1448,7 +1448,7 @@ const server = http.createServer(async (req, res) => {
     'styles.css', 'mobile-design.css', 'home-design.css', 'profile-page.css', 'delivery-flow.css',
     'item-icons.js', 'delivery-engine.js', 'app.js', 'request-summary.js', 'home-design.js',
     'order-items.js', 'post-page.js', 'profile-page.js', 'edit-order.js', 'delivery-flow.js',
-    'post-wallet.js', 'language.js', 'notifications-page.js', 'notification-alerts.js', 'local-delivery-admin.js', 'local-delivery-admin.css'
+    'post-wallet.js', 'language.js', 'notifications-page.js', 'notification-alerts.js', 'repost-order.js', 'local-delivery-admin.js', 'local-delivery-admin.css'
   ]);
   if (req.method === 'GET' && urlPath === '/local-delivery.html') {
     return fs.readFile(path.join(__dirname, 'local-delivery.html'), (err, data) => {
