@@ -2731,6 +2731,15 @@ function computeOrderFees(subtotal, settingsFees) {
     establishAdminSession(req, res);
   }
 
+  if (req.method === 'GET' && urlPath === '/admin/local-delivery') {
+    const adminDeliveryPage = path.join(__dirname, 'local-delivery-admin.html');
+    return fs.readFile(adminDeliveryPage, (err, data) => {
+      if (err) return sendJSON(res, 404, { ok:false, error:'Local Delivery admin page not found' });
+      res.writeHead(200, { 'Content-Type':'text/html; charset=utf-8', 'Cache-Control':'no-store' });
+      res.end(data);
+    });
+  }
+
   if (req.method === 'GET' && urlPath === '/admin/activity-json') {
     const now = Date.now();
     const users = loadUserActivity().map(x => ({ ...x, online: now - new Date(x.lastSeenAt || 0).getTime() < 90000 })).sort((a,b) => Number(b.totalSeconds||0)-Number(a.totalSeconds||0));
@@ -4097,6 +4106,7 @@ label.muted{display:block;font-size:12px;margin-bottom:2px}
   <a class="nav-link" href="#sec-overview">📊 Overview</a>
   <a class="nav-link" href="#sec-order-stats">📦 Orders Summary</a>
   <a class="nav-link" href="#sec-orders">📋 Order List</a>
+  <a class="nav-link" href="/admin/local-delivery" style="color:#67e8f9">🚚 Local Delivery</a>
   <a class="nav-link" href="/admin/activity" style="color:#67e8f9">📊 User Activity Tracker</a>
   <a class="nav-link" href="#sec-frames">🖼️ Frame Types</a>
   <a class="nav-link" href="#sec-banner">🎬 Home Banner</a>
