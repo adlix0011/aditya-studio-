@@ -2919,6 +2919,48 @@ function computeOrderFees(subtotal, settingsFees) {
         if(recipient)addNotification({title:'💬 नया Local Delivery message',body:(acc.name||'Customer')+' ने “'+String(o.title).slice(0,70)+'” पर message भेजा है।',mobile:recipient,kind:'local-delivery-message',orderId:o.id});
         return sendJSON(res,200,{ok:true,message:o.messages[o.messages.length-1]});
       }
+      if(body.action==='payment-request'){
+        const o=orders.find(x=>String(x.id)===String(body.orderId||''));
+        if(!o||String(o.providerMobile)!==String(acc.mobile)||!['chat','booked'].includes(o.status))return sendJSON(res,403,{ok:false,message:'Payment request उपलब्ध नहीं है'});
+        o.paymentRequest={id:'pay-'+Date.now(),status:'pending',byMobile:acc.mobile,createdAt:new Date().toISOString()};
+        o.messages=Array.isArray(o.messages)?o.messages:[];o.messages.push({sender:'system',text:'💳 Delivery helper ने payment amount बदलने का अनुरोध भेजा है। कृपया Yes या No चुनें।',time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})});
+        fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));
+        addNotification({title:'💳 Payment change request',body:'Delivery helper ने payment amount बदलने का अनुरोध भेजा है।',mobile:o.ownerMobile,kind:'local-delivery-payment-request',orderId:o.id});
+        return sendJSON(res,200,{ok:true,order:o});
+      }
+      if(body.action==='payment-response'){
+        const o=orders.find(x=>String(x.id)===String(body.orderId||'')),answer=String(body.answer||'');
+        if(!o||String(o.ownerMobile)!==String(acc.mobile)||o.paymentRequest?.status!=='pending'||!['yes','no'].includes(answer))return sendJSON(res,403,{ok:false,message:'यह request उपलब्ध नहीं है'});
+        o.paymentRequest.status=answer==='yes'?'approved':'rejected';o.paymentRequest.respondedAt=new Date().toISOString();
+        o.messages=Array.isArray(o.messages)?o.messages:[];o.messages.push({sender:'system',text:answer==='yes'?'✅ Customer ने Yes किया। अब नई सामान/डिलीवरी रकम भरें।':'❌ Customer ने No किया। Helper, क्या आप पुरानी रकम में काम करना चाहते हैं?',time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})});
+        fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));
+        addNotification({title:answer==='yes'?'✅ Payment request approved':'❌ Payment request declined',body:answer==='yes'?'Customer नई रकम भर रहे हैं।':'Customer ने नई रकम मंज़ूर नहीं की। पुरानी रकम में काम करने पर विचार करें।',mobile:o.providerMobile,kind:'local-delivery-payment-response',orderId:o.id});
+        return sendJSON(res,200,{ok:true,order:o});
+      }
+      if(body.action==='payment-continue'||body.action==='payment-close'){
+        const o=orders.find(x=>String(x.id)===String(body.orderId||''));
+        if(!o||String(o.providerMobile)!==String(acc.mobile)||o.paymentRequest?.status!=='rejected')return sendJSON(res,403,{ok:false,message:'यह विकल्प उपलब्ध नहीं है'});
+        o.messages=Array.isArray(o.messages)?o.messages:[];
+        if(body.action==='payment-continue'){o.paymentRequest.status='continued';o.messages.push({sender:'system',text:'✅ Helper पुरानी तय रकम में काम करने के लिए तैयार है।',time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})})}
+        else {o.paymentRequest.status='closed';o.status='open';o.providerMobile=null;o.providerName=null;o.messages.push({sender:'system',text:'Helper ने पुरानी रकम में काम न करने का चयन किया। Post फिर से available है।',time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})})}
+        fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));
+        addNotification({title:body.action==='payment-continue'?'✅ Helper agreed to existing amount':'↩️ Delivery helper left request',body:body.action==='payment-continue'?'Helper पुरानी रकम में काम करने के लिए तैयार है।':'Post फिर से अन्य delivery users को दिखेगी।',mobile:o.ownerMobile,kind:'local-delivery-payment-response',orderId:o.id});
+        return sendJSON(res,200,{ok:true,order:o});
+      }
+      if(body.action==='payment-update'){
+        const o=orders.find(x=>String(x.id)===String(body.orderId||'')),items=Math.round(Number(body.items)),fee=Math.round(Number(body.fee));
+        if(!o||String(o.ownerMobile)!==String(acc.mobile)||o.paymentRequest?.status!=='approved'||!['chat','booked'].includes(o.status))return sendJSON(res,403,{ok:false,message:'नई रकम बदलने की अनुमति नहीं है'});
+        if(!Number.isSafeInteger(items)||items<0||items>100000||!Number.isSafeInteger(fee)||fee<1||fee>100000)return sendJSON(res,400,{ok:false,message:'सही सामान और delivery रकम भरें'});
+        let locks=[];try{locks=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_LOCKS_FILE,'utf8'))||[]}catch(_){}
+        const target=o.alreadyPurchased?fee:items+fee,row=locks.find(x=>x.orderId===String(o.id)&&String(x.mobile)===String(acc.mobile)&&x.status==='locked'),current=Number(row?.amount||0),change=target-current;
+        if(change>0&&!walletTxn(acc,'debit',change,{reason:'Local Delivery payment increase · '+o.id,source:'local_delivery_lock_adjust',orderId:o.id}))return sendJSON(res,400,{ok:false,message:'Wallet में नई रकम के लिए पर्याप्त पैसे नहीं हैं'});
+        if(change<0)walletTxn(acc,'credit',Math.abs(change),{reason:'Local Delivery payment decrease · '+o.id,source:'local_delivery_lock_adjust',orderId:o.id});
+        if(row){row.amount=target;row.updatedAt=new Date().toISOString()}else if(target>0)locks.unshift({orderId:String(o.id),mobile:acc.mobile,amount:target,createdAt:new Date().toISOString(),status:'locked'});
+        o.items=items;o.fee=fee;o.customerHold=target;o.paymentRequest={...o.paymentRequest,status:'applied',appliedAt:new Date().toISOString()};o.messages=Array.isArray(o.messages)?o.messages:[];o.messages.push({sender:'system',text:'💰 नई payment रकम लागू: सामान ₹'+items+' + delivery ₹'+fee+'। Wallet lock अब ₹'+target+' है।',time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})});
+        fs.writeFileSync(LOCAL_DELIVERY_LOCKS_FILE,JSON.stringify(locks.slice(0,1000),null,2));fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));saveAccounts(accounts);
+        addNotification({title:'💰 Payment amount updated',body:'Customer ने नई payment amount और wallet lock लागू कर दिया है।',mobile:o.providerMobile,kind:'local-delivery-payment-updated',orderId:o.id});
+        return sendJSON(res,200,{ok:true,order:o,walletBalance:acc.walletBalance,locked:target});
+      }
       if(body.action==='typing'||body.action==='seen'){
         const o=orders.find(x=>String(x.id)===String(body.orderId||''));
         if(!o||[o.ownerMobile,o.providerMobile].map(String).indexOf(String(acc.mobile))<0)return sendJSON(res,403,{ok:false});
