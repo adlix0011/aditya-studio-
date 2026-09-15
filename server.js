@@ -2923,7 +2923,7 @@ function computeOrderFees(subtotal, settingsFees) {
         const o=orders.find(x=>String(x.id)===String(body.orderId||''));
         if(!o||[o.ownerMobile,o.providerMobile].map(String).indexOf(String(acc.mobile))<0)return sendJSON(res,403,{ok:false});
         if(body.action==='typing'){o.typingByMobile=acc.mobile;o.typingAt=Date.now()}
-        else {(o.messages||[]).forEach(m=>{if(String(m.senderMobile||'')!==String(acc.mobile)&&!m.seenAt)m.seenAt=new Date().toISOString()})}
+        else {const cleanMobile=v=>String(v||'').replace(/\D/g,'').slice(-10),viewer=cleanMobile(acc.mobile);(o.messages||[]).forEach(m=>{if(cleanMobile(m.senderMobile)!==viewer&&!m.seenAt){m.seenAt=new Date().toISOString();m.seenByMobile=acc.mobile}})}
         fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));
         return sendJSON(res,200,{ok:true});
       }
