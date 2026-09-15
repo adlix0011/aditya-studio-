@@ -2987,6 +2987,17 @@ function computeOrderFees(subtotal, settingsFees) {
         addNotification({title:'💰 Payment amount updated',body:'Customer ने नई payment amount और wallet lock लागू कर दिया है।',mobile:o.providerMobile,kind:'local-delivery-payment-updated',orderId:o.id});
         return sendJSON(res,200,{ok:true,order:o,walletBalance:acc.walletBalance,locked:target});
       }
+      if(body.action==='pickup-progress'){
+        const o=orders.find(x=>String(x.id)===String(body.orderId||'')),rows=Array.isArray(body.items)?body.items:[];
+        if(!o||String(o.providerMobile)!==String(acc.mobile)||!['booked','delivering'].includes(o.status))return sendJSON(res,403,{ok:false,message:'Pickup update उपलब्ध नहीं है'});
+        o.pickupProgress=rows.slice(0,20).map(x=>({name:String(x.name||'').slice(0,100),quantity:String(x.quantity||'').slice(0,100),done:!!x.done,updatedAt:new Date().toISOString()}));o.messages=Array.isArray(o.messages)?o.messages:[];o.messages.push({sender:'system',text:'🛍️ Delivery boy ने सामान pickup list update की है।',time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})});fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));addNotification({title:'🛍️ Pickup update',body:'Delivery boy ने सामान की सूची update की है।',mobile:o.ownerMobile,kind:'local-delivery-pickup',orderId:o.id});return sendJSON(res,200,{ok:true,order:o});
+      }
+      if(body.action==='delivery-start'){
+        const o=orders.find(x=>String(x.id)===String(body.orderId||'')),minutes=Math.round(Number(body.minutes));
+        if(!o||String(o.providerMobile)!==String(acc.mobile)||o.status!=='booked'||!Number.isSafeInteger(minutes)||minutes<1||minutes>720)return sendJSON(res,400,{ok:false,message:'सही estimated time भरें'});
+        if(!Array.isArray(o.pickupProgress)||!o.pickupProgress.length||o.pickupProgress.some(x=>!x.done))return sendJSON(res,400,{ok:false,message:'पहले हर सामान पर tick करके pickup update करें'});
+        o.status='delivering';o.deliveryEtaMinutes=minutes;o.deliveryStartedAt=new Date().toISOString();o.messages=Array.isArray(o.messages)?o.messages:[];o.messages.push({sender:'system',text:'🚚 सभी सामान ले लिए गए। Estimated delivery time: '+minutes+' मिनट।',time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})});fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));addNotification({title:'🚚 Delivery शुरू हो गई',body:'सभी सामान ले लिए गए। अनुमानित समय '+minutes+' मिनट।',mobile:o.ownerMobile,kind:'local-delivery-started',orderId:o.id});return sendJSON(res,200,{ok:true,order:o});
+      }
       if(body.action==='typing'||body.action==='seen'){
         const o=orders.find(x=>String(x.id)===String(body.orderId||''));
         if(!o||[o.ownerMobile,o.providerMobile].map(String).indexOf(String(acc.mobile))<0)return sendJSON(res,403,{ok:false});
