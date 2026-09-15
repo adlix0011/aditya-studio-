@@ -2923,7 +2923,7 @@ function computeOrderFees(subtotal, settingsFees) {
         const o=orders.find(x=>String(x.id)===String(body.orderId||''));
         if(!o||String(o.providerMobile)!==String(acc.mobile)||o.status!=='chat')return sendJSON(res,403,{ok:false,message:'Delivery confirmation उपलब्ध नहीं है'});
         if(o.deliveryConfirmRequest?.status==='pending')return sendJSON(res,409,{ok:false,message:'Customer का जवाब बाकी है'});
-        o.deliveryConfirmRequest={id:'confirm-'+Date.now(),status:'pending',byMobile:acc.mobile,createdAt:new Date().toISOString()};o.messages=Array.isArray(o.messages)?o.messages:[];o.messages.push({sender:'system',text:'✅ Delivery helper ने order final confirm करने का अनुरोध भेजा है। कृपया Yes या No चुनें।',time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})});
+        o.deliveryConfirmRequest={id:'confirm-'+Date.now(),status:'pending',byMobile:acc.mobile,createdAt:new Date().toISOString()};o.messages=Array.isArray(o.messages)?o.messages:[];o.messages.push({sender:'system',text:'⏳ '+(o.ownerName||'Customer')+' के confirmation का इंतजार है। Delivery boy delivery के लिए ready है।',time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})});
         fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));addNotification({title:'✅ Delivery confirmation required',body:'Delivery helper ने order final confirm करने का अनुरोध भेजा है।',mobile:o.ownerMobile,kind:'local-delivery-confirm-request',orderId:o.id});return sendJSON(res,200,{ok:true,order:o});
       }
       if(body.action==='delivery-confirm-response'){
@@ -2931,6 +2931,12 @@ function computeOrderFees(subtotal, settingsFees) {
         if(!o||String(o.ownerMobile)!==String(acc.mobile)||o.deliveryConfirmRequest?.status!=='pending'||!['yes','no','wait'].includes(answer))return sendJSON(res,403,{ok:false,message:'यह confirmation उपलब्ध नहीं है'});
         o.deliveryConfirmRequest.status=answer==='yes'?'confirmed':answer==='wait'?'waiting':'rejected';o.deliveryConfirmRequest.respondedAt=new Date().toISOString();if(answer==='yes')o.status='booked';o.messages=Array.isArray(o.messages)?o.messages:[];o.messages.push({sender:'system',text:answer==='yes'?'✅ Customer ने delivery final confirm कर दी। Order अब केवल customer और selected delivery helper को दिखेगा।':answer==='wait'?'⏳ Customer ने Wait चुना है। Chat खुली रहेगी।':'❌ Customer ने अभी delivery final confirm नहीं की। Chat जारी रख सकते हैं।',time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})});
         fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));addNotification({title:answer==='yes'?'✅ Delivery confirmed':answer==='wait'?'⏳ Delivery confirmation waiting':'❌ Delivery confirmation declined',body:answer==='yes'?'Customer ने आपको final delivery user चुन लिया है।':answer==='wait'?'Customer ने Wait चुना है, chat जारी रखें।':'Customer ने अभी confirmation नहीं दी।',mobile:o.providerMobile,kind:'local-delivery-confirm-response',orderId:o.id});return sendJSON(res,200,{ok:true,order:o});
+      }
+      if(body.action==='delivery-chat-later'){
+        const o=orders.find(x=>String(x.id)===String(body.orderId||''));
+        if(!o||String(o.providerMobile)!==String(acc.mobile)||o.status!=='chat')return sendJSON(res,403,{ok:false,message:'यह विकल्प उपलब्ध नहीं है'});
+        o.deliveryConfirmRequest={status:'chat',at:new Date().toISOString()};o.messages=Array.isArray(o.messages)?o.messages:[];o.messages.push({sender:'system',text:'💬 Delivery boy ने कहा है कि delivery final करने से पहले chat में बात करेंगे।',time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})});
+        fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));return sendJSON(res,200,{ok:true,order:o});
       }
       if(body.action==='delivery-decline'){
         const o=orders.find(x=>String(x.id)===String(body.orderId||''));
