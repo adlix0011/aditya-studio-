@@ -1448,7 +1448,7 @@ const server = http.createServer(async (req, res) => {
     'styles.css', 'mobile-design.css', 'home-design.css', 'profile-page.css', 'delivery-flow.css',
     'item-icons.js', 'delivery-engine.js', 'app.js', 'request-summary.js', 'home-design.js',
     'order-items.js', 'post-page.js', 'profile-page.js', 'edit-order.js', 'delivery-flow.js',
-    'post-wallet.js', 'language.js', 'notifications-page.js', 'notification-alerts.js', 'repost-order.js', 'messages-hub.js', 'local-delivery-admin.js', 'local-delivery-admin.css'
+    'post-wallet.js', 'language.js', 'notifications-page.js', 'notification-alerts.js', 'repost-order.js', 'messages-hub.js', 'chat-room.js', 'local-delivery-admin.js', 'local-delivery-admin.css'
   ]);
   if (req.method === 'GET' && urlPath === '/local-delivery.html') {
     return fs.readFile(path.join(__dirname, 'local-delivery.html'), (err, data) => {
@@ -2906,17 +2906,26 @@ function computeOrderFees(subtotal, settingsFees) {
         return sendJSON(res,200,{ok:true,order:o});
       }
       if(body.action==='message'){
-        const orderId=String(body.orderId||''), text=String(body.text||'').trim().slice(0,2000);
+        const orderId=String(body.orderId||''), text=String(body.text||'').trim().slice(0,2000),photo=String(body.photo||'');
         const o=orders.find(x=>String(x.id)===orderId);
-        if(!o||!text)return sendJSON(res,400,{ok:false,message:'Message नहीं भेजा गया'});
+        if(!o||(!text&&!photo))return sendJSON(res,400,{ok:false,message:'Message नहीं भेजा गया'});
+        if(photo&&(!/^data:image\/(png|jpeg|webp);base64,/i.test(photo)||photo.length>1500000))return sendJSON(res,400,{ok:false,message:'Photo JPG, PNG या WEBP और 1MB से छोटी रखें'});
         if(String(o.ownerMobile)!==String(acc.mobile)&&String(o.providerMobile)!==String(acc.mobile))return sendJSON(res,403,{ok:false,message:'इस order पर message नहीं भेज सकते'});
         if(!['chat','booked','delivering'].includes(o.status))return sendJSON(res,409,{ok:false,message:'इस order में chat available नहीं है'});
         o.messages=Array.isArray(o.messages)?o.messages:[];
-        o.messages.push({ senderMobile:acc.mobile, senderName:acc.name||'Customer', text, time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}), at:new Date().toISOString() });
+        o.messages.push({ id:'m-'+Date.now()+'-'+Math.random().toString(36).slice(2,5),senderMobile:acc.mobile, senderName:acc.name||'Customer', text, photo, time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}), at:new Date().toISOString(), deliveredAt:new Date().toISOString() });
         o.updatedAt=new Date().toISOString();fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));
         const recipient=String(o.ownerMobile)===String(acc.mobile)?o.providerMobile:o.ownerMobile;
         if(recipient)addNotification({title:'💬 नया Local Delivery message',body:(acc.name||'Customer')+' ने “'+String(o.title).slice(0,70)+'” पर message भेजा है।',mobile:recipient,kind:'local-delivery-message',orderId:o.id});
         return sendJSON(res,200,{ok:true,message:o.messages[o.messages.length-1]});
+      }
+      if(body.action==='typing'||body.action==='seen'){
+        const o=orders.find(x=>String(x.id)===String(body.orderId||''));
+        if(!o||[o.ownerMobile,o.providerMobile].map(String).indexOf(String(acc.mobile))<0)return sendJSON(res,403,{ok:false});
+        if(body.action==='typing'){o.typingByMobile=acc.mobile;o.typingAt=Date.now()}
+        else {(o.messages||[]).forEach(m=>{if(String(m.senderMobile||'')!==String(acc.mobile)&&!m.seenAt)m.seenAt=new Date().toISOString()})}
+        fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));
+        return sendJSON(res,200,{ok:true});
       }
       return sendJSON(res,400,{ok:false,message:'Unknown action'});
     }catch(e){return sendJSON(res,500,{ok:false,message:'Order save नहीं हुआ'})}
