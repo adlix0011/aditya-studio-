@@ -2987,6 +2987,14 @@ function computeOrderFees(subtotal, settingsFees) {
         addNotification({title:'💰 Payment amount updated',body:'Customer ने नई payment amount और wallet lock लागू कर दिया है।',mobile:o.providerMobile,kind:'local-delivery-payment-updated',orderId:o.id});
         return sendJSON(res,200,{ok:true,order:o,walletBalance:acc.walletBalance,locked:target});
       }
+      if(body.action==='delivery-otp-create'){
+        const o=orders.find(x=>String(x.id)===String(body.orderId||''));
+        if(!o||String(o.ownerMobile)!==String(acc.mobile)||o.status!=='delivering')return sendJSON(res,403,{ok:false,message:'OTP अभी उपलब्ध नहीं है'});
+        const code=String(Math.floor(100000+Math.random()*900000));o.deliveryOtp={code,expiresAt:Date.now()+600000};fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));addNotification({title:'✅ सामान received',body:'Customer ने OTP बनाया है।',mobile:o.providerMobile,kind:'local-delivery-otp',orderId:o.id});return sendJSON(res,200,{ok:true,code});
+      }
+      if(body.action==='delivery-otp-verify'){
+        const o=orders.find(x=>String(x.id)===String(body.orderId||'')),code=String(body.code||'');if(!o||String(o.providerMobile)!==String(acc.mobile)||o.status!=='delivering'||!o.deliveryOtp||o.deliveryOtp.expiresAt<Date.now()||o.deliveryOtp.code!==code)return sendJSON(res,400,{ok:false,message:'OTP गलत या expire हो गया'});let locks=[];try{locks=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_LOCKS_FILE,'utf8'))||[]}catch(_){}const row=locks.find(x=>x.orderId===String(o.id)&&String(x.mobile)===String(o.ownerMobile)&&x.status==='locked'),amount=Number(row?.amount||0);if(amount>0){walletTxn(acc,'credit',amount,{reason:'Local Delivery completed · '+o.id,source:'local_delivery_settlement',orderId:o.id});row.status='settled'}o.status='completed';fs.writeFileSync(LOCAL_DELIVERY_LOCKS_FILE,JSON.stringify(locks,null,2));fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));saveAccounts(accounts);return sendJSON(res,200,{ok:true,walletBalance:acc.walletBalance,amount});
+      }
       if(body.action==='pickup-progress'){
         const o=orders.find(x=>String(x.id)===String(body.orderId||'')),rows=Array.isArray(body.items)?body.items:[];
         if(!o||String(o.providerMobile)!==String(acc.mobile)||!['booked','delivering'].includes(o.status))return sendJSON(res,403,{ok:false,message:'Pickup update उपलब्ध नहीं है'});
