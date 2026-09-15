@@ -2885,7 +2885,7 @@ function computeOrderFees(subtotal, settingsFees) {
   }
   if (req.method === 'POST' && urlPath === '/api/local-delivery/orders') {
     try {
-      const body=await readBody(req),accounts=loadAccounts(),acc=sessionAccount(req,body,accounts);
+      const body=await readBody(req,3e6),accounts=loadAccounts(),acc=sessionAccount(req,body,accounts);
       if(!acc)return sendJSON(res,401,{ok:false,message:'Login required'});
       let orders=[];try{orders=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_ORDERS_FILE,'utf8'))||[]}catch(_){}
       if(body.action==='list')return sendJSON(res,200,{ok:true,orders:orders.filter(o=>o.status==='open'||o.ownerMobile===acc.mobile||o.providerMobile===acc.mobile)});
