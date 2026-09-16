@@ -332,10 +332,15 @@ let _cache = {
 };
 
 function normalizeAccount(a) {
+  // Accounts created before mobile OTP verification existed have no flag.
+  // Keep their already-established account verified; new registrations always
+  // persist mobileVerified: false until their OTP is verified.
+  const legacyVerified = !Object.prototype.hasOwnProperty.call(a || {}, 'mobileVerified');
   return {
     ...a,
     mobile: String(a.mobile || ''),
-    pin: String(a.pin || '')
+    pin: String(a.pin || ''),
+    mobileVerified: legacyVerified ? true : !!a.mobileVerified
   };
 }
 
