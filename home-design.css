@@ -23,3 +23,5 @@ body.delivery-keyboard-open .sidebar{display:none!important}
 .add-money-glow{background:linear-gradient(100deg,#f59e0b,#ec4899,#7c3aed)!important;color:#fff!important;box-shadow:0 0 12px rgba(245,158,11,.75),0 0 24px rgba(236,72,153,.5);animation:addMoneyGlow 1.5s ease-in-out infinite alternate}@keyframes addMoneyGlow{to{box-shadow:0 0 19px rgba(250,204,21,.95),0 0 34px rgba(168,85,247,.72);transform:translateY(-1px)}}
 
 .chat-order-button{display:block;width:100%;margin:14px 0 8px;background:linear-gradient(110deg,#7c3aed,#db2777 52%,#2563eb)!important;color:#fff!important;box-shadow:0 0 16px rgba(168,85,247,.55),0 8px 20px rgba(37,99,235,.3);font-weight:900}
+
+.order-view-tabs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}.order-view-tabs button{border:1px solid #475569;border-radius:13px;padding:13px 7px;background:#17233c;color:#cbd5e1;font-weight:800;font-size:13px}.order-view-tabs button.active{background:linear-gradient(115deg,#7c3aed,#2563eb);border-color:#a78bfa;color:#fff;box-shadow:0 0 15px rgba(124,58,237,.45)}
