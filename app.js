@@ -3,6 +3,8 @@ const KEY='local-delivery-v1';
 // No sample people, sample money or sample requirements are shown to customers.
 // The account below is replaced from the existing Aditya Studio login session.
 const seed=()=>({users:{me:{name:'Login करें',balance:0}},orders:[],transactions:[]});
+// Compatibility state for older Local Delivery modules. It is always false: logout redirects to Login, never to a demo page.
+let demoLoggedOut=false;try{sessionStorage.removeItem('kaamsetu-logged-out')}catch(_){}
 let state;try{state=JSON.parse(localStorage.getItem(KEY))||seed()}catch{state=seed()}
 // Keep saved delivery records across code updates. Reset only truly corrupt
 // storage, never a valid signed-in user's record.
