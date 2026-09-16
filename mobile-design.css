@@ -22,3 +22,5 @@ body{font-family:'Plus Jakarta Sans','Segoe UI',sans-serif;line-height:1.5}h1,h2
 .order-history-fallback{margin-top:16px;padding:13px 15px;border:1px solid #29375d;border-radius:14px;background:#111a31;color:#dbeafe}.order-history-fallback summary{cursor:pointer;font-weight:800;color:#c4b5fd}.order-history-fallback[open] summary{margin-bottom:10px}
 
 .completion-page{text-align:center;padding-top:22vh}.completion-page h1{color:#86efac;font-size:27px}.completion-page p{color:#dbeafe;font-size:17px}.completion-page strong,.completion-page small{display:block;margin:16px auto;color:#bbf7d0}.completion-burst{font-size:72px;animation:deliveryCelebrate .7s ease-in-out infinite alternate}@keyframes deliveryCelebrate{to{transform:scale(1.2) rotate(12deg)}}
+
+.older-orders-button{display:block;width:100%;margin:18px 0 8px;padding:14px;border:1px solid #8b5cf6;border-radius:13px;background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;font-size:16px;font-weight:800;box-shadow:0 8px 20px rgba(124,58,237,.25)}
