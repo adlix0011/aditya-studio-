@@ -2950,7 +2950,7 @@ function computeOrderFees(subtotal, settingsFees) {
         if(!o||String(o.providerMobile)!==String(acc.mobile)||!['chat','booked'].includes(o.status))return sendJSON(res,403,{ok:false,message:'Payment request उपलब्ध नहीं है'});
         if(o.paymentRequest?.status==='pending')return sendJSON(res,409,{ok:false,message:'Customer का जवाब बाकी है'});
         o.paymentRequest={id:'pay-'+Date.now(),status:'pending',byMobile:acc.mobile,createdAt:new Date().toISOString()};
-        o.messages=Array.isArray(o.messages)?o.messages:[];o.messages.push({sender:'system',text:'💳 Delivery boy payment बढ़ाने के लिए request कर रहा है। क्या आप delivery boy को extra payment देना चाहते हैं?' ,time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})});
+        o.messages=Array.isArray(o.messages)?o.messages:[];o.messages.push({sender:'system',text:'💳 क्या आप delivery boy की delivery payment बढ़ाना चाहते हैं? Yes या No चुनें।' ,time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})});
         fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));
         addNotification({title:'💳 Payment change request',body:'Delivery helper ने payment amount बदलने का अनुरोध भेजा है।',mobile:o.ownerMobile,kind:'local-delivery-payment-request',orderId:o.id});
         return sendJSON(res,200,{ok:true,order:o});
