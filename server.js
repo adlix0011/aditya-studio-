@@ -3082,10 +3082,11 @@ function computeOrderFees(subtotal, settingsFees) {
         return sendJSON(res,200,{ok:true,order:o,walletBalance:acc.walletBalance,locked:target});
       }
       if(body.action==='actual-bill-request'){
-        const o=orders.find(x=>String(x.id)===String(body.orderId||'')),amount=Math.round(Number(body.amount));
+        const o=orders.find(x=>String(x.id)===String(body.orderId||'')),amount=Math.round(Number(body.amount)),photo=String(body.photo||'');
         if(!o||String(o.providerMobile)!==String(acc.mobile)||o.status!=='booked'||!Number.isSafeInteger(amount)||amount<0||amount>100000)return sendJSON(res,400,{ok:false,message:'सही bill amount भरें'});
+        if(!/^data:image\/(png|jpeg|webp);base64,/i.test(photo)||photo.length>1500000)return sendJSON(res,400,{ok:false,message:'Bill photo JPG, PNG या WEBP और 1 MB से छोटी रखें'});
         if(o.actualBillRequest?.status==='pending')return sendJSON(res,409,{ok:false,message:'Customer का bill approval बाकी है'});
-        o.actualBillRequest={status:'pending',amount,byMobile:acc.mobile,createdAt:new Date().toISOString()};o.messages=Array.isArray(o.messages)?o.messages:[];o.messages.push({sender:'system',text:'🧾 Delivery boy ने actual सामान bill ₹'+amount+' भेजा है। कृपया accept या reject करें।',time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})});fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));addNotification({title:'🧾 Actual bill approval',body:'Delivery boy ने actual सामान bill ₹'+amount+' भेजा है।',mobile:o.ownerMobile,kind:'local-delivery-bill-request',orderId:o.id});return sendJSON(res,200,{ok:true,order:o});
+        o.actualBillRequest={status:'pending',amount,photo,byMobile:acc.mobile,createdAt:new Date().toISOString()};o.messages=Array.isArray(o.messages)?o.messages:[];o.messages.push({sender:'system',text:'🧾 Delivery boy ने actual सामान bill ₹'+amount+' और bill photo भेजी है। कृपया accept या reject करें।',time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})});fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));addNotification({title:'🧾 Actual bill approval',body:'Delivery boy ने actual सामान bill ₹'+amount+' और photo भेजी है।',mobile:o.ownerMobile,kind:'local-delivery-bill-request',orderId:o.id});return sendJSON(res,200,{ok:true,order:o});
       }
       if(body.action==='actual-bill-response'){
         const o=orders.find(x=>String(x.id)===String(body.orderId||'')),answer=String(body.answer||'');
@@ -3125,7 +3126,7 @@ function computeOrderFees(subtotal, settingsFees) {
       if(body.action==='delivery-start'){
         const o=orders.find(x=>String(x.id)===String(body.orderId||'')),minutes=Math.round(Number(body.minutes));
         if(!o||String(o.providerMobile)!==String(acc.mobile)||o.status!=='booked'||!Number.isSafeInteger(minutes)||minutes<1||minutes>720)return sendJSON(res,400,{ok:false,message:'सही estimated time भरें'});
-        if(!Array.isArray(o.pickupProgress)||!o.pickupProgress.length||o.pickupProgress.some(x=>!x.done))return sendJSON(res,400,{ok:false,message:'पहले हर सामान पर tick करके pickup update करें'});
+        if(!Array.isArray(o.pickupProgress)||!o.pickupProgress.length||o.pickupProgress.some(x=>!x.done||!x.photo))return sendJSON(res,400,{ok:false,message:'हर सामान पर tick और उसकी photo लगाकर pickup update करें'});
         o.status='delivering';o.deliveryEtaMinutes=minutes;o.deliveryStartedAt=new Date().toISOString();o.messages=Array.isArray(o.messages)?o.messages:[];o.messages.push({sender:'system',text:'🚚 सभी सामान ले लिए गए। Estimated delivery time: '+minutes+' मिनट।',time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})});fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));addNotification({title:'🚚 Delivery शुरू हो गई',body:'सभी सामान ले लिए गए। अनुमानित समय '+minutes+' मिनट।',mobile:o.ownerMobile,kind:'local-delivery-started',orderId:o.id});return sendJSON(res,200,{ok:true,order:o});
       }
       if(body.action==='typing'||body.action==='seen'){
