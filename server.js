@@ -897,6 +897,8 @@ function saveNotifs(list) {
 }
 function addNotification(item) {
   const list = loadNotifs();
+  // Pickup progress may be saved more than once while the helper ticks products. Keep one silent notification card, not repeated popups.
+  if (item && item.kind === 'local-delivery-pickup' && list.some(n => n && n.kind === item.kind && String(n.orderId || '') === String(item.orderId || '') && Date.now() - new Date(n.at || 0).getTime() < 30 * 60 * 1000)) return;
   list.unshift(Object.assign({
     id: 'n-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
     at: new Date().toISOString(),
