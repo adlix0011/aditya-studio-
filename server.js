@@ -3150,6 +3150,12 @@ function computeOrderFees(subtotal, settingsFees) {
       res.end(data);
     });
   }
+  if (req.method === 'GET' && urlPath === '/admin/local-delivery-json') {
+    let orders=[], locks=[];
+    try { orders=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_ORDERS_FILE,'utf8'))||[]; } catch (_) {}
+    try { locks=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_LOCKS_FILE,'utf8'))||[]; } catch (_) {}
+    return sendJSON(res,200,{ok:true,orders:orders.slice(0,5000),locks:locks.slice(0,5000),generatedAt:new Date().toISOString()});
+  }
 
   if (req.method === 'GET' && urlPath === '/admin/activity-json') {
     const now = Date.now();
