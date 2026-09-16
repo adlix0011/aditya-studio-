@@ -90,7 +90,7 @@ async function syncStudioWallet(){
     // Profile/address/post forms are drafts. A background wallet refresh must
     // never rebuild an open form and erase text the customer is typing.
     const focused=document.activeElement;
-    const draftOpen=!!document.querySelector('#addressForm,#broadcastForm,#profileForm,#priceForm')||!!focused?.closest('#chatForm,#chatRoomForm,#paymentUpdateForm,#trackPickupForm,#trackStartForm');
+    const draftOpen=!!document.querySelector('#addressForm,#broadcastForm,#profileForm,#priceForm')||!!focused?.closest('#chatForm,#chatRoomForm,#paymentUpdateForm,#trackPickupForm,#trackStartForm,#trackOtpForm');
     // Notifications/messages have their own fetchers. Re-rendering the whole shell here makes their controls blink.
     const stableScreen=['notifications','messages'].includes(tab);
     if(!draftOpen&&!stableScreen)render();
