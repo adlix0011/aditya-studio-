@@ -953,6 +953,10 @@
         profileBtn.addEventListener('click', () => sideNav.classList.contains('open') ? closeNav() : openNav());
       }
       if (guestLoginBtn) guestLoginBtn.addEventListener('click', () => openLoginPanel('Login करके अपना profile और orders देखें'));
+      if (new URLSearchParams(window.location.search).get('auth') === 'login') {
+        history.replaceState({}, '', window.location.pathname);
+        setTimeout(() => openLoginPanel('Login या Sign up करके Local Delivery जारी रखें'), 80);
+      }
       function hideVerifyNudge() {
         if (verifyNudge) verifyNudge.classList.add('hidden');
         if (verifyNudge) verifyNudge.classList.remove('flex');
