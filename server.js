@@ -2913,7 +2913,7 @@ function computeOrderFees(subtotal, settingsFees) {
       };
       const requestedCandidate=(o)=>sameMobile(o.ownerMobile,acc.mobile)?sessionFor(o,body.peerMobile):sessionFor(o,acc.mobile);
       const writeOrders=()=>fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));
-      if(body.action==='list')return sendJSON(res,200,{ok:true,orders:orders.filter(o=>o.status==='open'||o.status==='chat'||sameMobile(o.ownerMobile,acc.mobile)||sameMobile(o.providerMobile,acc.mobile)||(o.deliveryCandidates||[]).some(c=>sameMobile(c.mobile,acc.mobile))).map(o=>viewFor(o,acc.mobile))});
+      if(body.action==='list')return sendJSON(res,200,{ok:true,orders:orders.filter(o=>(o.kind==='delivery-service'&&o.serviceActive!==false)||o.status==='open'||o.status==='chat'||sameMobile(o.ownerMobile,acc.mobile)||sameMobile(o.providerMobile,acc.mobile)||(o.deliveryCandidates||[]).some(c=>sameMobile(c.mobile,acc.mobile))).map(o=>viewFor(o,acc.mobile))});
       if(body.action==='create'){
         const o=body.order||{}; if(!o.id||!o.title)return sendJSON(res,400,{ok:false,message:'Invalid order'});
         o.ownerMobile=acc.mobile;o.ownerName=acc.name;o.createdAt=new Date().toISOString();
