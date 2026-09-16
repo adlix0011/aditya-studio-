@@ -390,9 +390,9 @@ function issueSession(acc) {
   // hash account record me bhi rakho, taaki logged-in customer ka wallet/coupon
   // session restart ke baad bhi bina dobara login maange chale.
   const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-  const old = Array.isArray(acc.sessionTokens) ? acc.sessionTokens : [];
-  acc.sessionTokens = old.filter(row => row && Number(row.expiresAt) > Date.now()).slice(-4);
-  acc.sessionTokens.push({ tokenHash, expiresAt });
+  // One account is allowed on only one device/browser at a time. A new login revokes every older token immediately.
+  for (const [existingToken, row] of sessions.entries()) if (row && String(row.mobile) === String(acc.mobile)) sessions.delete(existingToken);
+  acc.sessionTokens = [{ tokenHash, expiresAt }];
   saveSessions();
   return token;
 }
