@@ -40,13 +40,11 @@ const DeliveryEngine=(()=>{
   }else if(action==='otp'){
    if(!owner||!['booked','delivering'].includes(o.status)||o.proposal||o.cancelBy)fail('Booking और price agreement के बाद OTP बनेगा।');
    reserve(s,o);
-   if(o.otp&&now-o.otp.createdAt<30000)fail('नया OTP बनाने से पहले 30 सेकंड रुकें।');
-   if(o.otp?.blockedUntil>now)fail('गलत attempts के कारण OTP अभी lock है। एक मिनट बाद कोशिश करें।');
-   o.ownerDone=true;o.status='delivering';o.otp={code:otpCode(),createdAt:now,expiresAt:now+600000,attempts:0,blockedUntil:0};note(o,'Customer ने सामान मिलने की पुष्टि की। Delivery OTP तैयार है; code केवल customer view में दिखेगा।');
+   if(o.otp)return {message:'OTP पहले से बना हुआ है। वही code delivery boy को दें।'};
+   o.ownerDone=true;o.status='delivering';o.otp={code:otpCode(),createdAt:now,attempts:0,blockedUntil:0};note(o,'Customer ने सामान मिलने की पुष्टि की। Delivery OTP तैयार है; code केवल customer view में दिखेगा।');
   }else if(action==='verify'){
    if(!helper||o.status!=='delivering'||!o.ownerDone||o.proposal||o.cancelBy||!o.otp)fail('Customer को पहले सामान check करके OTP बनाना है।');
    if(o.otp.blockedUntil>now)fail('OTP attempts lock हैं। एक मिनट बाद कोशिश करें।');
-   if(o.otp.expiresAt<=now)fail('OTP expire हो गया। Customer से नया OTP बनवाएं।');
    if(!/^\d{6}$/.test(String(data.code)))fail('6 अंकों का OTP भरें।');
    if(o.otp.code!==String(data.code)){o.otp.attempts++;if(o.otp.attempts>=5){o.otp.blockedUntil=now+60000;o.otp.attempts=0}return {message:o.otp.blockedUntil>now?'5 गलत OTP। एक मिनट के लिए रोक दिया गया।':'गलत OTP। Customer से code दोबारा पूछें।',error:true};}
    reserve(s,o);const amount=total(o);s.users[o.owner].balance-=amount;s.users[o.provider].balance+=amount;o.providerDone=true;o.status='completed';o.customerHold=0;o.helperHold=0;o.otp=null;o.settledAt=now;
