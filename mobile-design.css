@@ -34,3 +34,5 @@ body{font-family:'Plus Jakarta Sans','Segoe UI',sans-serif;line-height:1.5}h1,h2
 .delivery-final-lock{border-color:#f59e0b!important;background:#2a210d!important;color:#fde68a!important}
 
 .already-paid-tag{display:inline-flex;align-items:center;padding:5px 9px;border:1px solid #fbbf24;border-radius:999px;background:#422006;color:#fde68a;font-size:12px;font-weight:900}.already-paid-choice{border:1px solid #fbbf24!important;background:#2a210d!important}.already-paid-choice h2{color:#fde68a!important}.already-paid-choice label{display:grid!important;grid-template-columns:20px 1fr;gap:8px}.already-paid-choice small{grid-column:2;color:#fef3c7!important;line-height:1.45}
+
+.chat-room-compose input:disabled,.chat-camera:has(input:disabled),.chat-room-compose button:disabled{opacity:.5;cursor:not-allowed}.chat-room-compose{align-items:center}.chat-photo-preview{position:absolute;bottom:62px;left:12px;z-index:7}
