@@ -1469,7 +1469,9 @@ const server = http.createServer(async (req, res) => {
     const contentType = requestedAsset.endsWith('.css') ? 'text/css; charset=utf-8' : 'application/javascript; charset=utf-8';
     return fs.readFile(path.join(__dirname, requestedAsset), (err, data) => {
       if (err) { res.writeHead(404); return res.end('Local Delivery asset missing'); }
-      res.writeHead(200, { 'Content-Type': contentType, 'Cache-Control': 'public, max-age=300' });
+      // Local Delivery is an authenticated, actively changing app. Never keep an
+      // old JavaScript bundle on a phone after a deployment.
+      res.writeHead(200, { 'Content-Type': contentType, 'Cache-Control': 'no-store, max-age=0, must-revalidate' });
       res.end(data);
     });
   }
