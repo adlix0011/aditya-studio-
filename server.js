@@ -2914,8 +2914,10 @@ function computeOrderFees(subtotal, settingsFees) {
         o.messages=Array.isArray(o.messages)?o.messages:[];
         o.messages.push({ id:'m-'+Date.now()+'-'+Math.random().toString(36).slice(2,5),senderMobile:acc.mobile, senderName:acc.name||'Customer', text, photo, time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}), at:new Date().toISOString(), deliveredAt:new Date().toISOString() });
         o.updatedAt=new Date().toISOString();fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));
-        const recipient=String(o.ownerMobile)===String(acc.mobile)?o.providerMobile:o.ownerMobile;
-        if(recipient)addNotification({title:'💬 नया Local Delivery message',body:(acc.name||'Customer')+' ने “'+String(o.title).slice(0,70)+'” पर message भेजा है।',mobile:recipient,kind:'local-delivery-message',orderId:o.id});
+        const senderMobile=String(acc.mobile);
+        const recipient=String(o.ownerMobile)===senderMobile?String(o.providerMobile||''):String(o.ownerMobile||'');
+        // Alert only the other participant after an actual text/photo message has been saved.
+        if(recipient&&recipient!==senderMobile)addNotification({title:'💬 नया Local Delivery message',body:(acc.name||'Customer')+' ने “'+String(o.title).slice(0,70)+'” पर message भेजा है।',mobile:recipient,kind:'local-delivery-message',orderId:o.id,actualMessage:true,senderMobile});
         return sendJSON(res,200,{ok:true,message:o.messages[o.messages.length-1]});
       }
       if(body.action==='delivery-confirm-request'){
