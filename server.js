@@ -2914,6 +2914,12 @@ function computeOrderFees(subtotal, settingsFees) {
       const requestedCandidate=(o)=>sameMobile(o.ownerMobile,acc.mobile)?sessionFor(o,body.peerMobile):sessionFor(o,acc.mobile);
       const writeOrders=()=>fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));
       if(body.action==='list')return sendJSON(res,200,{ok:true,orders:orders.filter(o=>(o.kind==='delivery-service'&&o.serviceActive!==false)||o.status==='open'||o.status==='chat'||sameMobile(o.ownerMobile,acc.mobile)||sameMobile(o.providerMobile,acc.mobile)||(o.deliveryCandidates||[]).some(c=>sameMobile(c.mobile,acc.mobile))).map(o=>viewFor(o,acc.mobile))});
+      if(body.action==='owner-delete'||body.action==='owner-edit'){
+        const o=orders.find(x=>String(x.id)===String(body.orderId||''));
+        if(!o||!sameMobile(o.ownerMobile,acc.mobile)||!['open','chat','service'].includes(o.status))return sendJSON(res,403,{ok:false,message:'Final confirmation के बाद post edit या delete नहीं हो सकती'});
+        if(body.action==='owner-delete'){let locks=[];try{locks=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_LOCKS_FILE,'utf8'))||[]}catch(_){}const row=locks.find(x=>x.orderId===String(o.id)&&sameMobile(x.mobile,acc.mobile)&&x.status==='locked');if(row){walletTxn(acc,'credit',Number(row.amount||0),{reason:'Local Delivery post deleted refund · '+o.id,source:'local_delivery_post_delete',orderId:o.id});row.status='refunded';row.refundedAt=new Date().toISOString();fs.writeFileSync(LOCAL_DELIVERY_LOCKS_FILE,JSON.stringify(locks,null,2));saveAccounts(accounts)}orders=orders.filter(x=>x!==o);writeOrders();return sendJSON(res,200,{ok:true,walletBalance:acc.walletBalance})}
+        const next=body.order||{},keys=['title','description','area','address','district','deliveryVillage','quantity','lineItems','category','neededBy','items','fee','alreadyPurchased','photo','service'];for(const k of keys)if(next[k]!==undefined)o[k]=next[k];o.updatedAt=new Date().toISOString();writeOrders();return sendJSON(res,200,{ok:true,order:viewFor(o,acc.mobile)});
+      }
       if(body.action==='create'){
         const o=body.order||{}; if(!o.id||!o.title)return sendJSON(res,400,{ok:false,message:'Invalid order'});
         o.ownerMobile=acc.mobile;o.ownerName=acc.name;o.createdAt=new Date().toISOString();

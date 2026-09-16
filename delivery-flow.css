@@ -11,3 +11,5 @@
 .service-feed{margin:0 0 20px;padding:12px;border:1px solid rgba(14,165,233,.38);border-radius:18px;background:rgba(14,165,233,.06)}.service-feed .market-list{margin:0}
 
 .post-choice-page{max-width:620px}.post-choice-card{display:flex;width:100%;min-height:108px;margin:14px 0;padding:20px;text-align:left;flex-direction:column;justify-content:center;gap:8px;border-radius:18px;border:1px solid #475569;color:#fff;background:#14213a}.post-choice-card b{font-size:19px}.post-choice-card span{color:#cbd5e1;font-size:14px;line-height:1.45}.need-choice{background:linear-gradient(135deg,#182b4e,#1d4ed8)}.service-choice{background:linear-gradient(135deg,#064e3b,#0e7490);border-color:#22c55e;box-shadow:0 0 22px rgba(34,197,94,.18)}
+
+.owner-post-controls{display:flex;gap:8px;padding:0 14px 14px}.owner-post-controls button{flex:1;padding:10px;border:1px solid #4f46e5;border-radius:10px;background:#1e293b;color:#e0e7ff;font-weight:800}.owner-post-controls button:last-child{border-color:#ef4444;color:#fecaca}
