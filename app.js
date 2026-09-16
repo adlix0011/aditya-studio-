@@ -80,7 +80,7 @@ async function syncStudioWallet(){
     if(!session?.sessionToken)return;
     const response=await fetch('/api/restore-session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mobile:session.mobile,sessionToken:session.sessionToken})});
     const account=await response.json();
-    if(!response.ok||!account?.ok){localStorage.removeItem('aditya_studio_session_v1');localStorage.removeItem('aditya_studio_persistent_login_v2');localStorage.removeItem('aditya_studio_wallet_snapshot_v1');if(location.pathname.includes('local-delivery'))location.replace('/?auth=login');return;}
+    if(!response.ok||!account?.ok){/* Keep the browser login intact. A temporary network error, server restart, or background refresh must never log the user out. Only the manual Profile logout clears this session. */return;}
     user=String(account.id||'me');
     state.users[user]={...(state.users[user]||{}),name:String(account.name||'User'),phone:String(account.mobile||''),balance:Number(account.walletBalance)||0,pendingBalance:Number(account.walletPendingBalance)||0,village:String(account.village||''),address:String(account.address||''),district:String(account.district||''),pincode:String(account.pincode||''),landmark:String(account.landmark||'')};
     try{const browserAddress=JSON.parse(localStorage.getItem('local_delivery_address_'+session.mobile)||'null');if(browserAddress)for(const k of ['address','village','district','pincode','landmark'])if(!state.users[user][k]&&browserAddress[k])state.users[user][k]=browserAddress[k]}catch(_){};
