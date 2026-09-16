@@ -2887,7 +2887,7 @@ function computeOrderFees(subtotal, settingsFees) {
       const body=await readBody(req,3e6),accounts=loadAccounts(),acc=sessionAccount(req,body,accounts);
       if(!acc)return sendJSON(res,401,{ok:false,message:'Login required'});
       let orders=[];try{orders=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_ORDERS_FILE,'utf8'))||[]}catch(_){}
-      if(body.action==='list')return sendJSON(res,200,{ok:true,orders:orders.filter(o=>o.status==='open'||o.status==='chat'||o.ownerMobile===acc.mobile||o.providerMobile===acc.mobile)});
+      if(body.action==='list')return sendJSON(res,200,{ok:true,orders:orders.filter(o=>o.status==='open'||o.status==='chat'||o.ownerMobile===acc.mobile||o.providerMobile===acc.mobile||(o.deliveryCandidates||[]).some(c=>String(c.mobile)===String(acc.mobile)))});
       if(body.action==='create'){
         const o=body.order||{}; if(!o.id||!o.title)return sendJSON(res,400,{ok:false,message:'Invalid order'});
         o.ownerMobile=acc.mobile;o.ownerName=acc.name;o.createdAt=new Date().toISOString();orders.unshift(o);fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));
@@ -2898,10 +2898,13 @@ function computeOrderFees(subtotal, settingsFees) {
         const orderId=String(body.orderId||''); const o=orders.find(x=>String(x.id)===orderId);
         if(!o)return sendJSON(res,404,{ok:false,message:'Order नहीं मिला'});
         if(o.ownerMobile===acc.mobile)return sendJSON(res,400,{ok:false,message:'अपना order accept नहीं कर सकते'});
-        if(o.status!=='open')return sendJSON(res,409,{ok:false,message:'यह order पहले accept हो चुका है'});
-        o.status='chat'; o.providerMobile=acc.mobile; o.providerName=acc.name||'Delivery helper'; o.acceptedAt=new Date().toISOString();
+        if(!['open','chat'].includes(o.status))return sendJSON(res,409,{ok:false,message:'यह order अब final हो चुका है'});
+        o.deliveryCandidates=Array.isArray(o.deliveryCandidates)?o.deliveryCandidates:[];
+        if(o.providerMobile&&!o.deliveryCandidates.some(c=>String(c.mobile)===String(o.providerMobile)))o.deliveryCandidates.push({mobile:o.providerMobile,name:o.providerName||'Delivery helper',acceptedAt:o.acceptedAt||new Date().toISOString()});
+        if(o.deliveryCandidates.some(c=>String(c.mobile)===String(acc.mobile)))return sendJSON(res,409,{ok:false,message:'आपने यह order पहले accept किया है'});
+        o.status='chat';o.deliveryCandidates.push({mobile:acc.mobile,name:acc.name||'Delivery helper',acceptedAt:new Date().toISOString()});if(!o.providerMobile){o.providerMobile=acc.mobile;o.providerName=acc.name||'Delivery helper'}o.acceptedAt=new Date().toISOString();
         fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));
-        addNotification({ title:'✅ आपका order accept हो गया', body:(o.providerName||'Delivery helper')+' ने “'+String(o.title).slice(0,90)+'” accept किया है। अब details पर बात करें।', mobile:o.ownerMobile, kind:'local-delivery-accepted', orderId:o.id });
+        addNotification({ title:'✅ नया delivery request', body:(acc.name||'Delivery helper')+' ने “'+String(o.title).slice(0,90)+'” के लिए बात शुरू की है।', mobile:o.ownerMobile, kind:'local-delivery-accepted', orderId:o.id });
         return sendJSON(res,200,{ok:true,order:o});
       }
       if(body.action==='message'){
@@ -2909,20 +2912,20 @@ function computeOrderFees(subtotal, settingsFees) {
         const o=orders.find(x=>String(x.id)===orderId);
         if(!o||(!text&&!photo))return sendJSON(res,400,{ok:false,message:'Message नहीं भेजा गया'});
         if(photo&&(!/^data:image\/(png|jpeg|webp);base64,/i.test(photo)||photo.length>1500000))return sendJSON(res,400,{ok:false,message:'Photo JPG, PNG या WEBP और 1MB से छोटी रखें'});
-        if(String(o.ownerMobile)!==String(acc.mobile)&&String(o.providerMobile)!==String(acc.mobile))return sendJSON(res,403,{ok:false,message:'इस order पर message नहीं भेज सकते'});
+        if(String(o.ownerMobile)!==String(acc.mobile)&&String(o.providerMobile)!==String(acc.mobile)&&!(o.deliveryCandidates||[]).some(c=>String(c.mobile)===String(acc.mobile)))return sendJSON(res,403,{ok:false,message:'इस order पर message नहीं भेज सकते'});
         if(!['chat','booked','delivering'].includes(o.status))return sendJSON(res,409,{ok:false,message:'इस order में chat available नहीं है'});
         o.messages=Array.isArray(o.messages)?o.messages:[];
-        o.messages.push({ id:'m-'+Date.now()+'-'+Math.random().toString(36).slice(2,5),senderMobile:acc.mobile, senderName:acc.name||'Customer', text, photo, time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}), at:new Date().toISOString(), deliveredAt:new Date().toISOString() });
+        o.messages.push({ id:'m-'+Date.now()+'-'+Math.random().toString(36).slice(2,5),senderMobile:acc.mobile, senderName:acc.name||'Customer', text, photo, recipientMobile:String(String(o.ownerMobile)===String(acc.mobile)?String(body.recipientMobile||o.providerMobile||''):String(o.ownerMobile||'')), time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}), at:new Date().toISOString(), deliveredAt:new Date().toISOString() });
         o.updatedAt=new Date().toISOString();fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));
         const senderMobile=String(acc.mobile);
-        const recipient=String(o.ownerMobile)===senderMobile?String(o.providerMobile||''):String(o.ownerMobile||'');
+        const recipient=String(o.ownerMobile)===senderMobile?String(body.recipientMobile||o.providerMobile||''):String(o.ownerMobile||'');
         // Alert only the other participant after an actual text/photo message has been saved.
         if(recipient&&recipient!==senderMobile)addNotification({title:'💬 नया Local Delivery message',body:(acc.name||'Customer')+' ने “'+String(o.title).slice(0,70)+'” पर message भेजा है।',mobile:recipient,kind:'local-delivery-message',orderId:o.id,actualMessage:true,senderMobile});
         return sendJSON(res,200,{ok:true,message:o.messages[o.messages.length-1]});
       }
       if(body.action==='delivery-confirm-request'){
         const o=orders.find(x=>String(x.id)===String(body.orderId||''));
-        if(!o||String(o.providerMobile)!==String(acc.mobile)||o.status!=='chat')return sendJSON(res,403,{ok:false,message:'Delivery confirmation उपलब्ध नहीं है'});
+        if(!o||(!(o.deliveryCandidates||[]).some(c=>String(c.mobile)===String(acc.mobile))&&String(o.providerMobile)!==String(acc.mobile))||o.status!=='chat')return sendJSON(res,403,{ok:false,message:'Delivery confirmation उपलब्ध नहीं है'});
         if(o.deliveryConfirmRequest?.status==='pending')return sendJSON(res,409,{ok:false,message:'Customer का जवाब बाकी है'});
         o.deliveryConfirmRequest={id:'confirm-'+Date.now(),status:'pending',byMobile:acc.mobile,createdAt:new Date().toISOString()};o.messages=Array.isArray(o.messages)?o.messages:[];o.messages.push({sender:'system',text:'⏳ '+(o.ownerName||'Customer')+' के confirmation का इंतजार है। Delivery boy delivery के लिए ready है।',time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})});
         fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));addNotification({title:'✅ Delivery confirmation required',body:'Delivery helper ने order final confirm करने का अनुरोध भेजा है।',mobile:o.ownerMobile,kind:'local-delivery-confirm-request',orderId:o.id});return sendJSON(res,200,{ok:true,order:o});
@@ -2930,7 +2933,7 @@ function computeOrderFees(subtotal, settingsFees) {
       if(body.action==='delivery-confirm-response'){
         const o=orders.find(x=>String(x.id)===String(body.orderId||'')),answer=String(body.answer||'');
         if(!o||String(o.ownerMobile)!==String(acc.mobile)||o.deliveryConfirmRequest?.status!=='pending'||!['yes','no','wait'].includes(answer))return sendJSON(res,403,{ok:false,message:'यह confirmation उपलब्ध नहीं है'});
-        o.deliveryConfirmRequest.status=answer==='yes'?'confirmed':answer==='wait'?'waiting':'rejected';o.deliveryConfirmRequest.respondedAt=new Date().toISOString();if(answer==='yes')o.status='booked';o.messages=Array.isArray(o.messages)?o.messages:[];o.messages.push({sender:'system',text:answer==='yes'?'✅ Customer ने delivery final confirm कर दी। Order अब केवल customer और selected delivery helper को दिखेगा।':answer==='wait'?'⏳ Customer ने Wait चुना है। Chat खुली रहेगी।':'❌ Customer ने अभी delivery final confirm नहीं की। Chat जारी रख सकते हैं।',time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})});
+        o.deliveryConfirmRequest.status=answer==='yes'?'confirmed':answer==='wait'?'waiting':'rejected';o.deliveryConfirmRequest.respondedAt=new Date().toISOString();if(answer==='yes'){o.status='booked';o.providerMobile=o.deliveryConfirmRequest.byMobile;const chosen=(o.deliveryCandidates||[]).find(c=>String(c.mobile)===String(o.providerMobile));o.providerName=chosen?.name||o.providerName;o.deliveryCandidates=[chosen||{mobile:o.providerMobile,name:o.providerName}]}o.messages=Array.isArray(o.messages)?o.messages:[];o.messages.push({sender:'system',text:answer==='yes'?'✅ Customer ने delivery final confirm कर दी। Order अब केवल customer और selected delivery helper को दिखेगा।':answer==='wait'?'⏳ Customer ने Wait चुना है। Chat खुली रहेगी।':'❌ Customer ने अभी delivery final confirm नहीं की। Chat जारी रख सकते हैं।',time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})});
         fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));addNotification({title:answer==='yes'?'✅ Delivery confirmed':answer==='wait'?'⏳ Delivery confirmation waiting':'❌ Delivery confirmation declined',body:answer==='yes'?'Customer ने आपको final delivery user चुन लिया है।':answer==='wait'?'Customer ने Wait चुना है, chat जारी रखें।':'Customer ने अभी confirmation नहीं दी।',mobile:o.providerMobile,kind:'local-delivery-confirm-response',orderId:o.id});return sendJSON(res,200,{ok:true,order:o});
       }
       if(body.action==='delivery-chat-later'){
