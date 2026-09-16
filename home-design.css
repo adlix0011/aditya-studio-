@@ -21,3 +21,5 @@ body.delivery-keyboard-open .sidebar{display:none!important}
 .post-wallet-ok,.post-wallet-short{margin-top:12px;padding:13px;border-radius:10px;font-size:12px;line-height:20px}.post-wallet-ok{color:#6ee7b7;background:#05966918;border:1px solid #05966955}.post-wallet-short{background:#f59e0b17;border:1px solid #f59e0b66;color:#fde68a}.post-wallet-short strong,.post-wallet-short span{display:block}.post-wallet-short .btn{margin-top:10px;width:100%;min-height:44px}.light-market .post-wallet-ok{color:#047857}.light-market .post-wallet-short{color:#92400e}
 
 .add-money-glow{background:linear-gradient(100deg,#f59e0b,#ec4899,#7c3aed)!important;color:#fff!important;box-shadow:0 0 12px rgba(245,158,11,.75),0 0 24px rgba(236,72,153,.5);animation:addMoneyGlow 1.5s ease-in-out infinite alternate}@keyframes addMoneyGlow{to{box-shadow:0 0 19px rgba(250,204,21,.95),0 0 34px rgba(168,85,247,.72);transform:translateY(-1px)}}
+
+.chat-order-button{display:block;width:100%;margin:14px 0 8px;background:linear-gradient(110deg,#7c3aed,#db2777 52%,#2563eb)!important;color:#fff!important;box-shadow:0 0 16px rgba(168,85,247,.55),0 8px 20px rgba(37,99,235,.3);font-weight:900}
