@@ -2949,13 +2949,14 @@ function computeOrderFees(subtotal, settingsFees) {
         fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));addNotification({title:'↩️ Delivery boy ने मना किया',body:'Post फिर से अन्य delivery users को दिखेगी।',mobile:o.ownerMobile,kind:'local-delivery-confirm-response',orderId:o.id});return sendJSON(res,200,{ok:true,order:o});
       }
       if(body.action==='payment-request'){
-        const o=orders.find(x=>String(x.id)===String(body.orderId||''));
+        const o=orders.find(x=>String(x.id)===String(body.orderId||'')),fee=Math.round(Number(body.fee||o?.fee));
         if(!o||String(o.providerMobile)!==String(acc.mobile)||!['chat','booked'].includes(o.status))return sendJSON(res,403,{ok:false,message:'Payment request उपलब्ध नहीं है'});
+        if(!Number.isSafeInteger(fee)||fee<1||fee>100000)return sendJSON(res,400,{ok:false,message:'सही delivery payment भरें'});
         if(o.paymentRequest?.status==='pending')return sendJSON(res,409,{ok:false,message:'Customer का जवाब बाकी है'});
-        o.paymentRequest={id:'pay-'+Date.now(),status:'pending',byMobile:acc.mobile,createdAt:new Date().toISOString()};
-        o.messages=Array.isArray(o.messages)?o.messages:[];o.messages.push({sender:'system',text:'💳 क्या आप delivery boy की delivery payment बढ़ाना चाहते हैं? Yes या No चुनें।' ,time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})});
+        o.paymentRequest={id:'pay-'+Date.now(),status:'pending',byMobile:acc.mobile,requestedFee:fee,originalFee:Number(o.fee||0),createdAt:new Date().toISOString()};
+        o.messages=Array.isArray(o.messages)?o.messages:[];o.messages.push({sender:'system',text:'💳 Delivery boy ने ₹'+fee+' delivery payment का प्रस्ताव भेजा है। Accept, Reject या Chat में बात करें।' ,time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})});
         fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));
-        addNotification({title:'💳 Payment change request',body:'Delivery helper ने payment amount बदलने का अनुरोध भेजा है।',mobile:o.ownerMobile,kind:'local-delivery-payment-request',orderId:o.id});
+        addNotification({title:'💳 Payment change request',body:'Delivery boy ने नई delivery payment ₹'+fee+' का proposal भेजा है।',mobile:o.ownerMobile,kind:'local-delivery-payment-request',orderId:o.id});
         return sendJSON(res,200,{ok:true,order:o});
       }
       if(body.action==='payment-response'){
@@ -2966,6 +2967,16 @@ function computeOrderFees(subtotal, settingsFees) {
         fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));
         addNotification({title:answer==='yes'?'✅ Payment request approved':'❌ Payment request declined',body:answer==='yes'?'Customer नई रकम भर रहे हैं।':'Customer ने नई रकम मंज़ूर नहीं की। पुरानी रकम में काम करने पर विचार करें।',mobile:o.providerMobile,kind:'local-delivery-payment-response',orderId:o.id});
         return sendJSON(res,200,{ok:true,order:o});
+      }
+      if(body.action==='payment-counter'){
+        const o=orders.find(x=>String(x.id)===String(body.orderId||'')),fee=Math.round(Number(body.fee));
+        if(!o||String(o.ownerMobile)!==String(acc.mobile)||o.paymentRequest?.status!=='rejected'||!Number.isSafeInteger(fee)||fee<1||fee>100000)return sendJSON(res,400,{ok:false,message:'सही counter payment भरें'});
+        o.paymentRequest={...o.paymentRequest,status:'counter-pending',counterFee:fee,counteredAt:new Date().toISOString()};o.messages=Array.isArray(o.messages)?o.messages:[];o.messages.push({sender:'system',text:'💬 Customer ने ₹'+fee+' का counter offer भेजा है। Delivery boy Yes, No या Chat चुनें।',time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})});fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));addNotification({title:'💬 Customer counter offer',body:'Customer ₹'+fee+' में delivery चाहता है।',mobile:o.providerMobile,kind:'local-delivery-payment-response',orderId:o.id});return sendJSON(res,200,{ok:true,order:o});
+      }
+      if(body.action==='payment-counter-response'){
+        const o=orders.find(x=>String(x.id)===String(body.orderId||'')),answer=String(body.answer||'');
+        if(!o||String(o.providerMobile)!==String(acc.mobile)||o.paymentRequest?.status!=='counter-pending'||!['yes','no'].includes(answer))return sendJSON(res,400,{ok:false,message:'Counter offer उपलब्ध नहीं है'});
+        o.paymentRequest.status=answer==='yes'?'approved':'counter-rejected';if(answer==='yes')o.paymentRequest.requestedFee=o.paymentRequest.counterFee;o.messages=Array.isArray(o.messages)?o.messages:[];o.messages.push({sender:'system',text:answer==='yes'?'✅ Delivery boy ने ₹'+o.paymentRequest.requestedFee+' का counter offer स्वीकार किया। Customer final payment लागू करें।':'❌ Delivery boy ने counter offer स्वीकार नहीं किया। Chat में बात करें।',time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})});fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));addNotification({title:answer==='yes'?'✅ Counter offer accepted':'❌ Counter offer declined',body:answer==='yes'?'Delivery boy आपकी रकम पर तैयार है।':'Delivery boy ने counter offer मना किया।',mobile:o.ownerMobile,kind:'local-delivery-payment-response',orderId:o.id});return sendJSON(res,200,{ok:true,order:o});
       }
       if(body.action==='payment-continue'||body.action==='payment-close'){
         const o=orders.find(x=>String(x.id)===String(body.orderId||''));
