@@ -105,7 +105,13 @@ async function compressDeliveryPhoto(bytes) {
   return output;
 }
 function isLocalDeliveryMediaUrl(value) {
-  return /^\/local-delivery-media\/[a-f0-9-]+\.webp$/i.test(String(value || ''));
+  return /^\/local-delivery-media\/[a-f0-9-]+\.(webp|jpe?g|png)$/i.test(String(value || ''));
+}
+function localDeliveryPhotoExtension(type) {
+  return type === 'image/png' ? 'png' : type === 'image/webp' ? 'webp' : 'jpg';
+}
+function localDeliveryPhotoContentType(name) {
+  return /\.png$/i.test(name) ? 'image/png' : /\.jpe?g$/i.test(name) ? 'image/jpeg' : 'image/webp';
 }
 function r2PresignedUrl(method, objectKey, expiresSeconds) {
   if (!r2Ready()) throw new Error('R2 is not configured');
@@ -1490,11 +1496,11 @@ const server = http.createServer(async (req, res) => {
       serveLiveHtml(res, data);
     });
   }
-  if (req.method === 'GET' && /^\/local-delivery-media\/[a-f0-9-]+\.webp$/i.test(urlPath)) {
+  if (req.method === 'GET' && /^\/local-delivery-media\/[a-f0-9-]+\.(webp|jpe?g|png)$/i.test(urlPath)) {
     const name = path.basename(urlPath);
     return fs.readFile(path.join(LOCAL_DELIVERY_MEDIA_DIR, name), (err, data) => {
       if (err) { res.writeHead(404); return res.end('Photo not found'); }
-      res.writeHead(200, { 'Content-Type': 'image/webp', 'Cache-Control': 'public, max-age=31536000, immutable' });
+      res.writeHead(200, { 'Content-Type': localDeliveryPhotoContentType(name), 'Cache-Control': 'public, max-age=31536000, immutable' });
       res.end(data);
     });
   }
@@ -2930,13 +2936,18 @@ function computeOrderFees(subtotal, settingsFees) {
       if (!acc) return sendJSON(res, 401, { ok:false, message:'Photo upload के लिए login करें।' });
       const image = safeImageDataUrl(body.photo);
       if (!image || image.bytes.length > 10 * 1024 * 1024) return sendJSON(res, 400, { ok:false, message:'JPG, PNG या WEBP photo चुनें। Maximum size 10 MB है।' });
-      const output = await compressDeliveryPhoto(image.bytes);
-      const name = crypto.randomUUID() + '.webp';
+      // Sharp normally makes a compact WebP. If the server package is not yet
+      // installed, save the browser-selected safe image instead of blocking the
+      // delivery workflow. The next deployment can restore compression without
+      // making mobile uploads unavailable.
+      const canCompress = !!sharp;
+      const output = canCompress ? await compressDeliveryPhoto(image.bytes) : image.bytes;
+      const name = crypto.randomUUID() + '.' + (canCompress ? 'webp' : localDeliveryPhotoExtension(image.type));
       fs.writeFileSync(path.join(LOCAL_DELIVERY_MEDIA_DIR, name), output);
-      return sendJSON(res, 200, { ok:true, url:'/local-delivery-media/' + name, size:output.length });
+      return sendJSON(res, 200, { ok:true, url:'/local-delivery-media/' + name, size:output.length, compressed:canCompress });
     } catch (e) {
       console.error('local delivery photo upload:', e.message);
-      return sendJSON(res, e.code === 'SHARP_MISSING' ? 503 : 400, { ok:false, message:e.code === 'SHARP_MISSING' ? 'Photo service थोड़ी देर में तैयार होगी। फिर try करें।' : 'Photo upload नहीं हुई। JPG, PNG या WEBP photo फिर से चुनें।' });
+      return sendJSON(res, 400, { ok:false, message:'Photo upload नहीं हुई। JPG, PNG या WEBP photo फिर से चुनें।' });
     }
   }
   if (req.method === 'POST' && urlPath === '/api/local-delivery/orders') {
