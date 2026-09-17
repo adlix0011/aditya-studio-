@@ -3597,8 +3597,7 @@ async function loadBookImages(){
           setErr(out.error === 'not-found' ? 'Account server pe nahi mila' : (out.message || out.error || 'Request fail') + ' ['+res.status+']');
           return;
         }
-        setErr('');
-        alert('✅ OTP request admin panel me aa gayi. Admin WhatsApp se OTP bhejega.');
+        setErr('✅ OTP request admin queue में पहुंच गई है। Admin WhatsApp पर OTP भेजेंगे; OTP मिलते ही नीचे भरें।');
       }catch(e){
         reqBtn.disabled = false; reqBtn.textContent = 'OTP Request भेजें (Admin)';
         setErr('Server error');
