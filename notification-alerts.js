@@ -10,7 +10,7 @@
     // An actual saved incoming chat message only marks the bell and can chime.
     if(n.kind!=='local-delivery-message'||n.actualMessage!==true)return;
     document.querySelector('.notification-bell i')?.classList.add('unread');
-    sound();
+    // Background polling must stay silent.
   }
   async function poll(){const s=session();if(!s?.sessionToken)return;try{const r=await fetch('/api/my-notifications',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mobile:s.mobile,sessionToken:s.sessionToken})}),d=await r.json();if(!r.ok||!d.ok)return;const seen=readSeen(),items=Array.isArray(d.items)?d.items:[];if(!initialized){items.forEach(n=>seen.add(n.id));saveSeen(seen);initialized=true;return}items.slice().reverse().forEach(n=>{if(n.id&&!seen.has(n.id)){seen.add(n.id);show(n)}});saveSeen(seen)}catch(_){}}
   function enable(){audioReady=true;}
