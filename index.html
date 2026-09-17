@@ -993,7 +993,7 @@
           if (!res.ok || !out.ok) throw new Error(out.message || (out.error === 'resend-too-soon' ? 'एक मिनट बाद फिर try करें।' : 'OTP request नहीं जा सकी।'));
           if (area) { area.classList.remove('hidden'); area.classList.add('grid'); }
           setProfileVerifyMessage(out.delivery === 'whatsapp_manual' ? '✅ Request admin को मिल गई है। WhatsApp पर OTP आने के बाद नीचे डालें।' : '✅ OTP भेज दिया गया है। नीचे 6-digit OTP डालें।');
-          document.getElementById('profOtpInput')?.focus();
+        // OTP keyboard user के tap करने पर ही खुलेगा.
         } catch (e) { setProfileVerifyMessage(e.message || 'OTP request नहीं जा सकी।', true); }
         finally { if (button) { button.disabled = false; button.textContent = 'WhatsApp OTP दोबारा Request करें'; } }
       }
@@ -1002,7 +1002,7 @@
         hideVerifyNudge(); openNav();
         const box = document.getElementById('profVerifyBox');
         if (box) box.classList.remove('hidden');
-        document.getElementById('profOtpInput')?.focus();
+        // OTP keyboard user के tap करने पर ही खुलेगा.
       }
       document.getElementById('profRequestOtpBtn')?.addEventListener('click', requestProfileOtp);
       document.getElementById('profVerifyOtpBtn')?.addEventListener('click', async function () {
