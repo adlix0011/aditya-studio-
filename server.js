@@ -7,7 +7,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const sharp = require('sharp');
+let sharp = null; try { sharp = require('sharp'); } catch (e) { console.warn('Sharp image processor is not installed:', e.message); }
 
 const PORT = process.env.PORT || 8000;
 // PINs are hashed individually; this is only retained for legacy deployments.
@@ -87,6 +87,7 @@ function safeImageDataUrl(value) {
   return isAllowedImageBytes(bytes, match[1]) ? { bytes, type: match[1].toLowerCase().replace('image/jpg', 'image/jpeg') } : null;
 }
 async function compressDeliveryPhoto(bytes) {
+  if (!sharp) { const error = new Error('Sharp image processor missing'); error.code = 'SHARP_MISSING'; throw error; }
   // Keep the original upload off the phone's canvas. libvips/Sharp does the
   // resize on the server and produces a WebP that is small enough for tracking.
   let width = 1280, quality = 76, output = null;
@@ -2933,7 +2934,7 @@ function computeOrderFees(subtotal, settingsFees) {
       return sendJSON(res, 200, { ok:true, url:'/local-delivery-media/' + name, size:output.length });
     } catch (e) {
       console.error('local delivery photo upload:', e.message);
-      return sendJSON(res, 400, { ok:false, message:'Photo upload नहीं हुई। JPG, PNG या WEBP photo फिर से चुनें।' });
+      return sendJSON(res, e.code === 'SHARP_MISSING' ? 503 : 400, { ok:false, message:e.code === 'SHARP_MISSING' ? 'Photo service थोड़ी देर में तैयार होगी। फिर try करें।' : 'Photo upload नहीं हुई। JPG, PNG या WEBP photo फिर से चुनें।' });
     }
   }
   if (req.method === 'POST' && urlPath === '/api/local-delivery/orders') {
