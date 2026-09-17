@@ -951,7 +951,12 @@
         }, 350);
       }
       if (profileBtn) {
-        profileBtn.addEventListener('click', () => sideNav.classList.contains('open') ? closeNav() : openNav());
+        profileBtn.addEventListener('click', () => {
+          if (sideNav.classList.contains('open')) { closeNav(); return; }
+          openNav();
+          // Admin/server is the source of truth for verification status.
+          void syncProfileFromServer();
+        });
       }
       if (guestLoginBtn) guestLoginBtn.addEventListener('click', () => openLoginPanel('Login करके अपना profile और orders देखें'));
       if (new URLSearchParams(window.location.search).get('auth') === 'login') {
@@ -997,7 +1002,9 @@
         } catch (e) { setProfileVerifyMessage(e.message || 'OTP request नहीं जा सकी।', true); }
         finally { if (button) { button.disabled = false; button.textContent = 'WhatsApp OTP दोबारा Request करें'; } }
       }
-      function openProfileVerify() {
+      async function openProfileVerify() {
+        // A previously saved browser session can be old; check the server first.
+        await syncProfileFromServer();
         if (!user || user.mobileVerified) return;
         hideVerifyNudge(); openNav();
         const box = document.getElementById('profVerifyBox');
@@ -1055,6 +1062,25 @@
       function clearSession() { localStorage.removeItem(SESSION_KEY); localStorage.removeItem(PERSIST_SESSION_KEY); }
 
       let user = null;
+
+      // Keep Profile verification status aligned with the Admin/server record.
+      // This prevents an old browser session from incorrectly showing “Verify”.
+      async function syncProfileFromServer() {
+        const session = loadSession() || {};
+        if (!user || !user.mobile || !session.sessionToken) return false;
+        try {
+          const res = await fetch('/api/restore-session', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mobile: user.mobile, sessionToken: session.sessionToken })
+          });
+          const out = await res.json().catch(() => ({}));
+          if (!res.ok || !out.ok) return false;
+          user = { ...user, ...out, mobileVerified: !!out.mobileVerified, sessionToken: out.sessionToken || session.sessionToken };
+          saveSession({ ...session, ...out, mobileVerified: !!out.mobileVerified, sessionToken: user.sessionToken });
+          updateTokenUI();
+          return true;
+        } catch (_) { return false; }
+      }
 
       function escapeProfileText(value) {
         return String(value == null ? '' : value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
