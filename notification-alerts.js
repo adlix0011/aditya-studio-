@@ -1,14 +1,19 @@
-/* Live customer alerts. Browser notifications need one explicit permission tap. */
+/* Local Delivery alerts: background sync must never open a foreground popup. */
 (function(){
   const seenKey='aditya_delivery_seen_notifications_v1'; let initialized=false,audioReady=false;
   function session(){try{return JSON.parse(localStorage.getItem('aditya_studio_session_v1')||localStorage.getItem('aditya_studio_persistent_login_v2')||'null')}catch(_){return null}}
   function readSeen(){try{return new Set(JSON.parse(localStorage.getItem(seenKey)||'[]'))}catch(_){return new Set()}}
   function saveSeen(s){try{localStorage.setItem(seenKey,JSON.stringify([...s].slice(0,80)))}catch(_){}}
   function sound(){if(!audioReady)return;try{const C=window.AudioContext||window.webkitAudioContext,c=new C(),t=c.currentTime;[660,880,1040].forEach((f,i)=>{const o=c.createOscillator(),g=c.createGain();o.frequency.value=f;g.gain.setValueAtTime(.0001,t+i*.13);g.gain.exponentialRampToValueAtTime(.13,t+i*.13+.015);g.gain.exponentialRampToValueAtTime(.0001,t+i*.13+.12);o.connect(g).connect(c.destination);o.start(t+i*.13);o.stop(t+i*.13+.13)});setTimeout(()=>c.close(),650)}catch(_){}}
-  function popup(n){if(n.kind!=='local-delivery-message'||document.querySelector('#messages,#roomMessages')){if(n.kind==='local-delivery-message'&&typeof syncStudioWallet==='function')syncStudioWallet();return}document.getElementById('deliveryMessageSticker')?.remove();const box=document.createElement('button');box.id='deliveryMessageSticker';box.type='button';box.innerHTML='<b>💬 नया Message</b><span>'+String(n.body||'बातचीत खोलें')+'</span><em>Tap करके chat खोलें →</em>';box.style.cssText='position:fixed;right:14px;bottom:94px;z-index:10050;width:min(300px,calc(100vw - 28px));padding:13px 15px;text-align:left;border:1px solid #fb7185;border-radius:18px;background:linear-gradient(135deg,#4c1d95,#be185d);color:#fff;box-shadow:0 14px 32px rgba(0,0,0,.45),0 0 20px rgba(244,63,94,.48);font:700 13px Arial;animation:deliveryPop .32s ease-out';box.querySelector('b').style.cssText='display:block;font-size:15px';box.querySelector('span').style.cssText='display:block;margin:5px 0;color:#fce7f3';box.querySelector('em').style.cssText='font-style:normal;color:#fde68a;font-size:11px';box.onclick=()=>{box.remove();if(n.orderId){active=n.orderId;tab='orders';render()}};document.body.appendChild(box);setTimeout(()=>box.remove(),12000)}
-  function show(n){const alertKinds=['local-delivery-message','local-delivery-bill-request','local-delivery-bill-response'];document.querySelector('.notification-bell i')?.classList.add('unread');if(!alertKinds.includes(n.kind))return;if(n.kind==='local-delivery-message'&&n.actualMessage!==true)return;/* Real incoming messages get one sound and an unread bell only. Do not show a second popup or toast while the customer is working. */sound();}
+  function show(n){
+    // Never show a sticker, toast, browser notification or alert from polling.
+    // An actual saved incoming chat message only marks the bell and can chime.
+    if(n.kind!=='local-delivery-message'||n.actualMessage!==true)return;
+    document.querySelector('.notification-bell i')?.classList.add('unread');
+    sound();
+  }
   async function poll(){const s=session();if(!s?.sessionToken)return;try{const r=await fetch('/api/my-notifications',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mobile:s.mobile,sessionToken:s.sessionToken})}),d=await r.json();if(!r.ok||!d.ok)return;const seen=readSeen(),items=Array.isArray(d.items)?d.items:[];if(!initialized){items.forEach(n=>seen.add(n.id));saveSeen(seen);initialized=true;return}items.slice().reverse().forEach(n=>{if(n.id&&!seen.has(n.id)){seen.add(n.id);show(n)}});saveSeen(seen)}catch(_){}}
-  function enable(){audioReady=true;if(window.Notification&&Notification.permission==='default')Notification.requestPermission().catch(()=>{});}
-  document.addEventListener('pointerdown',enable,{once:true,passive:true}); document.addEventListener('keydown',enable,{once:true});
+  function enable(){audioReady=true;}
+  document.addEventListener('pointerdown',enable,{once:true,passive:true});document.addEventListener('keydown',enable,{once:true});
   poll();setInterval(poll,5000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)poll()});
 })();
