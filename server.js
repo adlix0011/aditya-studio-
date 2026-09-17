@@ -238,6 +238,7 @@ const AUTO_BACKUP_DIR = path.join(DATA_DIR, 'auto-backups');
 const SESSIONS_FILE = path.join(DATA_DIR, 'sessions.json');
 const INDEX_HTML_FILE = path.join(__dirname, 'index.html');
 const MY_ORDERS_HTML_FILE = path.join(__dirname, 'my-orders.html');
+const DELIVERY_PICKUP_HTML_FILE = path.join(__dirname, 'delivery-pickup.html');
 const SPIN_ROLLER_HTML_FILE = path.join(__dirname, 'spin-roller.html');
 const LEGAL_HTML_FILE = path.join(__dirname, 'legal.html');
 // Local project me legacy Book Now file kabhi backup folder me hoti hai; dono locations support karo.
@@ -1497,6 +1498,13 @@ const server = http.createServer(async (req, res) => {
       if (err) { res.writeHead(404); return res.end('Local Delivery page missing'); }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store, max-age=0' });
       serveLiveHtml(res, data);
+    });
+  }
+  if (req.method === 'GET' && (urlPath === '/delivery-pickup' || urlPath === '/delivery-pickup.html')) {
+    return fs.readFile(DELIVERY_PICKUP_HTML_FILE, (err, data) => {
+      if (err) { res.writeHead(404); return res.end('Pickup workflow page missing'); }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store, max-age=0' });
+      res.end(data);
     });
   }
   if (req.method === 'GET' && /^\/local-delivery-media\/[a-f0-9-]+\.(webp|jpe?g|png)$/i.test(urlPath)) {
