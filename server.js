@@ -3255,6 +3255,24 @@ function computeOrderFees(subtotal, settingsFees) {
     } catch (e) { return sendJSON(res, 400, { ok:false }); }
   }
 
+  // Admin fallback: every unverified account can be put into the WhatsApp OTP
+  // queue from /admin, even if the customer's earlier request was interrupted.
+  if (req.method === 'POST' && urlPath === '/admin/create-whatsapp-otp') {
+    if (!isAdminAuthed(req)) return requireAdminAuth(req, res);
+    try {
+      const body = await readFormBody(req);
+      const mobile = String(body.mobile || '').replace(/\D/g, '');
+      const accounts = loadAccounts();
+      const acc = accounts.find(a => String(a.mobile) === mobile);
+      if (acc && !acc.mobileVerified) ensureAdminWhatsAppOtp(acc);
+      res.writeHead(302, { Location: '/admin#sec-otp' });
+      return res.end();
+    } catch (e) {
+      res.writeHead(302, { Location: '/admin#sec-otp' });
+      return res.end();
+    }
+  }
+
   if (req.method === 'POST' && urlPath === '/admin/otp-delete') {
     if (!isAdminAuthed(req)) return requireAdminAuth(req, res);
     try {
@@ -4409,6 +4427,10 @@ loadOrdersPage();setInterval(loadOrdersPage,20000);
       return '<tr><td>'+esc(fmtDate(t.createdAt))+'</td><td>'+esc(t.name||'Customer')+'<br><small>'+esc(t.mobile||'')+'</small></td><td><b>₹'+esc(t.amount)+'</b></td><td style="color:'+color+';font-weight:800">'+label+'</td><td>'+esc(t.utr||'Screenshot')+'</td><td>'+esc(t.verifiedAt?fmtDate(t.verifiedAt):'—')+'</td></tr>';
     }).join('') || '<tr><td colspan="6" class="muted">Abhi recharge record nahi hai.</td></tr>';
 
+    const queuedOtpMobiles = new Set(pendingOtps.map(r => String(r.mobile || '')));
+    const missingOtpCards = accounts.filter(a => !a.mobileVerified && !queuedOtpMobiles.has(String(a.mobile || ''))).map(a => {
+      return '<div class="msg-card" style="border-color:rgba(251,191,36,.75);background:linear-gradient(135deg,#2a1c05,#16120b)"><div class="msg-text">📱 <b>'+esc(a.name || 'Customer')+'</b> ('+esc(a.mobile || '')+')<br><span style="color:#fde68a;font-weight:700">OTP request अभी queue में नहीं है</span><br><span class="muted">नीचे button दबाकर WhatsApp OTP बनाएं और भेजें।</span></div><div class="msg-actions"><form method="POST" action="/admin/create-whatsapp-otp"><input type="hidden" name="mobile" value="'+esc(a.mobile || '')+'"><button type="submit" class="gen-btn" style="background:#16a34a;color:#fff;border:1px solid #4ade80">➕ WhatsApp OTP बनाएं</button></form></div></div>';
+    }).join('');
     const otpCards = pendingOtps.map(r => {
       const manual = String(r.manualOtp || '');
       const status = manual ? '<span style="color:#facc15;font-weight:700">WhatsApp OTP भेजना बाकी है</span>' : '<span style="color:#8fd19e;font-weight:700">SMS OTP sent</span>';
