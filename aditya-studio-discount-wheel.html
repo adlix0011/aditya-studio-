@@ -3621,7 +3621,7 @@ async function loadBookImages(){
       if(!res.ok||!out.ok)throw Error(out.message||out.error||'OTP request नहीं जा सकी।');
       if(out.alreadyVerified){acc.mobileVerified=true;setErr('✅ आपका mobile पहले से verified है।');openProfileModal();return;}
       setErr('✅ OTP request admin को मिल गई है। Admin WhatsApp पर 6-digit OTP भेजेंगे।');
-      document.getElementById('profileOtpInput')?.focus();
+      // Keyboard केवल OTP field पर user के tap करने पर खुलेगा.
     }catch(err){ setErr('❌ '+String(err.message||'OTP request नहीं जा सकी।')); }
     finally{ button.disabled=false; button.textContent='WhatsApp OTP दोबारा Request करें'; }
   },true);
@@ -3761,7 +3761,7 @@ if (new URLSearchParams(location.search).get('mode') === 'register') {
       var verifyBox = document.getElementById('profileVerifyBox');
       var otpInput = document.getElementById('profileOtpInput');
       if(verifyBox) verifyBox.style.display = 'block';
-      if(otpInput) setTimeout(function(){ otpInput.focus(); }, 150);
+      // OTP field दिखेगी; mobile keyboard user के tap करने पर ही खुलेगा.
     } else {
       if(authCard) authCard.style.display = 'block';
       tabLogin.click();
