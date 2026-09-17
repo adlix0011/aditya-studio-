@@ -425,9 +425,11 @@ function issueSession(acc) {
   // hash account record me bhi rakho, taaki logged-in customer ka wallet/coupon
   // session restart ke baad bhi bina dobara login maange chale.
   const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-  // One account is allowed on only one device/browser at a time. A new login revokes every older token immediately.
-  for (const [existingToken, row] of sessions.entries()) if (row && String(row.mobile) === String(acc.mobile)) sessions.delete(existingToken);
-  acc.sessionTokens = [{ tokenHash, expiresAt }];
+  // Each browser keeps its own persistent login. Signing in on a second phone
+  // or PC must never log the first browser out. Tokens are stored only as hashes
+  // in the account record; retain the newest five active browser sessions.
+  const existingTokens = Array.isArray(acc.sessionTokens) ? acc.sessionTokens : [];
+  acc.sessionTokens = [{ tokenHash, expiresAt }, ...existingTokens.filter(item => item && item.tokenHash !== tokenHash && Number(item.expiresAt) >= Date.now())].slice(0, 5);
   saveSessions();
   return token;
 }
