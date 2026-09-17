@@ -3604,6 +3604,27 @@ async function loadBookImages(){
       }
     });
   }
+  // Capture phase makes this action work even if another profile script rerenders the modal.
+  document.addEventListener('click', async function(event){
+    const button=event.target && event.target.closest && event.target.closest('#profileRequestOtpBtn');
+    if(!button) return;
+    event.preventDefault(); event.stopImmediatePropagation();
+    const acc=currentAccount;
+    if(!acc || !acc.mobile){ setErr('पहले अपने mobile से login करें।'); return; }
+    button.disabled=true; button.textContent='OTP request भेजी जा रही है…';
+    setErr('⏳ Admin को OTP request भेजी जा रही है…');
+    try{
+      let saved=null; try{saved=JSON.parse(localStorage.getItem('aditya_studio_session_v1')||localStorage.getItem('aditya_studio_persistent_login_v2')||'null')}catch(_){}
+      const base=typeof API_BASE==='string'?API_BASE:'';
+      const res=await fetch(base+'/api/request-spin-otp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mobile:String(acc.mobile),sessionToken:saved&&saved.sessionToken||''})});
+      const out=await res.json().catch(()=>({}));
+      if(!res.ok||!out.ok)throw Error(out.message||out.error||'OTP request नहीं जा सकी।');
+      if(out.alreadyVerified){acc.mobileVerified=true;setErr('✅ आपका mobile पहले से verified है।');openProfileModal();return;}
+      setErr('✅ OTP request admin को मिल गई है। Admin WhatsApp पर 6-digit OTP भेजेंगे।');
+      document.getElementById('profileOtpInput')?.focus();
+    }catch(err){ setErr('❌ '+String(err.message||'OTP request नहीं जा सकी।')); }
+    finally{ button.disabled=false; button.textContent='WhatsApp OTP दोबारा Request करें'; }
+  },true);
   if(verBtn){
     verBtn.addEventListener('click', async function(){
       setErr('');
