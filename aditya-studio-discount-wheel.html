@@ -3437,10 +3437,20 @@ document.addEventListener('click', function notifUnlockOnce(){
   var verifyRow = document.getElementById('homeVerifyRow');
   var verifyBtn = document.getElementById('homeVerifyBtn');
   function showVerifyNeed(){ if(verifyRow) verifyRow.style.display='flex'; }
-  function openVerifyFlow(){
+  async function openVerifyFlow(){
     if(currentAccount){
+      // Browser ke purane status par भरोसा नहीं: पहले server से verification status लें.
+      try{
+        var raw=localStorage.getItem('aditya_studio_session_v1')||localStorage.getItem('aditya_studio_persistent_login_v2')||'';
+        var saved=raw?JSON.parse(raw):null;
+        if(saved&&saved.sessionToken){
+          var r=await fetch((typeof API_BASE==='string'?API_BASE:'')+'/api/restore-session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mobile:currentAccount.mobile,sessionToken:saved.sessionToken})});
+          var out=await r.json();
+          if(r.ok&&out&&out.ok){currentAccount={...currentAccount,...out,mobileVerified:!!out.mobileVerified};saved={...saved,...out,mobileVerified:!!out.mobileVerified};localStorage.setItem('aditya_studio_session_v1',JSON.stringify(saved));}
+        }
+      }catch(_){}
       if(typeof openProfileModal === 'function') openProfileModal();
-      var box=document.getElementById('profileVerifyBox'); if(box) box.style.display='block';
+      var box=document.getElementById('profileVerifyBox'); if(box) box.style.display=currentAccount.mobileVerified?'none':'block';
       return;
     }
     if(authCard){ authCard.style.display='block'; tabLogin.click(); authCard.scrollIntoView({behavior:'smooth',block:'start'}); }
