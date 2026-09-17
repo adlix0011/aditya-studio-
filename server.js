@@ -7,6 +7,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const sharp = require('sharp');
 
 const PORT = process.env.PORT || 8000;
 // PINs are hashed individually; this is only retained for legacy deployments.
@@ -84,6 +85,26 @@ function safeImageDataUrl(value) {
   if (!match) return null;
   const bytes = Buffer.from(match[2].replace(/\s/g, ''), 'base64');
   return isAllowedImageBytes(bytes, match[1]) ? { bytes, type: match[1].toLowerCase().replace('image/jpg', 'image/jpeg') } : null;
+}
+async function compressDeliveryPhoto(bytes) {
+  // Keep the original upload off the phone's canvas. libvips/Sharp does the
+  // resize on the server and produces a WebP that is small enough for tracking.
+  let width = 1280, quality = 76, output = null;
+  for (let attempt = 0; attempt < 8; attempt++) {
+    output = await sharp(bytes, { limitInputPixels: 32e6 })
+      .rotate()
+      .resize({ width, withoutEnlargement: true })
+      .webp({ quality, effort: 4 })
+      .toBuffer();
+    if (output.length <= 500 * 1024) return output;
+    if (quality > 46) quality -= 10;
+    else { width = Math.max(640, Math.round(width * 0.82)); quality = 70; }
+  }
+  if (!output || output.length > 750 * 1024) throw new Error('Photo को 500 KB के करीब compress नहीं किया जा सका। थोड़ी साफ या छोटी photo चुनें।');
+  return output;
+}
+function isLocalDeliveryMediaUrl(value) {
+  return /^\/local-delivery-media\/[a-f0-9-]+\.webp$/i.test(String(value || ''));
 }
 function r2PresignedUrl(method, objectKey, expiresSeconds) {
   if (!r2Ready()) throw new Error('R2 is not configured');
@@ -203,6 +224,8 @@ const WALLET_TOPUPS_FILE = path.join(DATA_DIR, 'wallet-topups.json');
 const ACTIVITY_FILE = path.join(DATA_DIR, 'user-activity.json');
 const LOCAL_DELIVERY_LOCKS_FILE = path.join(DATA_DIR, 'local-delivery-locks.json');
 const LOCAL_DELIVERY_ORDERS_FILE = path.join(DATA_DIR, 'local-delivery-orders.json');
+const LOCAL_DELIVERY_MEDIA_DIR = path.join(DATA_DIR, 'local-delivery-media');
+try { fs.mkdirSync(LOCAL_DELIVERY_MEDIA_DIR, { recursive: true }); } catch (e) { console.warn('Local delivery media dir unavailable:', e.message); }
 const AUTO_BACKUP_DIR = path.join(DATA_DIR, 'auto-backups');
 // Browser login ko server restart ke baad bhi valid rakhne ke liye (7 days).
 const SESSIONS_FILE = path.join(DATA_DIR, 'sessions.json');
@@ -1462,6 +1485,14 @@ const server = http.createServer(async (req, res) => {
       if (err) { res.writeHead(404); return res.end('Local Delivery page missing'); }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store, max-age=0' });
       serveLiveHtml(res, data);
+    });
+  }
+  if (req.method === 'GET' && /^\/local-delivery-media\/[a-f0-9-]+\.webp$/i.test(urlPath)) {
+    const name = path.basename(urlPath);
+    return fs.readFile(path.join(LOCAL_DELIVERY_MEDIA_DIR, name), (err, data) => {
+      if (err) { res.writeHead(404); return res.end('Photo not found'); }
+      res.writeHead(200, { 'Content-Type': 'image/webp', 'Cache-Control': 'public, max-age=31536000, immutable' });
+      res.end(data);
     });
   }
   const requestedAsset = urlPath.slice(1);
@@ -2889,6 +2920,22 @@ function computeOrderFees(subtotal, settingsFees) {
       return sendJSON(res,200,{ok:true,walletBalance:acc.walletBalance,refunded:row.amount});
     }catch(e){return sendJSON(res,500,{ok:false,message:'Refund नहीं हुआ'})}
   }
+  if (req.method === 'POST' && urlPath === '/api/local-delivery/photo-upload') {
+    try {
+      const body = await readBody(req, 15 * 1024 * 1024);
+      const accounts = loadAccounts(), acc = sessionAccount(req, body, accounts);
+      if (!acc) return sendJSON(res, 401, { ok:false, message:'Photo upload के लिए login करें।' });
+      const image = safeImageDataUrl(body.photo);
+      if (!image || image.bytes.length > 10 * 1024 * 1024) return sendJSON(res, 400, { ok:false, message:'JPG, PNG या WEBP photo चुनें। Maximum size 10 MB है।' });
+      const output = await compressDeliveryPhoto(image.bytes);
+      const name = crypto.randomUUID() + '.webp';
+      fs.writeFileSync(path.join(LOCAL_DELIVERY_MEDIA_DIR, name), output);
+      return sendJSON(res, 200, { ok:true, url:'/local-delivery-media/' + name, size:output.length });
+    } catch (e) {
+      console.error('local delivery photo upload:', e.message);
+      return sendJSON(res, 400, { ok:false, message:'Photo upload नहीं हुई। JPG, PNG या WEBP photo फिर से चुनें।' });
+    }
+  }
   if (req.method === 'POST' && urlPath === '/api/local-delivery/orders') {
     try {
       const body=await readBody(req,3e6),accounts=loadAccounts(),acc=sessionAccount(req,body,accounts);
@@ -3101,7 +3148,7 @@ function computeOrderFees(subtotal, settingsFees) {
       if(body.action==='actual-bill-request'){
         const o=orders.find(x=>String(x.id)===String(body.orderId||'')),amount=Math.round(Number(body.amount)),photo=String(body.photo||'');
         if(!o||String(o.providerMobile)!==String(acc.mobile)||o.status!=='booked'||!Number.isSafeInteger(amount)||amount<0||amount>100000)return sendJSON(res,400,{ok:false,message:'सही bill amount भरें'});
-        if(!/^data:image\/(png|jpeg|webp);base64,/i.test(photo)||photo.length>1500000)return sendJSON(res,400,{ok:false,message:'Bill photo JPG, PNG या WEBP और 1 MB से छोटी रखें'});
+        if(!isLocalDeliveryMediaUrl(photo)&&(!/^data:image\/(png|jpeg|webp);base64,/i.test(photo)||photo.length>1500000))return sendJSON(res,400,{ok:false,message:'Bill photo upload करके फिर भेजें'});
         if(o.actualBillRequest?.status==='pending')return sendJSON(res,409,{ok:false,message:'Customer का bill approval बाकी है'});
         o.actualBillRequest={status:'pending',amount,photo,byMobile:acc.mobile,createdAt:new Date().toISOString()};o.messages=Array.isArray(o.messages)?o.messages:[];o.messages.push({sender:'system',text:'🧾 Delivery boy ने actual सामान bill ₹'+amount+' और bill photo भेजी है। कृपया accept या reject करें।',time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})});fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));addNotification({title:'🧾 Actual bill approval',body:'Delivery boy ने actual सामान bill ₹'+amount+' और photo भेजी है।',mobile:o.ownerMobile,kind:'local-delivery-bill-request',orderId:o.id});return sendJSON(res,200,{ok:true,order:o});
       }
