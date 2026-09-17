@@ -10,6 +10,38 @@ function saveSession(){localStorage.setItem('aditya_studio_session_v1',JSON.stri
 async function json(url,body){const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),d=await r.json().catch(()=>({}));if(!r.ok||!d.ok)throw Error(d.message||'Request पूरा नहीं हुआ');return d}
 function showVerify(text){form.hidden=true;verifyBox.hidden=false;verifyBox.innerHTML='<strong>📱 Mobile verification जरूरी है</strong><p>'+text+'</p><div class="row"><input id="verifyOtp" inputmode="numeric" maxlength="6" placeholder="6 अंकों का OTP"><button type="button" id="verifyOtpBtn">OTP Verify</button></div><button type="button" id="requestOtpBtn">OTP Request करें</button><div id="verifyMsg" class="pending"></div>';const out=document.getElementById('verifyMsg');document.getElementById('requestOtpBtn').onclick=async()=>{try{const d=await json('/api/request-spin-otp',{mobile:session.mobile,sessionToken:session.sessionToken});out.textContent=d.alreadyVerified?'पहले से verified है।':'OTP request भेज दिया गया है। WhatsApp पर OTP मिलने के बाद ऊपर भरें।'}catch(e){out.textContent=e.message}};document.getElementById('verifyOtpBtn').onclick=async()=>{const otp=document.getElementById('verifyOtp').value.trim();if(!/^\d{6}$/.test(otp)){out.textContent='6 अंकों का OTP भरें।';return}try{const d=await json('/api/verify-spin-otp',{mobile:session.mobile,sessionToken:session.sessionToken,otp});session={...session,...d,mobileVerified:true};saveSession();verifyBox.hidden=true;form.hidden=false;show('✓ Mobile verified. अब QR payment submit करें।',true)}catch(e){out.textContent=e.message}}}
 async function checkVerification(){if(!session||!session.sessionToken||!session.mobile){location.replace('/?auth=login');return}saveSession();try{const d=await json('/api/restore-session',{mobile:session.mobile,sessionToken:session.sessionToken});if(d.mobileVerified){session={...session,...d,mobileVerified:true};saveSession();return}showVerify('Recharge करने से पहले अपना मोबाइल OTP से verify करें।')}catch(_){showVerify('Verification status नहीं मिला। OTP request करके verify करें।')}}
-function showSuccess(){document.querySelector('.card').innerHTML='<div class="success-screen"><h1>✅ Recharge submitted successfully</h1><div class="loading-ring"></div><p class="wait-label">Please wait — admin verification pending</p><div class="wait-timer" id="waitTimer">10:00</div><p>Verification complete होने पर amount wallet में automatically add होगा।</p></div><a class="help-whatsapp" href="https://wa.me/917024230041?text=Hello%2C%20maine%20wallet%20recharge%20submit%20kiya%20hai." target="_blank" rel="noopener">💬 Any query? Help on WhatsApp</a><a class="success-back" href="'+returnUrl+'">← Back to Local Delivery</a>';let left=600,timer=document.getElementById('waitTimer');(function tick(){timer.textContent=String(Math.floor(left/60)).padStart(2,'0')+':'+String(left%60).padStart(2,'0');if(left-->0)setTimeout(tick,1000)})()}
-form.addEventListener('submit',async e=>{e.preventDefault();const amount=+document.getElementById('amount').value,utr=document.getElementById('utr').value.trim(),file=document.getElementById('proof').files[0];if(file&&file.size>1024*1024)return show('Screenshot 1MB से छोटा रखें');let proof='';if(file)proof=await new Promise((a,b)=>{const r=new FileReader();r.onload=()=>a(String(r.result||''));r.onerror=b;r.readAsDataURL(file)});const b=document.getElementById('submitBtn');b.disabled=true;b.textContent='Submit हो रहा है…';try{await json('/api/wallet/topup',{sessionToken:session.sessionToken,amount,utr,proof});showSuccess()}catch(x){show(x.message||'Network error');b.disabled=false;b.textContent='Payment Submit करें'}});checkVerification();
+let rechargePollTimer=null;
+function goToWallet(){
+  try{sessionStorage.setItem('local_delivery_view_v1',JSON.stringify({tab:'wallet',active:null}))}catch(_){}
+  location.replace('/local-delivery');
+}
+function rechargeApproved(amount,balance){
+  clearInterval(rechargePollTimer);
+  document.querySelector('.card').innerHTML='<div class="success-screen"><h1>✅ Recharge verified</h1><p class="wait-label">₹'+amount+' wallet में add हो गया</p><div class="wait-timer">₹'+Number(balance||0).toLocaleString('en-IN')+'</div><p>आपका नया wallet balance</p><button class="success-back" id="openWalletBtn" type="button">💰 Wallet खोलें</button></div>';
+  document.getElementById('openWalletBtn').onclick=goToWallet;
+  setTimeout(goToWallet,1800);
+}
+function rechargeRejected(amount){
+  clearInterval(rechargePollTimer);
+  document.querySelector('.card').innerHTML='<div class="success-screen"><h1 style="color:#fca5a5">Recharge verify नहीं हुआ</h1><p>₹'+amount+' wallet में add नहीं हुआ। कृपया Help on WhatsApp से संपर्क करें।</p></div><a class="help-whatsapp" href="https://wa.me/917024230041?text=Hello%2C%20mera%20wallet%20recharge%20verify%20nahi%20hua." target="_blank" rel="noopener">💬 Help on WhatsApp</a><a class="success-back" href="'+returnUrl+'">← Back to Local Delivery</a>';
+}
+async function checkRechargeStatus(topupId,amount){
+  try{
+    const data=await json('/api/wallet/history',{sessionToken:session.sessionToken});
+    const row=(data.walletHistory||[]).find(item=>String(item.ref||'')===String(topupId));
+    if(!row)return;
+    if(row.type==='approved'){
+      session={...session,walletBalance:Number(data.walletBalance)||0};saveSession();
+      rechargeApproved(amount,data.walletBalance);
+    }else if(row.type==='rejected') rechargeRejected(amount);
+  }catch(_){}
+}
+function showSuccess(topupId,amount){
+  document.querySelector('.card').innerHTML='<div class="success-screen"><h1>✅ Recharge submitted successfully</h1><div class="loading-ring"></div><p class="wait-label">Admin verification का इंतज़ार है</p><div class="wait-timer" id="waitTimer">00:00</div><p>Verify होते ही यह timer हटेगा और wallet अपने-आप खुलेगा।</p></div><a class="help-whatsapp" href="https://wa.me/917024230041?text=Hello%2C%20maine%20wallet%20recharge%20submit%20kiya%20hai." target="_blank" rel="noopener">💬 Any query? Help on WhatsApp</a><a class="success-back" href="'+returnUrl+'">← Back to Local Delivery</a>';
+  let elapsed=0,timer=document.getElementById('waitTimer');
+  const tick=()=>{timer.textContent=String(Math.floor(elapsed/60)).padStart(2,'0')+':'+String(elapsed%60).padStart(2,'0');elapsed++};
+  tick();rechargePollTimer=setInterval(()=>{tick();checkRechargeStatus(topupId,amount)},2500);
+  checkRechargeStatus(topupId,amount);
+}
+form.addEventListener('submit',async e=>{e.preventDefault();const amount=+document.getElementById('amount').value,utr=document.getElementById('utr').value.trim(),file=document.getElementById('proof').files[0];if(file&&file.size>1024*1024)return show('Screenshot 1MB से छोटा रखें');let proof='';if(file)proof=await new Promise((a,b)=>{const r=new FileReader();r.onload=()=>a(String(r.result||''));r.onerror=b;r.readAsDataURL(file)});const b=document.getElementById('submitBtn');b.disabled=true;b.textContent='Submit हो रहा है…';try{const result=await json('/api/wallet/topup',{sessionToken:session.sessionToken,amount,utr,proof});showSuccess(result.topupId,amount)}catch(x){show(x.message||'Network error');b.disabled=false;b.textContent='Payment Submit करें'}});checkVerification();
 </script></body></html>
