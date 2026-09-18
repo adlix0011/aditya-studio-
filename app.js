@@ -72,6 +72,7 @@ render();
 
 // Reuse the signed-in Aditya Studio account and its wallet amount. The browser
 // keeps the same session keys that the main website already uses.
+let deliverySyncFingerprint='';
 async function syncStudioWallet(){
   try{
     const raw=localStorage.getItem('aditya_studio_session_v1')||localStorage.getItem('aditya_studio_persistent_login_v2');
@@ -85,6 +86,8 @@ async function syncStudioWallet(){
     try{const browserAddress=JSON.parse(localStorage.getItem('local_delivery_address_'+session.mobile)||'null');if(browserAddress)for(const k of ['address','village','district','pincode','landmark'])if(!state.users[user][k]&&browserAddress[k])state.users[user][k]=browserAddress[k]}catch(_){};
     state.transactions=(Array.isArray(account.walletHistory)?account.walletHistory:[]).map(t=>({user,amount:t.type==='debit'?-Number(t.amount||0):(t.type==='credit'||t.type==='approved'?Number(t.amount||0):0),displayAmount:Number(t.amount||0),status:String(t.type||''),label:t.reason||'Wallet transaction',date:t.timestamp||''}));
     try{const ordersResponse=await fetch('/api/local-delivery/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mobile:session.mobile,sessionToken:session.sessionToken,action:'list'})}),ordersData=await ordersResponse.json();if(ordersResponse.ok&&ordersData.ok&&Array.isArray(ordersData.orders)){const mobile=String(session.mobile||''),sameMobile=(a,b)=>{const x=String(a||'').replace(/\D/g,'').slice(-10),y=String(b||'').replace(/\D/g,'').slice(-10);return !!x&&x===y};state.orders=ordersData.orders.map(raw=>{const o={...raw};if(sameMobile(o.ownerMobile,mobile))o.owner=user;else if(o.owner===user)o.owner='owner:'+String(o.ownerMobile||o.id);const candidate=(o.deliveryCandidates||[]).find(c=>sameMobile(c.mobile,mobile));if(sameMobile(o.providerMobile,mobile)||candidate){o.provider=user;if(candidate)o.providerName=candidate.name||o.providerName}else if(o.provider===user)o.provider='provider:'+String(o.providerMobile||o.id);o.messages=(Array.isArray(o.messages)?o.messages:[]).map(m=>{if(m.sender==='system')return m;const mineMessage=sameMobile(m.senderMobile,mobile);return {...m,sender:mineMessage?user:(m.sender||'remote:'+String(m.senderMobile||'message')),senderName:m.senderName||'Customer'}});return o})}}catch(_){}
+    const nextFingerprint=JSON.stringify({user,balance:state.users[user]?.balance||0,pending:state.users[user]?.pendingBalance||0,orders:state.orders.map(o=>[o.id,o.status,o.updatedAt,o.completedAt,(o.messages||[]).length,o.deliveryOtp?.verifiedAt||'',o.actualBillRequest?.status||''])});
+    const remoteChanged=nextFingerprint!==deliverySyncFingerprint; deliverySyncFingerprint=nextFingerprint;
     save();
     // Profile/address/post forms are drafts. A background wallet refresh must
     // never rebuild an open form and erase text the customer is typing.
@@ -92,13 +95,13 @@ async function syncStudioWallet(){
     const draftOpen=!!document.querySelector('#addressForm,#broadcastForm,#profileForm,#priceForm')||!!focused?.closest('#chatForm,#chatRoomForm,#paymentUpdateForm,#trackPickupForm,#trackStartForm,#trackOtpForm,#actualBillForm');
     // Notifications/messages have their own fetchers. Re-rendering the whole shell here makes their controls blink.
     const stableScreen=['notifications','messages'].includes(tab);
-    if(!draftOpen&&!stableScreen)render();
+    if(remoteChanged&&!draftOpen&&!stableScreen)render();
   }catch(e){}
 }
 syncStudioWallet();
 window.addEventListener('pageshow',syncStudioWallet);
 window.addEventListener('focus',syncStudioWallet);
-setInterval(()=>{if(!document.hidden)syncStudioWallet()},2000);
+setInterval(()=>{if(!document.hidden)syncStudioWallet()},5000);
 
 document.addEventListener('submit',async e=>{
   if(e.target.id!=='redeemCode')return;

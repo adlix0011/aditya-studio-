@@ -40,7 +40,7 @@ render();
 
 
 
-setInterval(()=>{if(tab==='home'&&!active&&!document.hidden)render()},1000);
+
 
 document.addEventListener('click',e=>{const b=e.target.closest('[data-service-request]');if(!b)return;serviceTargetId=b.dataset.serviceRequest;deliveryPostMode='request';tab='post';active=null;render()});
 
