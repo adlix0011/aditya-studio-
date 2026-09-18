@@ -3245,6 +3245,43 @@ function computeOrderFees(subtotal, settingsFees) {
     return sendJSON(res,200,{ok:true,orders:orders.slice(0,5000),locks:locks.slice(0,5000),generatedAt:new Date().toISOString()});
   }
 
+  // Admin can settle a Help/Dispute cancellation once, returning the complete
+  // customer wallet lock either to the post owner or to the confirmed helper.
+  if (req.method === 'POST' && urlPath === '/admin/local-delivery-cancel') {
+    if (!isAdminAuthed(req)) return requireAdminAuth(req, res);
+    try {
+      const body=await readBody(req), orderId=String(body.orderId||'').trim();
+      const recipient=String(body.recipient||'').trim();
+      const reason=String(body.reason||'Admin Help/Dispute cancellation').trim().slice(0,300);
+      if(!orderId || !['owner','delivery'].includes(recipient)) return sendJSON(res,400,{ok:false,message:'Order और settlement account चुनें।'});
+      const accounts=loadAccounts();
+      let orders=[]; try{orders=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_ORDERS_FILE,'utf8'))||[]}catch(_){}
+      let locks=[]; try{locks=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_LOCKS_FILE,'utf8'))||[]}catch(_){}
+      const order=orders.find(x=>String(x.id)===orderId);
+      if(!order) return sendJSON(res,404,{ok:false,message:'Order नहीं मिला।'});
+      if(['completed','cancelled','rejected'].includes(String(order.status||''))) return sendJSON(res,400,{ok:false,message:'यह order पहले ही final हो चुका है।'});
+      const lock=locks.find(x=>String(x.orderId)===orderId&&String(x.mobile)===String(order.ownerMobile)&&x.status==='locked');
+      if(!lock) return sendJSON(res,400,{ok:false,message:'इस order में active locked amount नहीं है।'});
+      const receiverMobile=recipient==='delivery'?String(order.providerMobile||''):String(order.ownerMobile||'');
+      const receiver=accounts.find(x=>String(x.mobile)===receiverMobile);
+      if(!receiver) return sendJSON(res,400,{ok:false,message:recipient==='delivery'?'Confirmed delivery boy account नहीं मिला।':'Post user account नहीं मिला।'});
+      const amount=Math.round(Number(lock.amount)||0);
+      if(!walletTxn(receiver,'credit',amount,{reason:'Admin cancellation settlement · '+orderId,source:'local_delivery_admin_cancel',orderId})) return sendJSON(res,500,{ok:false,message:'Wallet settlement नहीं हुआ।'});
+      const now=new Date().toISOString();
+      lock.status=recipient==='delivery'?'admin_settled_delivery':'admin_refunded_owner';
+      lock.settledAt=now; lock.settledTo=recipient; lock.settledToMobile=receiver.mobile; lock.adminReason=reason;
+      order.status='cancelled'; order.cancelledAt=now;
+      order.adminCancellation={at:now,recipient,recipientMobile:receiver.mobile,amount,reason};
+      order.messages=Array.isArray(order.messages)?order.messages:[];
+      order.messages.push({sender:'system',text:'⚖️ Admin ने Help request पर order cancel किया। ₹'+amount+' '+(recipient==='delivery'?'delivery boy':'post user')+' के wallet में settle किए गए। Reason: '+reason,at:now});
+      fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));
+      fs.writeFileSync(LOCAL_DELIVERY_LOCKS_FILE,JSON.stringify(locks.slice(0,1000),null,2));
+      saveAccounts(accounts);
+      notify(order.ownerMobile,'⚖️ Order cancelled by admin','₹'+amount+' '+(recipient==='delivery'?'delivery boy':'आपके')+' wallet में settle किए गए।','local-delivery-admin-cancel');
+      if(order.providerMobile&&String(order.providerMobile)!==String(order.ownerMobile)) notify(order.providerMobile,'⚖️ Order cancelled by admin','₹'+amount+' '+(recipient==='delivery'?'आपके':'post user के')+' wallet में settle किए गए।','local-delivery-admin-cancel');
+      return sendJSON(res,200,{ok:true,amount,recipient,order});
+    } catch(e) { console.error('admin local delivery cancel:',e.message); return sendJSON(res,500,{ok:false,message:'Admin cancellation पूरी नहीं हुई।'}); }
+  }
   if (req.method === 'GET' && urlPath === '/admin/activity-json') {
     const now = Date.now();
     const users = loadUserActivity().map(x => ({ ...x, online: now - new Date(x.lastSeenAt || 0).getTime() < 90000 })).sort((a,b) => Number(b.totalSeconds||0)-Number(a.totalSeconds||0));
