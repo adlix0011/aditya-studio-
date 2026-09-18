@@ -1493,7 +1493,7 @@ const server = http.createServer(async (req, res) => {
     'order-items.js', 'post-page.js', 'profile-page.js', 'edit-order.js', 'delivery-flow.js',
     'post-wallet.js', 'language.js', 'notifications-page.js', 'notification-alerts.js', 'repost-order.js', 'messages-hub.js', 'chat-room.js', 'order-tracking.js', 'local-delivery-admin.js', 'local-delivery-admin.css'
   ]);
-  if (req.method === 'GET' && urlPath === '/local-delivery.html') {
+  if (req.method === 'GET' && (urlPath === '/local-delivery.html' || urlPath === '/local-delivery')) {
     return fs.readFile(path.join(__dirname, 'local-delivery.html'), (err, data) => {
       if (err) { res.writeHead(404); return res.end('Local Delivery page missing'); }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store, max-age=0' });
