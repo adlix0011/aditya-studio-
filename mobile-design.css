@@ -60,3 +60,4 @@ body{font-family:'Plus Jakarta Sans','Segoe UI',sans-serif;line-height:1.5}h1,h2
 
 /* Compact old-style map with real pickup and destination labels. */
 .road-line .road-step{background:transparent;border:0;padding:0;cursor:default}.road-line .road-step small{max-width:72px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.road-otp-button{width:100%;margin-top:10px;padding:10px;border:0;border-radius:10px;background:#16a34a;color:#fff;font-weight:900}.role-owner .road-line:before{background:linear-gradient(90deg,#8b5cf6 45%,#334155 45%)}
+.history-simple{display:block!important;margin-top:4px!important;color:#93c5fd!important;font-size:11px!important}
