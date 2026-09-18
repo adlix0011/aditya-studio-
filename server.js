@@ -3216,7 +3216,11 @@ function computeOrderFees(subtotal, settingsFees) {
         const o=orders.find(x=>String(x.id)===String(body.orderId||'')),minutes=Math.round(Number(body.minutes));
         if(!o||String(o.providerMobile)!==String(acc.mobile)||o.status!=='booked'||!Number.isSafeInteger(minutes)||minutes<1||minutes>720)return sendJSON(res,400,{ok:false,message:'सही estimated time भरें'});
         if(!Array.isArray(o.pickupProgress)||!o.pickupProgress.length||o.pickupProgress.some(x=>!x.done||!x.photo))return sendJSON(res,400,{ok:false,message:'हर सामान पर tick और उसकी photo लगाकर pickup update करें'});
-        o.status='delivering';o.deliveryEtaMinutes=minutes;o.deliveryStartedAt=new Date().toISOString();o.messages=Array.isArray(o.messages)?o.messages:[];o.messages.push({sender:'system',text:'🚚 सभी सामान ले लिए गए। Estimated delivery time: '+minutes+' मिनट।',time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})});fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));addNotification({title:'🚚 Delivery शुरू हो गई',body:'सभी सामान ले लिए गए। अनुमानित समय '+minutes+' मिनट।',mobile:o.ownerMobile,kind:'local-delivery-started',orderId:o.id});return sendJSON(res,200,{ok:true,order:o});
+        if(o.actualBillRequest?.status==='pending'){
+          const waitMs=Date.now()-new Date(o.actualBillRequest.createdAt||0).getTime(), remaining=300000-waitMs;
+          if(remaining>0)return sendJSON(res,400,{ok:false,message:'Customer bill approval का '+Math.ceil(remaining/1000)+' सेकंड इंतजार करें। 5 मिनट बाद आगे बढ़ सकते हैं।'});
+          o.actualBillRequest.approvalWaitExpiredAt=new Date().toISOString();
+        }        o.status='delivering';o.deliveryEtaMinutes=minutes;o.deliveryStartedAt=new Date().toISOString();o.messages=Array.isArray(o.messages)?o.messages:[];o.messages.push({sender:'system',text:'🚚 सभी सामान ले लिए गए। Estimated delivery time: '+minutes+' मिनट।',time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})});fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));addNotification({title:'🚚 Delivery शुरू हो गई',body:'सभी सामान ले लिए गए। अनुमानित समय '+minutes+' मिनट।',mobile:o.ownerMobile,kind:'local-delivery-started',orderId:o.id});return sendJSON(res,200,{ok:true,order:o});
       }
       if(body.action==='typing'||body.action==='seen'){
         const o=orders.find(x=>String(x.id)===String(body.orderId||''));
