@@ -1,7 +1,6 @@
 /* Local Delivery alerts: only new, server-recorded events may open a popup. */
 (function(){
   const seenKey='aditya_delivery_seen_notifications_v1';
-  const initialGraceMs=60000;
   let initialized=false,audioReady=false;
   function session(){try{return JSON.parse(localStorage.getItem('aditya_studio_session_v1')||localStorage.getItem('aditya_studio_persistent_login_v2')||'null')}catch(_){return null}}
   function readSeen(){try{return new Set(JSON.parse(localStorage.getItem(seenKey)||'[]'))}catch(_){return new Set()}}
@@ -27,8 +26,7 @@
       if(!r.ok||!d.ok)return;
       const seen=readSeen(),items=Array.isArray(d.items)?d.items:[];
       if(!initialized){
-        const now=Date.now();
-        items.forEach(n=>{if(n.id)seen.add(n.id)});const newest=items[0],fresh=newest&&now-new Date(newest.at||0).getTime()<=initialGraceMs;if(newest?.id&&!readSeen().has(newest.id)&&fresh&&isPopupEvent(newest))show(newest);
+        items.forEach(n=>{if(n.id)seen.add(n.id)});
         saveSeen(seen);initialized=true;return;
       }
       items.slice().reverse().forEach(n=>{if(n.id&&!seen.has(n.id)){seen.add(n.id);show(n)}});saveSeen(seen);
