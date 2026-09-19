@@ -938,7 +938,7 @@ function addNotification(item) {
   // Pickup progress may be saved more than once while the helper ticks products. Keep one silent notification card, not repeated popups.
   if (item && item.kind === 'local-delivery-pickup' && list.some(n => n && n.kind === item.kind && String(n.orderId || '') === String(item.orderId || '') && Date.now() - new Date(n.at || 0).getTime() < 30 * 60 * 1000)) return;
   // A retry may submit the same message twice. Keep the message, but alert the recipient only once.
-  if (item && item.kind === 'local-delivery-message' && list.some(n => n && n.kind === item.kind && String(n.orderId || '') === String(item.orderId || '') && String(n.mobile || '') === String(item.mobile || '') && String(n.senderMobile || '') === String(item.senderMobile || '') && Date.now() - new Date(n.at || 0).getTime() < 10 * 1000)) return;
+  if (item && item.kind === 'local-delivery-message' && item.messageId && list.some(n => n && n.kind === item.kind && String(n.messageId || '') === String(item.messageId))) return;
   list.unshift(Object.assign({
     id: 'n-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
     at: new Date().toISOString(),
@@ -3050,7 +3050,7 @@ function computeOrderFees(subtotal, settingsFees) {
           if(photo&&(!/^data:image\/(png|jpeg|webp);base64,/i.test(photo)||photo.length>1500000))return sendJSON(res,400,{ok:false,message:'Photo JPG, PNG या WEBP और 1MB से छोटी रखें'});
           if(!['chat','booked','delivering'].includes(o.status))return sendJSON(res,409,{ok:false,message:'इस order में chat available नहीं है'});
           candidate.messages.push({id:'m-'+Date.now()+'-'+Math.random().toString(36).slice(2,5),senderMobile:acc.mobile,senderName:acc.name||'Customer',text,photo,recipientMobile:owner?candidate.mobile:o.ownerMobile,time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}),at:new Date().toISOString(),deliveredAt:new Date().toISOString()});
-          o.updatedAt=new Date().toISOString();writeOrders();notify(owner?candidate.mobile:o.ownerMobile,'💬 नया Local Delivery message',(acc.name||'Customer')+' ने “'+String(o.title).slice(0,70)+'” पर message भेजा है।','local-delivery-message');return sendJSON(res,200,{ok:true,message:candidate.messages[candidate.messages.length-1]});
+          o.updatedAt=new Date().toISOString();writeOrders();const preview=text?text.replace(/\s+/g,' ').slice(0,120):'📷 Photo भेजी है',sentMessage=candidate.messages[candidate.messages.length-1];addNotification({title:'💬 '+(acc.name||'Customer')+' का message',body:(acc.name||'Customer')+': '+preview,mobile:owner?candidate.mobile:o.ownerMobile,kind:'local-delivery-message',orderId:o.id,senderMobile:acc.mobile,messageId:sentMessage.id,actualMessage:true});return sendJSON(res,200,{ok:true,message:sentMessage});
         }
         if(body.action==='delivery-confirm-request'){
           if(owner||o.status!=='chat')return sendJSON(res,403,{ok:false,message:'Delivery confirmation उपलब्ध नहीं है'});
