@@ -18,7 +18,7 @@
     document.body.appendChild(box);sound();setTimeout(()=>box.remove(),12000);
   }
   function isPopupEvent(n){return n?.kind==='local-delivery-confirm-request'||(n?.kind==='local-delivery-message'&&n?.actualMessage===true)}
-  function show(n){document.querySelector('.notification-bell i')?.classList.add('unread');if(isPopupEvent(n)&&!document.querySelector('.chat-room'))popup(n)}
+  function show(n){try{localStorage.setItem('aditya_delivery_notifications_unread','1')}catch(_){}document.querySelector('.notification-bell i')?.classList.add('unread');if(isPopupEvent(n)&&!document.querySelector('.chat-room'))popup(n)}
   async function poll(){
     const s=session();if(!s?.sessionToken)return;
     try{
