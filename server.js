@@ -3251,6 +3251,14 @@ function computeOrderFees(subtotal, settingsFees) {
           o.actualBillRequest.approvalWaitExpiredAt=new Date().toISOString();
         }        o.status='delivering';o.deliveryEtaMinutes=minutes;o.deliveryStartedAt=new Date().toISOString();o.messages=Array.isArray(o.messages)?o.messages:[];o.messages.push({sender:'system',text:'🚚 सभी सामान ले लिए गए। Estimated delivery time: '+minutes+' मिनट।',time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})});fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));addNotification({title:'🚚 Delivery शुरू हो गई',body:'सभी सामान ले लिए गए। अनुमानित समय '+minutes+' मिनट।',mobile:o.ownerMobile,kind:'local-delivery-started',orderId:o.id});return sendJSON(res,200,{ok:true,order:o});
       }
+      if(body.action==='location-update'){
+        const o=orders.find(x=>String(x.id)===String(body.orderId||'')),lat=Number(body.lat),lng=Number(body.lng),accuracy=Math.round(Number(body.accuracy||0));
+        if(!o||String(o.providerMobile)!==String(acc.mobile)||o.status!=='delivering')return sendJSON(res,403,{ok:false,message:'Live location update उपलब्ध नहीं है'});
+        if(!Number.isFinite(lat)||!Number.isFinite(lng)||lat<-90||lat>90||lng<-180||lng>180)return sendJSON(res,400,{ok:false,message:'सही location नहीं मिली'});
+        o.liveLocation={lat,lng,accuracy:Math.max(0,Math.min(5000,accuracy)),updatedAt:new Date().toISOString()};
+        fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));
+        return sendJSON(res,200,{ok:true,location:o.liveLocation});
+      }
       if(body.action==='typing'||body.action==='seen'){
         const o=orders.find(x=>String(x.id)===String(body.orderId||''));
         if(!o||[o.ownerMobile,o.providerMobile].map(String).indexOf(String(acc.mobile))<0)return sendJSON(res,403,{ok:false});
@@ -3317,6 +3325,23 @@ function computeOrderFees(subtotal, settingsFees) {
       return sendJSON(res,200,{ok:true,amount,recipient,order});
     } catch(e) { console.error('admin local delivery cancel:',e.message); return sendJSON(res,500,{ok:false,message:'Admin cancellation पूरी नहीं हुई।'}); }
   }
+  if (req.method === 'POST' && urlPath === '/admin/local-delivery-help-resolve') {
+    if (!isAdminAuthed(req)) return requireAdminAuth(req, res);
+    try {
+      const body=await readBody(req),orderId=String(body.orderId||'').trim(),note=String(body.note||'').trim().slice(0,500);
+      if(!orderId||note.length<3)return sendJSON(res,400,{ok:false,message:'Admin note लिखें।'});
+      let orders=[];try{orders=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_ORDERS_FILE,'utf8'))||[]}catch(_){}
+      const order=orders.find(x=>String(x.id)===orderId);if(!order)return sendJSON(res,404,{ok:false,message:'Order नहीं मिला।'});
+      const now=new Date().toISOString();order.helpCases=Array.isArray(order.helpCases)?order.helpCases:[];
+      const open=order.helpCases.filter(c=>c.status==='open');if(!open.length)return sendJSON(res,409,{ok:false,message:'Open Help case नहीं है।'});
+      open.forEach(c=>{c.status='resolved';c.resolvedAt=now;c.resolution='Resolved without cancellation';c.adminNote=note});
+      order.messages=Array.isArray(order.messages)?order.messages:[];order.messages.push({sender:'system',text:'✅ Admin ने Help case resolve किया। Order जारी रहेगा। Note: '+note,at:now,time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})});
+      fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));
+      notify(order.ownerMobile,'✅ Help case resolved','Admin: '+note,'local-delivery-help-resolved');if(order.providerMobile&&String(order.providerMobile)!==String(order.ownerMobile))notify(order.providerMobile,'✅ Help case resolved','Admin: '+note,'local-delivery-help-resolved');
+      return sendJSON(res,200,{ok:true,order});
+    }catch(e){console.error('admin help resolve:',e.message);return sendJSON(res,500,{ok:false,message:'Help case resolve नहीं हुआ।'});}
+  }
+
   if (req.method === 'GET' && urlPath === '/admin/activity-json') {
     const now = Date.now();
     const users = loadUserActivity().map(x => ({ ...x, online: now - new Date(x.lastSeenAt || 0).getTime() < 90000 })).sort((a,b) => Number(b.totalSeconds||0)-Number(a.totalSeconds||0));
