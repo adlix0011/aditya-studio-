@@ -11,7 +11,7 @@
 const api=async(action,extra={})=>{const s=sess(),r=await fetch('/api/local-delivery/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mobile:s?.mobile,sessionToken:s?.sessionToken,action,orderId:trackId,...extra})}),d=await r.json();if(!r.ok||!d.ok)throw Error(d.message||'Update नहीं हुआ');return d};
  const countdown=o=>{if(!o.deliveryStartedAt||!o.deliveryEtaMinutes)return 'Pickup update का इंतजार है';const left=Math.max(0,new Date(o.deliveryStartedAt).getTime()+Number(o.deliveryEtaMinutes)*60000-Date.now()),m=Math.floor(left/60000),s=Math.floor(left/1000)%60;return left?'लगभग '+m+' मिनट '+String(s).padStart(2,'0')+' सेकंड बाकी':'Estimated time पूरा हुआ'};
  function list(){
-  const expired=o=>o.neededBy&&new Date(o.neededBy).getTime()<Date.now()-86400000;
+  const expired=o=>{const t=new Date(o.neededBy||'').getTime();return Number.isFinite(t)&&t<=Date.now()};
   const deliveryActive=o=>o.provider===user&&['booked','delivering'].includes(o.status)&&!expired(o);
   const postedActive=o=>o.owner===user&&!['completed','cancelled'].includes(o.status)&&!expired(o);
   const deliveryHistory=o=>o.provider===user&&!deliveryActive(o);
