@@ -3033,7 +3033,7 @@ function computeOrderFees(subtotal, settingsFees) {
       }
       // Candidate-scoped negotiation. Never use the order-wide provider fields
       // while an order is still in chat: several helpers may be discussing it.
-      if(['message','delivery-confirm-request','delivery-confirm-response','delivery-chat-later','delivery-decline','payment-request','payment-response','payment-counter','payment-counter-response','payment-continue','payment-close','payment-update'].includes(body.action)){
+      if(['message','delivery-confirm-request','delivery-confirm-response','delivery-chat-later','delivery-decline','payment-request','payment-response','payment-counter','payment-counter-response','payment-continue','payment-close','payment-update','help-request'].includes(body.action)){
         const o=orders.find(x=>String(x.id)===String(body.orderId||''));
         if(!o)return sendJSON(res,404,{ok:false,message:'Order नहीं मिला'});
         const owner=sameMobile(o.ownerMobile,acc.mobile);
@@ -3044,6 +3044,26 @@ function computeOrderFees(subtotal, settingsFees) {
         candidate.messages=Array.isArray(candidate.messages)?candidate.messages:[];
         const note=(text)=>candidate.messages.push({sender:'system',text,time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})});
         const notify=(mobile,title,bodyText,kind)=>addNotification({title,body:bodyText,mobile,kind,orderId:o.id});
+        if(body.action==='help-request'){
+          if(!['booked','delivering','disputed'].includes(String(o.status||'')))return sendJSON(res,409,{ok:false,message:'Help request final booking के बाद ही भेज सकते हैं'});
+          const reason=String(body.reason||'').trim().slice(0,1000);
+          if(reason.length<3)return sendJSON(res,400,{ok:false,message:'Help reason कम से कम 3 अक्षर में लिखें'});
+          o.helpCases=Array.isArray(o.helpCases)?o.helpCases:[];
+          let item=o.helpCases.find(x=>String(x.byMobile||'')===String(acc.mobile)&&x.status==='open');
+          const now=new Date().toISOString();
+          const evidence={
+            chatMessages:(candidate.messages||[]).slice(-30).map(m=>({senderName:String(m.senderName||m.sender||''),text:String(m.text||'').slice(0,1000),photo:String(m.photo||''),at:m.at||m.time||now})),
+            pickupPhotos:(o.pickupProgress||[]).filter(x=>x.photo).map(x=>({name:String(x.name||''),photo:String(x.photo||''),at:x.updatedAt||now})),
+            billPhoto:String(o.actualBillRequest?.photo||'')
+          };
+          if(item){item.reason=reason;item.updatedAt=now;item.evidence=evidence}else{item={id:'help-'+Date.now()+'-'+Math.random().toString(36).slice(2,7),byMobile:acc.mobile,byName:acc.name||'User',reason,createdAt:now,updatedAt:now,status:'open',evidence};o.helpCases.unshift(item)}
+          o.messages=Array.isArray(o.messages)?o.messages:[];
+          o.messages.push({sender:'system',text:'⚠️ '+(acc.name||'User')+' ने Help request भेजी है। Admin review तक chat और proof सुरक्षित रखे गए हैं।',time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}),at:now});
+          writeOrders();
+          const otherMobile=owner?candidate.mobile:o.ownerMobile;
+          if(otherMobile)notify(otherMobile,'⚠️ Help request opened',(acc.name||'User')+' ने order पर help request भेजी है। आप भी Help से अपना reason भेज सकते हैं।','local-delivery-help-request');
+          return sendJSON(res,200,{ok:true,helpCase:item,order:viewFor(o,acc.mobile)});
+        }
         if(body.action==='message'){
           const text=String(body.text||'').trim().slice(0,2000),photo=String(body.photo||'');
           if(!text&&!photo)return sendJSON(res,400,{ok:false,message:'Message नहीं भेजा गया'});
@@ -3285,6 +3305,8 @@ function computeOrderFees(subtotal, settingsFees) {
       lock.settledAt=now; lock.settledTo=recipient; lock.settledToMobile=receiver.mobile; lock.adminReason=reason;
       order.status='cancelled'; order.cancelledAt=now;
       order.adminCancellation={at:now,recipient,recipientMobile:receiver.mobile,amount,reason};
+      order.helpCases=Array.isArray(order.helpCases)?order.helpCases:[];
+      order.helpCases.forEach(c=>{if(c.status==='open'){c.status='resolved';c.resolvedAt=now;c.resolution=recipient==='delivery'?'Settled to delivery boy':'Refunded to post user';c.adminReason=reason}});
       order.messages=Array.isArray(order.messages)?order.messages:[];
       order.messages.push({sender:'system',text:'⚖️ Admin ने Help request पर order cancel किया। ₹'+amount+' '+(recipient==='delivery'?'delivery boy':'post user')+' के wallet में settle किए गए। Reason: '+reason,at:now});
       fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));
