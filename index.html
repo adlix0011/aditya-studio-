@@ -2023,3 +2023,17 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 </body>
 </html>
+<script>
+/* Keep the homepage bell unread-only: opening the alert centre marks the current feed as read on this device. */
+(function () {
+  const key = 'aditya_studio_notification_read_through_v1';
+  const buttons = Array.from(document.querySelectorAll('[data-notification-button]'));
+  let busy = false, retry = 0;
+  function session() { try { return (typeof loadSession === 'function' && loadSession()) || JSON.parse(localStorage.getItem('aditya_studio_session_v1') || localStorage.getItem('aditya_studio_persistent_login_v2') || 'null') || {}; } catch (_) { return {}; } }
+  function paint(count) { buttons.forEach(function (button) { const old = button.querySelector('.notif-count'); const text = count > 9 ? '9+' : String(count); if (!count) { if (old) old.remove(); return; } if (old && old.textContent === text) return; if (old) old.remove(); const badge = document.createElement('span'); badge.className = 'notif-count absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center z-20'; badge.textContent = text; button.appendChild(badge); }); }
+  async function sync(markRead) { if (busy) return; busy = true; try { const s = session(); const res = await fetch('/api/my-notifications', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({sessionToken:s.sessionToken || ''}) }); const data = await res.json(); if (!res.ok || !data.ok) return; let through = Number(localStorage.getItem(key) || 0); if (markRead) { through = Date.now(); localStorage.setItem(key, String(through)); } const unread = (Array.isArray(data.items) ? data.items : []).filter(function (item) { return new Date(item.at || 0).getTime() > through; }).length; paint(unread); } catch (_) {} finally { busy = false; } }
+  buttons.forEach(function (button) { button.addEventListener('click', function () { sync(true); }, true); });
+  new MutationObserver(function () { clearTimeout(retry); retry = setTimeout(function () { sync(false); }, 0); }).observe(document.body, {childList:true, subtree:true});
+  sync(false);
+})();
+</script></script>
