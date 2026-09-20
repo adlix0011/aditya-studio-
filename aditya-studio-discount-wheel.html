@@ -3312,7 +3312,8 @@ function closeProfileModal(){
       notifPanel.classList.toggle('show');
       var dot = document.getElementById('notifDot');
       if(dot) dot.classList.remove('show');
-      try { localStorage.setItem('aditya_notif_seen', String(Date.now())); } catch(e){}
+      notifBtn.classList.remove('pulse');
+      try { localStorage.setItem('aditya_notif_seen', String(window._latestNotifAt || Date.now())); } catch(e){}
     });
   }
 })();
@@ -3389,9 +3390,9 @@ async function loadNotifications(){
     }).join('');
     let seen = 0;
     try { seen = Number(localStorage.getItem('aditya_notif_seen') || 0); } catch(e){}
-    const newest = items[0] && items[0].at ? new Date(items[0].at).getTime() : 0;
+    const newest = items[0] && items[0].at ? new Date(items[0].at).getTime() : 0; window._latestNotifAt=newest;
     if(dot && newest > seen){ dot.classList.add('show'); if(bell) bell.classList.add('pulse'); }
-    else if(bell && _lastNotifSig === sig){ /* keep pulse if just arrived */ }
+    else { if(dot) dot.classList.remove('show'); if(bell) bell.classList.remove('pulse'); }
   } catch(e){
     if(list) list.innerHTML = '<div class="notif-item">सूचना लोड नहीं हुई — server.js update deploy करें</div>';
   }
