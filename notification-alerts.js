@@ -1,9 +1,13 @@
 /* Local Delivery alerts: only new, server-recorded events may open a popup. */
 (function(){
-  const seenKey='aditya_delivery_seen_notifications_v1';
+  const seenKey='aditya_delivery_seen_notifications_v1',popupKey='aditya_delivery_popup_notifications_v1';
   let initialized=false,audioReady=false;
   function session(){try{return JSON.parse(localStorage.getItem('aditya_studio_session_v1')||localStorage.getItem('aditya_studio_persistent_login_v2')||'null')}catch(_){return null}}
   function readSeen(){try{return new Set(JSON.parse(localStorage.getItem(seenKey)||'[]'))}catch(_){return new Set()}}
+  function readPopupSeen(){try{return new Set(JSON.parse(sessionStorage.getItem(popupKey)||'[]'))}catch(_){return new Set()}}
+  function savePopupSeen(x){try{sessionStorage.setItem(popupKey,JSON.stringify([...x].slice(-120)))}catch(_){}}
+  const popupSeen=readPopupSeen();
+  const signature=n=>String(n.id||n.messageId||[n.kind,n.orderId,n.senderMobile,n.at,n.body].join('|'));
   function saveSeen(s){try{localStorage.setItem(seenKey,JSON.stringify([...s].slice(0,80)))}catch(_){}}
   function escapeHtml(value){return String(value||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
   function sound(){if(!audioReady)return;try{const C=window.AudioContext||window.webkitAudioContext,c=new C(),t=c.currentTime;[660,880,1040].forEach((f,i)=>{const o=c.createOscillator(),g=c.createGain();o.frequency.value=f;g.gain.setValueAtTime(.0001,t+i*.13);g.gain.exponentialRampToValueAtTime(.13,t+i*.13+.015);g.gain.exponentialRampToValueAtTime(.0001,t+i*.13+.12);o.connect(g).connect(c.destination);o.start(t+i*.13);o.stop(t+i*.13+.13)});setTimeout(()=>c.close(),650)}catch(_){}}
@@ -18,7 +22,7 @@
     document.body.appendChild(box);sound();setTimeout(()=>box.remove(),12000);
   }
   function isPopupEvent(n){return n?.kind==='local-delivery-confirm-request'||(n?.kind==='local-delivery-message'&&n?.actualMessage===true)}
-  function show(n){try{localStorage.setItem('aditya_delivery_notifications_unread','1')}catch(_){}document.querySelector('.notification-bell i')?.classList.add('unread');if(isPopupEvent(n)&&!document.querySelector('.chat-room'))popup(n)}
+  function show(n){try{localStorage.setItem('aditya_delivery_notifications_unread','1')}catch(_){}document.querySelector('.notification-bell i')?.classList.add('unread');const key=signature(n);if(isPopupEvent(n)&&!document.querySelector('.chat-room')&&!popupSeen.has(key)){popupSeen.add(key);savePopupSeen(popupSeen);popup(n)}}
   async function poll(){
     const s=session();if(!s?.sessionToken)return;
     try{
