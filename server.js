@@ -230,6 +230,7 @@ const EDIT_REQUESTS_FILE = path.join(DATA_DIR, 'edit-requests.json');
 const WALLET_TOPUPS_FILE = path.join(DATA_DIR, 'wallet-topups.json');
 const ACTIVITY_FILE = path.join(DATA_DIR, 'user-activity.json');
 const LOCAL_DELIVERY_LOCKS_FILE = path.join(DATA_DIR, 'local-delivery-locks.json');
+const LOCAL_DELIVERY_LEDGER_FILE = path.join(DATA_DIR, 'local-delivery-wallet-ledger.json');
 const LOCAL_DELIVERY_ORDERS_FILE = path.join(DATA_DIR, 'local-delivery-orders.json');
 const LOCAL_DELIVERY_MEDIA_DIR = path.join(DATA_DIR, 'local-delivery-media');
 try { fs.mkdirSync(LOCAL_DELIVERY_MEDIA_DIR, { recursive: true }); } catch (e) { console.warn('Local delivery media dir unavailable:', e.message); }
@@ -1259,10 +1260,25 @@ function activePromoWallet(acc) {
 function walletHistoryId() {
   return 'WH-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
 }
+function appendLocalDeliveryLedger(entry) {
+  if (!String(entry.source || '').startsWith('local_delivery')) return;
+  let list = [];
+  try { list = JSON.parse(fs.readFileSync(LOCAL_DELIVERY_LEDGER_FILE, 'utf8')) || []; } catch (_) {}
+  if (entry.operationKey && list.some(row => row.operationKey === entry.operationKey)) return;
+  list.unshift({ id: entry.id, operationKey: entry.operationKey || '', type: entry.type, amount: entry.amount, balanceAfter: entry.balanceAfter, orderId: entry.orderId || null, source: entry.source, reason: entry.reason, mobile: entry.mobile || '', timestamp: entry.timestamp });
+  const tmp = LOCAL_DELIVERY_LEDGER_FILE + '.tmp';
+  try { fs.writeFileSync(tmp, JSON.stringify(list.slice(0, 10000), null, 2), 'utf8'); fs.renameSync(tmp, LOCAL_DELIVERY_LEDGER_FILE); }
+  catch (_) { try { fs.writeFileSync(LOCAL_DELIVERY_LEDGER_FILE, JSON.stringify(list.slice(0, 10000), null, 2), 'utf8'); } catch (_) {} }
+}
 /** Credit/debit wallet. amount > 0. Returns entry or null if debit fails. */
 function walletTxn(acc, type, amount, meta) {
   ensureWallet(acc);
   expireWalletPromos(acc);
+  const operationKey = String((meta && meta.operationKey) || '');
+  if (operationKey) {
+    const previous = (acc.walletHistory || []).find(item => item.operationKey === operationKey);
+    if (previous) return previous;
+  }
   amount = Math.round(Number(amount) || 0);
   if (amount <= 0) return null;
   if (type === 'debit' && acc.walletBalance < amount) return null;
@@ -1287,12 +1303,15 @@ function walletTxn(acc, type, amount, meta) {
     ref: (meta && meta.ref) || '',
     couponId: (meta && meta.couponId) || null,
     orderId: (meta && meta.orderId) || null,
+    operationKey,
+    mobile: String(acc.mobile || ''),
     byAdmin: !!(meta && meta.byAdmin),
     timestamp: new Date().toISOString()
   };
   if (type === 'credit' && meta && meta.expiresAt) { entry.expiresAt = meta.expiresAt; entry.promoRemaining = amount; }
   acc.walletHistory.unshift(entry);
   if (acc.walletHistory.length > 200) acc.walletHistory = acc.walletHistory.slice(0, 200);
+  appendLocalDeliveryLedger(entry);
   return entry;
 }
 /** Extract ₹ value from a spin/coupon history entry */
@@ -2921,7 +2940,7 @@ function computeOrderFees(subtotal, settingsFees) {
       if (!orderId) return sendJSON(res,400,{ok:false,message:'Order id required'});
       const existing=locks.find(x=>x.orderId===orderId&&x.mobile===acc.mobile);
       if (existing) return sendJSON(res,200,{ok:true,walletBalance:acc.walletBalance,locked:existing.amount});
-      const entry=walletTxn(acc,'debit',amount,{reason:'Local Delivery lock · '+orderId,source:'local_delivery_lock',orderId});
+      const entry=walletTxn(acc,'debit',amount,{reason:'Local Delivery lock · '+orderId,source:'local_delivery_lock',orderId,operationKey:'local-lock:'+orderId+':'+acc.mobile});
       if (!entry) return sendJSON(res,400,{ok:false,message:'Wallet में पर्याप्त पैसे नहीं हैं।'});
       locks.unshift({orderId,mobile:acc.mobile,amount,createdAt:new Date().toISOString(),status:'locked'});
       fs.writeFileSync(LOCAL_DELIVERY_LOCKS_FILE,JSON.stringify(locks.slice(0,1000),null,2)); saveAccounts(accounts);
@@ -2935,7 +2954,7 @@ function computeOrderFees(subtotal, settingsFees) {
       let locks=[];try{locks=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_LOCKS_FILE,'utf8'))||[]}catch(_){}
       const row=locks.find(x=>x.orderId===String(body.orderId||'')&&x.mobile===acc.mobile&&x.status==='locked');
       if(!row)return sendJSON(res,404,{ok:false,message:'Locked payment नहीं मिला'});
-      walletTxn(acc,'credit',row.amount,{reason:'Local Delivery cancel refund · '+row.orderId,source:'local_delivery_refund',orderId:row.orderId});
+      walletTxn(acc,'credit',row.amount,{reason:'Local Delivery cancel refund · '+row.orderId,source:'local_delivery_refund',orderId:row.orderId,operationKey:'local-refund:'+row.orderId+':'+acc.mobile});
       row.status='refunded';row.refundedAt=new Date().toISOString();fs.writeFileSync(LOCAL_DELIVERY_LOCKS_FILE,JSON.stringify(locks,null,2));saveAccounts(accounts);
       return sendJSON(res,200,{ok:true,walletBalance:acc.walletBalance,refunded:row.amount});
     }catch(e){return sendJSON(res,500,{ok:false,message:'Refund नहीं हुआ'})}
@@ -3006,7 +3025,7 @@ function computeOrderFees(subtotal, settingsFees) {
       if(body.action==='owner-delete'||body.action==='owner-edit'){
         const o=orders.find(x=>String(x.id)===String(body.orderId||''));
         if(!o||!sameMobile(o.ownerMobile,acc.mobile)||!['open','chat','service'].includes(o.status))return sendJSON(res,403,{ok:false,message:'Final confirmation के बाद post edit या delete नहीं हो सकती'});
-        if(body.action==='owner-delete'){let locks=[];try{locks=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_LOCKS_FILE,'utf8'))||[]}catch(_){}const row=locks.find(x=>x.orderId===String(o.id)&&sameMobile(x.mobile,acc.mobile)&&x.status==='locked');if(row){walletTxn(acc,'credit',Number(row.amount||0),{reason:'Local Delivery post deleted refund · '+o.id,source:'local_delivery_post_delete',orderId:o.id});row.status='refunded';row.refundedAt=new Date().toISOString();fs.writeFileSync(LOCAL_DELIVERY_LOCKS_FILE,JSON.stringify(locks,null,2));saveAccounts(accounts)}orders=orders.filter(x=>x!==o);writeOrders();return sendJSON(res,200,{ok:true,walletBalance:acc.walletBalance})}
+        if(body.action==='owner-delete'){let locks=[];try{locks=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_LOCKS_FILE,'utf8'))||[]}catch(_){}const row=locks.find(x=>x.orderId===String(o.id)&&sameMobile(x.mobile,acc.mobile)&&x.status==='locked');if(row){walletTxn(acc,'credit',Number(row.amount||0),{reason:'Local Delivery post deleted refund · '+o.id,source:'local_delivery_post_delete',orderId:o.id,operationKey:'local-delete-refund:'+o.id+':'+acc.mobile});row.status='refunded';row.refundedAt=new Date().toISOString();fs.writeFileSync(LOCAL_DELIVERY_LOCKS_FILE,JSON.stringify(locks,null,2));saveAccounts(accounts)}orders=orders.filter(x=>x!==o);writeOrders();return sendJSON(res,200,{ok:true,walletBalance:acc.walletBalance})}
         const next=body.order||{},nextDue=new Date(next.neededBy!==undefined?next.neededBy:o.neededBy||'').getTime();if(o.kind!=='delivery-service'&&(!Number.isFinite(nextDue)||nextDue<=Date.now()))return sendJSON(res,400,{ok:false,message:'पुराना समय नहीं चुन सकते। आगे का date और time चुनें।'});const keys=['title','description','area','address','district','deliveryVillage','quantity','lineItems','category','neededBy','items','fee','alreadyPurchased','photo','service'];for(const k of keys)if(next[k]!==undefined)o[k]=next[k];o.updatedAt=new Date().toISOString();writeOrders();return sendJSON(res,200,{ok:true,order:viewFor(o,acc.mobile)});
       }
       if(body.action==='create'){
@@ -3091,7 +3110,7 @@ function computeOrderFees(subtotal, settingsFees) {
         if(body.action==='delivery-confirm-response'){
           const answer=String(body.answer||'');if(!owner||candidate.deliveryConfirmRequest?.status!=='pending'||!['yes','no','wait'].includes(answer))return sendJSON(res,403,{ok:false,message:'यह confirmation उपलब्ध नहीं है'});
           candidate.deliveryConfirmRequest.status=answer==='yes'?'confirmed':answer==='wait'?'waiting':'rejected';candidate.deliveryConfirmRequest.respondedAt=new Date().toISOString();
-          if(answer==='yes'){let locks=[];try{locks=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_LOCKS_FILE,'utf8'))||[]}catch(_){}const target=o.alreadyPurchased?Math.round(Number(o.fee||0)):Math.round(Number(o.items||0)+Number(o.fee||0)),row=locks.find(x=>x.orderId===String(o.id)&&sameMobile(x.mobile,o.ownerMobile)&&x.status==='locked');if(target<1)return sendJSON(res,400,{ok:false,message:'Final delivery payment सही नहीं है'});if(!row&&!walletTxn(acc,'debit',target,{reason:'Local Delivery final booking lock · '+o.id,source:'local_delivery_final_lock',orderId:o.id}))return sendJSON(res,400,{ok:false,message:'Wallet में final booking के लिए पर्याप्त पैसे नहीं हैं'});if(!row){locks.unshift({orderId:String(o.id),mobile:o.ownerMobile,amount:target,createdAt:new Date().toISOString(),status:'locked'});fs.writeFileSync(LOCAL_DELIVERY_LOCKS_FILE,JSON.stringify(locks.slice(0,1000),null,2));saveAccounts(accounts)}o.customerHold=target;o.status='booked';o.providerMobile=candidate.mobile;o.providerName=candidate.name;o.deliveryCandidates=[{mobile:candidate.mobile,name:candidate.name,acceptedAt:candidate.acceptedAt}];o.candidateSessions=[candidate];o.messages=candidate.messages;o.paymentRequest=candidate.paymentRequest||null;o.deliveryConfirmRequest=candidate.deliveryConfirmRequest;}
+          if(answer==='yes'){let locks=[];try{locks=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_LOCKS_FILE,'utf8'))||[]}catch(_){}const target=o.alreadyPurchased?Math.round(Number(o.fee||0)):Math.round(Number(o.items||0)+Number(o.fee||0)),row=locks.find(x=>x.orderId===String(o.id)&&sameMobile(x.mobile,o.ownerMobile)&&x.status==='locked');if(target<1)return sendJSON(res,400,{ok:false,message:'Final delivery payment सही नहीं है'});if(!row&&!walletTxn(acc,'debit',target,{reason:'Local Delivery final booking lock · '+o.id,source:'local_delivery_final_lock',orderId:o.id,operationKey:'local-final-lock:'+o.id+':'+target}))return sendJSON(res,400,{ok:false,message:'Wallet में final booking के लिए पर्याप्त पैसे नहीं हैं'});if(!row){locks.unshift({orderId:String(o.id),mobile:o.ownerMobile,amount:target,createdAt:new Date().toISOString(),status:'locked'});fs.writeFileSync(LOCAL_DELIVERY_LOCKS_FILE,JSON.stringify(locks.slice(0,1000),null,2));saveAccounts(accounts)}o.customerHold=target;o.status='booked';o.providerMobile=candidate.mobile;o.providerName=candidate.name;o.deliveryCandidates=[{mobile:candidate.mobile,name:candidate.name,acceptedAt:candidate.acceptedAt}];o.candidateSessions=[candidate];o.messages=candidate.messages;o.paymentRequest=candidate.paymentRequest||null;o.deliveryConfirmRequest=candidate.deliveryConfirmRequest;}
           note(answer==='yes'?'✅ Customer ने delivery final confirm कर दी।':answer==='wait'?'⏳ Customer ने Wait चुना है। Chat खुली रहेगी।':'❌ Customer ने अभी delivery final confirm नहीं की। Chat जारी रख सकते हैं।');writeOrders();notify(candidate.mobile,answer==='yes'?'✅ Delivery confirmed':answer==='wait'?'⏳ Delivery confirmation waiting':'❌ Delivery confirmation declined',answer==='yes'?'Customer ने आपको final delivery user चुन लिया है।':answer==='wait'?'Customer ने Wait चुना है, chat जारी रखें।':'Customer ने अभी confirmation नहीं दी।','local-delivery-confirm-response');return sendJSON(res,200,{ok:true,order:viewFor(o,acc.mobile)});
         }
         if(body.action==='delivery-chat-later'){if(owner||o.status!=='chat')return sendJSON(res,403,{ok:false,message:'यह विकल्प उपलब्ध नहीं है'});candidate.deliveryConfirmRequest={status:'chat',at:new Date().toISOString()};note('💬 Delivery boy ने कहा है कि delivery final करने से पहले chat में बात करेंगे।');writeOrders();return sendJSON(res,200,{ok:true,order:viewFor(o,acc.mobile)})}
@@ -3112,7 +3131,7 @@ function computeOrderFees(subtotal, settingsFees) {
           if(owner||candidate.paymentRequest?.status!=='rejected')return sendJSON(res,403,{ok:false,message:'यह विकल्प उपलब्ध नहीं है'});candidate.paymentRequest.status=body.action==='payment-continue'?'continued':'closed';note(body.action==='payment-continue'?'✅ Helper पुरानी तय रकम में काम करने के लिए तैयार है।':'Helper ने पुरानी रकम में काम न करने का चयन किया।');writeOrders();notify(o.ownerMobile,body.action==='payment-continue'?'✅ Helper agreed to existing amount':'↩️ Delivery helper left request',body.action==='payment-continue'?'Helper पुरानी रकम में काम करने के लिए तैयार है।':'Chat बंद हुई, post अन्य users के लिए available है।','local-delivery-payment-response');return sendJSON(res,200,{ok:true,order:viewFor(o,acc.mobile)})
         }
         if(body.action==='payment-update'){
-          const fee=Math.round(Number(body.fee)),items=Math.round(Number(o.items||0));if(!owner||candidate.paymentRequest?.status!=='approved'||!['chat','booked'].includes(o.status)||!Number.isSafeInteger(fee)||fee<=Number(o.fee||0)||fee>100000)return sendJSON(res,403,{ok:false,message:'Delivery payment केवल बढ़ाई जा सकती है, कम नहीं की जा सकती'});let locks=[];try{locks=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_LOCKS_FILE,'utf8'))||[]}catch(_){}const target=o.alreadyPurchased?fee:items+fee,row=locks.find(x=>x.orderId===String(o.id)&&sameMobile(x.mobile,acc.mobile)&&x.status==='locked'),current=Number(row?.amount||0),change=target-current;if(change>0&&!walletTxn(acc,'debit',change,{reason:'Local Delivery payment increase · '+o.id,source:'local_delivery_lock_adjust',orderId:o.id}))return sendJSON(res,400,{ok:false,message:'Wallet में नई रकम के लिए पर्याप्त पैसे नहीं हैं'});if(row){row.amount=target;row.updatedAt=new Date().toISOString()}else if(target>0)locks.unshift({orderId:String(o.id),mobile:acc.mobile,amount:target,createdAt:new Date().toISOString(),status:'locked'});o.fee=fee;o.customerHold=target;candidate.paymentRequest={...candidate.paymentRequest,status:'applied',appliedAt:new Date().toISOString()};if(o.status==='chat'){o.status='booked';o.providerMobile=candidate.mobile;o.providerName=candidate.name;o.deliveryCandidates=[{mobile:candidate.mobile,name:candidate.name,acceptedAt:candidate.acceptedAt}];o.candidateSessions=[candidate];o.messages=candidate.messages;o.paymentRequest=candidate.paymentRequest;o.deliveryConfirmRequest=candidate.deliveryConfirmRequest||null;}note('💰 नई delivery payment ₹'+fee+' लागू हुई। Wallet lock अब ₹'+target+' है।');fs.writeFileSync(LOCAL_DELIVERY_LOCKS_FILE,JSON.stringify(locks.slice(0,1000),null,2));writeOrders();saveAccounts(accounts);notify(candidate.mobile,'💰 Payment amount updated','Customer ने नई payment amount और wallet lock लागू कर दिया है।','local-delivery-payment-updated');return sendJSON(res,200,{ok:true,order:viewFor(o,acc.mobile),walletBalance:acc.walletBalance,locked:target})
+          const fee=Math.round(Number(body.fee)),items=Math.round(Number(o.items||0));if(!owner||candidate.paymentRequest?.status!=='approved'||!['chat','booked'].includes(o.status)||!Number.isSafeInteger(fee)||fee<=Number(o.fee||0)||fee>100000)return sendJSON(res,403,{ok:false,message:'Delivery payment केवल बढ़ाई जा सकती है, कम नहीं की जा सकती'});let locks=[];try{locks=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_LOCKS_FILE,'utf8'))||[]}catch(_){}const target=o.alreadyPurchased?fee:items+fee,row=locks.find(x=>x.orderId===String(o.id)&&sameMobile(x.mobile,acc.mobile)&&x.status==='locked'),current=Number(row?.amount||0),change=target-current;if(change>0&&!walletTxn(acc,'debit',change,{reason:'Local Delivery payment increase · '+o.id,source:'local_delivery_lock_adjust',orderId:o.id,operationKey:'local-payment-adjust:'+o.id+':'+target}))return sendJSON(res,400,{ok:false,message:'Wallet में नई रकम के लिए पर्याप्त पैसे नहीं हैं'});if(row){row.amount=target;row.updatedAt=new Date().toISOString()}else if(target>0)locks.unshift({orderId:String(o.id),mobile:acc.mobile,amount:target,createdAt:new Date().toISOString(),status:'locked'});o.fee=fee;o.customerHold=target;candidate.paymentRequest={...candidate.paymentRequest,status:'applied',appliedAt:new Date().toISOString()};if(o.status==='chat'){o.status='booked';o.providerMobile=candidate.mobile;o.providerName=candidate.name;o.deliveryCandidates=[{mobile:candidate.mobile,name:candidate.name,acceptedAt:candidate.acceptedAt}];o.candidateSessions=[candidate];o.messages=candidate.messages;o.paymentRequest=candidate.paymentRequest;o.deliveryConfirmRequest=candidate.deliveryConfirmRequest||null;}note('💰 नई delivery payment ₹'+fee+' लागू हुई। Wallet lock अब ₹'+target+' है।');fs.writeFileSync(LOCAL_DELIVERY_LOCKS_FILE,JSON.stringify(locks.slice(0,1000),null,2));writeOrders();saveAccounts(accounts);notify(candidate.mobile,'💰 Payment amount updated','Customer ने नई payment amount और wallet lock लागू कर दिया है।','local-delivery-payment-updated');return sendJSON(res,200,{ok:true,order:viewFor(o,acc.mobile),walletBalance:acc.walletBalance,locked:target})
         }
       }
       if(body.action==='message'){
@@ -3202,7 +3221,7 @@ function computeOrderFees(subtotal, settingsFees) {
         if(!Number.isSafeInteger(fee)||fee<=Number(o.fee||0)||fee>100000)return sendJSON(res,400,{ok:false,message:'Delivery payment केवल बढ़ाई जा सकती है, कम नहीं की जा सकती'});
         let locks=[];try{locks=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_LOCKS_FILE,'utf8'))||[]}catch(_){}
         const target=o.alreadyPurchased?fee:items+fee,row=locks.find(x=>x.orderId===String(o.id)&&String(x.mobile)===String(acc.mobile)&&x.status==='locked'),current=Number(row?.amount||0),change=target-current;
-        if(change>0&&!walletTxn(acc,'debit',change,{reason:'Local Delivery payment increase · '+o.id,source:'local_delivery_lock_adjust',orderId:o.id}))return sendJSON(res,400,{ok:false,message:'Wallet में नई रकम के लिए पर्याप्त पैसे नहीं हैं'});
+        if(change>0&&!walletTxn(acc,'debit',change,{reason:'Local Delivery payment increase · '+o.id,source:'local_delivery_lock_adjust',orderId:o.id,operationKey:'local-payment-adjust:'+o.id+':'+target}))return sendJSON(res,400,{ok:false,message:'Wallet में नई रकम के लिए पर्याप्त पैसे नहीं हैं'});
         if(row){row.amount=target;row.updatedAt=new Date().toISOString()}else if(target>0)locks.unshift({orderId:String(o.id),mobile:acc.mobile,amount:target,createdAt:new Date().toISOString(),status:'locked'});
         o.items=items;o.fee=fee;o.customerHold=target;o.paymentRequest={...o.paymentRequest,status:'applied',appliedAt:new Date().toISOString()};if(o.status==='chat'&&o.providerMobile)o.status='booked';o.messages=Array.isArray(o.messages)?o.messages:[];o.messages.push({sender:'system',text:'💰 नई delivery payment ₹'+fee+' लागू हुई। Wallet lock अब ₹'+target+' है।',time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})});
         fs.writeFileSync(LOCAL_DELIVERY_LOCKS_FILE,JSON.stringify(locks.slice(0,1000),null,2));fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));saveAccounts(accounts);
@@ -3221,7 +3240,7 @@ function computeOrderFees(subtotal, settingsFees) {
         if(!o||String(o.ownerMobile)!==String(acc.mobile)||o.actualBillRequest?.status!=='pending'||!['accept','reject'].includes(answer))return sendJSON(res,403,{ok:false,message:'Bill approval उपलब्ध नहीं है'});
         if(answer==='reject'){o.actualBillRequest.status='rejected';o.actualBillRequest.respondedAt=new Date().toISOString();o.messages=Array.isArray(o.messages)?o.messages:[];o.messages.push({sender:'system',text:'❌ Customer ने actual bill स्वीकार नहीं किया। Chat में बात करें।',time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})});fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));addNotification({title:'❌ Actual bill rejected',body:'Customer ने bill accept नहीं किया।',mobile:o.providerMobile,kind:'local-delivery-bill-response',orderId:o.id});return sendJSON(res,200,{ok:true,order:o})}
         let locks=[];try{locks=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_LOCKS_FILE,'utf8'))||[]}catch(_){}const row=locks.find(x=>x.orderId===String(o.id)&&String(x.mobile)===String(acc.mobile)&&x.status==='locked'),target=o.alreadyPurchased?Math.round(Number(o.fee||0)):Math.round(Number(o.actualBillRequest.amount||0)+Number(o.fee||0)),current=Number(row?.amount||0),change=target-current;
-        if(change>0&&!walletTxn(acc,'debit',change,{reason:'Actual bill lock increase · '+o.id,source:'local_delivery_actual_bill',orderId:o.id}))return sendJSON(res,400,{ok:false,message:'Wallet में actual bill के लिए पर्याप्त पैसे नहीं हैं'});if(change<0)walletTxn(acc,'credit',Math.abs(change),{reason:'Actual bill lock refund · '+o.id,source:'local_delivery_actual_bill',orderId:o.id});if(row){row.amount=target;row.updatedAt=new Date().toISOString()}else if(target>0)locks.unshift({orderId:String(o.id),mobile:acc.mobile,amount:target,createdAt:new Date().toISOString(),status:'locked'});o.items=Number(o.actualBillRequest.amount);o.customerHold=target;o.actualBillRequest.status='approved';o.actualBillRequest.respondedAt=new Date().toISOString();o.messages=Array.isArray(o.messages)?o.messages:[];o.messages.push({sender:'system',text:'✅ Actual bill ₹'+o.items+' approved। Wallet lock अब ₹'+target+' है।',time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})});fs.writeFileSync(LOCAL_DELIVERY_LOCKS_FILE,JSON.stringify(locks.slice(0,1000),null,2));fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));saveAccounts(accounts);addNotification({title:'✅ Actual bill approved',body:'Customer ने actual bill approve कर दिया। Wallet lock update हो गया।',mobile:o.providerMobile,kind:'local-delivery-bill-response',orderId:o.id});return sendJSON(res,200,{ok:true,order:o,locked:target,walletBalance:acc.walletBalance});
+        if(change>0&&!walletTxn(acc,'debit',change,{reason:'Actual bill lock increase · '+o.id,source:'local_delivery_actual_bill',orderId:o.id,operationKey:'local-bill-lock:'+o.id+':'+target+':'+(change>0?'debit':'credit')}))return sendJSON(res,400,{ok:false,message:'Wallet में actual bill के लिए पर्याप्त पैसे नहीं हैं'});if(change<0)walletTxn(acc,'credit',Math.abs(change),{reason:'Actual bill lock refund · '+o.id,source:'local_delivery_actual_bill',orderId:o.id,operationKey:'local-bill-lock:'+o.id+':'+target+':'+(change>0?'debit':'credit')});if(row){row.amount=target;row.updatedAt=new Date().toISOString()}else if(target>0)locks.unshift({orderId:String(o.id),mobile:acc.mobile,amount:target,createdAt:new Date().toISOString(),status:'locked'});o.items=Number(o.actualBillRequest.amount);o.customerHold=target;o.actualBillRequest.status='approved';o.actualBillRequest.respondedAt=new Date().toISOString();o.messages=Array.isArray(o.messages)?o.messages:[];o.messages.push({sender:'system',text:'✅ Actual bill ₹'+o.items+' approved। Wallet lock अब ₹'+target+' है।',time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})});fs.writeFileSync(LOCAL_DELIVERY_LOCKS_FILE,JSON.stringify(locks.slice(0,1000),null,2));fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));saveAccounts(accounts);addNotification({title:'✅ Actual bill approved',body:'Customer ने actual bill approve कर दिया। Wallet lock update हो गया।',mobile:o.providerMobile,kind:'local-delivery-bill-response',orderId:o.id});return sendJSON(res,200,{ok:true,order:o,locked:target,walletBalance:acc.walletBalance});
       }
       if(body.action==='delivery-otp-create'){
         const o=orders.find(x=>String(x.id)===String(body.orderId||''));
@@ -3243,7 +3262,7 @@ function computeOrderFees(subtotal, settingsFees) {
         if(otp.code!==code){otp.attempts=Number(otp.attempts||0)+1;const remaining=Math.max(0,Number(otp.maxAttempts||5)-otp.attempts);if(!remaining)otp.lockedAt=now;fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));return sendJSON(res,400,{ok:false,message:remaining?'OTP गलत है। '+remaining+' कोशिश बाकी है।':'OTP की 5 गलत कोशिशें हो चुकी हैं। Customer से नया OTP लें।',attemptsRemaining:remaining});}
         let locks=[];try{locks=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_LOCKS_FILE,'utf8'))||[]}catch(_){}const row=locks.find(x=>x.orderId===String(o.id)&&String(x.mobile)===String(o.ownerMobile)&&x.status==='locked'),amount=Number(row?.amount||0);
         if(!row||!Number.isSafeInteger(amount)||amount<1)return sendJSON(res,409,{ok:false,message:'Wallet lock सुरक्षित नहीं है। Delivery complete नहीं की जा सकती। Help से संपर्क करें।'});
-        if(!walletTxn(acc,'credit',amount,{reason:'Local Delivery completed · '+o.id,source:'local_delivery_settlement',orderId:o.id}))return sendJSON(res,500,{ok:false,message:'Payment settlement नहीं हुआ। दुबारा OTP submit न करें; Help से संपर्क करें।'});
+        if(!walletTxn(acc,'credit',amount,{reason:'Local Delivery completed · '+o.id,source:'local_delivery_settlement',orderId:o.id,operationKey:'local-settlement:'+o.id+':'+acc.mobile}))return sendJSON(res,500,{ok:false,message:'Payment settlement नहीं हुआ। दुबारा OTP submit न करें; Help से संपर्क करें।'});
         row.status='settled';row.settledAt=new Date().toISOString();o.status='completed';o.completedAt=new Date().toISOString();o.deliveryOtp.verifiedAt=o.completedAt;o.messages=Array.isArray(o.messages)?o.messages:[];o.messages.push({sender:'system',text:'🎉 Delivery successfully completed! OTP verify हो गया और payment ₹'+amount+' delivery boy के wallet में भेज दिया गया।',time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})});fs.writeFileSync(LOCAL_DELIVERY_LOCKS_FILE,JSON.stringify(locks,null,2));fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));saveAccounts(accounts);addNotification({title:'🎉 Delivery successfully completed',body:'OTP verify हो गया। आपका order सफलतापूर्वक पूरा हुआ।',mobile:o.ownerMobile,kind:'local-delivery-completed',orderId:o.id});return sendJSON(res,200,{ok:true,walletBalance:acc.walletBalance,amount,order:o});
       }
       if(body.action==='pickup-progress'){
@@ -3323,7 +3342,7 @@ function computeOrderFees(subtotal, settingsFees) {
       const receiver=accounts.find(x=>String(x.mobile)===receiverMobile);
       if(!receiver) return sendJSON(res,400,{ok:false,message:recipient==='delivery'?'Confirmed delivery boy account नहीं मिला।':'Post user account नहीं मिला।'});
       const amount=Math.round(Number(lock.amount)||0);
-      if(!walletTxn(receiver,'credit',amount,{reason:'Admin cancellation settlement · '+orderId,source:'local_delivery_admin_cancel',orderId})) return sendJSON(res,500,{ok:false,message:'Wallet settlement नहीं हुआ।'});
+      if(!walletTxn(receiver,'credit',amount,{reason:'Admin cancellation settlement · '+orderId,source:'local_delivery_admin_cancel',orderId,operationKey:'local-admin-cancel:'+orderId+':'+recipient})) return sendJSON(res,500,{ok:false,message:'Wallet settlement नहीं हुआ।'});
       const now=new Date().toISOString();
       lock.status=recipient==='delivery'?'admin_settled_delivery':'admin_refunded_owner';
       lock.settledAt=now; lock.settledTo=recipient; lock.settledToMobile=receiver.mobile; lock.adminReason=reason;
@@ -6586,6 +6605,7 @@ function createDailyAutomaticBackup() {
       version: 1, automatic: true, createdAt: new Date().toISOString(),
       accounts: read(DATA_FILE), walletTopups: read(WALLET_TOPUPS_FILE),
       localDeliveryOrders: read(LOCAL_DELIVERY_ORDERS_FILE), localDeliveryLocks: read(LOCAL_DELIVERY_LOCKS_FILE),
+      localDeliveryWalletLedger: read(LOCAL_DELIVERY_LEDGER_FILE),
       frameOrders: read(FRAME_ORDERS_FILE), notifications: read(NOTIF_FILE),
       codes: read(CODES_FILE), settings: read(SETTINGS_FILE)
     };
