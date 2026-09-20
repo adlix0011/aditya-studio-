@@ -3022,6 +3022,15 @@ function computeOrderFees(subtotal, settingsFees) {
         const orderId=String(body.orderId||''); const o=orders.find(x=>String(x.id)===orderId);
         if(!o)return sendJSON(res,404,{ok:false,message:'Order नहीं मिला'});
         if(o.ownerMobile===acc.mobile)return sendJSON(res,400,{ok:false,message:'अपना order accept नहीं कर सकते'});
+        const dueAt=new Date(o.neededBy||'').getTime();
+        if(Number.isFinite(dueAt)&&dueAt<=Date.now()){
+          if(o.status!=='expired'){
+            o.status='expired';o.expiredAt=new Date().toISOString();o.updatedAt=o.expiredAt;
+            writeOrders();
+            addNotification({title:'⌛ Post expired',body:'“'+String(o.title).slice(0,90)+'” का तय समय पूरा हो गया। समय बदलकर इसे फिर से post कर सकते हैं।',mobile:o.ownerMobile,kind:'local-delivery-expired',orderId:o.id});
+          }
+          return sendJSON(res,410,{ok:false,message:'Post expired हो चुकी है। यह order अब बंद है।'});
+        }
         if(!['open','chat'].includes(o.status))return sendJSON(res,409,{ok:false,message:'यह order अब final हो चुका है'});
         o.deliveryCandidates=Array.isArray(o.deliveryCandidates)?o.deliveryCandidates:[];
         if(o.providerMobile&&!o.deliveryCandidates.some(c=>String(c.mobile)===String(o.providerMobile)))o.deliveryCandidates.push({mobile:o.providerMobile,name:o.providerName||'Delivery helper',acceptedAt:o.acceptedAt||new Date().toISOString()});
