@@ -1015,6 +1015,7 @@ function defaultSettings() {
       deliveryMinAmount: 0,
       deliveryFreeAbove: 500
     },
+    localDeliveryHelperWalletFreeLimit: 500,
     qualityOptions: [
       { id: 'normal', label: 'Normal', sub: 'Standard print', extra: 0 },
       { id: 'lamination', label: 'Lamination', sub: 'Gloss protect', extra: 80 },
@@ -3042,6 +3043,8 @@ function computeOrderFees(subtotal, settingsFees) {
         const orderId=String(body.orderId||''); const o=orders.find(x=>String(x.id)===orderId);
         if(!o)return sendJSON(res,404,{ok:false,message:'Order नहीं मिला'});
         if(o.ownerMobile===acc.mobile)return sendJSON(res,400,{ok:false,message:'अपना order accept नहीं कर सकते'});
+        const helperWalletFreeLimit=Math.max(0,Math.round(Number(loadSettings().localDeliveryHelperWalletFreeLimit ?? 500))),productAmount=Math.round(Number(o.items||0));
+        if(!o.alreadyPurchased&&productAmount>helperWalletFreeLimit&&Number(acc.walletBalance||0)<productAmount)return sendJSON(res,400,{ok:false,needsRecharge:true,requiredWallet:productAmount,helperWalletFreeLimit,message:'₹'+helperWalletFreeLimit+' से अधिक सामान के लिए delivery boy के wallet में कम से कम ₹'+productAmount+' होना जरूरी है। पहले recharge करें।'});
         const dueAt=new Date(o.neededBy||'').getTime();
         if(Number.isFinite(dueAt)&&dueAt<=Date.now()){
           if(o.status!=='expired'){
@@ -3318,7 +3321,16 @@ function computeOrderFees(subtotal, settingsFees) {
     let orders=[], locks=[];
     try { orders=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_ORDERS_FILE,'utf8'))||[]; } catch (_) {}
     try { locks=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_LOCKS_FILE,'utf8'))||[]; } catch (_) {}
-    return sendJSON(res,200,{ok:true,orders:orders.slice(0,5000),locks:locks.slice(0,5000),generatedAt:new Date().toISOString()});
+    return sendJSON(res,200,{ok:true,orders:orders.slice(0,5000),locks:locks.slice(0,5000),helperWalletFreeLimit:Math.max(0,Math.round(Number(loadSettings().localDeliveryHelperWalletFreeLimit ?? 500))),generatedAt:new Date().toISOString()});
+  }
+  if (req.method === 'POST' && urlPath === '/admin/local-delivery-settings') {
+    if (!isAdminAuthed(req)) return requireAdminAuth(req, res);
+    try {
+      const body=await readBody(req), limit=Math.round(Number(body.helperWalletFreeLimit));
+      if (!Number.isFinite(limit) || limit < 0 || limit > 100000) return sendJSON(res,400,{ok:false,message:'₹0 से ₹1,00,000 तक सही amount भरें'});
+      const settings=loadSettings(); settings.localDeliveryHelperWalletFreeLimit=limit; saveSettings(settings);
+      return sendJSON(res,200,{ok:true,helperWalletFreeLimit:limit});
+    } catch (_) { return sendJSON(res,500,{ok:false,message:'Setting save नहीं हुई'}); }
   }
 
   // Admin can settle a Help/Dispute cancellation once, returning the complete
