@@ -39,6 +39,10 @@ const OTP_PEPPER = process.env.OTP_SECRET || SMS_GATEWAY_API_KEY || crypto.rando
 const SESSION_TTL_MS = 365 * 24 * 60 * 60 * 1000;
 const sessions = new Map();
 const authAttempts = new Map();
+// Short-lived Local Delivery activity counters. They protect the API from
+// bursts without affecting normal browsing, and are intentionally kept only
+// in memory so no personal network data is written to disk.
+const localDeliveryActivity = new Map();
 
 function r2Ready() {
   return !!(R2_BUCKET && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY && /^https:\/\//i.test(R2_ENDPOINT));
@@ -494,6 +498,34 @@ function recordAuthFailure(req, mobile) {
   else row.count++;
 }
 function clearAuthFailures(req, mobile) { authAttempts.delete(clientKey(req, mobile)); }
+function localDeliverySpamCheck(req, acc, action, options) {
+  const now = Date.now();
+  const limit = Math.max(1, Number(options && options.limit) || 1);
+  const windowMs = Math.max(1000, Number(options && options.windowMs) || 60000);
+  const duplicateMs = Math.max(0, Number(options && options.duplicateMs) || 0);
+  const fingerprint = String(options && options.fingerprint || '').trim().toLowerCase();
+  const key = String(action || 'activity') + ':' + String(acc && acc.mobile || '') + ':' + requestNetworkKey(req);
+  let row = localDeliveryActivity.get(key);
+  if (!row) { row = { events: [], fingerprints: new Map() }; localDeliveryActivity.set(key, row); }
+  row.events = row.events.filter(at => now - at < windowMs);
+  for (const [value, at] of row.fingerprints) if (now - at >= duplicateMs) row.fingerprints.delete(value);
+  if (fingerprint && duplicateMs && row.fingerprints.has(fingerprint)) {
+    const wait = Math.max(1, Math.ceil((duplicateMs - (now - row.fingerprints.get(fingerprint))) / 1000));
+    return { blocked: true, message: 'Same request बार-बार नहीं भेज सकते। ' + wait + ' सेकंड बाद try करें।' };
+  }
+  if (row.events.length >= limit) {
+    const wait = Math.max(1, Math.ceil((windowMs - (now - row.events[0])) / 1000));
+    return { blocked: true, message: 'बहुत जल्दी requests भेजी गई हैं। ' + wait + ' सेकंड बाद try करें।' };
+  }
+  row.events.push(now);
+  if (fingerprint && duplicateMs) row.fingerprints.set(fingerprint, now);
+  // Keep the in-memory map bounded on a busy public server.
+  if (localDeliveryActivity.size > 5000) {
+    const oldest = localDeliveryActivity.keys().next().value;
+    if (oldest) localDeliveryActivity.delete(oldest);
+  }
+  return null;
+}
 
 async function mongoLoadAccounts() {
   const rows = await mongoDb.collection('accounts').find({}).project({ _id: 0 }).toArray();
@@ -3031,6 +3063,12 @@ function computeOrderFees(subtotal, settingsFees) {
       }
       if(body.action==='create'){
         const o=body.order||{}; if(!o.id||!o.title)return sendJSON(res,400,{ok:false,message:'Invalid order'});
+        // Local Delivery is limited to mobile-verified accounts.  This keeps
+        // anonymous/newly-created accounts from flooding the post feed or
+        // sending requests to delivery helpers.
+        if(!acc.mobileVerified)return sendJSON(res,403,{ok:false,error:'mobile-verification-required',message:'Local Delivery post बनाने के लिए पहले अपना mobile number verify करें।'});
+        const postSpam = localDeliverySpamCheck(req, acc, 'post', { limit: 3, windowMs: 10 * 60 * 1000, duplicateMs: 10 * 60 * 1000, fingerprint: [o.kind, o.title, o.description, o.area, o.address, o.neededBy].join('|') });
+        if(postSpam)return sendJSON(res,429,{ok:false,error:'too-many-requests',message:postSpam.message});
         o.ownerMobile=acc.mobile;o.ownerName=acc.name;o.createdAt=new Date().toISOString();
         if(o.kind==='delivery-service'){o.status='service';o.serviceActive=true;orders.unshift(o);fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));addNotification({title:'🚚 नई delivery service',body:(acc.name||'Delivery boy')+' ने delivery service post की है।',kind:'local-delivery-service'});return sendJSON(res,200,{ok:true,order:o});}
         if(!o.targetServiceId){const dueAt=new Date(o.neededBy||'').getTime();if(!Number.isFinite(dueAt)||dueAt<=Date.now())return sendJSON(res,400,{ok:false,message:'पुराना समय नहीं चुन सकते। आगे का date और time चुनें।'});}
@@ -3043,6 +3081,11 @@ function computeOrderFees(subtotal, settingsFees) {
         const orderId=String(body.orderId||''); const o=orders.find(x=>String(x.id)===orderId);
         if(!o)return sendJSON(res,404,{ok:false,message:'Order नहीं मिला'});
         if(o.ownerMobile===acc.mobile)return sendJSON(res,400,{ok:false,message:'अपना order accept नहीं कर सकते'});
+        // Only a verified mobile can take a delivery request.  The check is
+        // server-side so it cannot be bypassed by calling this API directly.
+        if(!acc.mobileVerified)return sendJSON(res,403,{ok:false,error:'mobile-verification-required',message:'Order लेने के लिए पहले अपना mobile number verify करें।'});
+        const acceptSpam = localDeliverySpamCheck(req, acc, 'accept', { limit: 10, windowMs: 10 * 60 * 1000, duplicateMs: 2 * 60 * 1000, fingerprint: orderId });
+        if(acceptSpam)return sendJSON(res,429,{ok:false,error:'too-many-requests',message:acceptSpam.message});
         const helperWalletFreeLimit=Math.max(0,Math.round(Number(loadSettings().localDeliveryHelperWalletFreeLimit ?? 500))),productAmount=Math.round(Number(o.items||0));
         if(!o.alreadyPurchased&&productAmount>helperWalletFreeLimit&&Number(acc.walletBalance||0)<productAmount)return sendJSON(res,400,{ok:false,needsRecharge:true,requiredWallet:productAmount,helperWalletFreeLimit,message:'₹'+helperWalletFreeLimit+' से अधिक सामान के लिए delivery boy के wallet में कम से कम ₹'+productAmount+' होना जरूरी है। पहले recharge करें।'});
         const dueAt=new Date(o.neededBy||'').getTime();
@@ -3099,6 +3142,8 @@ function computeOrderFees(subtotal, settingsFees) {
         if(body.action==='message'){
           const text=String(body.text||'').trim().slice(0,2000),photo=String(body.photo||'');
           if(!text&&!photo)return sendJSON(res,400,{ok:false,message:'Message नहीं भेजा गया'});
+          const messageSpam=localDeliverySpamCheck(req,acc,'message',{limit:8,windowMs:60*1000,duplicateMs:60*1000,fingerprint:String(o.id)+'|'+text+'|'+photo.slice(0,120)});
+          if(messageSpam)return sendJSON(res,429,{ok:false,error:'too-many-messages',message:messageSpam.message});
           if(photo&&(!/^data:image\/(png|jpeg|webp);base64,/i.test(photo)||photo.length>1500000))return sendJSON(res,400,{ok:false,message:'Photo JPG, PNG या WEBP और 1MB से छोटी रखें'});
           if(!['chat','booked','delivering'].includes(o.status))return sendJSON(res,409,{ok:false,message:'इस order में chat available नहीं है'});
           candidate.messages.push({id:'m-'+Date.now()+'-'+Math.random().toString(36).slice(2,5),senderMobile:acc.mobile,senderName:acc.name||'Customer',text,photo,recipientMobile:owner?candidate.mobile:o.ownerMobile,time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}),at:new Date().toISOString(),deliveredAt:new Date().toISOString()});
@@ -3141,6 +3186,8 @@ function computeOrderFees(subtotal, settingsFees) {
         const orderId=String(body.orderId||''), text=String(body.text||'').trim().slice(0,2000),photo=String(body.photo||'');
         const o=orders.find(x=>String(x.id)===orderId);
         if(!o||(!text&&!photo))return sendJSON(res,400,{ok:false,message:'Message नहीं भेजा गया'});
+        const messageSpam=localDeliverySpamCheck(req,acc,'message',{limit:8,windowMs:60*1000,duplicateMs:60*1000,fingerprint:String(orderId)+'|'+text+'|'+photo.slice(0,120)});
+        if(messageSpam)return sendJSON(res,429,{ok:false,error:'too-many-messages',message:messageSpam.message});
         if(photo&&(!/^data:image\/(png|jpeg|webp);base64,/i.test(photo)||photo.length>1500000))return sendJSON(res,400,{ok:false,message:'Photo JPG, PNG या WEBP और 1MB से छोटी रखें'});
         if(String(o.ownerMobile)!==String(acc.mobile)&&String(o.providerMobile)!==String(acc.mobile)&&!(o.deliveryCandidates||[]).some(c=>String(c.mobile)===String(acc.mobile)))return sendJSON(res,403,{ok:false,message:'इस order पर message नहीं भेज सकते'});
         if(!['chat','booked','delivering'].includes(o.status))return sendJSON(res,409,{ok:false,message:'इस order में chat available नहीं है'});
