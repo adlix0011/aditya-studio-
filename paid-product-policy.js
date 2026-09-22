@@ -49,6 +49,12 @@
     showNeed(e.target.form);
   }, true);
   document.addEventListener('input', e => { if (e.target.form?.matches('#broadcastForm') && ['items','fee'].includes(e.target.name)) showNeed(e.target.form); }, true);
+  document.addEventListener('input', e => {
+    if (e.target.form?.matches('#broadcastForm')) saveDraft(e.target.form);
+  }, true);
+  document.addEventListener('change', e => {
+    if (e.target.form?.matches('#broadcastForm')) saveDraft(e.target.form);
+  }, true);
   document.addEventListener('click', e => {
     const add = e.target.closest('#postMoneyNeed a[href*="add-money"]');
     if (add) {
@@ -68,6 +74,19 @@
     saveDraft(form); showNeed(form);
     const card = document.getElementById('postMoneyNeed');
     card?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, true);
+  // A tap on the main Post button must stay on this page. This runs even when
+  // another old handler or browser validation would otherwise take over.
+  window.addEventListener('click', e => {
+    const button = e.target.closest?.('#broadcastForm button[type="submit"]');
+    if (!button) return;
+    const form = button.form;
+    if (!form || paid(form)) return;
+    const amount = productAmount(form) + deliveryFee(form);
+    if (amount <= LIMIT || balance() >= amount) return;
+    e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+    saveDraft(form); showNeed(form);
+    document.getElementById('postMoneyNeed')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, true);
   document.addEventListener('submit', e => {
     const form = e.target;
