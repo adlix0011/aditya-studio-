@@ -3,6 +3,16 @@
   const LIMIT = 500;
   const DRAFT = 'local_delivery_paid_post_draft_v1';
   const form = () => document.getElementById('broadcastForm');
+  const districts = ['रायपुर','बिलासपुर','दुर्ग','कोरबा','रायगढ़','राजनांदगांव','जगदलपुर','सरगुजा','महासमुंद','जांजगीर-चांपा','कबीरधाम','धमतरी','बस्तर','बालोद','बलौदाबाजार-भाटापारा','बलरामपुर','बेमेतरा','बीजापुर','दंतेवाड़ा','गरियाबंद','जशपुर','कांकेर','कोंडागांव','खैरागढ़-छुईखदान-गंडई','मनेन्द्रगढ़-चिरमिरी-भरतपुर','मोहला-मानपुर-अंबागढ़ चौकी','मुंगेली','नारायणपुर','गौरेला-पेण्ड्रा-मरवाही','सक्ती','सारंगढ़-बिलाईगढ़','सुकमा','सूरजपुर'];
+  const districtPicker = f => {
+    const input = f?.elements?.district;
+    if (!input || input.tagName === 'SELECT') return;
+    const select = document.createElement('select');
+    select.name = 'district'; select.required = true; select.className = input.className;
+    const value = districts.includes(input.value) ? input.value : 'रायपुर';
+    select.innerHTML = districts.map(d => '<option value="' + d + '"' + (d === value ? ' selected' : '') + '>' + d + '</option>').join('');
+    input.replaceWith(select);
+  };
   const amount = f => Math.max(0, Math.round(Number(f?.elements?.items?.value || 0))) + Math.max(0, Math.round(Number(f?.elements?.fee?.value || 0)));
   const paid = f => !!f?.elements?.alreadyPurchased?.checked;
   const balance = () => Number((document.querySelector('.wallet-chip,.wallet')?.textContent || '0').replace(/[^0-9]/g, '')) || 0;
@@ -50,7 +60,7 @@
     e.preventDefault(); e.stopImmediatePropagation(); save(f); show(f);
     document.getElementById('postMoneyNeed')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, true);
-  const watch = new MutationObserver(() => { const f = form(); if (f) show(f); });
+  const watch = new MutationObserver(() => { const f = form(); if (f) { districtPicker(f); show(f); } });
   watch.observe(document.documentElement, { childList: true, subtree: true });
-  show(form());
+  districtPicker(form()); show(form());
 })();
