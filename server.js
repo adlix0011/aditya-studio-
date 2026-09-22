@@ -1506,7 +1506,12 @@ const STUDIO_BOTTOM_NAV = `<style id="studio-bottom-nav-style">
     .studio-bottom-nav .studio-bottom-nav-icon{font-size:20px;line-height:1}
     .studio-bottom-nav a[aria-current="page"]{color:#fff;background:linear-gradient(135deg,#6d28d9,#2563eb 58%,#0891b2);box-shadow:0 4px 13px rgba(79,70,229,.43)}
   }
-  @media (max-width:767px){body:has(#sideNav.open) .studio-bottom-nav,body:has(#profileModal.show) .studio-bottom-nav{display:none}}
+  @media (max-width:767px){
+    body:has(#sideNav.open) .studio-bottom-nav,body:has(#profileModal.show) .studio-bottom-nav{display:none}
+    /* Product detail has its own sticky Order button. Do not let site navigation cover it. */
+    body:has(#order-btn-m) .studio-bottom-nav{display:none!important}
+    body:has(#order-btn-m){padding-bottom:88px!important}
+  }
   @media (min-width:768px){.studio-bottom-nav{display:none}}
 </style><nav class="studio-bottom-nav" aria-label="Quick navigation"><a href="/" data-studio-nav="home"><span class="studio-bottom-nav-icon">⌂</span><span>Home</span></a><a href="/my-orders" data-studio-nav="orders"><span class="studio-bottom-nav-icon">▣</span><span>Orders</span></a><a href="/local-delivery.html" data-studio-nav="delivery"><span class="studio-bottom-nav-icon">🚚</span><span>Local Delivery</span></a></nav><script>(function(){var p=location.pathname;var k=p==='/local-delivery.html'?'delivery':(p==='/my-orders'||p==='/my-orders.html'?'orders':'home');var a=document.querySelector('[data-studio-nav="'+k+'"]');if(a)a.setAttribute('aria-current','page');})();</script>`;
 function serveLiveHtml(res, data, includeLiveSync) {
