@@ -5445,14 +5445,14 @@ function adminWhatsAppOtp(mobile, otp) {
   if (!/^[6-9]\\d{9}$/.test(to) || !/^\\d{6}$/.test(code)) { alert('OTP ya mobile invalid hai.'); return; }
   fetch('/admin/otp-mark-sent',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({mobile:to})}).catch(function(){});
   var text = 'Aditya Studio OTP: ' + code + '. Yeh 5 minute tak valid hai. Kisi ke saath share na karein.';
-  window.location.href = 'https://wa.me/91' + to + '?text=' + encodeURIComponent(text);
+  window.open('https://wa.me/91' + to + '?text=' + encodeURIComponent(text), '_blank', 'noopener');
 }
 function adminWhatsAppPinResetOtp(mobile, otp) {
   var to = String(mobile || '').replace(/\\D/g, '');
   var code = String(otp || '').replace(/\\D/g, '');
   if (!/^[6-9]\\d{9}$/.test(to) || !/^\\d{6}$/.test(code)) { alert('OTP ya mobile invalid hai.'); return; }
   var text = 'Aditya Studio PIN reset OTP: ' + code + '. Yeh sahi OTP daalne tak valid hai. Kisi ke saath share na karein.';
-  window.location.href = 'https://wa.me/91' + to + '?text=' + encodeURIComponent(text);
+  window.open('https://wa.me/91' + to + '?text=' + encodeURIComponent(text), '_blank', 'noopener');
 }
 
 function renderOtps(list) {
