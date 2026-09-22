@@ -30,6 +30,8 @@ const OTP_TTL_MS = 5 * 60 * 1000;
 const PIN_RESET_OTP_TTL_MS = 10 * 60 * 1000;
 const PIN_RESET_OTP_MAX_ATTEMPTS = 3;
 const PIN_RESET_OTP_LOCK_MS = 15 * 60 * 1000;
+const PIN_LOGIN_MAX_ATTEMPTS = 3;
+const PIN_LOGIN_BLOCK_MS = 24 * 60 * 60 * 1000;
 // Mobile verification OTP admin panel me user verify karne tak pending rahega.
 // PIN-reset OTP अलग policy पर चलता है और WhatsApp से admin भेजता है.
 const MOBILE_VERIFY_OTP_TTL_MS = 365 * 24 * 60 * 60 * 1000;
@@ -2361,6 +2363,7 @@ function computeOrderFees(subtotal, settingsFees) {
         return sendJSON(res, 401, { ok: false, error: 'wrong-otp', message: 'OTP गलत है। ' + (PIN_RESET_OTP_MAX_ATTEMPTS - row.attempts) + ' कोशिश बाकी है।' });
       }
       row.verified = true; row.verifiedAt = new Date().toISOString(); setPin(acc, newPin); acc.pinResetRequested = false;
+      acc.pinLoginFailures = 0; acc.pinLoginFailureStartedAt = null; acc.pinLoginBlockedUntil = null;
       saveOtpRequests(list); saveAccounts(accounts); clearAuthFailures(req, mobile + ':pin-reset-verify');
       return sendJSON(res, 200, { ok: true, message: 'नया PIN बन गया है। अब login करें।' });
     } catch (e) { return sendJSON(res, 500, { ok: false, error: 'server-error' }); }
@@ -2440,12 +2443,34 @@ function computeOrderFees(subtotal, settingsFees) {
       const body = await readBody(req);
       const mobile = String(body.mobile || '').trim();
       const pin = String(body.pin || '').trim();
-      if (rateLimited(req, mobile, 5, 15 * 60 * 1000)) return sendJSON(res, 429, { ok: false, error: 'too-many-attempts', message: 'Bahut login attempts hue. 15 minute baad try karein.' });
       const accounts = loadAccounts();
       const acc = accounts.find(a => String(a.mobile) === mobile);
       if (!acc) { recordAuthFailure(req, mobile); return sendJSON(res, 401, { ok: false, error: 'not-found' }); }
-      if (!verifyPin(acc, pin)) { recordAuthFailure(req, mobile); return sendJSON(res, 401, { ok: false, error: 'wrong-pin' }); }
+      const now = Date.now();
+      if (Number(acc.pinLoginBlockedUntil || 0) > now) {
+        return sendJSON(res, 429, { ok: false, error: 'pin-login-blocked', lockedUntil: acc.pinLoginBlockedUntil, message: '3 गलत PIN attempts के कारण login 24 घंटे के लिए block है। PIN Reset करके नया PIN बनाते ही block हट जाएगा।' });
+      }
+      if (acc.pinLoginBlockedUntil) {
+        acc.pinLoginBlockedUntil = null; acc.pinLoginFailures = 0; acc.pinLoginFailureStartedAt = null;
+      }
+      if (!verifyPin(acc, pin)) {
+        const startedAt = Number(acc.pinLoginFailureStartedAt || 0);
+        const failures = startedAt && now - startedAt < PIN_LOGIN_BLOCK_MS ? Number(acc.pinLoginFailures || 0) + 1 : 1;
+        acc.pinLoginFailureStartedAt = failures === 1 ? now : startedAt;
+        acc.pinLoginFailures = failures;
+        recordAuthFailure(req, mobile);
+        if (failures >= PIN_LOGIN_MAX_ATTEMPTS) {
+          acc.pinLoginBlockedUntil = now + PIN_LOGIN_BLOCK_MS;
+          acc.pinLoginFailures = 0;
+          acc.pinLoginFailureStartedAt = null;
+          saveAccounts(accounts);
+          return sendJSON(res, 429, { ok: false, error: 'pin-login-blocked', lockedUntil: acc.pinLoginBlockedUntil, message: '3 गलत PIN attempts हो गए। Login 24 घंटे के लिए block है। PIN Reset करके OTP से नया PIN बनाएं, block तुरंत हट जाएगा।' });
+        }
+        saveAccounts(accounts);
+        return sendJSON(res, 401, { ok: false, error: 'wrong-pin', message: 'PIN गलत है। ' + (PIN_LOGIN_MAX_ATTEMPTS - failures) + ' कोशिश बाकी है।' });
+      }
       clearAuthFailures(req, mobile);
+      acc.pinLoginFailures = 0; acc.pinLoginFailureStartedAt = null; acc.pinLoginBlockedUntil = null;
       acc.visitCount = (acc.visitCount || 0) + 1;
       acc.lastVisitAt = new Date().toISOString();
       const loginSessionToken = issueSession(acc);
@@ -4345,6 +4370,9 @@ function computeOrderFees(subtotal, settingsFees) {
       setPin(acc, newPin);
         acc.pinResetRequested = false;
         acc.pinResetRequestedAt = null;
+        acc.pinLoginFailures = 0;
+        acc.pinLoginFailureStartedAt = null;
+        acc.pinLoginBlockedUntil = null;
         saveAccounts(accounts);
         const msg = 'Hi ' + acc.name + ', aapka Aditya Studio ka naya PIN hai: ' + newPin;
         res.writeHead(302, { Location: 'https://wa.me/91' + mobile + '?text=' + encodeURIComponent(msg) });

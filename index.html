@@ -1321,7 +1321,7 @@
           });
           const data = await res.json();
           if (!data.ok) {
-            err.textContent = 'Login fail — mobile/PIN check karo';
+            err.textContent = data.message || 'Login fail — mobile/PIN check karo';
             err.classList.remove('hidden');
             return;
           }
