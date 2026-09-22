@@ -56,6 +56,19 @@
       try { sessionStorage.setItem('local_delivery_view_v1', JSON.stringify({ tab: 'post', active: null })); } catch (_) {}
     }
   }, true);
+  // This runs on window before the older document submit handler. It prevents
+  // that handler from trying a wallet lock first and gives the user the inline
+  // recharge card immediately.
+  window.addEventListener('submit', e => {
+    const form = e.target;
+    if (!form?.matches?.('#broadcastForm') || paid(form)) return;
+    const amount = productAmount(form) + deliveryFee(form);
+    if (amount <= LIMIT || balance() >= amount) return;
+    e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+    saveDraft(form); showNeed(form);
+    const card = document.getElementById('postMoneyNeed');
+    card?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, true);
   document.addEventListener('submit', e => {
     const form = e.target;
     if (!form?.matches('#broadcastForm')) return;
