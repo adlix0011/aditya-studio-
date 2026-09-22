@@ -27,8 +27,11 @@ const R2_ACCESS_KEY_ID = String(process.env.R2_ACCESS_KEY_ID || '').trim();
 const R2_SECRET_ACCESS_KEY = String(process.env.R2_SECRET_ACCESS_KEY || '').trim();
 const R2_ENDPOINT = String(process.env.R2_ENDPOINT || '').trim().replace(/\/+$/, '');
 const OTP_TTL_MS = 5 * 60 * 1000;
+const PIN_RESET_OTP_TTL_MS = 10 * 60 * 1000;
+const PIN_RESET_OTP_MAX_ATTEMPTS = 3;
+const PIN_RESET_OTP_LOCK_MS = 15 * 60 * 1000;
 // Mobile verification OTP admin panel me user verify karne tak pending rahega.
-// PIN-reset OTP alag se sirf 5 minute ke liye valid hota hai.
+// PIN-reset OTP अलग policy पर चलता है और WhatsApp से admin भेजता है.
 const MOBILE_VERIFY_OTP_TTL_MS = 365 * 24 * 60 * 60 * 1000;
 const OTP_RESEND_COOLDOWN_MS = 60 * 1000;
 const OTP_MAX_ATTEMPTS = 5;
@@ -2315,14 +2318,19 @@ function computeOrderFees(subtotal, settingsFees) {
       const accounts = loadAccounts(), acc = accounts.find(a => String(a.mobile) === mobile);
       if (!acc) return sendJSON(res, 404, { ok: false, error: 'not-found', message: 'यह mobile number register नहीं है।' });
       let list = loadOtpRequests(), now = Date.now();
-      list = list.filter(r => r.verified || (r.expiresAt && new Date(r.expiresAt).getTime() > now && r.otpHash));
+      const locked = list.find(r => r.mobile === mobile && !r.verified && r.purpose === 'pin_reset' && Number(r.lockedUntil || 0) > now);
+      if (locked) return sendJSON(res, 429, { ok: false, error: 'otp-locked', message: '3 गलत OTP attempts के कारण PIN reset 15 मिनट के लिए block है। बाद में नया OTP request करें।', lockedUntil: locked.lockedUntil });
+      list = list.filter(r => r.verified || r.purpose !== 'pin_reset' || (!r.lockedAt && r.expiresAt && new Date(r.expiresAt).getTime() > now));
       const existing = list.find(r => r.mobile === mobile && !r.verified && r.purpose === 'pin_reset');
       if (existing && now - new Date(existing.createdAt || 0).getTime() < OTP_RESEND_COOLDOWN_MS) return sendJSON(res, 429, { ok: false, error: 'resend-too-soon', message: 'नया OTP माँगने से पहले 1 मिनट रुकें।' });
-      const otp = generateOtp(), requestId = 'pin-reset-' + mobile + '-' + now, sms = await sendOtpSms(mobile, otp, requestId);
+      const otp = generateOtp(), requestId = 'pin-reset-' + mobile + '-' + now;
       if (existing) list = list.filter(r => r !== existing);
-      list.unshift({ mobile, name: acc.name || '', id: acc.id || '', otpHash: hashOtp(otp), requestId, smsId: sms.sms_id || sms.id || '', createdAt: new Date().toISOString(), expiresAt: new Date(now + OTP_TTL_MS).toISOString(), attempts: 0, verified: false, purpose: 'pin_reset' });
+      list.unshift({ mobile, name: acc.name || '', id: acc.id || '', otpHash: hashOtp(otp), requestId, smsId: '', createdAt: new Date().toISOString(), expiresAt: new Date(now + PIN_RESET_OTP_TTL_MS).toISOString(), attempts: 0, verified: false, purpose: 'pin_reset', manualOtp: otp, delivery: 'whatsapp_manual' });
+      acc.pinResetRequested = true;
+      acc.pinResetRequestedAt = new Date().toISOString();
       saveOtpRequests(list.slice(0, 100));
-      return sendJSON(res, 200, { ok: true, expiresInSeconds: Math.floor(OTP_TTL_MS / 1000) });
+      saveAccounts(accounts);
+      return sendJSON(res, 200, { ok: true, expiresInSeconds: Math.floor(PIN_RESET_OTP_TTL_MS / 1000), message: 'OTP request admin को भेज दी गई है। OTP WhatsApp से आएगा।' });
     } catch (e) {
       const status = e && e.code === 'sms-not-configured' ? 503 : 502;
       return sendJSON(res, status, { ok: false, error: e && e.code || 'sms-send-failed', message: e && e.message || 'OTP नहीं भेज पाए।' });
@@ -2338,10 +2346,20 @@ function computeOrderFees(subtotal, settingsFees) {
       const row = list.find(r => r.mobile === mobile && !r.verified && r.purpose === 'pin_reset');
       if (!acc) return sendJSON(res, 404, { ok: false, error: 'not-found' });
       if (!row) return sendJSON(res, 400, { ok: false, error: 'no-request', message: 'पहले PIN reset OTP भेजें।' });
-      if (!row.expiresAt || new Date(row.expiresAt).getTime() <= Date.now()) return sendJSON(res, 410, { ok: false, error: 'otp-expired', message: 'OTP expire हो गया है।' });
+      const now = Date.now();
+      if (Number(row.lockedUntil || 0) > now) return sendJSON(res, 429, { ok: false, error: 'otp-locked', message: '3 गलत OTP attempts के कारण PIN reset 15 मिनट के लिए block है। बाद में नया OTP request करें।', lockedUntil: row.lockedUntil });
+      if (!row.expiresAt || new Date(row.expiresAt).getTime() <= now) return sendJSON(res, 410, { ok: false, error: 'otp-expired', message: 'OTP expire हो गया है। नया OTP request करें।' });
       row.attempts = Number(row.attempts || 0) + 1;
-      if (row.attempts > OTP_MAX_ATTEMPTS) { row.lockedAt = new Date().toISOString(); saveOtpRequests(list); return sendJSON(res, 429, { ok: false, error: 'too-many-attempts' }); }
-      if (!otpMatches(row, otp)) { saveOtpRequests(list); recordAuthFailure(req, mobile + ':pin-reset-verify'); return sendJSON(res, 401, { ok: false, error: 'wrong-otp', message: 'OTP गलत है।' }); }
+      if (!otpMatches(row, otp)) {
+        if (row.attempts >= PIN_RESET_OTP_MAX_ATTEMPTS) {
+          row.lockedAt = new Date().toISOString(); row.lockedUntil = now + PIN_RESET_OTP_LOCK_MS;
+          acc.pinResetRequested = false; acc.pinResetRequestedAt = null;
+          saveOtpRequests(list); saveAccounts(accounts); recordAuthFailure(req, mobile + ':pin-reset-verify');
+          return sendJSON(res, 429, { ok: false, error: 'otp-locked', message: '3 गलत OTP attempts हो गए। PIN reset 15 मिनट के लिए block है। इसके बाद नया OTP request करें।', lockedUntil: row.lockedUntil });
+        }
+        saveOtpRequests(list); recordAuthFailure(req, mobile + ':pin-reset-verify');
+        return sendJSON(res, 401, { ok: false, error: 'wrong-otp', message: 'OTP गलत है। ' + (PIN_RESET_OTP_MAX_ATTEMPTS - row.attempts) + ' कोशिश बाकी है।' });
+      }
       row.verified = true; row.verifiedAt = new Date().toISOString(); setPin(acc, newPin); acc.pinResetRequested = false;
       saveOtpRequests(list); saveAccounts(accounts); clearAuthFailures(req, mobile + ':pin-reset-verify');
       return sendJSON(res, 200, { ok: true, message: 'नया PIN बन गया है। अब login करें।' });
@@ -2945,10 +2963,20 @@ function computeOrderFees(subtotal, settingsFees) {
       const accounts = loadAccounts();
       const acc = accounts.find(a => a.mobile === mobile);
       if (!acc) return sendJSON(res, 404, { ok: false, error: 'no-account' });
+      const now = Date.now();
+      let list = loadOtpRequests();
+      const locked = list.find(r => r.mobile === mobile && !r.verified && r.purpose === 'pin_reset' && Number(r.lockedUntil || 0) > now);
+      if (locked) return sendJSON(res, 429, { ok: false, error: 'otp-locked', message: '3 गलत OTP attempts के कारण PIN reset 15 मिनट के लिए block है। बाद में नया OTP request करें।', lockedUntil: locked.lockedUntil });
+      list = list.filter(r => r.verified || r.purpose !== 'pin_reset' || (!r.lockedAt && r.expiresAt && new Date(r.expiresAt).getTime() > now));
+      const existing = list.find(r => r.mobile === mobile && !r.verified && r.purpose === 'pin_reset');
+      if (existing && now - new Date(existing.createdAt || 0).getTime() < OTP_RESEND_COOLDOWN_MS) return sendJSON(res, 429, { ok: false, error: 'resend-too-soon', message: 'नया OTP माँगने से पहले 1 मिनट रुकें।' });
+      if (existing) list = list.filter(r => r !== existing);
+      const otp = generateOtp();
+      list.unshift({ mobile, name: acc.name || '', id: acc.id || '', otpHash: hashOtp(otp), requestId:'pin-reset-' + mobile + '-' + now, smsId:'', createdAt:new Date().toISOString(), expiresAt:new Date(now + PIN_RESET_OTP_TTL_MS).toISOString(), attempts:0, verified:false, purpose:'pin_reset', manualOtp:otp, delivery:'whatsapp_manual' });
       acc.pinResetRequested = true;
       acc.pinResetRequestedAt = new Date().toISOString();
-      saveAccounts(accounts);
-      return sendJSON(res, 200, { ok: true });
+      saveOtpRequests(list.slice(0, 100)); saveAccounts(accounts);
+      return sendJSON(res, 200, { ok: true, expiresInSeconds: Math.floor(PIN_RESET_OTP_TTL_MS / 1000), message:'OTP request admin को भेज दी गई है। OTP WhatsApp से आएगा।' });
     } catch (e) {
       return sendJSON(res, 400, { ok: false });
     }
@@ -4340,14 +4368,16 @@ function computeOrderFees(subtotal, settingsFees) {
 
   if (req.method === 'GET' && urlPath === '/admin/live-json') {
     const accounts = loadAccounts();
-    const pendingResets = accounts.filter(a => a.pinResetRequested).map(a => ({
-      id: a.id, name: a.name, mobile: a.mobile,
-      at: a.pinResetRequestedAt || null
-    }));
-    const pendingOtps = loadOtpRequests().filter(r => !r.verified).map(r => ({
+    const rawPendingOtps = loadOtpRequests().filter(r => !r.verified);
+    const pendingResets = accounts.filter(a => a.pinResetRequested).map(a => {
+      const row = rawPendingOtps.find(r => r.purpose === 'pin_reset' && String(r.mobile) === String(a.mobile));
+      return { id: a.id, name: a.name, mobile: a.mobile, at: a.pinResetRequestedAt || null,
+        otp: row && row.manualOtp || '', expiresAt: row && row.expiresAt || null };
+    });
+    const pendingOtps = rawPendingOtps.map(r => ({
       mobile: r.mobile, name: r.name || '', id: r.id || '',
       at: r.createdAt || null, expiresAt: r.expiresAt || null,
-      manualOtp: r.manualOtp || '', delivery: r.delivery || 'sms'
+      manualOtp: r.manualOtp || '', delivery: r.delivery || 'sms', purpose: r.purpose || ''
     }));
     const codes = loadCodes();
     const notifs = loadNotifs().slice(0, 10);
@@ -4633,7 +4663,7 @@ loadOrdersPage();setInterval(loadOrdersPage,20000);
     const missingOtpCards = accounts.filter(a => !a.mobileVerified && !queuedOtpMobiles.has(String(a.mobile || ''))).map(a => {
       return '<div class="msg-card" style="border-color:rgba(251,191,36,.75);background:linear-gradient(135deg,#2a1c05,#16120b)"><div class="msg-text">📱 <b>'+esc(a.name || 'Customer')+'</b> ('+esc(a.mobile || '')+')<br><span style="color:#fde68a;font-weight:700">OTP request अभी queue में नहीं है</span><br><span class="muted">नीचे button दबाकर WhatsApp OTP बनाएं और भेजें।</span></div><div class="msg-actions"><form method="POST" action="/admin/create-whatsapp-otp"><input type="hidden" name="mobile" value="'+esc(a.mobile || '')+'"><button type="submit" class="gen-btn" style="background:#16a34a;color:#fff;border:1px solid #4ade80">➕ WhatsApp OTP बनाएं</button></form></div></div>';
     }).join('');
-    const otpCards = pendingOtps.map(r => {
+    const otpCards = pendingOtps.filter(r => r.purpose !== 'pin_reset').map(r => {
       const manual = String(r.manualOtp || '');
       const status = manual ? '<span style="color:#facc15;font-weight:700">WhatsApp OTP भेजना बाकी है</span>' : '<span style="color:#8fd19e;font-weight:700">SMS OTP sent</span>';
       const code = manual ? '<div style="margin:9px 0;padding:8px 12px;border-radius:10px;background:#21170a;border:1px dashed #facc15;color:#fff3a6;font-size:22px;font-weight:900;letter-spacing:5px">OTP: '+esc(manual)+'</div>' : '';
@@ -4642,7 +4672,11 @@ loadOrdersPage();setInterval(loadOrdersPage,20000);
     }).join('') || '<div class="muted">No pending OTP</div>';
 
     const resetCards = pendingResets.map(acc => {
-      return '<div class="msg-card"><div class="msg-text">🔔 <b>' + esc(acc.name) + '</b> (' + esc(acc.mobile) + ')</div><div class="msg-actions"><form method="POST" action="/admin/reset-pin" style="display:flex;gap:6px"><input type="hidden" name="mobile" value="' + esc(acc.mobile) + '"><input class="inp" name="newPin" placeholder="Naya PIN" maxlength="4"><button class="gen-btn" type="submit">Reset → WA</button></form></div></div>';
+      const row = pendingOtps.find(r => r.purpose === 'pin_reset' && String(r.mobile) === String(acc.mobile));
+      const code = String(row && row.manualOtp || '');
+      const status = code ? '<br><span style="color:#fde68a;font-weight:700">OTP 10 मिनट तक valid है</span><div style="margin:9px 0;padding:8px 12px;border-radius:10px;background:#21170a;border:1px dashed #facc15;color:#fff3a6;font-size:22px;font-weight:900;letter-spacing:5px">OTP: '+esc(code)+'</div>' : '<br><span class="muted">OTP generate हो रहा है</span>';
+      const wa = code ? '<button type="button" class="gen-btn" style="background:#16a34a;color:#fff;border:1px solid #4ade80" data-omobile="'+esc(acc.mobile)+'" data-otp="'+esc(code)+'" onclick="adminWhatsAppPinResetOtp(this.dataset.omobile,this.dataset.otp)">💬 WhatsApp OTP भेजें</button>' : '';
+      return '<div class="msg-card"><div class="msg-text">🔔 <b>' + esc(acc.name) + '</b> (' + esc(acc.mobile) + ')' + status + '<span class="muted">Requested: '+esc(fmtDate(acc.at))+'</span></div><div class="msg-actions">'+wa+'</div></div>';
     }).join('') || '<div class="muted">No PIN resets</div>';
 
         const codeRows = codes.filter(c => !c.couponAccepted).map(c => {
@@ -5381,10 +5415,18 @@ function adminWhatsAppOtp(mobile, otp) {
   var text = 'Aditya Studio OTP: ' + code + '. Yeh 5 minute tak valid hai. Kisi ke saath share na karein.';
   window.location.href = 'https://wa.me/91' + to + '?text=' + encodeURIComponent(text);
 }
+function adminWhatsAppPinResetOtp(mobile, otp) {
+  var to = String(mobile || '').replace(/\\D/g, '');
+  var code = String(otp || '').replace(/\\D/g, '');
+  if (!/^[6-9]\\d{9}$/.test(to) || !/^\\d{6}$/.test(code)) { alert('OTP ya mobile invalid hai.'); return; }
+  var text = 'Aditya Studio PIN reset OTP: ' + code + '. Yeh 10 minute tak valid hai. Kisi ke saath share na karein.';
+  window.location.href = 'https://wa.me/91' + to + '?text=' + encodeURIComponent(text);
+}
 
 function renderOtps(list) {
   var box = document.getElementById('otpLiveBox');
   if (!box) return;
+  list = (list || []).filter(function(r) { return r.purpose !== 'pin_reset'; });
   if (!list.length) { box.innerHTML = '<div class="muted">No pending OTP</div>'; return; }
   box.innerHTML = list.map(function(r) {
     var manual = String(r.manualOtp || '');
@@ -5403,9 +5445,12 @@ function renderPins(list) {
   if (!box) return;
   if (!list.length) { box.innerHTML = '<div class="muted">No PIN resets</div>'; return; }
   box.innerHTML = list.map(function(a) {
+    var otp = String(a.otp || '');
+    var code = otp ? '<div style="margin:9px 0;padding:8px 12px;border-radius:10px;background:#21170a;border:1px dashed #facc15;color:#fff3a6;font-size:22px;font-weight:900;letter-spacing:5px">OTP: '+esc(otp)+'</div>' : '<span class="muted">OTP generate हो रहा है</span>';
+    var wa = otp ? '<button type="button" class="gen-btn" style="background:#16a34a;color:#fff;border:1px solid #4ade80" data-omobile="'+esc(a.mobile||'')+'" data-otp="'+esc(otp)+'" onclick="adminWhatsAppPinResetOtp(this.dataset.omobile,this.dataset.otp)">💬 WhatsApp OTP भेजें</button>' : '';
     return '<div class="msg-card" style="border-color:rgba(255,200,0,0.35)">'
-      + '<div class="msg-text">🔔 <b>' + esc(a.name) + '</b> (' + esc(a.mobile) + ') ' + esc(fmt(a.at)) + '</div>'
-      + '<div class="msg-actions"><form method="POST" action="/admin/reset-pin" style="display:flex;gap:6px"><input type="hidden" name="mobile" value="' + esc(a.mobile) + '"><input class="inp" name="newPin" placeholder="Naya PIN" maxlength="4"><button class="gen-btn" type="submit">Reset → WA</button></form></div></div>';
+      + '<div class="msg-text">🔔 <b>' + esc(a.name) + '</b> (' + esc(a.mobile) + ') ' + esc(fmt(a.at)) + '<br><span style="color:#fde68a;font-weight:700">OTP 10 मिनट तक valid है</span>' + code + '</div>'
+      + '<div class="msg-actions">'+wa+'</div></div>';
   }).join('');
 }
 
