@@ -78,7 +78,15 @@
       document.getElementById('postMoneyNeed')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }, true);
-  const watch = new MutationObserver(() => { const f = form(); if (f) { districtPicker(f); show(f); } });
+  // `show()` changes the form DOM.  Run this initialization only once per form,
+  // otherwise a MutationObserver loop freezes the post page on mobile.
+  const initialize = f => {
+    if (!f || f.dataset.rechargeGuardReady === '1') return;
+    f.dataset.rechargeGuardReady = '1';
+    districtPicker(f);
+    show(f);
+  };
+  const watch = new MutationObserver(() => initialize(form()));
   watch.observe(document.documentElement, { childList: true, subtree: true });
-  districtPicker(form()); show(form());
+  initialize(form());
 })();
