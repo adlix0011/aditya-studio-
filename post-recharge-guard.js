@@ -21,12 +21,22 @@
     const short = Math.max(0, total - balance());
     box.innerHTML = '<div class="post-wallet-short post-recharge-card"><strong>⚠️ Wallet balance कम है</strong><span>Product + delivery total <b>₹' + total.toLocaleString('en-IN') + '</b> है। Wallet में अभी <b>₹' + balance().toLocaleString('en-IN') + '</b> है।</span><span>Post करने के लिए ₹' + short.toLocaleString('en-IN') + ' add करें।</span><a class="btn add-money-glow" href="/add-money?return=%2Flocal-delivery">📷 Add Money · QR Scan</a><small>नीचे के Add Money button को दबाने तक payment page नहीं खुलेगा। आपकी भरी हुई details safe हैं।</small></div>';
   };
+  const showTimeError = f => {
+    const date = String(f?.elements?.neededDate?.value || ''), time = String(f?.elements?.neededTime?.value || '');
+    const box = document.getElementById('postTimeNeed');
+    if (!box || !date || !time) return false;
+    if (new Date(date + 'T' + time + ':00').getTime() > Date.now()) { box.innerHTML = ''; return false; }
+    box.innerHTML = '<div class="post-wallet-short"><strong>⏰ यह समय निकल चुका है</strong><span>आज के लिए आगे का time या अगली तारीख चुनें।</span></div>';
+    return true;
+  };
   document.addEventListener('input', e => { const f = e.target.form; if (f?.id !== 'broadcastForm') return; save(f); show(f); }, true);
   document.addEventListener('change', e => { const f = e.target.form; if (f?.id !== 'broadcastForm') return; save(f); show(f); }, true);
   document.addEventListener('click', e => {
     const button = e.target.closest?.('#broadcastForm button[type="submit"]');
     if (!button) return;
     const f = button.form;
+    show(f);
+    if (showTimeError(f)) { e.preventDefault(); e.stopImmediatePropagation(); save(f); return; }
     if (paid(f) || amount(f) <= LIMIT || balance() >= amount(f)) return;
     e.preventDefault(); e.stopImmediatePropagation(); save(f); show(f);
     document.getElementById('postMoneyNeed')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
