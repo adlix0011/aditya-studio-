@@ -1518,7 +1518,7 @@ const STUDIO_BOTTOM_NAV = `<style id="studio-bottom-nav-style">
 function serveLiveHtml(res, data, includeLiveSync) {
   const html = Buffer.isBuffer(data) ? data.toString('utf8') : String(data || '');
   const isLocalDelivery = /<title>\s*Local Delivery\s*<\/title>/i.test(html);
-  const extras = (isLocalDelivery ? '' : STUDIO_BOTTOM_NAV) + (includeLiveSync ? LIVE_SYNC_SNIPPET : '');
+  const extras = (isLocalDelivery ? '<script src="/post-recharge-guard.js?v=postguard1"></script>' : STUDIO_BOTTOM_NAV) + (includeLiveSync ? LIVE_SYNC_SNIPPET : '');
   res.end(extras ? html.replace(/<\/body>/i, extras + '</body>') : html);
 }
 function liveRevision() {
@@ -1553,7 +1553,7 @@ const server = http.createServer(async (req, res) => {
     'styles.css', 'mobile-design.css', 'home-design.css', 'profile-page.css', 'delivery-flow.css',
     'item-icons.js', 'delivery-engine.js', 'app.js', 'request-summary.js', 'home-design.js',
     'order-items.js', 'post-page.js', 'profile-page.js', 'edit-order.js', 'delivery-flow.js',
-    'post-wallet.js', 'paid-product-policy.js', 'language.js', 'notifications-page.js', 'notification-alerts.js', 'repost-order.js', 'messages-hub.js', 'chat-room.js', 'confirmation-wait.js', 'order-tracking.js', 'local-delivery-admin.js', 'local-delivery-admin.css'
+    'post-wallet.js', 'paid-product-policy.js', 'post-recharge-guard.js', 'language.js', 'notifications-page.js', 'notification-alerts.js', 'repost-order.js', 'messages-hub.js', 'chat-room.js', 'confirmation-wait.js', 'order-tracking.js', 'local-delivery-admin.js', 'local-delivery-admin.css'
   ]);
   if (req.method === 'GET' && (urlPath === '/local-delivery.html' || urlPath === '/local-delivery')) {
     return fs.readFile(path.join(__dirname, 'local-delivery.html'), (err, data) => {
