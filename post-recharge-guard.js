@@ -29,6 +29,15 @@
     box.innerHTML = '<div class="post-wallet-short"><strong>⏰ यह समय निकल चुका है</strong><span>आज के लिए आगे का time या अगली तारीख चुनें।</span></div>';
     return true;
   };
+  window.localDeliveryPostClick = f => {
+    show(f);
+    if (showTimeError(f)) { save(f); return false; }
+    if (!paid(f) && amount(f) > LIMIT && balance() < amount(f)) {
+      save(f); show(f); document.getElementById('postMoneyNeed')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return false;
+    }
+    return true;
+  };
   document.addEventListener('input', e => { const f = e.target.form; if (f?.id !== 'broadcastForm') return; save(f); show(f); }, true);
   document.addEventListener('change', e => { const f = e.target.form; if (f?.id !== 'broadcastForm') return; save(f); show(f); }, true);
   document.addEventListener('click', e => {
