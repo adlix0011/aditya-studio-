@@ -12,12 +12,12 @@ function showVerify(text){form.hidden=true;verifyBox.hidden=false;verifyBox.inne
 async function checkVerification(){if(!session||!session.sessionToken||!session.mobile){location.replace('/?auth=login');return}saveSession();try{const d=await json('/api/restore-session',{mobile:session.mobile,sessionToken:session.sessionToken});if(d.mobileVerified){session={...session,...d,mobileVerified:true};saveSession();return}showVerify('Recharge करने से पहले अपना मोबाइल OTP से verify करें।')}catch(_){showVerify('Verification status नहीं मिला। OTP request करके verify करें।')}}
 let rechargePollTimer=null;
 function goToWallet(){
-  try{sessionStorage.setItem('local_delivery_view_v1',JSON.stringify({tab:'wallet',active:null}))}catch(_){}
+  try{sessionStorage.setItem('local_delivery_view_v1',JSON.stringify({tab:'post',active:null}))}catch(_){}
   location.replace('/local-delivery');
 }
 function rechargeApproved(amount,balance){
   clearInterval(rechargePollTimer);
-  document.querySelector('.card').innerHTML='<div class="success-screen"><h1>✅ Recharge verified</h1><p class="wait-label">₹'+amount+' wallet में add हो गया</p><div class="wait-timer">₹'+Number(balance||0).toLocaleString('en-IN')+'</div><p>आपका नया wallet balance</p><button class="success-back" id="openWalletBtn" type="button">💰 Wallet खोलें</button></div>';
+  document.querySelector('.card').innerHTML='<div class="success-screen"><h1>✅ Recharge verified</h1><p class="wait-label">₹'+amount+' wallet में add हो गया</p><div class="wait-timer">₹'+Number(balance||0).toLocaleString('en-IN')+'</div><p>आपकी भरी हुई post सुरक्षित है।</p><button class="success-back" id="openWalletBtn" type="button">← Filled Post पर वापस जाएं</button></div>';
   document.getElementById('openWalletBtn').onclick=goToWallet;
   setTimeout(goToWallet,1800);
 }

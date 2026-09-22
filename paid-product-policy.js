@@ -20,7 +20,6 @@
       const field = form.elements[key]; if (!field) return;
       if (field.type === 'checkbox') field.checked = !!value; else field.value = value;
     });
-    sessionStorage.removeItem(DRAFT_KEY);
   }
   function showNeed(form) {
     const box = document.getElementById('postMoneyNeed'); if (!box) return;
@@ -28,7 +27,7 @@
     const amount = productAmount(form) + deliveryFee(form);
     if (amount <= LIMIT) { box.innerHTML = '<div class="post-wallet-ok">✓ Product + delivery total ₹500 तक है। अभी Add Money की जरूरत नहीं है।</div>'; return; }
     const need = Math.max(0, amount - balance());
-    box.innerHTML = '<div class="post-wallet-short"><strong>⚠️ Product + delivery total ₹500 से अधिक है</strong><span>Post करने के लिए wallet में ₹' + amount + ' चाहिए। अभी ₹' + need + ' कम है।</span><a class="btn add-money-glow" href="/add-money?return=%2Flocal-delivery">💰 Add Money</a></div>';
+    box.innerHTML = '<div class="post-wallet-short post-recharge-card"><strong>⚠️ Wallet recharge की जरूरत है</strong><span><b>Product ₹' + productAmount(form) + ' + delivery ₹' + deliveryFee(form) + ' = ₹' + amount + '</b></span><span>₹500 से अधिक total के लिए post करने से पहले wallet recharge करें। अभी ₹' + need + ' कम है।</span><a class="btn add-money-glow" href="/add-money?return=%2Flocal-delivery">📷 QR Scan करके Add Money करें</a><small>आपकी भरी हुई post details सुरक्षित हैं। Recharge के बाद यहीं वापस आएंगी।</small></div>';
   }
   function hydrate() {
     const form = document.getElementById('broadcastForm'); if (!form || form.dataset.paidPolicyReady) return;
@@ -37,22 +36,32 @@
     if (order?.alreadyPurchased) form.elements.alreadyPurchased.checked = true;
     restoreDraft(form); showNeed(form);
   }
+  // Older submit code checks the demo wallet before this policy listener runs.
+  // The server remains authoritative; this lets the inline ₹500 policy decide.
+  if (!window.__paidPostOriginalAvailable) {
+    window.__paidPostOriginalAvailable = DeliveryEngine.available;
+    DeliveryEngine.available = (...args) => document.getElementById('broadcastForm')
+      ? Number.MAX_SAFE_INTEGER : window.__paidPostOriginalAvailable(...args);
+  }
   document.addEventListener('change', e => {
     if (e.target.name !== 'alreadyPurchased' || !e.target.form?.matches('#broadcastForm')) return;
-    if (e.target.checked && !confirm('यह tick केवल तब करें जब दुकान को सामान का पूरा payment पहले ही हो चुका है। Paid product में ₹500 तक ही बिना wallet पैसे के post कर सकते हैं। क्या confirm है?')) e.target.checked = false;
+    if (e.target.checked && !confirm('यह tick केवल तब करें जब दुकान को सामान का पूरा payment पहले ही हो चुका है। Paid product की रकम wallet में नहीं जुड़ेगी। क्या confirm है?')) e.target.checked = false;
     showNeed(e.target.form);
   }, true);
   document.addEventListener('input', e => { if (e.target.form?.matches('#broadcastForm') && ['items','fee'].includes(e.target.name)) showNeed(e.target.form); }, true);
   document.addEventListener('click', e => {
     const add = e.target.closest('#postMoneyNeed a[href*="add-money"]');
-    if (add) saveDraft(add.closest('form') || document.getElementById('broadcastForm'));
+    if (add) {
+      saveDraft(add.closest('form') || document.getElementById('broadcastForm'));
+      try { sessionStorage.setItem('local_delivery_view_v1', JSON.stringify({ tab: 'post', active: null })); } catch (_) {}
+    }
   }, true);
   document.addEventListener('submit', e => {
     const form = e.target;
     if (!form?.matches('#broadcastForm')) return;
     const amount = paid(form) ? 0 : productAmount(form) + deliveryFee(form);
     if (amount > LIMIT && balance() < amount) {
-      e.preventDefault(); e.stopImmediatePropagation(); saveDraft(form); showNeed(form); toast('₹500 से अधिक product + delivery total के लिए पहले Add Money करें। आपका भरा हुआ post सुरक्षित है।'); return;
+      e.preventDefault(); e.stopImmediatePropagation(); saveDraft(form); showNeed(form); document.getElementById('postMoneyNeed')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return;
     }
     // Existing paid posts can be edited/reposted without a new wallet lock.
     const original = DeliveryEngine.available;
@@ -60,5 +69,6 @@
     setTimeout(() => { DeliveryEngine.available = original; }, 0);
   }, true);
   new MutationObserver(hydrate).observe(document.documentElement, { childList: true, subtree: true });
+  window.showPaidPostMoneyNeed = showNeed;
   hydrate();
 })();
