@@ -2287,6 +2287,7 @@ function computeOrderFees(subtotal, settingsFees) {
       const mobile = String(body.mobile || '').trim();
       const otp = String(body.otp || '').trim();
       if (!/^[0-9]{6}$/.test(otp)) return sendJSON(res, 400, { ok: false, error: 'invalid-otp' });
+      if (rateLimited(req, mobile + ':verify-otp', 5, 15 * 60 * 1000)) return sendJSON(res, 429, { ok: false, error: 'too-many-attempts', message: 'बहुत बार गलत OTP डाला गया है। 15 मिनट बाद फिर कोशिश करें।' });
       const accounts = loadAccounts();
       const acc = sessionAccount(req, body, accounts);
       const list = loadOtpRequests();
@@ -2299,10 +2300,14 @@ function computeOrderFees(subtotal, settingsFees) {
       // Admin-panel mobile verification OTP user verify kare tabhi close hoga.
       // Isliye is flow me time ke basis par OTP ko reject/delete nahi karte.
       // WhatsApp OTP stays usable until the customer enters the correct code.
-      // Do not expire or permanently lock a mobile-verification request merely
-      // because it was opened yesterday or because a few entries were wrong.
-      row.attempts = Number(row.attempts || 0) + 1;
-      if (!otpMatches(row, otp)) { saveOtpRequests(list); return sendJSON(res, 401, { ok: false, error: 'wrong-otp' }); }
+      // Check that code before considering old failed guesses, so a correct OTP
+      // still works tomorrow. Wrong guesses remain rate-limited and recorded.
+      if (!otpMatches(row, otp)) {
+        row.attempts = Number(row.attempts || 0) + 1;
+        saveOtpRequests(list);
+        recordAuthFailure(req, mobile + ':verify-otp');
+        return sendJSON(res, 401, { ok: false, error: 'wrong-otp' });
+      }
       clearAuthFailures(req, mobile + ':verify-otp');
       row.verified = true;
       row.verifiedAt = new Date().toISOString();
