@@ -101,6 +101,23 @@
     setTimeout(() => { DeliveryEngine.available = original; }, 0);
   }, true);
   new MutationObserver(hydrate).observe(document.documentElement, { childList: true, subtree: true });
+  // The legacy post handler still calls the old wallet-lock endpoint after its
+  // own validation.  A requirement whose total is within the ₹500 free limit
+  // must not create that lock.  The order API validates this rule server-side.
+  const nativeFetch = window.fetch.bind(window);
+  window.fetch = (input, init) => {
+    const url = typeof input === 'string' ? input : input?.url || '';
+    if (url.includes('/api/local-delivery/lock')) {
+      let body = null;
+      try { body = JSON.parse(init?.body || '{}'); } catch (_) {}
+      const form = document.getElementById('broadcastForm');
+      const total = productAmount(form) + deliveryFee(form);
+      if (form && !paid(form) && total <= LIMIT && Number(body?.amount) === total) {
+        return Promise.resolve(new Response(JSON.stringify({ ok:true, walletBalance:balance(), locked:0, freePost:true }), { status:200, headers:{ 'Content-Type':'application/json' } }));
+      }
+    }
+    return nativeFetch(input, init);
+  };
   window.showPaidPostMoneyNeed = showNeed;
   hydrate();
 })();
