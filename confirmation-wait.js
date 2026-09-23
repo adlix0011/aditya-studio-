@@ -15,9 +15,14 @@
     if (!session || typeof state === 'undefined' || !Array.isArray(state.orders)) return null;
     return state.orders.find(function (order) {
       if (order.status !== 'chat' || sameMobile(order.ownerMobile, session.mobile)) return false;
+      // Old and new orders keep the request in different places.  Always use
+      // the helper's session first, then fall back to the order-level copy.
+      // Without this fallback a pending request was real on the server but
+      // the helper still saw the obsolete "More options" card.
       const candidate = (order.candidateSessions || []).find(function (item) { return sameMobile(item.mobile, session.mobile); });
-      return candidate && candidate.deliveryConfirmRequest && ['pending', 'waiting'].includes(candidate.deliveryConfirmRequest.status)
-        ? { order: order, request: candidate.deliveryConfirmRequest } : false;
+      const request = candidate?.deliveryConfirmRequest || order.deliveryConfirmRequest;
+      return request && ['pending', 'waiting'].includes(request.status)
+        ? { order: order, request: request } : false;
     }) || null;
   }
 
@@ -44,7 +49,9 @@
     const host = document.getElementById('roomMessages');
     if (!item || !host) return;
     const deadline = new Date(item.request.expiresAt || (new Date(item.request.createdAt).getTime() + WAIT_MS)).getTime();
-    let card = host.querySelector('.confirmation-wait-card');
+    // Reuse and replace the old quick-options card when it is still present.
+    // This also fixes chats opened before the latest client script was cached.
+    let card = host.querySelector('.confirmation-wait-card, .chat-default-options');
     if (!card) {
       card = document.createElement('div');
       card.className = 'chat-default-options confirmation-wait-card';
