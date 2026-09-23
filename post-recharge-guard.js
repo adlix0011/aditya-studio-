@@ -16,6 +16,7 @@
   const amount = f => Math.max(0, Math.round(Number(f?.elements?.items?.value || 0))) + Math.max(0, Math.round(Number(f?.elements?.fee?.value || 0)));
   const paid = f => !!f?.elements?.alreadyPurchased?.checked;
   const balance = () => Number((document.querySelector('.wallet-chip,.wallet')?.textContent || '0').replace(/[^0-9]/g, '')) || 0;
+  const currentSession = () => { try { return JSON.parse(localStorage.getItem('aditya_studio_session_v1') || localStorage.getItem('aditya_studio_persistent_login_v2') || 'null'); } catch (_) { return null; } };
   const save = f => {
     if (!f) return;
     const data = {};
@@ -40,6 +41,13 @@
     const short = Math.max(0, total - balance());
     box.innerHTML = '<div class="post-wallet-short post-recharge-card"><strong>⚠️ Wallet balance कम है</strong><span>Product + delivery total <b>₹' + total.toLocaleString('en-IN') + '</b> है। Wallet में अभी <b>₹' + balance().toLocaleString('en-IN') + '</b> है।</span><span>Post करने के लिए ₹' + short.toLocaleString('en-IN') + ' add करें।</span><a class="btn add-money-glow" href="/add-money?return=%2Flocal-delivery">📷 Add Money · QR Scan</a><small>नीचे के Add Money button को दबाने तक payment page नहीं खुलेगा। आपकी भरी हुई details safe हैं।</small></div>';
   };
+  const showVerificationNeed = f => {
+    if (!f) return;
+    save(f);
+    let box = document.getElementById('postMoneyNeed');
+    if (!box) { box = document.createElement('div'); box.id = 'postMoneyNeed'; f.querySelector('button[type="submit"]')?.before(box); }
+    box.innerHTML = '<div class="post-recharge-card" style="border:2px solid #fb3b5f;background:linear-gradient(135deg,#4a1020,#1d1229);box-shadow:0 0 24px rgba(251,59,95,.38);color:#fff"><strong style="color:#ffd4dc;font-size:16px">⚠️ Mobile number verify करना जरूरी है</strong><span style="color:#ffe3e8">Local Delivery post करने से पहले अपना mobile number OTP से verify करें।</span><button type="button" id="verifyMobileForPost" class="btn" style="margin-top:11px;background:linear-gradient(135deg,#ff2f55,#b91c3b);color:#fff">📱 Number Verify करें</button><small style="color:#ffd0d8">आपकी भरी हुई post details सुरक्षित हैं। Verify होने के बाद इसी form पर वापस आएंगे।</small></div>';
+  };
   const showTimeError = f => {
     const date = String(f?.elements?.neededDate?.value || ''), time = String(f?.elements?.neededTime?.value || '');
     const box = document.getElementById('postTimeNeed');
@@ -50,6 +58,7 @@
   };
   window.localDeliveryPostClick = f => {
     show(f);
+    if (!currentSession()?.mobileVerified) { showVerificationNeed(f); document.getElementById('postMoneyNeed')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return false; }
     if (showTimeError(f)) { save(f); return false; }
     if (!paid(f) && amount(f) > LIMIT && balance() < amount(f)) {
       save(f); show(f); document.getElementById('postMoneyNeed')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -60,10 +69,13 @@
   document.addEventListener('input', e => { const f = e.target.form; if (f?.id !== 'broadcastForm') return; save(f); show(f); }, true);
   document.addEventListener('change', e => { const f = e.target.form; if (f?.id !== 'broadcastForm') return; save(f); show(f); }, true);
   document.addEventListener('click', e => {
+    const verify = e.target.closest?.('#verifyMobileForPost');
+    if (verify) { e.preventDefault(); const f = form(); save(f); location.href = '/verify-mobile.html?return=%2Flocal-delivery.html%3Fpost%3Dneed'; return; }
     const button = e.target.closest?.('#broadcastForm button[type="submit"]');
     if (!button) return;
     const f = button.form;
     show(f);
+    if (!currentSession()?.mobileVerified) { e.preventDefault(); e.stopImmediatePropagation(); showVerificationNeed(f); document.getElementById('postMoneyNeed')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
     if (showTimeError(f)) { e.preventDefault(); e.stopImmediatePropagation(); save(f); return; }
     if (paid(f) || amount(f) <= LIMIT || balance() >= amount(f)) return;
     e.preventDefault(); e.stopImmediatePropagation(); save(f); show(f);
@@ -73,6 +85,7 @@
     const f = e.target;
     if (f?.id !== 'broadcastForm') return;
     show(f);
+    if (!currentSession()?.mobileVerified) { e.preventDefault(); e.stopImmediatePropagation(); showVerificationNeed(f); document.getElementById('postMoneyNeed')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
     if (showTimeError(f) || (!paid(f) && amount(f) > LIMIT && balance() < amount(f))) {
       e.preventDefault(); e.stopImmediatePropagation(); save(f); show(f);
       document.getElementById('postMoneyNeed')?.scrollIntoView({ behavior: 'smooth', block: 'center' });

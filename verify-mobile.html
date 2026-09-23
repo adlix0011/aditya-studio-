@@ -27,6 +27,8 @@
   <script>
   (function(){
     const KEY='aditya_studio_session_v1';
+    const requestedReturn=new URLSearchParams(location.search).get('return')||'';
+    const returnUrl=requestedReturn.startsWith('/local-delivery')?requestedReturn:'/aditya-studio-discount-wheel.html?next=free-spin';
     const $=id=>document.getElementById(id);
     let session=null, resendTimer=null;
     function status(text,kind){const el=$('status');el.textContent=text;el.className='status '+(kind||'');}
@@ -53,7 +55,7 @@
         $('verifyBox').classList.remove('hidden');status(out.delivery==='whatsapp_manual'?'✅ OTP request admin ko mil gayi hai. Admin WhatsApp par OTP bhejenge, phir yahan 6-digit OTP daalein.':'✅ OTP SMS bhej diya gaya hai. Ab 6-digit OTP daalein.','ok');startResendTimer(60);$('otp').focus();
       }catch(e){status('15 second tak response nahi mila. Server aur SMS Gateway app check karke “OTP dobara bhejein” dabayein.','error');startResendTimer(8);}
     }
-    function verified(){status('✅ Mobile verify ho gaya! Free spin page khul raha hai…','ok');$('verifyBox').classList.add('hidden');setTimeout(function(){location.href='/aditya-studio-discount-wheel.html?next=free-spin';},900);}
+    function verified(){status(requestedReturn?'✅ Mobile verify हो गया! आपकी भरी हुई delivery post पर वापस जा रहे हैं…':'✅ Mobile verify ho gaya! Free spin page khul raha hai…','ok');$('verifyBox').classList.add('hidden');setTimeout(function(){location.href=returnUrl;},900);}
     async function verify(){
       const otp=$('otp').value.replace(/\D/g,'');if(!/^\d{6}$/.test(otp)){status('6-digit OTP daalein.','error');return;}
       setBusy('verify',true,'Verify ho raha hai…');

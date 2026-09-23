@@ -1518,7 +1518,7 @@ const STUDIO_BOTTOM_NAV = `<style id="studio-bottom-nav-style">
 function serveLiveHtml(res, data, includeLiveSync) {
   const html = Buffer.isBuffer(data) ? data.toString('utf8') : String(data || '');
   const isLocalDelivery = /<title>\s*Local Delivery\s*<\/title>/i.test(html);
-  const extras = (isLocalDelivery ? '<script src="/post-recharge-guard.js?v=postguard1"></script>' : STUDIO_BOTTOM_NAV) + (includeLiveSync ? LIVE_SYNC_SNIPPET : '');
+  const extras = (isLocalDelivery ? '<script src="/post-recharge-guard.js?v=postguard2"></script>' : STUDIO_BOTTOM_NAV) + (includeLiveSync ? LIVE_SYNC_SNIPPET : '');
   res.end(extras ? html.replace(/<\/body>/i, extras + '</body>') : html);
 }
 function liveRevision() {

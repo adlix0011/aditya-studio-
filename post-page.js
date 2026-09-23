@@ -11,7 +11,7 @@ document.addEventListener('input',e=>{if(!e.target.closest('.detailed-post')||![
 
 
 // Delivery boys can publish a service card; customers can request that exact service.
-let deliveryPostMode='choose',serviceTargetId='';
+let deliveryPostMode=new URLSearchParams(location.search).get('post')==='need'?'need':'choose',serviceTargetId='';
 function serviceTarget(){return (state.orders||[]).find(o=>String(o.id)===String(serviceTargetId)&&o.kind==='delivery-service')}
 function serviceOptions(){return '<label><input type="checkbox" name="parcelTypes" value="Parcel" checked><img src="https://images.unsplash.com/photo-1566576912321-d58ddd7a6088?auto=format&fit=crop&w=80&q=70" alt=""> Parcel</label><label><input type="checkbox" name="parcelTypes" value="Grocery"><img src="https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=80&q=70" alt=""> Grocery</label><label><input type="checkbox" name="parcelTypes" value="Documents"><img src="https://images.unsplash.com/photo-1456324504439-367cee3b3c32?auto=format&fit=crop&w=80&q=70" alt=""> Documents</label><label><input type="checkbox" name="parcelTypes" value="Medicine"><img src="https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=80&q=70" alt=""> Medicine</label>'}
 postView=function(){const saved=state.users[user]||{},target=serviceTarget(),mode=target?'request':deliveryPostMode;const switcher='<div class="delivery-post-switch">'+(target?'':'<button type="button" data-delivery-post-mode="need" class="'+(mode==='need'?'active':'')+'">🛍️ सामान मंगवाएं</button><button type="button" data-delivery-post-mode="service" class="'+(mode==='service'?'active':'')+'">🚚 Delivery service दें</button>')+'</div>';
