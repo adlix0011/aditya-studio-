@@ -37,9 +37,9 @@ async function checkRechargeStatus(topupId,amount){
   }catch(_){}
 }
 function showSuccess(topupId,amount){
-  document.querySelector('.card').innerHTML='<div class="success-screen"><h1>✅ Recharge submitted successfully</h1><div class="loading-ring"></div><p class="wait-label">Admin verification का इंतज़ार है</p><div class="wait-timer" id="waitTimer">00:00</div><p>Verify होते ही यह timer हटेगा और wallet अपने-आप खुलेगा।</p></div><a class="help-whatsapp" href="https://wa.me/917024230041?text=Hello%2C%20maine%20wallet%20recharge%20submit%20kiya%20hai." target="_blank" rel="noopener">💬 Any query? Help on WhatsApp</a><a class="success-back" href="'+returnUrl+'">← Back to Local Delivery</a>';
-  let elapsed=0,timer=document.getElementById('waitTimer');
-  const tick=()=>{timer.textContent=String(Math.floor(elapsed/60)).padStart(2,'0')+':'+String(elapsed%60).padStart(2,'0');elapsed++};
+  document.querySelector('.card').innerHTML='<div class="success-screen"><h1>✅ Recharge submitted successfully</h1><div class="loading-ring"></div><p class="wait-label">Admin verification का इंतज़ार है</p><div class="wait-timer" id="waitTimer">10:00</div><p>10 मिनट के अंदर verification हो सकता है। Verify होते ही timer हटेगा और wallet अपने-आप खुलेगा।</p></div><a class="help-whatsapp" href="https://wa.me/917024230041?text=Hello%2C%20maine%20wallet%20recharge%20submit%20kiya%20hai." target="_blank" rel="noopener">💬 Any query? Help on WhatsApp</a><a class="success-back" href="'+returnUrl+'">← Back to Local Delivery</a>';
+  const deadline=Date.now()+10*60*1000,timer=document.getElementById('waitTimer');
+  const tick=()=>{const remaining=Math.max(0,deadline-Date.now()),seconds=Math.ceil(remaining/1000);timer.textContent=String(Math.floor(seconds/60)).padStart(2,'0')+':'+String(seconds%60).padStart(2,'0')};
   tick();rechargePollTimer=setInterval(()=>{tick();checkRechargeStatus(topupId,amount)},2500);
   checkRechargeStatus(topupId,amount);
 }
