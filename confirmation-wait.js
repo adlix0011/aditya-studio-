@@ -16,7 +16,7 @@
     return state.orders.find(function (order) {
       if (order.status !== 'chat' || sameMobile(order.ownerMobile, session.mobile)) return false;
       const candidate = (order.candidateSessions || []).find(function (item) { return sameMobile(item.mobile, session.mobile); });
-      return candidate && candidate.deliveryConfirmRequest && candidate.deliveryConfirmRequest.status === 'pending'
+      return candidate && candidate.deliveryConfirmRequest && ['pending', 'waiting'].includes(candidate.deliveryConfirmRequest.status)
         ? { order: order, request: candidate.deliveryConfirmRequest } : false;
     }) || null;
   }
@@ -41,15 +41,29 @@
 
   function renderWaitingCard() {
     const item = pendingConfirmation();
-    const card = document.querySelector('.chat-default-options');
-    if (!item || !card) return;
+    const host = document.getElementById('roomMessages');
+    if (!item || !host) return;
     const deadline = new Date(item.request.expiresAt || (new Date(item.request.createdAt).getTime() + WAIT_MS)).getTime();
+    let card = host.querySelector('.confirmation-wait-card');
+    if (!card) {
+      card = document.createElement('div');
+      card.className = 'chat-default-options confirmation-wait-card';
+      host.appendChild(card);
+    }
     const remaining = deadline - Date.now();
     if (card.dataset.confirmationDeadline === String(deadline)) {
-      if (remaining <= 0) expireRequest(item);
+      if (remaining <= 0 && card.dataset.confirmationExpired !== '1') {
+        card.dataset.confirmationExpired = '1';
+        const mobile = String(item.order.ownerMobile || '').replace(/\D/g, '').slice(-10);
+        const message = encodeURIComponent('Namaste, maine aapki Local Delivery request accept ki hai. 5 minute se confirmation ka wait hai. Kripya chat me Yes/No batayein.');
+        card.innerHTML = '<div><strong>⏳ Customer का जवाब नहीं आया</strong>'
+          + '<p>5 मिनट का इंतजार पूरा हो गया है। Customer को WhatsApp पर message करके confirmation लें।</p>'
+          + (mobile ? '<a class="btn add-money-glow" href="https://wa.me/91' + mobile + '?text=' + message + '" target="_blank" rel="noopener">💬 Customer WhatsApp Help</a>' : '<a class="btn add-money-glow" href="https://wa.me/?text=' + message + '" target="_blank" rel="noopener">💬 WhatsApp Help</a>')
+          + '<small>Customer के reply के बाद chat में आगे की बात कर सकते हैं।</small></div>';
+        expireRequest(item);
+      }
       return;
     }
-    card.classList.add('confirmation-wait-card');
     card.dataset.confirmationDeadline = String(deadline);
     card.innerHTML = '<div><strong>⏳ Customer confirmation का इंतज़ार करें</strong>'
       + '<p>आपकी ₹' + Number(item.order.fee || 0) + ' delivery request customer को भेज दी गई है।</p>'
