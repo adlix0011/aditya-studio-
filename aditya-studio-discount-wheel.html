@@ -1409,6 +1409,16 @@
   </div>
 
 
+  <div class="card" id="registrationOtpCard" style="display:none;text-align:center;max-width:440px">
+    <div style="font-size:42px">📱</div>
+    <h2 style="margin:10px 0 7px;color:#fff">पहले अपना नंबर Verify करें</h2>
+    <p style="line-height:1.6;color:#dbeafe">आपके WhatsApp पर <b style="color:#fde68a">6 digit OTP</b> भेजा गया है। अपना mobile number verify करने के लिए वह OTP नीचे डालें।</p>
+    <input type="tel" inputmode="numeric" id="registrationOtpInput" placeholder="6 digit OTP" maxlength="6" autocomplete="one-time-code" style="width:100%;padding:15px;border-radius:12px;border:1px solid #22d3ee;background:#10182e;color:#fff;text-align:center;letter-spacing:8px;font-size:22px;outline:none">
+    <button type="button" class="btn" id="registrationOtpVerifyBtn" style="margin-top:12px">✅ OTP Verify करें</button>
+    <button type="button" class="btn-secondary" id="registrationOtpResendBtn" style="margin-top:9px">WhatsApp OTP दोबारा Request करें</button>
+    <p id="registrationOtpMsg" style="min-height:20px;margin:12px 0 0;font-size:13px;color:#fef3c7"></p>
+  </div>
+
   <!-- Free spin offer after first register -->
   <!-- Periodic free-spin nudge on home -->
   <div class="spin-nudge-popup" id="spinNudgePopup" aria-hidden="true">
@@ -2071,8 +2081,11 @@ registerForm.addEventListener('submit', async (e)=>{
     lwSpinning = false;
     // Register mode ka URL refresh/return par form ko phir se na khole.
     try { window.history.replaceState({}, document.title, window.location.pathname); } catch(ignore) {}
-    // First registration ka welcome gift seedha claim screen par dikhega.
-    if(currentAccount.freeSpinUsed === false) {
+    // New registration: WhatsApp OTP verification is required before the
+    // welcome free-spin claim becomes available.
+    if(currentAccount.freeSpinUsed === false && !currentAccount.mobileVerified) {
+      showRegistrationOtp();
+    } else if(currentAccount.freeSpinUsed === false) {
       showFreeSpinOffer();
     } else enterDashboard();
   }catch(err){
@@ -2180,6 +2193,55 @@ const freeWheelSection = document.getElementById('freeWheelSection');
 const claimFreeSpinBtn = document.getElementById('claimFreeSpinBtn');
 const freeSpinBtn = document.getElementById('freeSpinBtn');
 const freeWheelEl = document.getElementById('freeWheel');
+const registrationOtpCard = document.getElementById('registrationOtpCard');
+
+function showRegistrationOtp(){
+  if(!currentAccount || !registrationOtpCard) return;
+  window.__welcomeSpinActive = false;
+  if(authCard) authCard.style.display = 'none';
+  if(dashboardCard) dashboardCard.style.display = 'none';
+  if(codeCard) codeCard.style.display = 'none';
+  if(wheelSection) wheelSection.style.display = 'none';
+  if(freeSpinOffer) freeSpinOffer.style.display = 'none';
+  if(freeWheelSection) freeWheelSection.style.display = 'none';
+  const msg=document.getElementById('registrationOtpMsg');
+  if(msg) msg.textContent='WhatsApp OTP आने के बाद यहां डालें।';
+  registrationOtpCard.style.display='block';
+  setTimeout(()=>document.getElementById('registrationOtpInput')?.focus(),150);
+}
+function hideRegistrationOtp(){ if(registrationOtpCard) registrationOtpCard.style.display='none'; }
+async function requestRegistrationOtp(){
+  if(!currentAccount) return;
+  const button=document.getElementById('registrationOtpResendBtn'),msg=document.getElementById('registrationOtpMsg');
+  if(button){button.disabled=true;button.textContent='Request भेज रहे हैं…'}
+  try{
+    const res=await fetch(API_BASE+'/api/request-spin-otp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mobile:currentAccount.mobile,sessionToken:currentAccount.sessionToken||''})});
+    const out=await res.json().catch(()=>({}));
+    if(!res.ok||!out.ok) throw Error(out.message||'OTP request नहीं भेजी जा सकी।');
+    if(msg) msg.textContent='✅ OTP WhatsApp पर भेजने की request हो गई है। OTP मिलते ही यहां डालें।';
+  }catch(e){ if(msg) msg.textContent=e.message||'OTP request नहीं भेजी जा सकी।'; }
+  finally{if(button){button.disabled=false;button.textContent='WhatsApp OTP दोबारा Request करें'}}
+}
+async function verifyRegistrationOtp(){
+  if(!currentAccount) return;
+  const otp=(document.getElementById('registrationOtpInput')?.value||'').replace(/\D/g,'');
+  const button=document.getElementById('registrationOtpVerifyBtn'),msg=document.getElementById('registrationOtpMsg');
+  if(!/^\d{6}$/.test(otp)){if(msg)msg.textContent='कृपया 6 digit OTP डालें।';return;}
+  if(button){button.disabled=true;button.textContent='Verify हो रहा है…'}
+  try{
+    const res=await fetch(API_BASE+'/api/verify-spin-otp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mobile:currentAccount.mobile,otp,sessionToken:currentAccount.sessionToken||''})});
+    const out=await res.json().catch(()=>({}));
+    if(!res.ok||!out.ok) throw Error(out.error==='wrong-otp'?'OTP गलत है। फिर से check करें।':(out.message||'OTP verify नहीं हुआ।'));
+    currentAccount={...currentAccount,...out,mobileVerified:true,sessionToken:out.sessionToken||currentAccount.sessionToken};
+    saveSession(currentAccount,currentAccount._pin||'');
+    hideRegistrationOtp();
+    showFreeSpinOffer();
+  }catch(e){if(msg)msg.textContent=e.message||'OTP verify नहीं हुआ।';}
+  finally{if(button){button.disabled=false;button.textContent='✅ OTP Verify करें'}}
+}
+document.getElementById('registrationOtpVerifyBtn')?.addEventListener('click',verifyRegistrationOtp);
+document.getElementById('registrationOtpResendBtn')?.addEventListener('click',requestRegistrationOtp);
+document.getElementById('registrationOtpInput')?.addEventListener('keydown',e=>{if(e.key==='Enter')verifyRegistrationOtp()});
 
 // Welcome roller hamesha account ki real free-spin status dikhata hai.
 // Purane static "1 Free Spin" text ki wajah se used/na-available spin bhi 1 dikh rahi thi.

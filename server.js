@@ -2810,9 +2810,8 @@ function computeOrderFees(subtotal, settingsFees) {
       const accounts = loadAccounts();
       const acc = sessionAccount(req, body, accounts);
       if (!acc || String(acc.mobile) !== mobile) return sendJSON(res, 401, { ok: false, error: 'auth', message: 'Login required' });
+      if (!acc.mobileVerified) return sendJSON(res, 403, { ok: false, error: 'mobile-verification-required', message: 'Free spin claim करने से पहले WhatsApp OTP से mobile verify करें।' });
       if (acc.freeSpinUsed) return sendJSON(res, 409, { ok: false, error: 'already-used', message: 'Free spin pehle use ho chuki hai' });
-      // Mobile OTP profile se optional verification ke liye hai. Welcome free spin
-      // register/login ke turant baad bhi milna chahiye.
       const { prize, stats } = assignNextFreePrize();
       // Spin शुरू होते ही इसे consume करें. इससे refresh, slow network या multiple
       // tabs की वजह से वही free spin फिर से popup में नहीं आएगी.
