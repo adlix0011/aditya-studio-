@@ -26,7 +26,7 @@ home=function(){const all=state.orders||[],services=all.filter(o=>o.kind==='deli
 // request or opening the receive feed.
 function deliveryReceiveView(){
  const all=state.orders||[];
- const needs=all.filter(o=>o.kind!=='delivery-service'&&['open','chat'].includes(o.status)&&o.owner!==user&&isDeadlineActive(o));
+ const needs=all.filter(o=>o.kind!=='delivery-service'&&['open','chat'].includes(o.status)&&isDeadlineActive(o));
  const needle=locationSearch.toLowerCase();
  const suggestions=cgDistricts.filter(d=>d.includes(locationSearch)||(districtEnglish[d]||'').includes(needle)).slice(0,33);
  const list=needs.filter(o=>marketFilter==='All'||marketFilter==='Reward'&&o.fee>300||['Groceries','Pickup','Shopping','Other'].includes(marketFilter)&&o.category===marketFilter);
