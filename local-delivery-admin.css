@@ -14,3 +14,19 @@
 .admin-tools{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}.admin-tools input,.admin-tools select{min-width:0;padding:9px;border:1px solid #334155;background:#0b1220;color:#e2e8f0;border-radius:8px}.admin-tools input:first-child{grid-column:1/-1}.admin-report{display:flex;gap:8px;flex-wrap:wrap;margin:9px 0;color:#bfdbfe;font-size:11px}.admin-report b{width:100%;color:#e0e7ff}.admin-report span{padding:6px 8px;border-radius:7px;background:#172554}
 
 .helper-wallet-setting{margin:0 0 18px;border-color:#0f766e}.helper-wallet-setting .heading{align-items:flex-start}.helper-wallet-setting label{display:grid;gap:6px;margin-top:12px;color:#99f6e4;font-size:12px;font-weight:800}.helper-wallet-setting input{width:100%;padding:10px;border:1px solid #0f766e;background:#0b1220;color:#f8fafc;border-radius:8px;font-size:16px;font-weight:800}.helper-wallet-setting .note{display:block;margin:5px 0 0;line-height:1.4}
+
+/* Desktop admin view: use the available screen space instead of a narrow mobile card. */
+@media(min-width:901px){
+ body{background:linear-gradient(90deg,#090d17 0,#090d17 244px,#0b0f19 244px)}
+ .admin-shell{max-width:1600px;margin-left:244px;padding:28px clamp(30px,4vw,68px) 48px}
+ header{padding-bottom:20px}
+ .intro{padding:30px 0 22px}.intro h1{font-size:36px}
+ .stats{grid-template-columns:repeat(3,minmax(170px,245px));gap:14px;margin-bottom:24px}
+ .stats div{padding:18px 10px}.stats strong{font-size:24px}
+ .helper-wallet-setting{max-width:none;width:100%}
+ .panel{padding:20px;margin-bottom:20px}
+ .panel:nth-of-type(4){display:inline-block;vertical-align:top;width:calc(38% - 12px);margin-right:18px}
+ .panel:nth-of-type(5){display:inline-block;vertical-align:top;width:calc(62% - 12px)}
+ .admin-order{padding:15px}.admin-order-grid{grid-template-columns:repeat(4,1fr)}
+}
+@media(max-width:900px){.admin-shell{max-width:760px}}
