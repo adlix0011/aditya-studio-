@@ -6768,6 +6768,25 @@ function adminShowAllSections() {
 })();
 
 adminInitUi();
+// Admin modules: each button opens a focused URL while keeping the existing controls and data intact.
+(function(){
+  var groups={
+    dashboard:{label:'📊 Dashboard',ids:['sec-overview','sec-order-stats']},
+    help:{label:'🆘 User Help & OTP',ids:['sec-otp','sec-registration-limit','sec-customers','sec-codes']},
+    orders:{label:'📦 Orders & Wallet',ids:['sec-order-stats','sec-orders','sec-wallet-recharges']},
+    site:{label:'🎨 Site UI & Frames',ids:['sec-fees','sec-quality','sec-frames','sec-banner','sec-hero','sec-home-frame','sec-book','sec-ui-panel']},
+    alerts:{label:'🔔 Alert Center',ids:['sec-overview','sec-notif']},
+    backup:{label:'💾 Backup',ids:['sec-backup']}
+  };
+  var current=new URLSearchParams(location.search).get('module')||'dashboard';if(!groups[current])current='dashboard';
+  var side=document.querySelector('.sidebar');if(!side)return;
+  var nav=document.createElement('nav');nav.className='module-nav';nav.innerHTML=Object.keys(groups).map(function(k){return '<a href="/admin?module='+k+'" class="'+(k===current?'active':'')+'">'+groups[k].label+'</a>'}).join('')+'<a href="/admin/local-delivery">🚚 Local Delivery</a><a href="/admin/activity">📍 User activity</a>';
+  var anchor=side.querySelector('.brand-sub');anchor.insertAdjacentElement('afterend',nav);
+  var style=document.createElement('style');style.textContent='.module-nav{display:grid;gap:7px;margin:18px 0}.module-nav a{display:block;padding:10px 11px;border-radius:9px;color:#d8d0c4;text-decoration:none;background:#1b1511;border:1px solid rgba(212,175,55,.13);font-size:13px}.module-nav a.active{background:linear-gradient(135deg,#6d4b12,#2a2010);color:#ffe38b;border-color:#d4af37}.sidebar>.nav-link{display:none}body.admin-module-focus .main>section.panel{display:none}body.admin-module-focus .main>section.panel.module-show{display:block}';document.head.appendChild(style);
+  document.body.classList.add('admin-module-focus');
+  (groups[current].ids||[]).forEach(function(id){var el=document.getElementById(id);if(el)el.classList.add('module-show')});
+  var h=document.querySelector('.topbar h1');if(h)h.textContent=groups[current].label;
+})();
 
 
 
