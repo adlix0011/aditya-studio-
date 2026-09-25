@@ -49,4 +49,3 @@ setTimeout(() => {
   };
   render();
 }, 0);
-
