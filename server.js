@@ -58,6 +58,55 @@ function r2Ready() {
   return !!(R2_BUCKET && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY && /^https:\/\//i.test(R2_ENDPOINT));
 }
 function telegramReady() { return !!(TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID); }
+function whatsappCloudReady() { return !!(WHATSAPP_ACCESS_TOKEN && WHATSAPP_PHONE_NUMBER_ID); }
+function whatsappCloudRecipient(mobile) {
+  const local = String(mobile || '').replace(/\D/g, '').slice(-10);
+  return /^[6-9]\d{9}$/.test(local) ? '91' + local : '';
+}
+async function sendWhatsAppCloudText(mobile, text) {
+  const to = whatsappCloudRecipient(mobile);
+  if (!whatsappCloudReady() || !to) return { ok:false, error: !whatsappCloudReady() ? 'WhatsApp Cloud API is not configured' : 'Invalid Indian WhatsApp number' };
+  try {
+    const response = await fetch('https://graph.facebook.com/v25.0/' + encodeURIComponent(WHATSAPP_PHONE_NUMBER_ID) + '/messages', {
+      method:'POST',
+      headers:{ 'Authorization':'Bearer ' + WHATSAPP_ACCESS_TOKEN, 'Content-Type':'application/json' },
+      body:JSON.stringify({ messaging_product:'whatsapp', to, type:'text', text:{ preview_url:false, body:String(text || '').slice(0,1000) } })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = String(data?.error?.message || ('WhatsApp HTTP ' + response.status)).slice(0,240);
+      whatsappCloudStatus = { ...whatsappCloudStatus, configured:true, lastError:error };
+      return { ok:false, error };
+    }
+    whatsappCloudStatus = { ...whatsappCloudStatus, configured:true, lastError:'', lastSentAt:new Date().toISOString(), lastSentTo:to };
+    return { ok:true, messageId:data?.messages?.[0]?.id || '' };
+  } catch (error) {
+    const message = String(error?.message || 'WhatsApp network error').slice(0,240);
+    whatsappCloudStatus = { ...whatsappCloudStatus, configured:true, lastError:message };
+    return { ok:false, error:message };
+  }
+}
+async function dispatchQueuedWhatsappAlert(queueKey) {
+  if (!whatsappCloudReady()) return false;
+  const list = loadNotifs();
+  const row = list.find(n => n && n.kind === 'local-delivery-whatsapp-queue' && String(n.queueKey || '') === String(queueKey || '') && !n.whatsappSentAt);
+  if (!row) return false;
+  const sent = await sendWhatsAppCloudText(row.whatsappTarget, row.whatsappText);
+  const current = loadNotifs();
+  const saved = current.find(n => n && String(n.id || '') === String(row.id));
+  if (!saved) return sent.ok;
+  if (sent.ok) {
+    saved.whatsappSentAt = new Date().toISOString();
+    saved.whatsappDelivery = 'cloud_api';
+    saved.whatsappMessageId = sent.messageId || '';
+    delete saved.whatsappLastError;
+  } else {
+    saved.whatsappLastError = sent.error || 'WhatsApp send failed';
+    saved.whatsappLastAttemptAt = new Date().toISOString();
+  }
+  saveNotifs(current);
+  return sent.ok;
+}
 let telegramAlertStatus = { configured: telegramReady(), ok: null, at: null, error: '' };
 async function sendTelegramAlert(title, details) {
   if (!telegramReady()) {
@@ -990,6 +1039,7 @@ function addNotification(item) {
     expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
   }, item));
   saveNotifs(list.slice(0, 50));
+  return item;
 }
 function loadUserActivity() {
   try { return fs.existsSync(ACTIVITY_FILE) ? (JSON.parse(fs.readFileSync(ACTIVITY_FILE, 'utf8')) || []) : []; }
@@ -3231,8 +3281,9 @@ function computeOrderFees(subtotal, settingsFees) {
         const activity=loadUserActivity().find(x=>sameMobile(x.mobile,target));
         const online=!!activity&&Date.now()-new Date(activity.lastSeenAt||0).getTime()<90000;
         if(online)return null;
-        addNotification({title:'📱 WhatsApp भेजना बाकी',body:(name||'User')+' offline है। तैयार WhatsApp alert भेजें।',mobile:target,kind:'local-delivery-whatsapp-queue',orderId:body.orderId||'',whatsappTarget:target,whatsappText:String(text||'').slice(0,1000),eventType,queueKey});
-        return {mobile:target,text:String(text||'')};
+        const queued=addNotification({title:'📱 WhatsApp भेजना बाकी',body:(name||'User')+' offline है। WhatsApp alert भेजा जा रहा है।',mobile:target,kind:'local-delivery-whatsapp-queue',orderId:body.orderId||'',whatsappTarget:target,whatsappText:String(text||'').slice(0,1000),eventType,queueKey});
+        if (queued) void dispatchQueuedWhatsappAlert(queueKey);
+        return {mobile:target,text:String(text||''),queued:!!queued};
       };
       // Orders settled before this workflow update stayed in chat state. Promote
       // them once so both participants can continue from the correct screens.
@@ -3570,7 +3621,7 @@ function computeOrderFees(subtotal, settingsFees) {
     try { orders=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_ORDERS_FILE,'utf8'))||[]; } catch (_) {}
     try { locks=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_LOCKS_FILE,'utf8'))||[]; } catch (_) {}
     const whatsappQueue=loadNotifs().filter(n=>n&&n.kind==='local-delivery-whatsapp-queue'&&!n.whatsappSentAt).slice(0,100);
-    return sendJSON(res,200,{ok:true,orders:orders.slice(0,5000),locks:locks.slice(0,5000),whatsappQueue,helperWalletFreeLimit:Math.max(0,Math.round(Number(loadSettings().localDeliveryHelperWalletFreeLimit ?? 500))),generatedAt:new Date().toISOString()});
+    return sendJSON(res,200,{ok:true,orders:orders.slice(0,5000),locks:locks.slice(0,5000),whatsappQueue,whatsappCloud:{configured:whatsappCloudReady(),lastSentAt:whatsappCloudStatus.lastSentAt||null,lastWebhookAt:whatsappCloudStatus.lastWebhookAt||null,lastError:whatsappCloudStatus.lastError||''},helperWalletFreeLimit:Math.max(0,Math.round(Number(loadSettings().localDeliveryHelperWalletFreeLimit ?? 500))),generatedAt:new Date().toISOString()});
   }
   if (req.method === 'POST' && urlPath === '/admin/local-delivery-whatsapp-sent') {
     if (!isAdminAuthed(req)) return requireAdminAuth(req, res);
