@@ -20,6 +20,11 @@ const SMS_GATEWAY_API_KEY = String(process.env.SMS_GATEWAY_API_KEY || '');
 // Telegram credentials live only in local/Render environment variables.
 const TELEGRAM_BOT_TOKEN = String(process.env.TELEGRAM_BOT_TOKEN || '').trim();
 const TELEGRAM_CHAT_ID = String(process.env.TELEGRAM_CHAT_ID || '').trim();
+// WhatsApp Cloud API secrets belong only in the server environment.
+const WHATSAPP_VERIFY_TOKEN = String(process.env.WHATSAPP_VERIFY_TOKEN || '').trim();
+const WHATSAPP_ACCESS_TOKEN = String(process.env.WHATSAPP_ACCESS_TOKEN || '').trim();
+const WHATSAPP_PHONE_NUMBER_ID = String(process.env.WHATSAPP_PHONE_NUMBER_ID || '').trim();
+let whatsappCloudStatus = { configured: !!(WHATSAPP_ACCESS_TOKEN && WHATSAPP_PHONE_NUMBER_ID), lastWebhookAt: null, lastWebhookEvent: '', lastError: '' };
 // Cloudflare R2 is optional. These private values live only in the local
 // environment / Render dashboard — never in this source file or browser code.
 const R2_BUCKET = String(process.env.R2_BUCKET || '').trim();
@@ -1539,6 +1544,32 @@ function liveRevision() {
 
 const server = http.createServer(async (req, res) => {
   const urlPath = (req.url || '/').split('?')[0];
+
+  // Meta verifies this public endpoint before enabling WhatsApp webhooks.
+  // The verify token is compared server-side and is never sent to clients.
+  if (urlPath === '/webhook/whatsapp' && req.method === 'GET') {
+    const query = new URL(req.url || '/', 'http://localhost').searchParams;
+    const receivedToken = Buffer.from(query.get('hub.verify_token') || '');
+    const expectedToken = Buffer.from(WHATSAPP_VERIFY_TOKEN);
+    if (query.get('hub.mode') === 'subscribe' && expectedToken.length > 0 && receivedToken.length === expectedToken.length && crypto.timingSafeEqual(receivedToken, expectedToken)) {
+      res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+      return res.end(query.get('hub.challenge') || '');
+    }
+    res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
+    return res.end('Webhook verification failed');
+  }
+  if (urlPath === '/webhook/whatsapp' && req.method === 'POST') {
+    try {
+      const payload = await readBody(req, 2e6);
+      const changes = Array.isArray(payload?.entry) ? payload.entry.flatMap(entry => Array.isArray(entry?.changes) ? entry.changes : []) : [];
+      const value = changes[0]?.value || {};
+      whatsappCloudStatus.lastWebhookAt = new Date().toISOString();
+      whatsappCloudStatus.lastWebhookEvent = Array.isArray(value.messages) && value.messages.length ? 'message' : Array.isArray(value.statuses) && value.statuses.length ? 'status' : 'update';
+      whatsappCloudStatus.lastError = '';
+    } catch (error) { whatsappCloudStatus.lastError = 'Invalid webhook payload'; }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end('{"ok":true}');
+  }
 
   // Relative "admin" link kisi bhi page (jaise /place-order.html) se khulne par
   // browser /place-order.html/admin bana deta hai. Use hamesha root admin par bhejo.
