@@ -977,6 +977,8 @@ function addNotification(item) {
   if (item && item.kind === 'local-delivery-pickup' && list.some(n => n && n.kind === item.kind && String(n.orderId || '') === String(item.orderId || '') && Date.now() - new Date(n.at || 0).getTime() < 30 * 60 * 1000)) return;
   // A retry may submit the same message twice. Keep the message, but alert the recipient only once.
   if (item && item.kind === 'local-delivery-message' && item.messageId && list.some(n => n && n.kind === item.kind && String(n.messageId || '') === String(item.messageId))) return;
+  // An offline WhatsApp alert is one queue item per underlying chat event.
+  if (item && item.kind === 'local-delivery-whatsapp-queue' && item.queueKey && list.some(n => n && n.kind === item.kind && String(n.queueKey || '') === String(item.queueKey))) return;
   list.unshift(Object.assign({
     id: 'n-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
     at: new Date().toISOString(),
@@ -3160,6 +3162,14 @@ function computeOrderFees(subtotal, settingsFees) {
       };
       const requestedCandidate=(o)=>sameMobile(o.ownerMobile,acc.mobile)?sessionFor(o,body.peerMobile):sessionFor(o,acc.mobile);
       const writeOrders=()=>fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));
+      const queueOfflineWhatsapp=(mobile,name,eventType,text,queueKey)=>{
+        const target=String(mobile||'').replace(/\D/g,'').slice(-10);if(!/^[6-9]\d{9}$/.test(target))return false;
+        const activity=loadUserActivity().find(x=>sameMobile(x.mobile,target));
+        const online=!!activity&&Date.now()-new Date(activity.lastSeenAt||0).getTime()<90000;
+        if(online)return false;
+        addNotification({title:'📱 WhatsApp भेजना बाकी',body:(name||'User')+' offline है। तैयार WhatsApp alert भेजें।',mobile:target,kind:'local-delivery-whatsapp-queue',orderId:body.orderId||'',whatsappTarget:target,whatsappText:String(text||'').slice(0,1000),eventType,queueKey});
+        return true;
+      };
       // Orders settled before this workflow update stayed in chat state. Promote
       // them once so both participants can continue from the correct screens.
       let promotedSettledOrder=false;
@@ -3222,6 +3232,7 @@ function computeOrderFees(subtotal, settingsFees) {
         o.status='chat';const acceptedAt=new Date().toISOString();o.deliveryCandidates.push({mobile:acc.mobile,name:acc.name||'Delivery helper',acceptedAt});candidateSessions(o);if(!o.providerMobile){o.providerMobile=acc.mobile;o.providerName=acc.name||'Delivery helper'}o.acceptedAt=acceptedAt;
         fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));
         addNotification({ title:'✅ नया delivery request', body:(acc.name||'Delivery helper')+' ने “'+String(o.title).slice(0,90)+'” के लिए बात शुरू की है।', mobile:o.ownerMobile, kind:'local-delivery-accepted', orderId:o.id });
+        queueOfflineWhatsapp(o.ownerMobile,o.ownerName,'delivery-request','आपका सामान '+(acc.name||'Delivery boy')+' delivery करने के लिए तैयार है। Site में जाकर request देख कर accept करें।','delivery-request:'+o.id+':'+acc.mobile);
         return sendJSON(res,200,{ok:true,order:o});
       }
       // Candidate-scoped negotiation. Never use the order-wide provider fields
@@ -3265,7 +3276,7 @@ function computeOrderFees(subtotal, settingsFees) {
           if(photo&&(!/^data:image\/(png|jpeg|webp);base64,/i.test(photo)||photo.length>1500000))return sendJSON(res,400,{ok:false,message:'Photo JPG, PNG या WEBP और 1MB से छोटी रखें'});
           if(!['chat','booked','delivering'].includes(o.status))return sendJSON(res,409,{ok:false,message:'इस order में chat available नहीं है'});
           candidate.messages.push({id:'m-'+Date.now()+'-'+Math.random().toString(36).slice(2,5),senderMobile:acc.mobile,senderName:acc.name||'Customer',text,photo,recipientMobile:owner?candidate.mobile:o.ownerMobile,time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}),at:new Date().toISOString(),deliveredAt:new Date().toISOString()});
-          o.updatedAt=new Date().toISOString();writeOrders();const preview=text?text.replace(/\s+/g,' ').slice(0,120):'📷 Photo भेजी है',sentMessage=candidate.messages[candidate.messages.length-1];addNotification({title:'💬 '+(acc.name||'Customer')+' का message',body:(acc.name||'Customer')+': '+preview,mobile:owner?candidate.mobile:o.ownerMobile,kind:'local-delivery-message',orderId:o.id,senderMobile:acc.mobile,messageId:sentMessage.id,actualMessage:true});return sendJSON(res,200,{ok:true,message:sentMessage});
+          o.updatedAt=new Date().toISOString();writeOrders();const preview=text?text.replace(/\s+/g,' ').slice(0,120):'📷 Photo भेजी है',sentMessage=candidate.messages[candidate.messages.length-1],recipientMobile=owner?candidate.mobile:o.ownerMobile,recipientName=owner?(candidate.name||'Delivery boy'):(o.ownerName||'Customer');addNotification({title:'💬 '+(acc.name||'Customer')+' का message',body:(acc.name||'Customer')+': '+preview,mobile:recipientMobile,kind:'local-delivery-message',orderId:o.id,senderMobile:acc.mobile,messageId:sentMessage.id,actualMessage:true});queueOfflineWhatsapp(recipientMobile,recipientName,'chat-message','आपको '+(acc.name||'एक user')+' ने Site में message किया है। Site में जाकर check करें।','chat-message:'+sentMessage.id);return sendJSON(res,200,{ok:true,message:sentMessage});
         }
         if(body.action==='delivery-confirm-request'){
           if(owner||o.status!=='chat')return sendJSON(res,403,{ok:false,message:'Delivery confirmation उपलब्ध नहीं है'});
@@ -3494,7 +3505,18 @@ function computeOrderFees(subtotal, settingsFees) {
     let orders=[], locks=[];
     try { orders=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_ORDERS_FILE,'utf8'))||[]; } catch (_) {}
     try { locks=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_LOCKS_FILE,'utf8'))||[]; } catch (_) {}
-    return sendJSON(res,200,{ok:true,orders:orders.slice(0,5000),locks:locks.slice(0,5000),helperWalletFreeLimit:Math.max(0,Math.round(Number(loadSettings().localDeliveryHelperWalletFreeLimit ?? 500))),generatedAt:new Date().toISOString()});
+    const whatsappQueue=loadNotifs().filter(n=>n&&n.kind==='local-delivery-whatsapp-queue'&&!n.whatsappSentAt).slice(0,100);
+    return sendJSON(res,200,{ok:true,orders:orders.slice(0,5000),locks:locks.slice(0,5000),whatsappQueue,helperWalletFreeLimit:Math.max(0,Math.round(Number(loadSettings().localDeliveryHelperWalletFreeLimit ?? 500))),generatedAt:new Date().toISOString()});
+  }
+  if (req.method === 'POST' && urlPath === '/admin/local-delivery-whatsapp-sent') {
+    if (!isAdminAuthed(req)) return requireAdminAuth(req, res);
+    try {
+      const body=await readBody(req), id=String(body.id||'');
+      const list=loadNotifs(), row=list.find(n=>String(n.id||'')===id&&n.kind==='local-delivery-whatsapp-queue');
+      if(!row)return sendJSON(res,404,{ok:false,message:'WhatsApp alert नहीं मिला'});
+      row.whatsappSentAt=new Date().toISOString();saveNotifs(list);
+      return sendJSON(res,200,{ok:true});
+    } catch (_) { return sendJSON(res,500,{ok:false,message:'WhatsApp alert update नहीं हुआ'}); }
   }
   if (req.method === 'POST' && urlPath === '/admin/local-delivery-settings') {
     if (!isAdminAuthed(req)) return requireAdminAuth(req, res);
