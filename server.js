@@ -712,7 +712,7 @@ async function sendOtpSms(mobile, otp, requestId) {
       headers: { 'Content-Type': 'application/json', 'X-API-Key': SMS_GATEWAY_API_KEY },
       body: JSON.stringify({
         phone_number: '+91' + mobile,
-        message: 'Aditya Studio OTP: ' + otp + '. Yeh 5 minute tak valid hai. Kisi ke saath share na karein.',
+        message: 'Aditya Studio OTP: ' + otp + '. Kisi ke saath share na karein.',
         request_id: requestId
       }),
       signal: controller.signal
@@ -5536,7 +5536,7 @@ function adminWhatsAppOtp(mobile, otp) {
   var code = String(otp || '').replace(/\\D/g, '');
   if (!/^[6-9]\\d{9}$/.test(to) || !/^\\d{6}$/.test(code)) { alert('OTP ya mobile invalid hai.'); return; }
   fetch('/admin/otp-mark-sent',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({mobile:to})}).catch(function(){});
-  var text = 'Aditya Studio OTP: ' + code + '. Yeh 5 minute tak valid hai. Kisi ke saath share na karein.';
+  var text = 'Aditya Studio OTP: ' + code + '. Kisi ke saath share na karein.';
   window.open('https://wa.me/91' + to + '?text=' + encodeURIComponent(text), '_blank', 'noopener');
 }
 function adminWhatsAppPinResetOtp(mobile, otp) {
