@@ -25,27 +25,3 @@ render=function(){deliveryRenderBefore();document.querySelectorAll('[data-action
 document.addEventListener('submit',e=>{if(!['priceForm','deliveryOtpForm','deliveryDisputeForm'].includes(e.target.id))return;e.preventDefault();e.stopImmediatePropagation();const d=new FormData(e.target);if(e.target.id==='priceForm')commitDelivery('propose',{items:Number(d.get('items')),fee:Number(d.get('fee'))});if(e.target.id==='deliveryOtpForm')commitDelivery('verify',{code:String(d.get('otp')).trim()});if(e.target.id==='deliveryDisputeForm')commitDelivery('dispute',{reason:d.get('reason')})},true);
 render();
 
-// local-delivery.html historically includes legacy Receive overrides after this
-// script. Run once after parsing so Delivery Receive always opens the proven
-// request-detail, accept, and chat flow instead of routing to Orders.
-setTimeout(() => {
-  const renderBeforeReceiveRestore = render;
-  const safeText = value => String(value == null ? '' : value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  const formatMoney = value => '₹' + Math.max(0, Number(value) || 0).toLocaleString('en-IN');
-  const requestCard = order => {
-    const owner = state.users[order.owner] || {};
-    const itemList = Array.isArray(order.lineItems) && order.lineItems.length
-      ? order.lineItems.map(item => `<li><strong>${safeText(item.name || 'सामान')}</strong>${item.quantity ? ` · ${safeText(item.quantity)}` : ''}</li>`).join('')
-      : `<li><strong>${safeText(order.title || 'सामान')}</strong>${order.quantity ? ` · ${safeText(order.quantity)}` : ''}</li>`;
-    return `<article class="card receive-full-card"><div class="row"><span class="badge">खुली मांग</span><div class="reward"><small>DELIVERY REWARD</small><strong>${formatMoney(order.fee)}</strong></div></div><div class="request-heading"><span class="category-icon">🛍️</span><div><small>${safeText(order.category || 'सामान')}</small><h3>${safeText(order.title || 'Delivery request')}</h3></div></div><p class="description">${safeText(order.description || 'कोई अतिरिक्त जानकारी नहीं दी गई है।')}</p><section class="receive-items"><small>सामान और Quantity</small><ul>${itemList}</ul></section><div class="route"><div><span class="route-dot"></span><div><small>PICKUP / ROUTE</small><p>${safeText(order.area || 'Pickup location')}</p></div></div><div><span class="route-dot destination"></span><div><small>DROP-OFF</small><p>${safeText(order.deliveryVillage || order.address || 'Delivery location')}</p></div></div></div><div class="row card-footer"><small>${safeText(owner.name || 'Customer')}<br>Items estimate: ${formatMoney(order.items)}</small><button class="btn small" data-open="${safeText(order.id)}">पूरी जानकारी देखें और स्वीकार करें ↗</button></div></article>`;
-  };
-  render = function () {
-    renderBeforeReceiveRestore();
-    if (tab !== 'receive' || active) return;
-    const content = document.querySelector('.content');
-    if (!content) return;
-    const posts = (state.orders || []).filter(order => order.kind !== 'delivery-service' && order.status === 'open' && order.owner !== user);
-    content.innerHTML = `<section class="delivery-receive-page"><div class="receive-hero"><div class="bike-animation"><span class="bike-rider">🧑‍✈️</span><span class="bike">🛵</span><i></i><i></i><i></i></div><div><p class="eyebrow">DELIVERY RECEIVE</p><h1>नई delivery requests</h1><p>अपने आसपास की खुली मांग चुनें और delivery शुरू करें।</p></div></div><div class="market-list">${posts.map(requestCard).join('') || '<div class="empty">अभी कोई delivery request उपलब्ध नहीं है।</div>'}</div></section>`;
-  };
-  render();
-}, 0);
