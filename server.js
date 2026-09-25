@@ -2281,6 +2281,37 @@ function computeOrderFees(subtotal, settingsFees) {
     }
   }
 
+  // Reported only by the authenticated local WhatsApp relay. The customer page
+  // polls the matching status route and can explain why an OTP cannot arrive.
+  if (req.method === 'POST' && urlPath === '/admin/otp-mark-whatsapp-unavailable') {
+    if (!isAdminAuthed(req)) return requireAdminAuth(req, res);
+    try {
+      const body = await readBody(req);
+      const mobile = String(body.mobile || '').replace(/\D/g, '');
+      const otp = String(body.otp || '').replace(/\D/g, '');
+      if (!/^[6-9]\d{9}$/.test(mobile) || !/^\d{6}$/.test(otp)) return sendJSON(res, 400, { ok:false, error:'invalid' });
+      const list = loadOtpRequests();
+      const row = list.find(r => r.mobile === mobile && r.purpose === 'mobile_verify' && !r.verified && String(r.manualOtp || '') === otp);
+      if (!row) return sendJSON(res, 404, { ok:false, error:'not-found' });
+      row.delivery = 'whatsapp_unavailable';
+      row.whatsappUnavailableAt = new Date().toISOString();
+      saveOtpRequests(list);
+      return sendJSON(res, 200, { ok:true });
+    } catch (e) { return sendJSON(res, 400, { ok:false }); }
+  }
+
+  if (req.method === 'POST' && urlPath === '/api/otp-delivery-status') {
+    try {
+      const body = await readBody(req);
+      const mobile = String(body.mobile || '').replace(/\D/g, '');
+      const acc = sessionAccount(req, body, loadAccounts());
+      if (!acc || String(acc.mobile) !== mobile) return sendJSON(res, 401, { ok:false, error:'auth' });
+      const row = loadOtpRequests().find(r => r.mobile === mobile && r.purpose === 'mobile_verify' && !r.verified);
+      const unavailable = !!row && row.delivery === 'whatsapp_unavailable';
+      return sendJSON(res, 200, { ok:true, unavailable, message: unavailable ? 'Aapka yeh number WhatsApp par registered nahi hai. Kripya WhatsApp wale number se register karein.' : '' });
+    } catch (e) { return sendJSON(res, 400, { ok:false }); }
+  }
+
   if (req.method === 'POST' && urlPath === '/api/verify-spin-otp') {
     try {
       const body = await readBody(req);

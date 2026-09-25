@@ -30,7 +30,7 @@
     const requestedReturn=new URLSearchParams(location.search).get('return')||'';
     const returnUrl=requestedReturn.startsWith('/local-delivery')?requestedReturn:'/aditya-studio-discount-wheel.html?next=free-spin';
     const $=id=>document.getElementById(id);
-    let session=null, resendTimer=null;
+    let session=null, resendTimer=null, deliveryWatch=null, unavailableAlerted=false;
     function status(text,kind){const el=$('status');el.textContent=text;el.className='status '+(kind||'');}
     function readSession(){try{const s=JSON.parse(localStorage.getItem(KEY)||'null');return s&&s.mobile&&s.sessionToken&&!s.pin?s:null;}catch(e){return null;}}
     function setBusy(id,busy,text){const b=$(id);b.disabled=busy;if(text)b.textContent=text;}
@@ -41,6 +41,20 @@
       try{return await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:controller.signal});}
       finally{clearTimeout(timer);}
     }
+    function stopDeliveryWatch(){if(deliveryWatch){clearInterval(deliveryWatch);deliveryWatch=null;}}
+    async function checkDeliveryStatus(){
+      if(!session||unavailableAlerted)return;
+      try{
+        const r=await postJson('/api/otp-delivery-status',{mobile:session.mobile,sessionToken:session.sessionToken});
+        const out=await r.json().catch(()=>({}));
+        if(r.ok&&out.unavailable){
+          unavailableAlerted=true;stopDeliveryWatch();
+          const msg=out.message||'Aapka yeh number WhatsApp par registered nahi hai. Kripya WhatsApp wale number se register karein.';
+          status(msg,'error');window.alert(msg);
+        }
+      }catch(_){}
+    }
+    function watchDeliveryStatus(){stopDeliveryWatch();unavailableAlerted=false;checkDeliveryStatus();deliveryWatch=setInterval(checkDeliveryStatus,4000);}
     async function sendOtp(){
       if(!session)return;
       setBusy('resend',true);status('OTP SMS bhej rahe hain…');
@@ -52,10 +66,10 @@
           const msg=out.error==='sms-not-configured'?'SMS Gateway settings load nahi hui. Server restart karke URL aur API key check karein.':out.error==='resend-too-soon'?'OTP resend ke liye 1 minute rukhein.':(out.message||'OTP SMS nahi bhej paaye.');
           status(msg,'error');startResendTimer(out.error==='resend-too-soon'?60:8);return;
         }
-        $('verifyBox').classList.remove('hidden');status(out.delivery==='whatsapp_manual'?'✅ OTP request admin ko mil gayi hai. Admin WhatsApp par OTP bhejenge, phir yahan 6-digit OTP daalein.':'✅ OTP SMS bhej diya gaya hai. Ab 6-digit OTP daalein.','ok');startResendTimer(60);$('otp').focus();
+        $('verifyBox').classList.remove('hidden');status(out.delivery==='whatsapp_manual'?'✅ OTP request admin ko mil gayi hai. Admin WhatsApp par OTP bhejenge, phir yahan 6-digit OTP daalein.':'✅ OTP SMS bhej diya gaya hai. Ab 6-digit OTP daalein.','ok');if(out.delivery==='whatsapp_manual')watchDeliveryStatus();startResendTimer(60);$('otp').focus();
       }catch(e){status('15 second tak response nahi mila. Server aur SMS Gateway app check karke “OTP dobara bhejein” dabayein.','error');startResendTimer(8);}
     }
-    function verified(){status(requestedReturn?'✅ Mobile verify हो गया! आपकी भरी हुई delivery post पर वापस जा रहे हैं…':'✅ Mobile verify ho gaya! Free spin page khul raha hai…','ok');$('verifyBox').classList.add('hidden');setTimeout(function(){location.href=returnUrl;},900);}
+    function verified(){stopDeliveryWatch();status(requestedReturn?'✅ Mobile verify हो गया! आपकी भरी हुई delivery post पर वापस जा रहे हैं…':'✅ Mobile verify ho gaya! Free spin page khul raha hai…','ok');$('verifyBox').classList.add('hidden');setTimeout(function(){location.href=returnUrl;},900);}
     async function verify(){
       const otp=$('otp').value.replace(/\D/g,'');if(!/^\d{6}$/.test(otp)){status('6-digit OTP daalein.','error');return;}
       setBusy('verify',true,'Verify ho raha hai…');
