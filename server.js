@@ -3107,6 +3107,28 @@ function computeOrderFees(subtotal, settingsFees) {
       return sendJSON(res, 400, { ok:false, message:'Photo upload नहीं हुई। JPG, PNG या WEBP photo फिर से चुनें।' });
     }
   }
+  // Chat presence is visible only to users who share this Local Delivery order.
+  if (req.method === 'POST' && urlPath === '/api/local-delivery/presence') {
+    try {
+      const body=await readBody(req), accounts=loadAccounts(), acc=sessionAccount(req,body,accounts);
+      if(!acc)return sendJSON(res,401,{ok:false,message:'Login required'});
+      const orders=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_ORDERS_FILE,'utf8'))||[];
+      const same=(a,b)=>String(a||'').replace(/\D/g,'').slice(-10)===String(b||'').replace(/\D/g,'').slice(-10);
+      const o=orders.find(x=>String(x.id)===String(body.orderId||''));
+      if(!o)return sendJSON(res,404,{ok:false,message:'Order नहीं मिला'});
+      const isOwner=same(o.ownerMobile,acc.mobile);
+      const candidates=Array.isArray(o.deliveryCandidates)?o.deliveryCandidates:[];
+      const isCandidate=same(o.providerMobile,acc.mobile)||candidates.some(c=>same(c.mobile,acc.mobile));
+      if(!isOwner&&!isCandidate)return sendJSON(res,403,{ok:false,message:'Chat presence उपलब्ध नहीं है'});
+      const requested=String(body.peerMobile||'').replace(/\D/g,'').slice(-10);
+      const peerMobile=isOwner?(requested||String(o.providerMobile||'').replace(/\D/g,'').slice(-10)):String(o.ownerMobile||'').replace(/\D/g,'').slice(-10);
+      const allowedPeer=isOwner&&candidates.some(c=>same(c.mobile,peerMobile));
+      if(!peerMobile||(isOwner&&!allowedPeer&&!same(o.providerMobile,peerMobile)))return sendJSON(res,403,{ok:false,message:'इस user की presence उपलब्ध नहीं है'});
+      const row=loadUserActivity().find(x=>same(x.mobile,peerMobile));
+      const online=!!row&&Date.now()-new Date(row.lastSeenAt||0).getTime()<90000;
+      return sendJSON(res,200,{ok:true,online});
+    } catch (_) { return sendJSON(res,500,{ok:false,message:'Presence check नहीं हुआ'}); }
+  }
   if (req.method === 'POST' && urlPath === '/api/local-delivery/orders') {
     try {
       const body=await readBody(req,3e6),accounts=loadAccounts(),acc=sessionAccount(req,body,accounts);

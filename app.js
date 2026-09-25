@@ -100,6 +100,17 @@ async function syncStudioWallet(){
   }catch(e){}
 }
 syncStudioWallet();
+// Keep Local Delivery presence current while the signed-in user uses this page.
+async function pingLocalDeliveryActivity(action='heartbeat'){
+  try{
+    const raw=localStorage.getItem('aditya_studio_session_v1')||localStorage.getItem('aditya_studio_persistent_login_v2');
+    const s=raw?JSON.parse(raw):null;if(!s?.sessionToken)return;
+    await fetch('/api/activity',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mobile:s.mobile,sessionToken:s.sessionToken,page:'/local-delivery',action}),keepalive:true});
+  }catch(_){}
+}
+pingLocalDeliveryActivity('page_open');
+setInterval(()=>{if(!document.hidden)pingLocalDeliveryActivity()},30000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)pingLocalDeliveryActivity('page_active')});
 window.addEventListener('pageshow',syncStudioWallet);
 window.addEventListener('focus',syncStudioWallet);
 setInterval(()=>{if(!document.hidden)syncStudioWallet()},5000);
