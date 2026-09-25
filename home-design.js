@@ -71,3 +71,16 @@ setInterval(()=>{if(tab==='home'&&!active)render()},30000);
 
 
 document.addEventListener('change',e=>{if(!e.target.closest('#broadcastForm')||!['neededDate','neededTime'].includes(e.target.name))return;const f=e.target.form,dueAt=new Date(localDeliveryDeadline(f)||'').getTime();if(Number.isFinite(dueAt)&&dueAt<=Date.now())toast('यह समय जा चुका है। आगे का date और time चुनें।')});
+
+// Unverified delivery users get a direct verification action on the requirement card.
+const verificationMarketCard=marketCard;
+marketCard=function(o){
+  let h=verificationMarketCard(o);
+  const raw=localStorage.getItem('aditya_studio_session_v1')||localStorage.getItem('aditya_studio_persistent_login_v2');
+  let signed=null;try{signed=raw?JSON.parse(raw):null}catch(_){}
+  if(o.owner!==user&&signed?.sessionToken&&!signed.mobileVerified&&!state.users[user]?.mobileVerified&&['open','chat'].includes(o.status)){
+    h=h.replace(/<button class="btn accept-wide" data-open="[^"]+" data-action="accept">[\s\S]*?<\/button>/,'<div class="notice" style="margin-top:12px;border-color:#ef4444;background:#3b111a;color:#fecaca"><b>⚠️ Order लेने के लिए mobile number verify करें।</b><button type="button" class="btn" style="margin-top:10px;background:linear-gradient(135deg,#ef4444,#b91c1c)" data-verify-mobile>📱 Number Verify करें</button></div>');
+  }
+  return h;
+};
+document.addEventListener('click',e=>{if(!e.target.closest('[data-verify-mobile]'))return;location.href='/verify-mobile.html?return='+encodeURIComponent('/local-delivery.html?tab=receive')});
