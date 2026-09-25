@@ -1464,7 +1464,14 @@ function hasAdminBasicAuth(req) {
   const provided = Buffer.from(pass, 'utf8');
   return expected.length === provided.length && crypto.timingSafeEqual(expected, provided);
 }
-function isAdminAuthed(req) { return hasAdminCookie(req) || hasAdminBasicAuth(req); }
+function base32Encode(buf) { const alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'; let bits=0,value=0,out=''; for (const byte of buf) { value=(value<<8)|byte; bits+=8; while(bits>=5){out+=alphabet[(value>>(bits-5))&31];bits-=5;} } if(bits>0)out+=alphabet[(value<<(5-bits))&31]; return out; }
+function base32Decode(text) { const alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'; let bits=0,value=0,out=[]; for(const char of String(text||'').toUpperCase().replace(/[^A-Z2-7]/g,'')){const n=alphabet.indexOf(char);if(n<0)continue;value=(value<<5)|n;bits+=5;if(bits>=8){out.push((value>>(bits-8))&255);bits-=8;}} return Buffer.from(out); }
+function adminTotpSecret() { try { return String(loadSettings().adminTotpSecret||'').replace(/[^A-Z2-7]/gi,'').toUpperCase(); } catch (_) { return ''; } }
+function validTotp(secret, code) { const clean=String(code||'').replace(/\D/g,''); if(!/^[0-9]{6}$/.test(clean)||!secret)return false; const key=base32Decode(secret),slot=Math.floor(Date.now()/30000); for(let drift=-1;drift<=1;drift++){const b=Buffer.alloc(8);b.writeBigUInt64BE(BigInt(slot+drift));const h=crypto.createHmac('sha1',key).update(b).digest(),offset=h[h.length-1]&15,n=((h[offset]&127)<<24)|(h[offset+1]<<16)|(h[offset+2]<<8)|h[offset+3];if(String(n%1000000).padStart(6,'0')===clean)return true;} return false; }
+function adminTotpCookieToken() { const secret=adminTotpSecret(); return secret?crypto.createHmac('sha256',ADMIN_PASSWORD||'disabled').update('aditya-admin-totp:'+secret).digest('hex'):''; }
+function hasAdminTotpCookie(req) { const secret=adminTotpSecret(),row=String(req.headers.cookie||'').split(';').map(v=>v.trim()).find(v=>v.startsWith('aditya_admin_totp=')); if(!secret||!row)return false; const got=Buffer.from(row.slice('aditya_admin_totp='.length)),want=Buffer.from(adminTotpCookieToken()); return got.length===want.length&&crypto.timingSafeEqual(got,want); }
+function hasAdminPassword(req) { return hasAdminCookie(req) || hasAdminBasicAuth(req); }
+function isAdminAuthed(req) { return hasAdminPassword(req) && (!adminTotpSecret() || hasAdminTotpCookie(req)); }
 function establishAdminSession(req, res) {
   if (hasAdminBasicAuth(req)) {
     res.setHeader('Set-Cookie', 'aditya_admin_session=' + adminCookieToken() + '; Path=/; HttpOnly; SameSite=Lax; Max-Age=28800');
@@ -3058,8 +3065,26 @@ function computeOrderFees(subtotal, settingsFees) {
     }
   }
 
+  // ---- Google Authenticator setup / verification (password is required first) ----
+  if (urlPath === '/admin/two-factor') {
+    if (!hasAdminPassword(req)) return requireAdminAuth(req, res);
+    establishAdminSession(req, res);
+    const settings=loadSettings(), existing=adminTotpSecret();
+    if (req.method === 'POST') {
+      const body=await readFormBody(req), secret=String(body.secret||existing||'').replace(/[^A-Z2-7]/gi,'').toUpperCase(), code=String(body.code||'');
+      if (!validTotp(secret,code)) { res.writeHead(302,{Location:'/admin/two-factor?error=code'}); return res.end(); }
+      if (!existing) { settings.adminTotpSecret=secret; saveSettings(settings); }
+      res.setHeader('Set-Cookie',(res.getHeader('Set-Cookie')?[].concat(res.getHeader('Set-Cookie')):[]).concat('aditya_admin_totp='+adminTotpCookieToken()+'; Path=/; HttpOnly; SameSite=Lax; Max-Age=28800'));
+      res.writeHead(302,{Location:'/admin'}); return res.end();
+    }
+    const secret=existing||base32Encode(crypto.randomBytes(20)), issuer='Aditya Studio Admin', account='admin@adityastudio.store', uri='otpauth://totp/'+encodeURIComponent(issuer)+':'+encodeURIComponent(account)+'?secret='+secret+'&issuer='+encodeURIComponent(issuer)+'&algorithm=SHA1&digits=6&period=30', error=urlObj.searchParams.get('error')==='code';
+    const html='<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Admin two-step verification</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0b0908;color:#f7f1e7;font-family:Arial;padding:20px}.card{width:min(460px,100%);padding:26px;border-radius:18px;background:#1b1511;border:1px solid #d4af3766}h1{color:#f5d45d;margin-top:0}p,small{color:#c8bda8;line-height:1.5}.secret{word-break:break-all;padding:12px;border-radius:9px;background:#0b0908;color:#86efac;font-family:monospace}.warn{color:#fca5a5}input{width:100%;box-sizing:border-box;padding:13px;margin:12px 0;border-radius:9px;border:1px solid #d4af37;background:#0b0908;color:white;font-size:20px;letter-spacing:7px;text-align:center}button{width:100%;padding:13px;border:0;border-radius:9px;background:#d4af37;color:#20170a;font-weight:900;font-size:16px}</style></head><body><main class="card"><h1>🔐 Google Authenticator</h1><p>'+(existing?'अपना Google Authenticator का 6-digit code डालें।':'Google Authenticator app में नया account जोड़ें और नीचे दी हुई setup key manual entry से डालें। फिर app का 6-digit code verify करें।')+'</p>'+(existing?'':'<p><b>Account:</b> '+esc(account)+'</p><div class="secret">'+esc(secret)+'</div><small>Setup URI: '+esc(uri)+'</small>')+(error?'<p class="warn">Code सही नहीं है। फिर से try करें।</p>':'')+'<form method="post"><input type="hidden" name="secret" value="'+esc(secret)+'"><input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" required><button>Verify और Admin खोलें</button></form></main></body></html>';
+    res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'}); return res.end(html);
+  }
+
   // ---- Admin auth ----
   if (urlPath === '/api/customers' || urlPath === '/admin' || urlPath.startsWith('/admin/')) {
+    if (hasAdminPassword(req) && req.method==='GET' && (!adminTotpSecret() || !hasAdminTotpCookie(req))) { res.writeHead(302,{Location:'/admin/two-factor'}); return res.end(); }
     if (!isAdminAuthed(req)) return requireAdminAuth(req, res);
     establishAdminSession(req, res);
   }
@@ -6788,7 +6813,7 @@ adminInitUi();
   };
   var current=new URLSearchParams(location.search).get('module')||'dashboard';if(!groups[current])current='dashboard';
   var side=document.querySelector('.sidebar');if(!side)return;
-  var nav=document.createElement('nav');nav.className='module-nav';nav.innerHTML=Object.keys(groups).map(function(k){return '<a href="/admin?module='+k+'" class="'+(k===current?'active':'')+'">'+groups[k].label+'</a>'}).join('')+'<a href="/admin/local-delivery">🚚 Local Delivery</a><a class="offline-alert-link" href="/admin/local-delivery#whatsappQueue">📱 Offline WhatsApp Alerts</a><a href="/admin/activity">📍 User activity</a>';
+  var nav=document.createElement('nav');nav.className='module-nav';nav.innerHTML=Object.keys(groups).map(function(k){return '<a href="/admin?module='+k+'" class="'+(k===current?'active':'')+'">'+groups[k].label+'</a>'}).join('')+'<a href="/admin/local-delivery">🚚 Local Delivery</a><a class="offline-alert-link" href="/admin/local-delivery#whatsappQueue">📱 Offline WhatsApp Alerts</a><a href="/admin/activity">📍 User activity</a><a href="/admin/two-factor">🔐 Google Authenticator</a>';
   var anchor=side.querySelector('.brand-sub');anchor.insertAdjacentElement('afterend',nav);
   var style=document.createElement('style');style.textContent='.module-nav{display:grid;gap:7px;margin:18px 0}.module-nav a{display:block;padding:10px 11px;border-radius:9px;color:#d8d0c4;text-decoration:none;background:#1b1511;border:1px solid rgba(212,175,55,.13);font-size:13px}.module-nav a.active{background:linear-gradient(135deg,#6d4b12,#2a2010);color:#ffe38b;border-color:#d4af37}.module-nav a.offline-alert-link{background:linear-gradient(135deg,#064e3b,#164e63);color:#a7f3d0;border-color:#34d399;font-weight:800}.sidebar>.nav-link{display:none}body.admin-module-focus .main>section.panel{display:none}body.admin-module-focus .main>section.panel.module-show{display:block}';document.head.appendChild(style);
   document.body.classList.add('admin-module-focus');
