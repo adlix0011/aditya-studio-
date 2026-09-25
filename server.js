@@ -2310,7 +2310,8 @@ function computeOrderFees(subtotal, settingsFees) {
       if (!acc || String(acc.mobile) !== mobile) return sendJSON(res, 401, { ok:false, error:'auth' });
       const row = loadOtpRequests().find(r => r.mobile === mobile && r.purpose === 'mobile_verify' && !r.verified);
       const unavailable = !!row && row.delivery === 'whatsapp_unavailable';
-      return sendJSON(res, 200, { ok:true, unavailable, message: unavailable ? 'Aapka yeh number WhatsApp par registered nahi hai. Kripya WhatsApp wale number se register karein.' : '' });
+      const sent = !!row && !!acc.verificationOtpSentAt && new Date(acc.verificationOtpSentAt).getTime() >= new Date(row.createdAt || 0).getTime();
+      return sendJSON(res, 200, { ok:true, unavailable, sent, message: unavailable ? 'OTP सेवा अभी बंद है। कुछ समय बाद फिर कोशिश करें।' : (sent ? 'OTP आपके WhatsApp में भेज दिया गया है।' : 'OTP सेवा अभी बंद है। कुछ समय बाद फिर कोशिश करें।') });
     } catch (e) { return sendJSON(res, 400, { ok:false }); }
   }
 
