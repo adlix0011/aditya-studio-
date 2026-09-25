@@ -112,7 +112,7 @@
       try { body = JSON.parse(init?.body || '{}'); } catch (_) {}
       const form = document.getElementById('broadcastForm');
       const total = productAmount(form) + deliveryFee(form);
-      if (form && !paid(form) && total <= LIMIT && Number(body?.amount) === total) {
+      if (form && !paid(form) && form.elements.paymentMethod?.value !== 'wallet' && total <= LIMIT && Number(body?.amount) === total) {
         return Promise.resolve(new Response(JSON.stringify({ ok:true, walletBalance:balance(), locked:0, freePost:true }), { status:200, headers:{ 'Content-Type':'application/json' } }));
       }
     }
