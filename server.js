@@ -1564,6 +1564,13 @@ const server = http.createServer(async (req, res) => {
       serveLiveHtml(res, data);
     });
   }
+  if (req.method === 'GET' && urlPath === '/order-payment.html') {
+    return fs.readFile(path.join(__dirname, 'order-payment.html'), (err, data) => {
+      if (err) { res.writeHead(404); return res.end('Payment page missing'); }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store, max-age=0' });
+      res.end(data);
+    });
+  }
   if (req.method === 'GET' && (urlPath === '/delivery-pickup' || urlPath === '/delivery-pickup.html')) {
     return fs.readFile(DELIVERY_PICKUP_HTML_FILE, (err, data) => {
       if (err) { res.writeHead(404); return res.end('Pickup workflow page missing'); }
