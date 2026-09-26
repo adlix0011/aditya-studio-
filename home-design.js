@@ -119,7 +119,7 @@ const cakeMenuItems=[
  {name:'Black Forest Cake',price:150,tier:'basic',details:'Chocolate and cream cake',photo:'https://images.unsplash.com/photo-1606890737304-57a1ca8a5b62?auto=format&fit=crop&w=700&q=85'},
  {name:'Vanilla Cake',price:200,tier:'basic',details:'Soft vanilla cream cake',photo:'https://images.unsplash.com/photo-1535141192574-5d4897c12636?auto=format&fit=crop&w=700&q=85'},
  {name:'Butterscotch Cake',price:250,tier:'standard',details:'Butterscotch celebration cake',photo:'https://images.unsplash.com/photo-1559622214-f8a9850965bb?auto=format&fit=crop&w=700&q=85'},
- {name:'Red Velvet Cake',price:350,tier:'special',details:'Red velvet cream cake',photo:'https://images.unsplash.com/photo-1586788680434-30d324f0d3d1?auto=format&fit=crop&w=700&q=85'},
+ {name:'Red Velvet Cake',price:350,tier:'special',details:'Red velvet cream cake',photo:'https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&w=700&q=85'},
  {name:'Fruit Cake',price:500,tier:'premium',details:'Fresh fruit celebration cake',photo:'https://images.unsplash.com/photo-1488477181946-6428a0291777?auto=format&fit=crop&w=700&q=85'},
  {name:'Premium Celebration Cake',price:1000,tier:'signature',details:'Premium special occasion cake',photo:'https://images.unsplash.com/photo-1565958011703-44f9829ba187?auto=format&fit=crop&w=700&q=85'}
 ];
