@@ -296,6 +296,7 @@ const LOCAL_DELIVERY_LOCKS_FILE = path.join(DATA_DIR, 'local-delivery-locks.json
 const LOCAL_DELIVERY_LEDGER_FILE = path.join(DATA_DIR, 'local-delivery-wallet-ledger.json');
 const LOCAL_DELIVERY_ORDERS_FILE = path.join(DATA_DIR, 'local-delivery-orders.json');
 const LOCAL_DELIVERY_MEDIA_DIR = path.join(DATA_DIR, 'local-delivery-media');
+const FOOD_DELIVERY_FEES = Object.freeze({ Siladehi:40, Ghivra:40, Basantpur:40, Kakirda:60, Karhi:80, Malda:60, Domadih:80, Sendri:80, Borshi:80, Taldevri:50, Kera:60, Girwani:40, Gatwa:60 });
 try { fs.mkdirSync(LOCAL_DELIVERY_MEDIA_DIR, { recursive: true }); } catch (e) { console.warn('Local delivery media dir unavailable:', e.message); }
 const AUTO_BACKUP_DIR = path.join(DATA_DIR, 'auto-backups');
 // Browser login ko server restart ke baad bhi valid rakhne ke liye (7 days).
@@ -3326,7 +3327,7 @@ function computeOrderFees(subtotal, settingsFees) {
         if(!acc.mobileVerified)return sendJSON(res,403,{ok:false,error:'mobile-verification-required',message:'Local Delivery post बनाने के लिए पहले अपना mobile number verify करें।'});
         const postSpam = localDeliverySpamCheck(req, acc, 'post', { limit: 3, windowMs: 10 * 60 * 1000, duplicateMs: 10 * 60 * 1000, fingerprint: [o.kind, o.title, o.description, o.area, o.address, o.neededBy].join('|') });
         if(postSpam)return sendJSON(res,429,{ok:false,error:'too-many-requests',message:postSpam.message});
-        o.ownerMobile=acc.mobile;o.ownerName=acc.name;o.createdAt=new Date().toISOString();
+        o.ownerMobile=acc.mobile;o.ownerName=acc.name;o.createdAt=new Date().toISOString(); if(o.directFoodOrder){const fixedFee=FOOD_DELIVERY_FEES[String(o.deliveryVillage||'').trim()];if(!fixedFee)return sendJSON(res,400,{ok:false,message:'Food order के लिए सूची में दिया गांव चुनें।'});o.fee=fixedFee;o.category='Food';}
         const freePostLimit=500,postTotal=Math.round(Number(o.items||0))+Math.round(Number(o.fee||0));
         if(!o.alreadyPurchased&&postTotal>freePostLimit&&Number(acc.walletBalance||0)<postTotal)return sendJSON(res,400,{ok:false,needsRecharge:true,requiredWallet:postTotal,message:'Product और delivery fee मिलाकर ₹500 से अधिक है। Post करने से पहले wallet में ₹'+postTotal+' add करें।'});
         if(o.kind==='delivery-service'){o.status='service';o.serviceActive=true;orders.unshift(o);fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));addNotification({title:'🚚 नई delivery service',body:(acc.name||'Delivery boy')+' ने delivery service post की है।',kind:'local-delivery-service'});return sendJSON(res,200,{ok:true,order:o});}
