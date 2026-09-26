@@ -321,6 +321,20 @@ const DEFAULT_FRAME_PREVIEW_FILE = path.join(__dirname, 'assets', 'default-frame
 const DEFAULT_PASSPORT_PREVIEW_FILE = path.join(__dirname, 'assets', 'default-passport-sheet.png');
 const VEG_BIRYANI_THUMBNAIL_FILE = path.join(__dirname, 'assets', 'veg-biryani-thumbnail.png');
 const CHICKEN_BIRYANI_THUMBNAIL_FILE = path.join(__dirname, 'assets', 'chicken-biryani-thumbnail.png');
+const SNACK_THUMBNAIL_FILES = {
+  '/assets/cheese-burger-thumbnail.png': path.join(__dirname, 'assets', 'cheese-burger-thumbnail.png'),
+  '/assets/double-cheese-burger-thumbnail.png': path.join(__dirname, 'assets', 'double-cheese-burger-thumbnail.png'),
+  '/assets/paneer-burger-thumbnail.png': path.join(__dirname, 'assets', 'paneer-burger-thumbnail.png'),
+  '/assets/aloo-sandwich-thumbnail.png': path.join(__dirname, 'assets', 'aloo-sandwich-thumbnail.png'),
+  '/assets/paneer-sandwich-thumbnail.png': path.join(__dirname, 'assets', 'paneer-sandwich-thumbnail.png'),
+  '/assets/double-cheese-corn-paneer-sandwich-thumbnail.png': path.join(__dirname, 'assets', 'double-cheese-corn-paneer-sandwich-thumbnail.png')
+};
+const GROCERY_THUMBNAIL_FILES = {
+  '/assets/atta-thumbnail.png': path.join(__dirname, 'assets', 'atta-thumbnail.png'),
+  '/assets/chawal-thumbnail.png': path.join(__dirname, 'assets', 'chawal-thumbnail.png'),
+  '/assets/dal-thumbnail.png': path.join(__dirname, 'assets', 'dal-thumbnail.png'),
+  '/assets/tel-thumbnail.png': path.join(__dirname, 'assets', 'tel-thumbnail.png')
+};
 const HTML_FILE = BOOK_NOW_HTML_FILE; // legacy alias
 console.log('[boot] Using data dir:', DATA_DIR);
 
@@ -1833,8 +1847,8 @@ const server = http.createServer(async (req, res) => {
 
   // Small local previews shown only until a customer uploads their own photo.
   // Exact allowlist avoids serving arbitrary files from disk.
-  if (req.method === 'GET' && ['/assets/default-frame-preview.png', '/assets/default-passport-sheet.png', '/assets/veg-biryani-thumbnail.png', '/assets/chicken-biryani-thumbnail.png'].includes(urlPath)) {
-    const file = urlPath.endsWith('default-passport-sheet.png') ? DEFAULT_PASSPORT_PREVIEW_FILE : urlPath.endsWith('veg-biryani-thumbnail.png') ? VEG_BIRYANI_THUMBNAIL_FILE : urlPath.endsWith('chicken-biryani-thumbnail.png') ? CHICKEN_BIRYANI_THUMBNAIL_FILE : DEFAULT_FRAME_PREVIEW_FILE;
+  if (req.method === 'GET' && ['/assets/default-frame-preview.png', '/assets/default-passport-sheet.png', '/assets/veg-biryani-thumbnail.png', '/assets/chicken-biryani-thumbnail.png', ...Object.keys(SNACK_THUMBNAIL_FILES), ...Object.keys(GROCERY_THUMBNAIL_FILES)].includes(urlPath)) {
+    const file = SNACK_THUMBNAIL_FILES[urlPath] || GROCERY_THUMBNAIL_FILES[urlPath] || (urlPath.endsWith('default-passport-sheet.png') ? DEFAULT_PASSPORT_PREVIEW_FILE : urlPath.endsWith('veg-biryani-thumbnail.png') ? VEG_BIRYANI_THUMBNAIL_FILE : urlPath.endsWith('chicken-biryani-thumbnail.png') ? CHICKEN_BIRYANI_THUMBNAIL_FILE : DEFAULT_FRAME_PREVIEW_FILE);
     return fs.readFile(file, (err, data) => {
       if (err) { res.writeHead(404); return res.end('Preview image missing'); }
       res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' });

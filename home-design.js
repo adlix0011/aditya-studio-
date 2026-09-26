@@ -35,7 +35,7 @@ function deliveryReceiveView(){
 }
 const homeCategories=[
  ['🍕 खाने का सामान',[['Biryani','https://images.unsplash.com/photo-1589302168068-964664d93dc0?auto=format&fit=crop&w=500&q=82',120],['Egg Roll','https://images.unsplash.com/photo-1625944525533-473f1a3d54e7?auto=format&fit=crop&w=500&q=82',30],['Pizza','https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=500&q=82',50],['Cake','https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&w=500&q=82',120]]],
- ['🛒 राशन का सामान',[['Aata','https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=500&q=82',45],['Chawal','https://images.unsplash.com/photo-1586208958839-06c17cacdf08?auto=format&fit=crop&w=500&q=82',40],['Dal','https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=500&q=82',90],['Tel','https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&w=500&q=82',120]]],
+ ['🛒 राशन का सामान',[['Aata','/assets/atta-thumbnail.png?v=1',45],['Chawal','/assets/chawal-thumbnail.png?v=1',40],['Dal','/assets/dal-thumbnail.png?v=1',90],['Tel','/assets/tel-thumbnail.png?v=1',120]]],
  ['💊 दवा और care',[['Medicine','https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=500&q=82',20],['First Aid','https://images.unsplash.com/photo-1603398938378-e54eab446dde?auto=format&fit=crop&w=500&q=82',30],['Cough Syrup','https://images.unsplash.com/photo-1585435557343-3b092031a831?auto=format&fit=crop&w=500&q=82',80],['Vitamins','https://images.unsplash.com/photo-1550572017-4fcdbb59cc32?auto=format&fit=crop&w=500&q=82',50]]],
  ['📦 सामान लाना',[['Market Pickup','https://images.unsplash.com/photo-1580674684081-7617fbf3d745?auto=format&fit=crop&w=500&q=82',20],['Courier','https://images.unsplash.com/photo-1566576912321-d58ddd7a6088?auto=format&fit=crop&w=500&q=82',40],['Documents','https://images.unsplash.com/photo-1456324504439-367cee3b3c32?auto=format&fit=crop&w=500&q=82',20],['Parcel','https://images.unsplash.com/photo-1566576912321-d58ddd7a6088?auto=format&fit=crop&w=500&q=82',30]]]
 ];
@@ -132,12 +132,12 @@ document.addEventListener('click',e=>{const cake=e.target.closest('[data-home-it
 
 // Egg Roll opens the Grace fast-food card menu, with the burger and sandwich prices from the shop board.
 const eggRollMenuItems=[
- {name:'Cheese Burger',price:40,details:'Cheese burger',photo:'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=700&q=85'},
- {name:'Double Cheese Burger',price:50,details:'Double cheese burger',photo:'https://images.unsplash.com/photo-1550547660-d9450f859349?auto=format&fit=crop&w=700&q=85'},
- {name:'Paneer Burger',price:60,details:'Paneer burger',photo:'https://images.unsplash.com/photo-1565299507177-b0ac66763828?auto=format&fit=crop&w=700&q=85'},
- {name:'Aloo Sandwich',price:40,details:'Grilled aloo sandwich',photo:'https://images.unsplash.com/photo-1528735602780-2552fd46c7af?auto=format&fit=crop&w=700&q=85'},
- {name:'Paneer Sandwich',price:60,details:'Grilled paneer sandwich',photo:'https://images.unsplash.com/photo-1553909489-cd47e0907980?auto=format&fit=crop&w=700&q=85'},
- {name:'Double Cheese Corn Paneer Sandwich',price:80,details:'Double cheese, corn and paneer sandwich',photo:'https://images.unsplash.com/photo-1481070555726-e2fe8357725c?auto=format&fit=crop&w=700&q=85'}
+ {name:'Cheese Burger',price:40,details:'Cheese burger',photo:'/assets/cheese-burger-thumbnail.png?v=1'},
+ {name:'Double Cheese Burger',price:50,details:'Double cheese burger',photo:'/assets/double-cheese-burger-thumbnail.png?v=1'},
+ {name:'Paneer Burger',price:60,details:'Paneer burger',photo:'/assets/paneer-burger-thumbnail.png?v=1'},
+ {name:'Aloo Sandwich',price:40,details:'Grilled aloo sandwich',photo:'/assets/aloo-sandwich-thumbnail.png?v=1'},
+ {name:'Paneer Sandwich',price:60,details:'Grilled paneer sandwich',photo:'/assets/paneer-sandwich-thumbnail.png?v=1'},
+ {name:'Double Cheese Corn Paneer Sandwich',price:80,details:'Double cheese, corn and paneer sandwich',photo:'/assets/double-cheese-corn-paneer-sandwich-thumbnail.png?v=1'}
 ];
 let eggRollMenuOpen=new URLSearchParams(location.search).get('menu')==='egg-roll';
 if(eggRollMenuOpen){tab='home';active=null}
