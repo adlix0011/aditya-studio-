@@ -1657,9 +1657,9 @@ const server = http.createServer(async (req, res) => {
   // Local Delivery is a small client app. Keep its files explicitly allow-listed
   // so this server never exposes arbitrary files from the project folder.
   const localDeliveryAssets = new Set([
-    'styles.css', 'mobile-design.css', 'home-design.css', 'profile-page.css', 'delivery-flow.css',
+    'styles.css', 'mobile-design.css', 'home-design.css', 'profile-page.css', 'delivery-flow.css', 'food-checkout.css',
     'item-icons.js', 'delivery-engine.js', 'app.js', 'request-summary.js', 'home-design.js',
-    'order-items.js', 'post-page.js', 'profile-page.js', 'edit-order.js', 'delivery-flow.js',
+    'order-items.js', 'post-page.js', 'food-checkout.js', 'profile-page.js', 'edit-order.js', 'delivery-flow.js',
     'post-wallet.js', 'paid-product-policy.js', 'post-recharge-guard.js', 'language.js', 'notifications-page.js', 'notification-alerts.js', 'repost-order.js', 'messages-hub.js', 'chat-room.js', 'confirmation-wait.js', 'order-tracking.js', 'local-delivery-admin.js', 'local-delivery-admin.css'
   ]);
   if (req.method === 'GET' && (urlPath === '/local-delivery.html' || urlPath === '/local-delivery')) {
@@ -1669,7 +1669,13 @@ const server = http.createServer(async (req, res) => {
       serveLiveHtml(res, data);
     });
   }
-  if (req.method === 'GET' && urlPath === '/order-payment.html') {
+  if (req.method === 'GET' && (urlPath === '/meal.html' || urlPath === '/food-order.html')) {
+    return fs.readFile(path.join(__dirname, urlPath === '/meal.html' ? 'meal.html' : 'food-order.html'), (err, data) => {
+      if (err) { res.writeHead(404); return res.end('Food checkout page missing'); }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store, max-age=0' });
+      serveLiveHtml(res, data);
+    });
+  }  if (req.method === 'GET' && urlPath === '/order-payment.html') {
     return fs.readFile(path.join(__dirname, 'order-payment.html'), (err, data) => {
       if (err) { res.writeHead(404); return res.end('Payment page missing'); }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store, max-age=0' });
