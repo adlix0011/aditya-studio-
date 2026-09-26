@@ -297,6 +297,10 @@ const LOCAL_DELIVERY_LEDGER_FILE = path.join(DATA_DIR, 'local-delivery-wallet-le
 const LOCAL_DELIVERY_ORDERS_FILE = path.join(DATA_DIR, 'local-delivery-orders.json');
 const LOCAL_DELIVERY_MEDIA_DIR = path.join(DATA_DIR, 'local-delivery-media');
 const FOOD_DELIVERY_FEES = Object.freeze({ Birra:30, Deorani:50, Basantpur:40, Siladehi:40, Bandabhra:50, Ghiwra:40, Gatwa:70, Taldeori:40, Mauhadih:40, Kikirda:60, Kera:60, Mukta:80, Borsi:80, Sendri:80, Domadih:80, Karhi:80, Malda:60 });
+const FOOD_SHOP_TIME_ZONE = 'Asia/Kolkata';
+function foodIndiaParts(value=new Date()){const out={};for(const p of new Intl.DateTimeFormat('en-CA',{timeZone:FOOD_SHOP_TIME_ZONE,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(value))if(p.type!=='literal')out[p.type]=p.value;return out;}
+function foodIndiaDate(value=new Date()){const p=foodIndiaParts(value);return `${p.year}-${p.month}-${p.day}`;}
+function foodScheduleError(neededBy){const due=new Date(neededBy||'');if(!Number.isFinite(due.getTime()))return 'Food order के लिए सही delivery date और time चुनें।';const now=new Date(),current=foodIndiaParts(now),target=foodIndiaParts(due),minutes=Number(target.hour)*60+Number(target.minute),today=foodIndiaDate(now),tomorrow=foodIndiaDate(new Date(now.getTime()+86400000)),isOpen=Number(current.hour)>=14&&Number(current.hour)<20;if(minutes<840||minutes>1200)return 'Food delivery time केवल दोपहर 2:00 PM से रात 8:00 PM तक है।';if(isOpen&&foodIndiaDate(due)!==today)return 'Shop अभी खुली है। आज 2 PM से 8 PM के बीच का delivery time चुनें।';if(!isOpen&&foodIndiaDate(due)!==tomorrow)return 'Shop अभी बंद है। केवल अगले दिन के लिए pre-book कर सकते हैं।';if(isOpen&&due.getTime()<=now.getTime())return 'आगे का सही delivery time चुनें।';return '';}
 try { fs.mkdirSync(LOCAL_DELIVERY_MEDIA_DIR, { recursive: true }); } catch (e) { console.warn('Local delivery media dir unavailable:', e.message); }
 const AUTO_BACKUP_DIR = path.join(DATA_DIR, 'auto-backups');
 // Browser login ko server restart ke baad bhi valid rakhne ke liye (7 days).
@@ -3344,7 +3348,7 @@ function computeOrderFees(subtotal, settingsFees) {
         if(!acc.mobileVerified)return sendJSON(res,403,{ok:false,error:'mobile-verification-required',message:'Local Delivery post बनाने के लिए पहले अपना mobile number verify करें।'});
         const postSpam = localDeliverySpamCheck(req, acc, 'post', { limit: 3, windowMs: 10 * 60 * 1000, duplicateMs: 10 * 60 * 1000, fingerprint: [o.kind, o.title, o.description, o.area, o.address, o.neededBy].join('|') });
         if(postSpam)return sendJSON(res,429,{ok:false,error:'too-many-requests',message:postSpam.message});
-        o.ownerMobile=acc.mobile;o.ownerName=acc.name;o.createdAt=new Date().toISOString(); if(o.directFoodOrder){const fixedFee=FOOD_DELIVERY_FEES[String(o.deliveryVillage||'').trim()];if(!fixedFee)return sendJSON(res,400,{ok:false,message:'Food order के लिए सूची में दिया गांव चुनें।'});o.fee=fixedFee;o.category='Food';}
+        o.ownerMobile=acc.mobile;o.ownerName=acc.name;o.createdAt=new Date().toISOString(); if(o.directFoodOrder){const fixedFee=FOOD_DELIVERY_FEES[String(o.deliveryVillage||'').trim()];if(!fixedFee)return sendJSON(res,400,{ok:false,message:'Food order के लिए सूची में दिया गांव चुनें।'});const scheduleError=foodScheduleError(o.neededBy);if(scheduleError)return sendJSON(res,400,{ok:false,message:scheduleError});o.fee=fixedFee;o.category='Food';}
         const freePostLimit=500,postTotal=Math.round(Number(o.items||0))+Math.round(Number(o.fee||0));
         if(!o.alreadyPurchased&&postTotal>freePostLimit&&Number(acc.walletBalance||0)<postTotal)return sendJSON(res,400,{ok:false,needsRecharge:true,requiredWallet:postTotal,message:'Product और delivery fee मिलाकर ₹500 से अधिक है। Post करने से पहले wallet में ₹'+postTotal+' add करें।'});
         if(o.kind==='delivery-service'){o.status='service';o.serviceActive=true;orders.unshift(o);fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));addNotification({title:'🚚 नई delivery service',body:(acc.name||'Delivery boy')+' ने delivery service post की है।',kind:'local-delivery-service'});return sendJSON(res,200,{ok:true,order:o});}
@@ -7047,6 +7051,7 @@ server.listen(PORT, '0.0.0.0', () => {
     setInterval(createDailyAutomaticBackup, 60 * 60 * 1000);
   }
 })();
+
 
 
 
