@@ -38,3 +38,6 @@ body.delivery-keyboard-open .sidebar{display:none!important}
 
 /* Give the food photo more room while keeping product information compact. */
 .biryani-menu-card img{height:132px}.biryani-menu-copy{padding:6px 8px 8px}.biryani-menu-copy b{font-size:11px;line-height:14px}.biryani-menu-copy small{display:none}.biryani-menu-copy strong{margin-top:5px;font-size:17px}.biryani-menu-copy em{margin-top:5px;padding:7px 4px;font-size:9px}@media(max-width:430px){.biryani-menu-card img{height:112px}.biryani-menu-copy{padding:5px 6px 7px}.biryani-menu-copy b{font-size:10px;line-height:13px}.biryani-menu-copy strong{font-size:15px}.biryani-menu-copy em{padding:6px 2px}}
+
+/* Fill the complete thumbnail area without empty side bars. */
+.biryani-menu-card img{object-fit:cover}
