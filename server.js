@@ -112,7 +112,10 @@ async function sendWhatsAppCloudOtp(mobile, otp) {
     const response = await fetch('https://graph.facebook.com/v25.0/' + encodeURIComponent(WHATSAPP_PHONE_NUMBER_ID) + '/messages', {
       method:'POST',
       headers:{ 'Authorization':'Bearer ' + WHATSAPP_ACCESS_TOKEN, 'Content-Type':'application/json' },
-      body:JSON.stringify({ messaging_product:'whatsapp', to, type:'template', template:{ name:WHATSAPP_OTP_TEMPLATE, language:{ code:'en' }, components:[{ type:'body', parameters:[{ type:'text', text:String(otp) }] }] } })
+      body:JSON.stringify({ messaging_product:'whatsapp', to, type:'template', template:{ name:WHATSAPP_OTP_TEMPLATE, language:{ code:'en' }, components:[
+        { type:'body', parameters:[{ type:'text', text:String(otp) }] },
+        { type:'button', sub_type:'url', index:'0', parameters:[{ type:'text', text:String(otp) }] }
+      ] } })
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
