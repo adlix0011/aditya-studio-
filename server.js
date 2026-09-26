@@ -296,7 +296,7 @@ const LOCAL_DELIVERY_LOCKS_FILE = path.join(DATA_DIR, 'local-delivery-locks.json
 const LOCAL_DELIVERY_LEDGER_FILE = path.join(DATA_DIR, 'local-delivery-wallet-ledger.json');
 const LOCAL_DELIVERY_ORDERS_FILE = path.join(DATA_DIR, 'local-delivery-orders.json');
 const LOCAL_DELIVERY_MEDIA_DIR = path.join(DATA_DIR, 'local-delivery-media');
-const FOOD_DELIVERY_FEES = Object.freeze({ Siladehi:40, Ghivra:40, Basantpur:40, Kakirda:60, Karhi:80, Malda:60, Domadih:80, Sendri:80, Borshi:80, Taldevri:50, Kera:60, Girwani:40, Gatwa:60, Birra:30, Devrani:50, Sonaidih:40, Sonadah:40, Bandabhara:40, Mauhadih:50, Mukta:60 });
+const FOOD_DELIVERY_FEES = Object.freeze({ Birra:30, Deorani:50, Basantpur:40, Siladehi:40, Bandabhra:50, Ghiwra:40, Gatwa:70, Taldeori:40, Mauhadih:40, Kikirda:60, Kera:60, Mukta:80, Borsi:80, Sendri:80, Domadih:80, Karhi:80, Malda:60 });
 try { fs.mkdirSync(LOCAL_DELIVERY_MEDIA_DIR, { recursive: true }); } catch (e) { console.warn('Local delivery media dir unavailable:', e.message); }
 const AUTO_BACKUP_DIR = path.join(DATA_DIR, 'auto-backups');
 // Browser login ko server restart ke baad bhi valid rakhne ke liye (7 days).
