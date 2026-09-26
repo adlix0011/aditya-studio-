@@ -1,6 +1,6 @@
 (function(){
   if(!window.__foodOrderPage)return;
-  const villageFees={Siladehi:40,Ghivra:40,Basantpur:40,Kakirda:60,Karhi:80,Malda:60,Domadih:80,Sendri:80,Borshi:80,Taldevri:50,Kera:60,Girwani:40,Gatwa:60,Birra:30,Devrani:50};
+  const villageFees={Siladehi:40,Ghivra:40,Basantpur:40,Kakirda:60,Karhi:80,Malda:60,Domadih:80,Sendri:80,Borshi:80,Taldevri:50,Kera:60,Girwani:40,Gatwa:60,Birra:30,Devrani:50,Sonaidih:40,Sonadah:40,Bandabhara:40,Mauhadih:50,Mukta:60};
   window.__foodDeliveryFeeByVillage=villageFees; const villages=Object.keys(villageFees);
   let picked={};try{picked=JSON.parse(sessionStorage.getItem('local_delivery_home_item_v1')||'{}')}catch(_){}
   if(picked?.name)window.__pizzaMenuSelection={...picked};
