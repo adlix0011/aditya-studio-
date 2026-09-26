@@ -2498,8 +2498,8 @@ function computeOrderFees(subtotal, settingsFees) {
       const acc = sessionAccount(req, body, loadAccounts());
       if (!acc || String(acc.mobile) !== mobile) return sendJSON(res, 401, { ok:false, error:'auth' });
       const row = loadOtpRequests().find(r => r.mobile === mobile && r.purpose === 'mobile_verify' && !r.verified);
-      const unavailable = !!row && row.delivery === 'whatsapp_unavailable';
-      const sent = !!row && !!acc.verificationOtpSentAt && new Date(acc.verificationOtpSentAt).getTime() >= new Date(row.createdAt || 0).getTime();
+      const unavailable = !!row && (row.delivery === 'whatsapp_unavailable' || row.delivery === 'whatsapp_cloud_failed');
+      const sent = !!row && (row.delivery === 'whatsapp_cloud' || !!row.whatsappMessageId || (!!acc.verificationOtpSentAt && new Date(acc.verificationOtpSentAt).getTime() >= new Date(row.createdAt || 0).getTime()));
       return sendJSON(res, 200, { ok:true, unavailable, sent, message: unavailable ? 'OTP सेवा अभी बंद है। कुछ समय बाद फिर कोशिश करें।' : (sent ? 'OTP आपके WhatsApp में भेज दिया गया है।' : 'OTP सेवा अभी बंद है। कुछ समय बाद फिर कोशिश करें।') });
     } catch (e) { return sendJSON(res, 400, { ok:false }); }
   }

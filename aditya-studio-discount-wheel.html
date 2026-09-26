@@ -2085,6 +2085,13 @@ registerForm.addEventListener('submit', async (e)=>{
     // welcome free-spin claim becomes available.
     if(currentAccount.freeSpinUsed === false && !currentAccount.mobileVerified) {
       showRegistrationOtp();
+      if(out.otpDelivery === 'whatsapp_cloud') {
+        const msg=document.getElementById('registrationOtpMsg');
+        if(msg) msg.textContent='✅ OTP आपके WhatsApp पर भेज दिया गया है। 6 digit OTP यहां डालें।';
+      } else if(out.otpDelivery === 'whatsapp_cloud_failed') {
+        // Server keeps the OTP securely; retry once through the same Cloud API route.
+        void requestRegistrationOtp();
+      }
     } else if(currentAccount.freeSpinUsed === false) {
       showFreeSpinOffer();
     } else enterDashboard();
