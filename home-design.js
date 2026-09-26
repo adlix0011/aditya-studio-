@@ -133,12 +133,12 @@ document.addEventListener('click',e=>{const cake=e.target.closest('[data-home-it
 
 // Egg Roll opens the Grace fast-food card menu, with the burger and sandwich prices from the shop board.
 const eggRollMenuItems=[
- {name:'Cheese Burger',price:40,details:'Cheese burger',photo:'/assets/cheese-burger-thumbnail.png?v=1'},
- {name:'Double Cheese Burger',price:50,details:'Double cheese burger',photo:'/assets/double-cheese-burger-thumbnail.png?v=1'},
- {name:'Paneer Burger',price:60,details:'Paneer burger',photo:'/assets/paneer-burger-thumbnail.png?v=1'},
- {name:'Aloo Sandwich',price:40,details:'Grilled aloo sandwich',photo:'/assets/aloo-sandwich-thumbnail.png?v=1'},
- {name:'Paneer Sandwich',price:60,details:'Grilled paneer sandwich',photo:'/assets/paneer-sandwich-thumbnail.png?v=1'},
- {name:'Double Cheese Corn Paneer Sandwich',price:80,details:'Double cheese, corn and paneer sandwich',photo:'/assets/double-cheese-corn-paneer-sandwich-thumbnail.png?v=1'}
+ {name:'Cheese Burger',price:40,details:'Cheese burger',photo:'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=700&q=88'},
+ {name:'Double Cheese Burger',price:50,details:'Double cheese burger',photo:'https://images.unsplash.com/photo-1550547660-d9450f859349?auto=format&fit=crop&w=700&q=88'},
+ {name:'Paneer Burger',price:60,details:'Paneer burger',photo:'https://images.unsplash.com/photo-1520072959219-c595dc870360?auto=format&fit=crop&w=700&q=88'},
+ {name:'Aloo Sandwich',price:40,details:'Grilled aloo sandwich',photo:'https://images.unsplash.com/photo-1528735602780-2552fd46c7af?auto=format&fit=crop&w=700&q=88'},
+ {name:'Paneer Sandwich',price:60,details:'Grilled paneer sandwich',photo:'https://images.unsplash.com/photo-1539252554453-80ab65ce3586?auto=format&fit=crop&w=700&q=88'},
+ {name:'Double Cheese Corn Paneer Sandwich',price:80,details:'Double cheese, corn and paneer sandwich',photo:'https://images.unsplash.com/photo-1509722747041-616f39b57569?auto=format&fit=crop&w=700&q=88'}
 ];
 let eggRollMenuOpen=new URLSearchParams(location.search).get('menu')==='egg-roll';
 if(eggRollMenuOpen){tab='home';active=null}
@@ -146,5 +146,6 @@ const categoryHomeBeforeEggRoll=home;
 home=function(){if(!eggRollMenuOpen)return categoryHomeBeforeEggRoll();return `<section class="pizza-menu-page egg-roll-menu-page"><button type="button" class="back pizza-menu-back" data-egg-roll-menu-back>← होम पर वापस जाएं</button><div class="pizza-menu-hero"><span>🍔 Grace fast food</span><h1>Burger और Sandwich चुनें</h1><p>अपनी पसंद का item और price चुनें। वही item और रकम order form में अपने-आप भर जाएगी।</p></div><div class="pizza-menu-list">${eggRollMenuItems.map((item,index)=>`<button type="button" class="biryani-menu-card pizza-product-card" data-egg-roll-variant="${index}"><img src="${item.photo}" alt="${esc(item.name)}"><span class="biryani-menu-copy"><b>${esc(item.name)}</b><small>${esc(item.details)}</small><strong>₹${item.price}</strong><em>${foodShopOrderLabel()}</em></span></button>`).join('')}</div></section>`};
 if(eggRollMenuOpen)render();
 document.addEventListener('click',e=>{const eggRoll=e.target.closest('[data-home-item="Egg Roll"]');if(eggRoll){e.preventDefault();e.stopImmediatePropagation();eggRollMenuOpen=true;tab='home';active=null;history.pushState({},'',location.pathname+'?menu=egg-roll');render();return}if(e.target.closest('[data-egg-roll-menu-back]')){e.preventDefault();eggRollMenuOpen=false;history.replaceState({},'',location.pathname);render();return}const option=e.target.closest('[data-egg-roll-variant]');if(!option)return;const item=eggRollMenuItems[Number(option.dataset.eggRollVariant)];if(!item)return;e.preventDefault();e.stopImmediatePropagation();window.__pizzaMenuSelection=item;try{sessionStorage.setItem('local_delivery_home_item_v1',JSON.stringify({name:item.name,category:'Food',price:item.price,details:item.details,menu:'egg-roll',sourceItem:'Egg Roll'}))}catch(_){}eggRollMenuOpen=false;location.href='/meal.html'},true);
+
 
 
