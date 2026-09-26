@@ -3357,6 +3357,18 @@ function computeOrderFees(subtotal, settingsFees) {
           return sendJSON(res,410,{ok:false,message:'Post expired हो चुकी है। यह order अब बंद है।'});
         }
         if(!['open','chat'].includes(o.status))return sendJSON(res,409,{ok:false,message:'यह order अब final हो चुका है'});
+        // Food menu prices are fixed in the app.  A verified delivery boy can
+        // take these orders directly; chat stays available after booking.
+        if(o.directFoodOrder){
+          const acceptedAt=new Date().toISOString();
+          o.status='booked';o.providerMobile=acc.mobile;o.providerName=acc.name||'Delivery helper';
+          o.deliveryCandidates=[{mobile:acc.mobile,name:o.providerName,acceptedAt}];
+          o.candidateSessions=[{mobile:acc.mobile,name:o.providerName,acceptedAt,messages:[],paymentRequest:null,deliveryConfirmRequest:null}];
+          o.acceptedAt=acceptedAt;o.updatedAt=acceptedAt;
+          fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));
+          addNotification({title:'✅ Food order accepted',body:(acc.name||'Delivery boy')+' ने आपका “'+String(o.title).slice(0,90)+'” order accept कर लिया है।',mobile:o.ownerMobile,kind:'local-delivery-accepted',orderId:o.id});
+          return sendJSON(res,200,{ok:true,order:viewFor(o,acc.mobile),directAccepted:true});
+        }
         o.deliveryCandidates=Array.isArray(o.deliveryCandidates)?o.deliveryCandidates:[];
         if(o.providerMobile&&!o.deliveryCandidates.some(c=>String(c.mobile)===String(o.providerMobile)))o.deliveryCandidates.push({mobile:o.providerMobile,name:o.providerName||'Delivery helper',acceptedAt:o.acceptedAt||new Date().toISOString()});
         if(o.deliveryCandidates.some(c=>String(c.mobile)===String(acc.mobile)))return sendJSON(res,409,{ok:false,message:'आपने यह order पहले accept किया है'});
