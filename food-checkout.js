@@ -17,6 +17,7 @@ window.foodShopScheduleCheck=check;
   window.addEventListener('change',e=>{const f=e.target.form;if(e.target.id==='foodVillage'){f.elements.fee.value=villageFees[e.target.value]??'';syncFoodTotal(f)}if(e.target.id==='foodBiryaniType'){const opt=e.target.options[e.target.selectedIndex],row=f.querySelector('.food-item-row');row.dataset.foodUnitPrice=String(opt.dataset.price||0);f.querySelector('[data-item-name]').value=opt.value;syncFoodTotal(f)}if(e.target.id==='foodQuantity')syncFoodTotal(f);if(['neededDate','neededTime'].includes(e.target.name)&&f?.id==='broadcastForm')check(f,false);});
   document.addEventListener('click',e=>{if(e.target.id!=='foodPrebook')return;const f=e.target.form,s=schedule();f.elements.neededDate.value=s.tomorrow;f.elements.neededTime.value='14:00';toast('कल 2:00 PM का pre-book time चुन लिया गया है।');});
   document.addEventListener('input',e=>{if(e.target.id==='foodDeliveryFee'){e.target.value=villageFees[e.target.form.elements.deliveryVillage.value]??'';toast('Food delivery fee गांव के हिसाब से fixed है।')}});
-  tab='post';active=null;render();syncFoodTotal(document.querySelector('#broadcastForm'));
+  tab='post';active=null;render();syncFoodTotal(document.querySelector('#broadcastForm'));window.addEventListener('pageshow',()=>setTimeout(()=>syncFoodTotal(document.querySelector('#broadcastForm')),0));setTimeout(()=>syncFoodTotal(document.querySelector('#broadcastForm')),80);
 })();
+
 
