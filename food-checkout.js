@@ -2,7 +2,7 @@
   if(!window.__foodOrderPage)return;
   const villageDetails=[{name:'Birra',km:'0 km',fee:30},{name:'Deorani',km:'2.9 km',fee:50},{name:'Basantpur',km:'2.9 km',fee:40},{name:'Siladehi',km:'3.0 km',fee:40},{name:'Bandabhra',km:'3.3 km',fee:50},{name:'Ghiwra',km:'3.7 km',fee:40},{name:'Gatwa',km:'4.2 km',fee:70},{name:'Taldeori',km:'4.5 km',fee:40},{name:'Mauhadih',km:'5 km',fee:40},{name:'Kikirda',km:'6.7 km',fee:60},{name:'Kera',km:'7 km',fee:60},{name:'Mukta',km:'7 km',fee:80},{name:'Borsi',km:'8 km',fee:80},{name:'Sendri',km:'8 km',fee:80},{name:'Domadih',km:'9 km',fee:80},{name:'Karhi',km:'9 km',fee:80},{name:'Malda',km:'10 km',fee:60}];
   const villageFees=Object.fromEntries(villageDetails.map(v=>[v.name,v.fee])); window.__foodDeliveryFeeByVillage=villageFees;
-  let picked={};try{picked=JSON.parse(sessionStorage.getItem('local_delivery_home_item_v1')||'{}')}catch(_){} if(picked?.name)window.__pizzaMenuSelection={...picked};
+  let picked={};try{picked=JSON.parse(sessionStorage.getItem('local_delivery_home_item_v1')||'{}')}catch(_){} if(picked?.name)window.__pizzaMenuSelection={...picked};if(/biryani/i.test(String(picked?.name||''))){toast('🍛 Biryani जल्द ही उपलब्ध होगा।');location.replace('/local-delivery.html');return;}
   const namesToMenu={Pizza:'pizza',Biryani:'biryani',Cake:'cake','Egg Roll':'egg-roll'},inferredMenu=picked.menu||namesToMenu[picked.sourceItem]||(/Biryani/i.test(String(picked.name||''))?'biryani':/Cake/i.test(String(picked.name||''))?'cake':/Burger|Sandwich/i.test(String(picked.name||''))?'egg-roll':'pizza'),foodMenuPath='/local-delivery.html?menu='+encodeURIComponent(inferredMenu),pad=n=>String(n).padStart(2,'0');
   const day=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
   function schedule(){const now=new Date(),open=now.getHours()>=14&&now.getHours()<20,target=new Date(now);if(!open)target.setDate(target.getDate()+1);return {open,now,target,date:day(target),tomorrow:day(new Date(now.getFullYear(),now.getMonth(),now.getDate()+1)),time:open?(now.getHours()===19?'20:00':pad(Math.max(14,now.getHours()+1))+':00'):'14:00'};}
@@ -19,5 +19,6 @@ window.foodShopScheduleCheck=check;
   document.addEventListener('input',e=>{if(e.target.id==='foodDeliveryFee'){e.target.value=villageFees[e.target.form.elements.deliveryVillage.value]??'';toast('Food delivery fee गांव के हिसाब से fixed है।')}});
   tab='post';active=null;render();syncFoodTotal(document.querySelector('#broadcastForm'));window.addEventListener('pageshow',()=>setTimeout(()=>syncFoodTotal(document.querySelector('#broadcastForm')),0));setTimeout(()=>syncFoodTotal(document.querySelector('#broadcastForm')),80);
 })();
+
 
 
