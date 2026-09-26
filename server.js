@@ -7,6 +7,24 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+// Local development may use a private .env file. Production environment
+// variables always win, and .env is ignored by Git.
+function loadLocalEnv() {
+  const envPath = path.join(__dirname, '.env');
+  if (!fs.existsSync(envPath)) return;
+  try {
+    for (const rawLine of fs.readFileSync(envPath, 'utf8').split(/\r?\n/)) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith('#')) continue;
+      const match = line.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
+      if (!match || Object.prototype.hasOwnProperty.call(process.env, match[1])) continue;
+      let value = match[2].trim();
+      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) value = value.slice(1, -1);
+      process.env[match[1]] = value;
+    }
+  } catch (error) { console.warn('Could not load local .env:', error.message); }
+}
+loadLocalEnv();
 let sharp = null; try { sharp = require('sharp'); } catch (e) { console.warn('Sharp image processor is not installed:', e.message); }
 
 const PORT = process.env.PORT || 8000;
@@ -24,6 +42,7 @@ const TELEGRAM_CHAT_ID = String(process.env.TELEGRAM_CHAT_ID || '').trim();
 const WHATSAPP_VERIFY_TOKEN = String(process.env.WHATSAPP_VERIFY_TOKEN || '').trim();
 const WHATSAPP_ACCESS_TOKEN = String(process.env.WHATSAPP_ACCESS_TOKEN || '').trim();
 const WHATSAPP_PHONE_NUMBER_ID = String(process.env.WHATSAPP_PHONE_NUMBER_ID || '').trim();
+const WHATSAPP_OTP_TEMPLATE = String(process.env.WHATSAPP_OTP_TEMPLATE || 'local_delivery_otp').trim();
 let whatsappCloudStatus = { configured: !!(WHATSAPP_ACCESS_TOKEN && WHATSAPP_PHONE_NUMBER_ID), lastWebhookAt: null, lastWebhookEvent: '', lastError: '' };
 // Cloudflare R2 is optional. These private values live only in the local
 // environment / Render dashboard — never in this source file or browser code.
@@ -71,6 +90,29 @@ async function sendWhatsAppCloudText(mobile, text) {
       method:'POST',
       headers:{ 'Authorization':'Bearer ' + WHATSAPP_ACCESS_TOKEN, 'Content-Type':'application/json' },
       body:JSON.stringify({ messaging_product:'whatsapp', to, type:'text', text:{ preview_url:false, body:String(text || '').slice(0,1000) } })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = String(data?.error?.message || ('WhatsApp HTTP ' + response.status)).slice(0,240);
+      whatsappCloudStatus = { ...whatsappCloudStatus, configured:true, lastError:error };
+      return { ok:false, error };
+    }
+    whatsappCloudStatus = { ...whatsappCloudStatus, configured:true, lastError:'', lastSentAt:new Date().toISOString(), lastSentTo:to };
+    return { ok:true, messageId:data?.messages?.[0]?.id || '' };
+  } catch (error) {
+    const message = String(error?.message || 'WhatsApp network error').slice(0,240);
+    whatsappCloudStatus = { ...whatsappCloudStatus, configured:true, lastError:message };
+    return { ok:false, error:message };
+  }
+}
+async function sendWhatsAppCloudOtp(mobile, otp) {
+  const to = whatsappCloudRecipient(mobile);
+  if (!whatsappCloudReady() || !to) return { ok:false, error: !whatsappCloudReady() ? 'WhatsApp Cloud API is not configured' : 'Invalid Indian WhatsApp number' };
+  try {
+    const response = await fetch('https://graph.facebook.com/v25.0/' + encodeURIComponent(WHATSAPP_PHONE_NUMBER_ID) + '/messages', {
+      method:'POST',
+      headers:{ 'Authorization':'Bearer ' + WHATSAPP_ACCESS_TOKEN, 'Content-Type':'application/json' },
+      body:JSON.stringify({ messaging_product:'whatsapp', to, type:'template', template:{ name:WHATSAPP_OTP_TEMPLATE, language:{ code:'en' }, components:[{ type:'body', parameters:[{ type:'text', text:String(otp) }] }] } })
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
@@ -2373,18 +2415,31 @@ function computeOrderFees(subtotal, settingsFees) {
       // Wahi OTP rehta hai, lekin har click par admin queue aur Telegram alert
       // refresh hota hai so the studio cannot miss the customer's request.
       if (existing && existing.manualOtp) {
-        existing.delivery = 'whatsapp_manual';
+        const delivery = whatsappCloudReady() ? 'whatsapp_cloud' : 'whatsapp_manual';
+        existing.delivery = delivery;
         existing.requestedAt = new Date().toISOString();
         existing.lastRequestedAt = existing.requestedAt;
         saveOtpRequests(list.slice(0, 100));
+        if (delivery === 'whatsapp_cloud') {
+          const sent = await sendWhatsAppCloudOtp(mobile, existing.manualOtp);
+          if (!sent.ok) {
+            existing.delivery = 'whatsapp_cloud_failed';
+            existing.lastDeliveryError = sent.error || 'WhatsApp send failed';
+            saveOtpRequests(list.slice(0, 100));
+            return sendJSON(res, 502, { ok:false, error:'whatsapp-send-failed', message:'WhatsApp OTP नहीं भेज पाए। थोड़ी देर बाद फिर try करें।' });
+          }
+          existing.whatsappMessageId = sent.messageId || '';
+          saveOtpRequests(list.slice(0, 100));
+          return sendJSON(res, 200, { ok: true, requestId: existing.requestId, alreadyVerified: false, delivery, alreadyPending: true, expiresInSeconds: Math.max(0, Math.floor((new Date(existing.expiresAt).getTime() - now) / 1000)) });
+        }
         void sendTelegramAlert('WhatsApp OTP Requested Again', 'Customer: ' + (acc.name || 'Customer') + '\nUser ID: ' + (acc.id || '—') + '\nMobile: ' + mobile + '\nAction: OTP admin panel me available hai; wahin se WhatsApp par bhejein.');
-        return sendJSON(res, 200, { ok: true, requestId: existing.requestId, alreadyVerified: false, delivery: 'whatsapp_manual', alreadyPending: true, expiresInSeconds: Math.max(0, Math.floor((new Date(existing.expiresAt).getTime() - now) / 1000)) });
+        return sendJSON(res, 200, { ok: true, requestId: existing.requestId, alreadyVerified: false, delivery, alreadyPending: true, expiresInSeconds: Math.max(0, Math.floor((new Date(existing.expiresAt).getTime() - now) / 1000)) });
       }
       const otp = generateOtp();
       const requestId = 'otp-' + mobile + '-' + now;
       // This button specifically asks the studio admin to send OTP on WhatsApp.
       // Do not silently switch to SMS: the request must stay visible in admin.
-      const sms = {}, delivery = 'whatsapp_manual';
+      const sms = {}, delivery = whatsappCloudReady() ? 'whatsapp_cloud' : 'whatsapp_manual';
       if (existing) list = list.filter(r => r !== existing);
       list.unshift({
         mobile, name: acc.name || '', id: acc.id || '', otpHash: hashOtp(otp), requestId,
@@ -2394,6 +2449,15 @@ function computeOrderFees(subtotal, settingsFees) {
         manualOtp: otp, delivery
       });
       saveOtpRequests(list.slice(0, 100));
+      if (delivery === 'whatsapp_cloud') {
+        const row = list.find(r => r.requestId === requestId);
+        const sent = await sendWhatsAppCloudOtp(mobile, otp);
+        if (!sent.ok) {
+          if (row) { row.delivery = 'whatsapp_cloud_failed'; row.lastDeliveryError = sent.error || 'WhatsApp send failed'; saveOtpRequests(list.slice(0, 100)); }
+          return sendJSON(res, 502, { ok:false, error:'whatsapp-send-failed', message:'WhatsApp OTP नहीं भेज पाए। थोड़ी देर बाद फिर try करें।' });
+        }
+        if (row) { row.whatsappMessageId = sent.messageId || ''; saveOtpRequests(list.slice(0, 100)); }
+      }
       recordAuthFailure(req, mobile + ':otp');
       console.log('OTP request created for:', mobile, requestId, delivery);
       void sendTelegramAlert('WhatsApp OTP Request', 'Customer: ' + (acc.name || 'Customer') + '\nUser ID: ' + (acc.id || '—') + '\nMobile: ' + mobile + '\nAction: OTP admin panel me available hai; wahin se WhatsApp par bhejein.');
@@ -2494,12 +2558,20 @@ function computeOrderFees(subtotal, settingsFees) {
       const existing = list.find(r => r.mobile === mobile && !r.verified && r.purpose === 'pin_reset');
       if (existing && now - new Date(existing.createdAt || 0).getTime() < OTP_RESEND_COOLDOWN_MS) return sendJSON(res, 429, { ok: false, error: 'resend-too-soon', message: 'नया OTP माँगने से पहले 1 मिनट रुकें।' });
       const otp = generateOtp(), requestId = 'pin-reset-' + mobile + '-' + now;
+      const otpDelivery = whatsappCloudReady() ? 'whatsapp_cloud' : 'whatsapp_manual';
       if (existing) list = list.filter(r => r !== existing);
-      list.unshift({ mobile, name: acc.name || '', id: acc.id || '', otpHash: hashOtp(otp), requestId, smsId: '', createdAt: new Date().toISOString(), expiresAt: null, attempts: 0, verified: false, purpose: 'pin_reset', manualOtp: otp, delivery: 'whatsapp_manual' });
+      const otpRow = { mobile, name: acc.name || '', id: acc.id || '', otpHash: hashOtp(otp), requestId, smsId: '', createdAt: new Date().toISOString(), expiresAt: null, attempts: 0, verified: false, purpose: 'pin_reset', manualOtp: otp, delivery: otpDelivery };
+      list.unshift(otpRow);
       acc.pinResetRequested = true;
       acc.pinResetRequestedAt = new Date().toISOString();
       saveOtpRequests(list.slice(0, 100));
       saveAccounts(accounts);
+      if (otpDelivery === 'whatsapp_cloud') {
+        const sent = await sendWhatsAppCloudOtp(mobile, otp);
+        if (sent.ok) otpRow.whatsappMessageId = sent.messageId || '';
+        else { otpRow.delivery = 'whatsapp_cloud_failed'; otpRow.lastDeliveryError = sent.error || 'WhatsApp send failed'; }
+        saveOtpRequests(list.slice(0, 100));
+      }
       return sendJSON(res, 200, { ok: true, message: 'OTP request admin को भेज दी गई है। OTP WhatsApp से आएगा और सही OTP डालने तक valid रहेगा।' });
     } catch (e) {
       const status = e && e.code === 'sms-not-configured' ? 503 : 502;
@@ -2593,13 +2665,21 @@ function computeOrderFees(subtotal, settingsFees) {
       accounts.push(acc);
       // Naye register user ki verification request admin WhatsApp OTP list me seedha aaye.
       const now = Date.now(), otp = generateOtp(), requestId = 'otp-' + mobile + '-' + now;
+      const otpDelivery = whatsappCloudReady() ? 'whatsapp_cloud' : 'whatsapp_manual';
       let otpList = loadOtpRequests().filter(r => keepPendingOtpForAdmin(r, now));
-      otpList.unshift({ mobile, name: acc.name || '', id: acc.id || '', otpHash: hashOtp(otp), requestId, smsId:'', createdAt:new Date().toISOString(), expiresAt:new Date(now + MOBILE_VERIFY_OTP_TTL_MS).toISOString(), attempts:0, verified:false, purpose:'mobile_verify', manualOtp:otp, delivery:'whatsapp_manual' });
+      const otpRow = { mobile, name: acc.name || '', id: acc.id || '', otpHash: hashOtp(otp), requestId, smsId:'', createdAt:new Date().toISOString(), expiresAt:new Date(now + MOBILE_VERIFY_OTP_TTL_MS).toISOString(), attempts:0, verified:false, purpose:'mobile_verify', manualOtp:otp, delivery:otpDelivery };
+      otpList.unshift(otpRow);
       saveOtpRequests(otpList.slice(0,100));
+      if (otpDelivery === 'whatsapp_cloud') {
+        const sent = await sendWhatsAppCloudOtp(mobile, otp);
+        if (sent.ok) otpRow.whatsappMessageId = sent.messageId || '';
+        else { otpRow.delivery = 'whatsapp_cloud_failed'; otpRow.lastDeliveryError = sent.error || 'WhatsApp send failed'; }
+        saveOtpRequests(otpList.slice(0,100));
+      }
       void sendTelegramAlert('New User Registered', 'Customer: ' + (acc.name || 'Customer') + '\nUser ID: ' + id + '\nMobile: ' + mobile + (acc.village ? ('\nVillage: ' + acc.village) : '') + '\nVerification: Pending');
       const registrationSessionToken = issueSession(acc);
       saveAccounts(accounts);
-      return sendJSON(res, 200, { ...accountPublicPayload(acc), sessionToken: registrationSessionToken, otpRequested:true });
+      return sendJSON(res, 200, { ...accountPublicPayload(acc), sessionToken: registrationSessionToken, otpRequested:true, otpDelivery:otpRow.delivery });
     } catch (e) {
       return sendJSON(res, 500, { ok: false, error: 'save-failed' });
     }
@@ -3163,10 +3243,18 @@ function computeOrderFees(subtotal, settingsFees) {
       if (existing && now - new Date(existing.createdAt || 0).getTime() < OTP_RESEND_COOLDOWN_MS) return sendJSON(res, 429, { ok: false, error: 'resend-too-soon', message: 'नया OTP माँगने से पहले 1 मिनट रुकें।' });
       if (existing) list = list.filter(r => r !== existing);
       const otp = generateOtp();
-      list.unshift({ mobile, name: acc.name || '', id: acc.id || '', otpHash: hashOtp(otp), requestId:'pin-reset-' + mobile + '-' + now, smsId:'', createdAt:new Date().toISOString(), expiresAt:null, attempts:0, verified:false, purpose:'pin_reset', manualOtp:otp, delivery:'whatsapp_manual' });
+      const otpDelivery = whatsappCloudReady() ? 'whatsapp_cloud' : 'whatsapp_manual';
+      const otpRow = { mobile, name: acc.name || '', id: acc.id || '', otpHash: hashOtp(otp), requestId:'pin-reset-' + mobile + '-' + now, smsId:'', createdAt:new Date().toISOString(), expiresAt:null, attempts:0, verified:false, purpose:'pin_reset', manualOtp:otp, delivery:otpDelivery };
+      list.unshift(otpRow);
       acc.pinResetRequested = true;
       acc.pinResetRequestedAt = new Date().toISOString();
       saveOtpRequests(list.slice(0, 100)); saveAccounts(accounts);
+      if (otpDelivery === 'whatsapp_cloud') {
+        const sent = await sendWhatsAppCloudOtp(mobile, otp);
+        if (sent.ok) otpRow.whatsappMessageId = sent.messageId || '';
+        else { otpRow.delivery = 'whatsapp_cloud_failed'; otpRow.lastDeliveryError = sent.error || 'WhatsApp send failed'; }
+        saveOtpRequests(list.slice(0, 100));
+      }
       return sendJSON(res, 200, { ok: true, message:'OTP request admin को भेज दी गई है। OTP WhatsApp से आएगा और सही OTP डालने तक valid रहेगा।' });
     } catch (e) {
       return sendJSON(res, 400, { ok: false });
