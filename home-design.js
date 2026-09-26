@@ -102,9 +102,9 @@ document.addEventListener('click',e=>{if(!e.target.closest('[data-verify-mobile]
 
 // Biryani also has shop varieties, so open a dedicated menu before the post form.
 const biryaniMenuItems=[
- {name:'Veg Biryani',price:100,details:'खुशबूदार veg biryani',photo:'https://images.unsplash.com/photo-1589302168068-964664d93dc0?auto=format&fit=crop&w=700&q=85'},
- {name:'Chicken Biryani · Half Plate',price:120,details:'Chicken biryani half plate',photo:'https://images.unsplash.com/photo-1563379926898-05f4575a45d8?auto=format&fit=crop&w=700&q=85'},
- {name:'Chicken Biryani · Full Plate',price:180,details:'Chicken biryani full plate',photo:'https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=700&q=85'}
+ {name:'Veg Biryani',price:100,details:'खुशबूदार veg biryani',photo:'/assets/veg-biryani-thumbnail.png'},
+ {name:'Chicken Biryani · Half Plate',price:120,details:'Chicken biryani half plate',photo:'/assets/chicken-biryani-thumbnail.png'},
+ {name:'Chicken Biryani · Full Plate',price:180,details:'Chicken biryani full plate',photo:'/assets/chicken-biryani-thumbnail.png'}
 ];
 let biryaniMenuOpen=new URLSearchParams(location.search).get('menu')==='biryani';
 if(biryaniMenuOpen){tab='home';active=null}
