@@ -42,8 +42,12 @@ const TELEGRAM_CHAT_ID = String(process.env.TELEGRAM_CHAT_ID || '').trim();
 const WHATSAPP_VERIFY_TOKEN = String(process.env.WHATSAPP_VERIFY_TOKEN || '').trim();
 const WHATSAPP_ACCESS_TOKEN = String(process.env.WHATSAPP_ACCESS_TOKEN || '').trim();
 const WHATSAPP_PHONE_NUMBER_ID = String(process.env.WHATSAPP_PHONE_NUMBER_ID || '').trim();
-const WHATSAPP_OTP_TEMPLATE = String(process.env.WHATSAPP_OTP_TEMPLATE || 'local_delivery_otp').trim();
+const WHATSAPP_OTP_TEMPLATE = String(process.env.WHATSAPP_OTP_TEMPLATE || 'aditya_studio_otp_v2').trim();
 let whatsappCloudStatus = { configured: !!(WHATSAPP_ACCESS_TOKEN && WHATSAPP_PHONE_NUMBER_ID), lastWebhookAt: null, lastWebhookEvent: '', lastError: '' };
+// The Windows WhatsApp Web relay updates this every 15 seconds using admin
+// authentication. A stale timestamp is shown as disconnected in /admin.
+let whatsappRelayStatus = { lastSeenAt:null, whatsapp:'not_connected', healthy:false, lastServerError:null, consecutiveServerFailures:0 };
+let whatsappRelayTestQueue = [];
 // Cloudflare R2 is optional. These private values live only in the local
 // environment / Render dashboard — never in this source file or browser code.
 const R2_BUCKET = String(process.env.R2_BUCKET || '').trim();
@@ -341,6 +345,7 @@ const LOCAL_DELIVERY_LOCKS_FILE = path.join(DATA_DIR, 'local-delivery-locks.json
 const LOCAL_DELIVERY_LEDGER_FILE = path.join(DATA_DIR, 'local-delivery-wallet-ledger.json');
 const LOCAL_DELIVERY_ORDERS_FILE = path.join(DATA_DIR, 'local-delivery-orders.json');
 const LOCAL_DELIVERY_MEDIA_DIR = path.join(DATA_DIR, 'local-delivery-media');
+const USED_LISTINGS_FILE = path.join(DATA_DIR, 'used-listings.json');
 const FOOD_DELIVERY_FEES = Object.freeze({ Birra:30, Deorani:50, Basantpur:40, Siladehi:40, Bandabhra:50, Ghiwra:40, Gatwa:70, Taldeori:40, Mauhadih:40, Kikirda:60, Kera:60, Mukta:80, Borsi:80, Sendri:80, Domadih:80, Karhi:80, Malda:60 });
 const FOOD_SHOP_TIME_ZONE = 'Asia/Kolkata';
 function foodIndiaParts(value=new Date()){const out={};for(const p of new Intl.DateTimeFormat('en-CA',{timeZone:FOOD_SHOP_TIME_ZONE,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(value))if(p.type!=='literal')out[p.type]=p.value;return out;}
@@ -1711,12 +1716,36 @@ const server = http.createServer(async (req, res) => {
     'order-items.js', 'post-page.js', 'food-checkout.js', 'profile-page.js', 'edit-order.js', 'delivery-flow.js',
     'post-wallet.js', 'paid-product-policy.js', 'post-recharge-guard.js', 'language.js', 'notifications-page.js', 'notification-alerts.js', 'repost-order.js', 'messages-hub.js', 'chat-room.js', 'confirmation-wait.js', 'order-tracking.js', 'local-delivery-admin.js', 'local-delivery-admin.css'
   ]);
-  if (req.method === 'GET' && (urlPath === '/local-delivery.html' || urlPath === '/local-delivery')) {
+  if (req.method === 'GET' && (urlPath === '/local' || urlPath === '/local-delivery.html' || urlPath === '/local-delivery')) {
     return fs.readFile(path.join(__dirname, 'local-delivery.html'), (err, data) => {
       if (err) { res.writeHead(404); return res.end('Local Delivery page missing'); }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store, max-age=0' });
       serveLiveHtml(res, data);
     });
+  }
+  if (req.method === 'GET' && (urlPath === '/sell-gadget' || urlPath === '/sell-gadget.html')) {
+    return fs.readFile(path.join(__dirname, 'sell-gadget.html'), (err, data) => {
+      if (err) { res.writeHead(404); return res.end('Sell gadget page missing'); }
+      res.writeHead(200, { 'Content-Type':'text/html; charset=utf-8', 'Cache-Control':'no-store, max-age=0' }); res.end(data);
+    });
+  }
+  if (req.method === 'GET' && urlPath === '/api/used-listings') {
+    let list=[]; try { list=JSON.parse(fs.readFileSync(USED_LISTINGS_FILE,'utf8')) || []; } catch (_) {}
+    const category=String(new URL(req.url,'http://localhost').searchParams.get('category')||'').trim();
+    list=list.filter(x=>x&&(!category||x.category===category)).slice(0,200).map(x=>({id:x.id,title:x.title,category:x.category,categoryLabel:x.categoryLabel,condition:x.condition,price:x.price,area:x.area,description:x.description,photos:Array.isArray(x.photos)?x.photos.slice(0,2):[],createdAt:x.createdAt}));
+    return sendJSON(res,200,{ok:true,listings:list});
+  }
+  if (req.method === 'POST' && urlPath === '/api/used-listings') {
+    try {
+      const body=await readBody(req,3e6), accounts=loadAccounts(), acc=sessionAccount(req,body,accounts);
+      if(!acc)return sendJSON(res,401,{ok:false,message:'Listing के लिए पहले login करें।'});
+      const categories={mobile:'Mobile phone',electronics:'Electronics',computer:'Computer / Laptop',appliance:'Home appliance',furniture:'Furniture',vehicle:'Vehicle / accessories',fashion:'Fashion',books:'Books / Study',other:'Other'};
+      const title=String(body.title||'').trim(),category=String(body.category||''),condition=String(body.condition||''),area=String(body.area||'').trim(),description=String(body.description||'').trim(),price=Math.round(Number(body.price)),photos=Array.isArray(body.photos)?body.photos.slice(0,2):[];
+      if(title.length<3||title.length>100||!categories[category]||!['Like new','Good','Used'].includes(condition)||area.length<2||area.length>100||description.length<5||description.length>1000||!Number.isFinite(price)||price<1||price>10000000)return sendJSON(res,400,{ok:false,message:'सभी सही item details भरें।'});
+      if(!photos.length||photos.some(x=>!isLocalDeliveryMediaUrl(x)))return sendJSON(res,400,{ok:false,message:'1 या 2 सही photos upload करें।'});
+      let list=[];try{list=JSON.parse(fs.readFileSync(USED_LISTINGS_FILE,'utf8'))||[]}catch(_){}
+      const row={id:'used-'+crypto.randomUUID(),title,category,categoryLabel:categories[category],condition,price,area,description,photos,ownerMobile:String(acc.mobile||''),ownerName:String(acc.name||'User').slice(0,80),createdAt:new Date().toISOString()};list.unshift(row);fs.writeFileSync(USED_LISTINGS_FILE,JSON.stringify(list.slice(0,2000),null,2));return sendJSON(res,200,{ok:true,listing:row});
+    }catch(e){console.error('used listing:',e.message);return sendJSON(res,400,{ok:false,message:'Listing save नहीं हुई। फिर से कोशिश करें。'});}
   }
   if (req.method === 'GET' && (urlPath === '/meal.html' || urlPath === '/food-order.html')) {
     return fs.readFile(path.join(__dirname, urlPath === '/meal.html' ? 'meal.html' : 'food-order.html'), (err, data) => {
@@ -3758,11 +3787,30 @@ function computeOrderFees(subtotal, settingsFees) {
     });
   }
   if (req.method === 'GET' && urlPath === '/admin/local-delivery-json') {
+    if (!isAdminAuthed(req)) return requireAdminAuth(req, res);
     let orders=[], locks=[];
     try { orders=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_ORDERS_FILE,'utf8'))||[]; } catch (_) {}
     try { locks=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_LOCKS_FILE,'utf8'))||[]; } catch (_) {}
+    let ledger=[], frameOrders=[];
+    try { ledger=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_LEDGER_FILE,'utf8'))||[]; } catch (_) {}
+    try { frameOrders=JSON.parse(fs.readFileSync(FRAME_ORDERS_FILE,'utf8'))||[]; } catch (_) {}
+    const topups=loadWalletTopups(), accounts=loadAccounts();
+    const profiles=accounts.map(acc=>{
+      const mobile=String(acc.mobile||'');
+      const localOrders=orders.filter(o=>String(o.ownerMobile||'')===mobile||String(o.providerMobile||'')===mobile);
+      return {
+        id:acc.id||'', mobile, name:acc.name||'', village:acc.village||'', createdAt:acc.createdAt||null,
+        mobileVerified:!!acc.mobileVerified, lastVisitAt:acc.lastVisitAt||null, visitCount:Number(acc.visitCount||0),
+        walletBalance:Number(acc.walletBalance||0), walletPendingBalance:Number(acc.walletPendingBalance||0),
+        walletHistory:(acc.walletHistory||[]).slice(0,100),
+        topups:topups.filter(t=>String(t.mobile||t.customerMobile||'')===mobile).slice(0,100),
+        localDeliveryLedger:ledger.filter(t=>String(t.mobile||'')===mobile).slice(0,100),
+        localOrders:localOrders.slice(0,100),
+        frameOrders:frameOrders.filter(o=>String(o.mobile||o.customerMobile||'')===mobile).slice(0,100)
+      };
+    });
     const whatsappQueue=loadNotifs().filter(n=>n&&n.kind==='local-delivery-whatsapp-queue'&&!n.whatsappSentAt).slice(0,100);
-    return sendJSON(res,200,{ok:true,orders:orders.slice(0,5000),locks:locks.slice(0,5000),whatsappQueue,whatsappCloud:{configured:whatsappCloudReady(),lastSentAt:whatsappCloudStatus.lastSentAt||null,lastWebhookAt:whatsappCloudStatus.lastWebhookAt||null,lastError:whatsappCloudStatus.lastError||''},helperWalletFreeLimit:Math.max(0,Math.round(Number(loadSettings().localDeliveryHelperWalletFreeLimit ?? 500))),generatedAt:new Date().toISOString()});
+    return sendJSON(res,200,{ok:true,orders:orders.slice(0,5000),locks:locks.slice(0,5000),profiles,whatsappQueue,whatsappCloud:{configured:whatsappCloudReady(),lastSentAt:whatsappCloudStatus.lastSentAt||null,lastWebhookAt:whatsappCloudStatus.lastWebhookAt||null,lastError:whatsappCloudStatus.lastError||''},helperWalletFreeLimit:Math.max(0,Math.round(Number(loadSettings().localDeliveryHelperWalletFreeLimit ?? 500))),generatedAt:new Date().toISOString()});
   }
   if (req.method === 'POST' && urlPath === '/admin/local-delivery-whatsapp-sent') {
     if (!isAdminAuthed(req)) return requireAdminAuth(req, res);
@@ -3859,6 +3907,63 @@ function computeOrderFees(subtotal, settingsFees) {
       acc.verificationOtpSentAt = new Date().toISOString(); saveAccounts(accounts);
       return sendJSON(res, 200, { ok:true });
     } catch (e) { return sendJSON(res, 400, { ok:false }); }
+  }
+
+  // Live health + test-message routes for the authenticated Windows relay.
+  if (req.method === 'POST' && urlPath === '/admin/whatsapp-relay-status') {
+    if (!isAdminAuthed(req)) return requireAdminAuth(req, res);
+    try {
+      const body = await readBody(req);
+      whatsappRelayStatus = {
+        lastSeenAt: new Date().toISOString(),
+        whatsapp: body.whatsapp === 'connected' ? 'connected' : 'not_connected',
+        healthy: body.healthy === true,
+        lastServerError: String(body.lastServerError || '').slice(0,240),
+        consecutiveServerFailures: Math.max(0, Math.min(999, Number(body.consecutiveServerFailures) || 0))
+      };
+      return sendJSON(res, 200, { ok:true });
+    } catch (e) { return sendJSON(res, 400, { ok:false }); }
+  }
+
+  if (req.method === 'GET' && urlPath === '/admin/whatsapp-relay-status') {
+    if (!isAdminAuthed(req)) return requireAdminAuth(req, res);
+    const seen = new Date(whatsappRelayStatus.lastSeenAt || 0).getTime();
+    const online = whatsappRelayStatus.whatsapp === 'connected' && whatsappRelayStatus.healthy && Date.now() - seen < 45_000;
+    return sendJSON(res, 200, { ok:true, online, status:whatsappRelayStatus });
+  }
+
+  if (req.method === 'POST' && urlPath === '/admin/whatsapp-relay-test') {
+    if (!isAdminAuthed(req)) return requireAdminAuth(req, res);
+    try {
+      const body = await readBody(req);
+      const mobile = String(body.mobile || '').replace(/\D/g, '').slice(-10);
+      if (!/^[6-9]\d{9}$/.test(mobile)) return sendJSON(res, 400, { ok:false, message:'10-digit Indian WhatsApp number daalein.' });
+      const id = 'wa-test-' + Date.now() + '-' + crypto.randomBytes(4).toString('hex');
+      whatsappRelayTestQueue = [{ id, mobile, text:'✅ Aditya Studio WhatsApp automation test successful. Time: ' + new Date().toLocaleString('en-IN'), createdAt:new Date().toISOString() }];
+      return sendJSON(res, 200, { ok:true, message:'Test message relay queue mein bhej diya gaya hai.' });
+    } catch (e) { return sendJSON(res, 400, { ok:false, message:'Test queue create nahi hui.' }); }
+  }
+
+  if (req.method === 'GET' && urlPath === '/admin/whatsapp-relay-next-test') {
+    if (!isAdminAuthed(req)) return requireAdminAuth(req, res);
+    const row = whatsappRelayTestQueue[0] || null;
+    return sendJSON(res, 200, { ok:true, test:row });
+  }
+
+  if (req.method === 'POST' && urlPath === '/admin/whatsapp-relay-test-ack') {
+    if (!isAdminAuthed(req)) return requireAdminAuth(req, res);
+    try {
+      const body = await readBody(req);
+      const id = String(body.id || '');
+      whatsappRelayTestQueue = whatsappRelayTestQueue.filter(row => row.id !== id);
+      return sendJSON(res, 200, { ok:true });
+    } catch (e) { return sendJSON(res, 400, { ok:false }); }
+  }
+
+  if (req.method === 'POST' && urlPath === '/admin/whatsapp-test-message') {
+    if (!isAdminAuthed(req)) return requireAdminAuth(req, res);
+    const sent = await sendWhatsAppCloudText('9755503929', 'Aditya Studio test message');
+    return sendJSON(res, sent.ok ? 200 : 502, { ok:sent.ok, message:sent.ok ? 'Test message sent' : (sent.error || 'Send failed') });
   }
 
   // Admin fallback: every unverified account can be put into the WhatsApp OTP
@@ -5184,6 +5289,7 @@ a{color:#D4AF37;text-decoration:none}
 .topbar h1{margin:0;font-size:1.35rem;color:#F4EAD6;font-weight:600}
 .topbar .links a{margin-left:12px;font-size:13px;color:#B7A480}
 .topbar .links a:hover{color:#D4AF37}
+.wa-health{display:flex;align-items:center;gap:8px;padding:8px 11px;border-radius:999px;background:#3a1515;border:1px solid #7f1d1d;color:#fecaca;font-size:12px;font-weight:800}.wa-health.online{background:#103c26;border-color:#22c55e;color:#bbf7d0}.wa-health .dot{width:10px;height:10px;border-radius:50%;background:#ef4444;box-shadow:0 0 10px #ef4444}.wa-health.online .dot{background:#22c55e;box-shadow:0 0 10px #22c55e}.wa-test{display:flex;gap:7px;align-items:center;flex-wrap:wrap}.wa-test input{width:170px}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:28px}
 .card{background:linear-gradient(160deg,#1a1410,#120e0a);border:1px solid rgba(212,175,55,.18);border-radius:14px;padding:16px}
 .card-click{cursor:pointer;transition:transform .15s,border-color .15s}
@@ -5265,8 +5371,9 @@ label.muted{display:block;font-size:12px;margin-bottom:2px}
 <main class="main">
 <div class="topbar">
   <h1>Dashboard</h1>
-  <div class="links"><a href="/">Home</a><a href="/book-now">Studio page</a></div>
+  <div class="links"><button type="button" class="gen-btn" style="padding:7px 10px;font-size:12px" onclick="fetch('/admin/whatsapp-test-message',{method:'POST',credentials:'same-origin'}).then(r=>r.json()).then(x=>alert(x.message||'Test message sent')).catch(()=>alert('Test message failed'))">💬 WhatsApp Test</button><span class="wa-health" id="waHealth"><i class="dot"></i><span>WhatsApp relay: checking…</span></span><a href="/">Home</a><a href="/book-now">Studio page</a></div>
 </div>
+<div class="wa-test" style="margin:-8px 0 18px"><input class="inp" id="waTestMobile" inputmode="numeric" maxlength="10" placeholder="10-digit WhatsApp number"><button type="button" class="gen-btn wa-link" onclick="sendWhatsAppRelayTest()">💬 Test message bhejein</button><small class="muted" id="waTestStatus">Relay connected ho to test message turant jayega.</small></div>
 <div id="newOrderBanner" onclick="location.hash='sec-orders'"></div>
 
 <section class="panel" id="sec-overview">
@@ -5943,6 +6050,37 @@ async function pollLive() {
   } catch (e) {
     if (st) st.textContent = 'retry…';
   }
+}
+async function loadWhatsAppRelayHealth() {
+  var badge = document.getElementById('waHealth');
+  if (!badge) return;
+  try {
+    var res = await fetch('/admin/whatsapp-relay-status', { credentials:'same-origin', cache:'no-store' });
+    var data = await res.json();
+    if (!res.ok || !data.ok) throw new Error('status');
+    var online = !!data.online;
+    badge.classList.toggle('online', online);
+    var label = badge.querySelector('span');
+    if (label) label.textContent = online ? 'WhatsApp relay: connected' : 'WhatsApp relay: disconnected';
+    badge.title = online ? 'Relay active hai aur website se connected hai.' : ('Last error: ' + ((data.status && data.status.lastServerError) || 'Relay se heartbeat nahi mila'));
+  } catch (e) {
+    badge.classList.remove('online');
+    var label = badge.querySelector('span'); if (label) label.textContent = 'WhatsApp relay: status unavailable';
+  }
+}
+
+async function sendWhatsAppRelayTest() {
+  var input = document.getElementById('waTestMobile');
+  var status = document.getElementById('waTestStatus');
+  var mobile = String((input || {}).value || '').replace(/\D/g, '');
+  if (!/^[6-9]\d{9}$/.test(mobile)) { alert('10-digit Indian WhatsApp number daalein.'); return; }
+  if (status) status.textContent = 'Test message queue mein ja raha hai…';
+  try {
+    var res = await fetch('/admin/whatsapp-relay-test', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({mobile:mobile}) });
+    var data = await res.json().catch(function(){return {}});
+    if (!res.ok || !data.ok) throw new Error(data.message || 'Test queue fail');
+    if (status) status.textContent = '✅ ' + (data.message || 'Test message relay queue mein hai.');
+  } catch (e) { if (status) status.textContent = '❌ ' + (e.message || 'Test message queue fail'); }
 }
 
 async function adminClearOtps() {
@@ -7053,6 +7191,8 @@ setInterval(loadAdminFrames, 15000);
 
 pollLive();
 setInterval(pollLive, 5000);
+loadWhatsAppRelayHealth();
+setInterval(loadWhatsAppRelayHealth, 10_000);
 </script>
 </body></html>`;
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store, max-age=0' });
