@@ -3918,6 +3918,24 @@ function computeOrderFees(subtotal, settingsFees) {
     } catch (e) { return sendJSON(res, 400, { ok:false }); }
   }
 
+  // Cloud API health is the source of truth for registration OTP and alerts.
+  if (req.method === 'GET' && urlPath === '/admin/whatsapp-cloud-status') {
+    if (!isAdminAuthed(req)) return requireAdminAuth(req, res);
+    const configured = whatsappCloudReady();
+    return sendJSON(res, 200, { ok:true, online: configured && !whatsappCloudStatus.lastError, status:{ configured, lastSentAt:whatsappCloudStatus.lastSentAt || null, lastError:whatsappCloudStatus.lastError || '' } });
+  }
+
+  if (req.method === 'POST' && urlPath === '/admin/whatsapp-cloud-test') {
+    if (!isAdminAuthed(req)) return requireAdminAuth(req, res);
+    try {
+      const body = await readBody(req);
+      const mobile = String(body.mobile || '').replace(/\D/g, '').slice(-10);
+      if (!/^[6-9]\d{9}$/.test(mobile)) return sendJSON(res, 400, { ok:false, message:'10-digit Indian WhatsApp number daalein.' });
+      const sent = await sendWhatsAppCloudText(mobile, '✅ Aditya Studio WhatsApp Cloud API test successful. Time: ' + new Date().toLocaleString('en-IN'));
+      return sendJSON(res, sent.ok ? 200 : 502, { ok:sent.ok, message:sent.ok ? 'Cloud API test message bhej diya gaya.' : (sent.error || 'Cloud API message send nahi hua.') });
+    } catch (e) { return sendJSON(res, 400, { ok:false, message:'Cloud API test create nahi hua.' }); }
+  }
+
   // Live health + test-message routes for the authenticated Windows relay.
   if (req.method === 'POST' && urlPath === '/admin/whatsapp-relay-status') {
     if (!isAdminAuthed(req)) return requireAdminAuth(req, res);
@@ -5380,9 +5398,9 @@ label.muted{display:block;font-size:12px;margin-bottom:2px}
 <main class="main">
 <div class="topbar">
   <h1>Dashboard</h1>
-  <div class="links"><button type="button" class="gen-btn" style="padding:7px 10px;font-size:12px" onclick="fetch('/admin/whatsapp-test-message',{method:'POST',credentials:'same-origin'}).then(r=>r.json()).then(x=>alert(x.message||'Test message sent')).catch(()=>alert('Test message failed'))">💬 WhatsApp Test</button><span class="wa-health" id="waHealth"><i class="dot"></i><span>WhatsApp relay: checking…</span></span><a href="/">Home</a><a href="/book-now">Studio page</a></div>
+  <div class="links"><button type="button" class="gen-btn" style="padding:7px 10px;font-size:12px" onclick="fetch('/admin/whatsapp-test-message',{method:'POST',credentials:'same-origin'}).then(r=>r.json()).then(x=>alert(x.message||'Test message sent')).catch(()=>alert('Test message failed'))">💬 WhatsApp Test</button><span class="wa-health" id="waHealth"><i class="dot"></i><span>WhatsApp Cloud API: checking…</span></span><a href="/">Home</a><a href="/book-now">Studio page</a></div>
 </div>
-<div class="wa-test" style="margin:-8px 0 18px"><input class="inp" id="waTestMobile" inputmode="numeric" maxlength="10" placeholder="10-digit WhatsApp number"><button type="button" class="gen-btn wa-link" onclick="sendWhatsAppRelayTest()">💬 Test message bhejein</button><small class="muted" id="waTestStatus">Relay connected ho to test message turant jayega.</small></div>
+<div class="wa-test" style="margin:-8px 0 18px"><input class="inp" id="waTestMobile" inputmode="numeric" maxlength="10" placeholder="10-digit WhatsApp number"><button type="button" class="gen-btn wa-link" onclick="sendWhatsAppRelayTest()">💬 Test message bhejein</button><small class="muted" id="waTestStatus">Cloud API connected ho to test message turant jayega.</small></div>
 <div id="newOrderBanner" onclick="location.hash='sec-orders'"></div>
 
 <section class="panel" id="sec-overview">
@@ -6064,17 +6082,17 @@ async function loadWhatsAppRelayHealth() {
   var badge = document.getElementById('waHealth');
   if (!badge) return;
   try {
-    var res = await fetch('/admin/whatsapp-relay-status', { credentials:'same-origin', cache:'no-store' });
+    var res = await fetch('/admin/whatsapp-cloud-status', { credentials:'same-origin', cache:'no-store' });
     var data = await res.json();
     if (!res.ok || !data.ok) throw new Error('status');
     var online = !!data.online;
     badge.classList.toggle('online', online);
     var label = badge.querySelector('span');
-    if (label) label.textContent = online ? 'WhatsApp relay: connected' : 'WhatsApp relay: disconnected';
-    badge.title = online ? 'Relay active hai aur website se connected hai.' : ('Last error: ' + ((data.status && data.status.lastServerError) || 'Relay se heartbeat nahi mila'));
+    if (label) label.textContent = online ? 'WhatsApp Cloud API: connected' : 'WhatsApp Cloud API: disconnected';
+    badge.title = online ? 'Cloud API OTP aur automatic alerts ke liye ready hai.' : ('Last error: ' + ((data.status && data.status.lastError) || 'Cloud API token ya Phone Number ID check karein'));
   } catch (e) {
     badge.classList.remove('online');
-    var label = badge.querySelector('span'); if (label) label.textContent = 'WhatsApp relay: status unavailable';
+    var label = badge.querySelector('span'); if (label) label.textContent = 'WhatsApp Cloud API: status unavailable';
   }
 }
 
@@ -6085,10 +6103,10 @@ async function sendWhatsAppRelayTest() {
   if (!/^[6-9]\d{9}$/.test(mobile)) { alert('10-digit Indian WhatsApp number daalein.'); return; }
   if (status) status.textContent = 'Test message queue mein ja raha hai…';
   try {
-    var res = await fetch('/admin/whatsapp-relay-test', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({mobile:mobile}) });
+    var res = await fetch('/admin/whatsapp-cloud-test', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({mobile:mobile}) });
     var data = await res.json().catch(function(){return {}});
     if (!res.ok || !data.ok) throw new Error(data.message || 'Test queue fail');
-    if (status) status.textContent = '✅ ' + (data.message || 'Test message relay queue mein hai.');
+    if (status) status.textContent = '✅ ' + (data.message || 'Cloud API test message bhej diya gaya.');
   } catch (e) { if (status) status.textContent = '❌ ' + (e.message || 'Test message queue fail'); }
 }
 
