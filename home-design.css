@@ -72,3 +72,5 @@ body.delivery-keyboard-open .sidebar{display:none!important}
 .nav-unread-badge{position:absolute;z-index:3;top:2px;right:calc(50% - 25px);display:grid;place-items:center;min-width:19px;height:19px;padding:0 4px;border:2px solid #061d42;border-radius:999px;background:#ef4444;color:#fff;font-size:10px;line-height:1;font-weight:950;font-style:normal;box-shadow:0 2px 7px #0009;text-shadow:none}.nav button[data-go=post] .nav-unread-badge{display:none}@media(max-width:760px){.nav button[data-go=receive] .nav-unread-badge,.nav button[data-go=messages] .nav-unread-badge{top:3px;right:calc(50% - 26px)}}
 
 .marketplace-ad.image-only{aspect-ratio:2.92;min-height:0;padding:0;overflow:hidden;background:#101827!important}.marketplace-ad.image-only span{display:none}.marketplace-ad.image-only img{display:block;width:100%;height:100%;object-fit:cover}.marketplace-ad.image-only.active{display:block}
+
+.home-category-feed .marketplace-ads{min-height:0;aspect-ratio:2.92}
