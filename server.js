@@ -43,6 +43,8 @@ const WHATSAPP_VERIFY_TOKEN = String(process.env.WHATSAPP_VERIFY_TOKEN || '').tr
 const WHATSAPP_ACCESS_TOKEN = String(process.env.WHATSAPP_ACCESS_TOKEN || '').trim();
 const WHATSAPP_PHONE_NUMBER_ID = String(process.env.WHATSAPP_PHONE_NUMBER_ID || '').trim();
 const WHATSAPP_OTP_TEMPLATE = String(process.env.WHATSAPP_OTP_TEMPLATE || 'aditya_studio_otp_v2').trim();
+const WHATSAPP_DELIVERY_TEMPLATE = String(process.env.WHATSAPP_DELIVERY_TEMPLATE || 'local_delivery_request').trim();
+const PUBLIC_SITE_URL = String(process.env.PUBLIC_SITE_URL || 'https://www.adityastudio.store').trim().replace(/\/+$/, '');
 let whatsappCloudStatus = { configured: !!(WHATSAPP_ACCESS_TOKEN && WHATSAPP_PHONE_NUMBER_ID), lastWebhookAt: null, lastWebhookEvent: '', lastError: '' };
 // The Windows WhatsApp Web relay updates this every 15 seconds using admin
 // authentication. A stale timestamp is shown as disconnected in /admin.
@@ -119,6 +121,38 @@ async function sendWhatsAppCloudOtp(mobile, otp) {
       body:JSON.stringify({ messaging_product:'whatsapp', to, type:'template', template:{ name:WHATSAPP_OTP_TEMPLATE, language:{ code:'en' }, components:[
         { type:'body', parameters:[{ type:'text', text:String(otp) }] },
         { type:'button', sub_type:'url', index:'0', parameters:[{ type:'text', text:String(otp) }] }
+      ] } })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = String(data?.error?.message || ('WhatsApp HTTP ' + response.status)).slice(0,240);
+      whatsappCloudStatus = { ...whatsappCloudStatus, configured:true, lastError:error };
+      return { ok:false, error };
+    }
+    whatsappCloudStatus = { ...whatsappCloudStatus, configured:true, lastError:'', lastSentAt:new Date().toISOString(), lastSentTo:to };
+    return { ok:true, messageId:data?.messages?.[0]?.id || '' };
+  } catch (error) {
+    const message = String(error?.message || 'WhatsApp network error').slice(0,240);
+    whatsappCloudStatus = { ...whatsappCloudStatus, configured:true, lastError:message };
+    return { ok:false, error:message };
+  }
+}
+async function sendWhatsAppCloudDeliveryRequest(mobile, details = {}) {
+  const to = whatsappCloudRecipient(mobile);
+  if (!whatsappCloudReady() || !to) return { ok:false, error: !whatsappCloudReady() ? 'WhatsApp Cloud API is not configured' : 'Invalid Indian WhatsApp number' };
+  const bodyParameters = [
+    String(details.item || 'Delivery order').slice(0,120),
+    String(details.pickup || 'Pickup location').slice(0,120),
+    String(details.drop || 'Drop location').slice(0,120),
+    String(details.profit || '0').replace(/[^0-9.]/g, '').slice(0,20) || '0'
+  ];
+  try {
+    const response = await fetch('https://graph.facebook.com/v25.0/' + encodeURIComponent(WHATSAPP_PHONE_NUMBER_ID) + '/messages', {
+      method:'POST',
+      headers:{ 'Authorization':'Bearer ' + WHATSAPP_ACCESS_TOKEN, 'Content-Type':'application/json' },
+      body:JSON.stringify({ messaging_product:'whatsapp', to, type:'template', template:{ name:WHATSAPP_DELIVERY_TEMPLATE, language:{ code:'en' }, components:[
+        { type:'header', parameters:[{ type:'image', image:{ link:PUBLIC_SITE_URL + '/assets/local-delivery-alert.png' } }] },
+        { type:'body', parameters:bodyParameters.map(text => ({ type:'text', text })) }
       ] } })
     });
     const data = await response.json().catch(() => ({}));
@@ -3946,6 +3980,12 @@ function computeOrderFees(subtotal, settingsFees) {
       const body = await readBody(req);
       const mobile = String(body.mobile || '').replace(/\D/g, '').slice(-10);
       if (!/^[6-9]\d{9}$/.test(mobile)) return sendJSON(res, 400, { ok:false, message:'10-digit Indian WhatsApp number daalein.' });
+      if (body.template === 'local_delivery_request') {
+        const sent = await sendWhatsAppCloudDeliveryRequest(mobile, {
+          item:'Demo grocery order', pickup:'Birra Market', drop:'Siladehi', profit:'80'
+        });
+        return sendJSON(res, sent.ok ? 200 : 502, { ok:sent.ok, message:sent.ok ? 'Delivery alert template bhej diya gaya.' : (sent.error || 'Delivery alert send nahi hua.') });
+      }
       const sent = await sendWhatsAppCloudText(mobile, '✅ Aditya Studio WhatsApp Cloud API test successful. Time: ' + new Date().toLocaleString('en-IN'));
       return sendJSON(res, sent.ok ? 200 : 502, { ok:sent.ok, message:sent.ok ? 'Cloud API test message bhej diya gaya.' : (sent.error || 'Cloud API message send nahi hua.') });
     } catch (e) { return sendJSON(res, 400, { ok:false, message:'Cloud API test create nahi hua.' }); }
