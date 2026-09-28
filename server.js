@@ -3484,7 +3484,22 @@ function computeOrderFees(subtotal, settingsFees) {
         if(!o.targetServiceId){const dueAt=new Date(o.neededBy||'').getTime();if(!Number.isFinite(dueAt)||dueAt<=Date.now())return sendJSON(res,400,{ok:false,message:'पुराना समय नहीं चुन सकते। आगे का date और time चुनें।'});}
         if(o.targetServiceId){const service=orders.find(x=>String(x.id)===String(o.targetServiceId)&&x.kind==='delivery-service'&&x.serviceActive!==false);if(!service)return sendJSON(res,404,{ok:false,message:'यह delivery service अब उपलब्ध नहीं है'});const cfg=service.service||{},weight=Number(o.parcelWeight||0),vehicles=Array.isArray(cfg.vehicles)?cfg.vehicles:[],nowTime=new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',hour12:false});if(cfg.availableFrom&&cfg.availableUntil&&(nowTime<String(cfg.availableFrom)||nowTime>String(cfg.availableUntil)))return sendJSON(res,409,{ok:false,message:'Delivery service अभी working hours में उपलब्ध नहीं है'});if(weight<0||weight>Number(cfg.maxWeight||0))return sendJSON(res,400,{ok:false,message:'Parcel weight इस delivery service की limit से अधिक है'});if(o.requestedVehicle&&o.requestedVehicle!=='Any'&&!vehicles.includes(o.requestedVehicle))return sendJSON(res,400,{ok:false,message:'चुना हुआ vehicle उपलब्ध नहीं है'});o.status='chat';o.providerMobile=service.ownerMobile;o.providerName=service.ownerName||'Delivery helper';o.deliveryCandidates=[{mobile:service.ownerMobile,name:o.providerName,acceptedAt:o.createdAt}];o.candidateSessions=[{mobile:service.ownerMobile,name:o.providerName,acceptedAt:o.createdAt,messages:[],paymentRequest:null,deliveryConfirmRequest:null}];o.acceptedAt=o.createdAt;o.serviceSnapshot={title:service.title,service:cfg};}
         orders.unshift(o);fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));
-        if(o.targetServiceId)addNotification({title:'📦 नई parcel request',body:(acc.name||'Customer')+' ने आपकी delivery service के लिए request भेजी है।',mobile:o.providerMobile,kind:'local-delivery-accepted',orderId:o.id});else addNotification({ title:'📣 नई Local Delivery requirement', body:(acc.name||'एक customer')+' ने “'+String(o.title).slice(0,90)+'” पोस्ट किया है। आसपास के सभी लोगों के लिए उपलब्ध है।', kind:'local-delivery-new' });
+        if(o.targetServiceId){
+          addNotification({title:'📦 नई parcel request',body:(acc.name||'Customer')+' ने आपकी delivery service के लिए request भेजी है।',mobile:o.providerMobile,kind:'local-delivery-accepted',orderId:o.id});
+          queueOfflineWhatsapp(o.providerMobile,o.providerName,'parcel-request','आपकी delivery service के लिए नई parcel request आई है। Site में जाकर देखें।','parcel-request:'+o.id+':'+o.providerMobile);
+        }else{
+          // An open order has no chosen helper yet. Notify only people who have
+          // explicitly published an active delivery service, never every customer.
+          const notifiedHelpers=new Set();
+          orders.filter(row=>row.kind==='delivery-service'&&row.serviceActive!==false&&row.ownerMobile&&!sameMobile(row.ownerMobile,acc.mobile)).forEach(service=>{
+            const mobile=String(service.ownerMobile).replace(/\D/g,'').slice(-10);
+            if(!/^[6-9]\d{9}$/.test(mobile)||notifiedHelpers.has(mobile))return;
+            notifiedHelpers.add(mobile);
+            addNotification({title:'📣 नई delivery requirement',body:(acc.name||'Customer')+' ने “'+String(o.title).slice(0,90)+'” पोस्ट किया है। Delivery Receive में खोलकर देखें।',mobile,kind:'local-delivery-new',orderId:o.id});
+            queueOfflineWhatsapp(mobile,service.ownerName||'Delivery user','new-requirement','नई delivery requirement आई है: '+String(o.title).slice(0,80)+'. Site में जाकर देखें।','new-requirement:'+o.id+':'+mobile);
+          });
+          addNotification({ title:'📣 नई Local Delivery requirement', body:(acc.name||'एक customer')+' ने “'+String(o.title).slice(0,90)+'” पोस्ट किया है। आसपास के delivery users को alert भेज दिया गया है।', kind:'local-delivery-new' });
+        }
         return sendJSON(res,200,{ok:true,order:o});
       }
       if(body.action==='accept'){
