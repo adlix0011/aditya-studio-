@@ -1146,6 +1146,31 @@ function addNotification(item) {
   saveNotifs(list.slice(0, 50));
   return item;
 }
+
+// An unaccepted food order closes after 24 hours so it cannot remain active.
+function expireUnacceptedFoodOrders() {
+  let orders = [];
+  try { orders = JSON.parse(fs.readFileSync(LOCAL_DELIVERY_ORDERS_FILE, 'utf8')) || []; }
+  catch (_) { return 0; }
+  const now = Date.now(); let changed = 0;
+  for (const order of orders) {
+    if (!order || !order.directFoodOrder || order.status !== 'open') continue;
+    const savedExpiry = new Date(order.foodExpiresAt || '').getTime();
+    const postedAt = new Date(order.createdAt || '').getTime();
+    const expiry = Number.isFinite(savedExpiry) && savedExpiry > 0 ? savedExpiry : postedAt + 24 * 60 * 60 * 1000;
+    if (!Number.isFinite(expiry) || expiry > now) continue;
+    const at = new Date(now).toISOString();
+    order.status = 'expired'; order.expiredAt = at; order.updatedAt = at;
+    order.foodExpiresAt = new Date(expiry).toISOString();
+    order.messages = Array.isArray(order.messages) ? order.messages : [];
+    order.messages.push({ sender: 'system', text: '⌛ Food order 24 घंटे तक accept नहीं हुई, इसलिए अपने-आप expire हो गई।', time: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) });
+    addNotification({ title: '⌛ Food order expired', body: '“' + String(order.title || 'Food order').slice(0, 90) + '” 24 घंटे तक accept नहीं हुई, इसलिए History में भेज दी गई।', mobile: order.ownerMobile, kind: 'local-delivery-food-expired', orderId: order.id });
+    changed++;
+  }
+  if (changed) fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE, JSON.stringify(orders.slice(0, 5000), null, 2));
+  return changed;
+}
+setInterval(() => { try { expireUnacceptedFoodOrders(); } catch (e) { console.error('food order expiry:', e.message); } }, 5 * 60 * 1000).unref();
 function loadUserActivity() {
   try { return fs.existsSync(ACTIVITY_FILE) ? (JSON.parse(fs.readFileSync(ACTIVITY_FILE, 'utf8')) || []) : []; }
   catch (e) { return []; }
@@ -3440,6 +3465,7 @@ function computeOrderFees(subtotal, settingsFees) {
       const body=await readBody(req,3e6),accounts=loadAccounts(),acc=sessionAccount(req,body,accounts);
       if(!acc)return sendJSON(res,401,{ok:false,message:'Login required'});
       let orders=[];try{orders=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_ORDERS_FILE,'utf8'))||[]}catch(_){}
+      if (expireUnacceptedFoodOrders()) { try { orders=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_ORDERS_FILE,'utf8'))||[]; } catch (_) {} }
       const sameMobile=(a,b)=>String(a||'').replace(/\D/g,'').slice(-10)===String(b||'').replace(/\D/g,'').slice(-10);
       // A chat, quote and confirmation belong to one delivery candidate.  Older
       // orders are migrated lazily so existing orders do not lose their chat.
@@ -3511,7 +3537,7 @@ function computeOrderFees(subtotal, settingsFees) {
         if(!acc.mobileVerified)return sendJSON(res,403,{ok:false,error:'mobile-verification-required',message:'Local Delivery post बनाने के लिए पहले अपना mobile number verify करें।'});
         const postSpam = localDeliverySpamCheck(req, acc, 'post', { limit: 3, windowMs: 10 * 60 * 1000, duplicateMs: 10 * 60 * 1000, fingerprint: [o.kind, o.title, o.description, o.area, o.address, o.neededBy].join('|') });
         if(postSpam)return sendJSON(res,429,{ok:false,error:'too-many-requests',message:postSpam.message});
-        o.ownerMobile=acc.mobile;o.ownerName=acc.name;o.createdAt=new Date().toISOString(); if(o.directFoodOrder){if(/biryani/i.test(String(o.title||'')))return sendJSON(res,409,{ok:false,message:'Biryani फिलहाल Coming Soon है।'});const fixedFee=FOOD_DELIVERY_FEES[String(o.deliveryVillage||'').trim()];if(!fixedFee)return sendJSON(res,400,{ok:false,message:'Food order के लिए सूची में दिया गांव चुनें।'});const scheduleError=foodScheduleError(o.neededBy);if(scheduleError)return sendJSON(res,400,{ok:false,message:scheduleError});o.fee=fixedFee;o.category='Food';}if(o.paymentMode==='cash-on-delivery'){o.customerHold=0;o.paymentStatus='cash-pending';}
+        o.ownerMobile=acc.mobile;o.ownerName=acc.name;o.createdAt=new Date().toISOString(); if(o.directFoodOrder){if(/biryani/i.test(String(o.title||'')))return sendJSON(res,409,{ok:false,message:'Biryani फिलहाल Coming Soon है।'});const fixedFee=FOOD_DELIVERY_FEES[String(o.deliveryVillage||'').trim()];if(!fixedFee)return sendJSON(res,400,{ok:false,message:'Food order के लिए सूची में दिया गांव चुनें।'});const scheduleError=foodScheduleError(o.neededBy);if(scheduleError)return sendJSON(res,400,{ok:false,message:scheduleError});o.fee=fixedFee;o.category='Food';o.foodExpiresAt=new Date(Date.now()+24*60*60*1000).toISOString();}if(o.paymentMode==='cash-on-delivery'){o.customerHold=0;o.paymentStatus='cash-pending';}
         const freePostLimit=500,postTotal=Math.round(Number(o.items||0))+Math.round(Number(o.fee||0));
         if(!o.alreadyPurchased&&o.paymentMode!=='cash-on-delivery'&&postTotal>freePostLimit&&Number(acc.walletBalance||0)<postTotal)return sendJSON(res,400,{ok:false,needsRecharge:true,requiredWallet:postTotal,message:'Product और delivery fee मिलाकर ₹500 से अधिक है। Post करने से पहले wallet में ₹'+postTotal+' add करें।'});
         if(o.kind==='delivery-service'){o.status='service';o.serviceActive=true;orders.unshift(o);fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));addNotification({title:'🚚 नई delivery service',body:(acc.name||'Delivery boy')+' ने delivery service post की है।',kind:'local-delivery-service'});return sendJSON(res,200,{ok:true,order:o});}
