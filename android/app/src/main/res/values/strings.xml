@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Aditya Studio</string>
+    <string name="title_activity_main">Aditya Studio</string>
+    <string name="package_name">store.adityastudio.app</string>
+    <string name="custom_url_scheme">store.adityastudio.app</string>
+</resources>
