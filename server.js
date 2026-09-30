@@ -553,6 +553,7 @@ function orderBroVerify(row,pass){ const parts=String(row?.passwordHash||'').spl
 function orderBroToken(row){ return crypto.createHmac('sha256', ADMIN_PASSWORD||PIN_SALT||'orderbro').update(String(row.id)+'|'+String(row.passwordHash)).digest('hex'); }
 function orderBroSession(req){ const raw=String(req.headers.cookie||'').split(';').map(x=>x.trim()).find(x=>x.startsWith('orderbro_session=')); if(!raw)return null; const value=decodeURIComponent(raw.slice(17)),[id,token]=value.split('.'); const row=orderBroAccounts().find(x=>String(x.id)===String(id)&&x.active!==false); if(!row||!token)return null; const expected=Buffer.from(orderBroToken(row)),got=Buffer.from(token); return expected.length===got.length&&crypto.timingSafeEqual(expected,got)?row:null; }
 function orderShopName(order){ if(order?.shopName)return String(order.shopName).trim(); const t=String(order?.title||''); return /pizza/i.test(t)?'Grace Pizza':/burger|sandwich|roll/i.test(t)?'Grace Fast Food':''; }
+function isFoodOrder(order){ return !!order && (order.directFoodOrder===true || String(order.category||'').trim().toLowerCase()==='food'); }
 
 function hashPin(pin) {
   const salt = crypto.randomBytes(16).toString('hex');
@@ -1796,7 +1797,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && urlPath === '/api/orderbro/logout') { res.setHeader('Set-Cookie','orderbro_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0'); return sendJSON(res,200,{ok:true}); }
   if (req.method === 'GET' && urlPath === '/api/orderbro/orders') {
     const member=orderBroSession(req); if(!member)return sendJSON(res,401,{ok:false,message:'पहले login करें।'}); let rows=[];try{rows=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_ORDERS_FILE,'utf8'))||[]}catch(_){};expireUnacceptedFoodOrders();const role=String(member.role||'shop');let own=[];
-    if(role==='delivery')own=rows.filter(o=>o&&o.directFoodOrder&&(o.status==='open'||String(o.providerMobile||'')===String(member.phone||'')||String(o.deliveryAcceptedById||'')===String(member.id))).map(o=>({...o,shopName:orderShopName(o)}));
+    if(role==='delivery')own=rows.filter(o=>isFoodOrder(o)&&(o.status==='open'||String(o.providerMobile||'')===String(member.phone||'')||String(o.deliveryAcceptedById||'')===String(member.id))).map(o=>({...o,shopName:orderShopName(o)}));
     else own=rows.filter(o=>o&&o.directFoodOrder&&orderShopName(o).toLowerCase()===String(member.shopName||'').toLowerCase()).map(o=>({...o,shopName:orderShopName(o)}));
     return sendJSON(res,200,{ok:true,member:{role,name:member.displayName||member.shopName||'Delivery boy',shopName:member.shopName||''},orders:own});
   }
