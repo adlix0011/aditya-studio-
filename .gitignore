@@ -17,3 +17,14 @@ settings.json
 user-activity.json
 wallet-topups.json
 unbilled-charges.csv
+
+# Delivery Manage release signing and build output
+/delivery-manage-android/release/
+/delivery-manage-android/*.jks
+
+/delivery-manage-android/release-signing.properties
+
+/delivery-manage-android/.gradle-cache/
+/delivery-manage-android/.android-cache/
+/delivery-manage-android/*-build-*.txt
+/delivery-manage-android/signed-release-*.txt
