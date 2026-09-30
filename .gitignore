@@ -28,3 +28,7 @@ unbilled-charges.csv
 /delivery-manage-android/.android-cache/
 /delivery-manage-android/*-build-*.txt
 /delivery-manage-android/signed-release-*.txt
+
+# Firebase server credential (private)
+firebase-service-account.json
+

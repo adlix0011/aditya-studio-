@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "974816857221",
+    "project_id": "aditya-studio-delivery-alerts",
+    "storage_bucket": "aditya-studio-delivery-alerts.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:974816857221:android:88813c7fa00d342be3adec",
+        "android_client_info": {
+          "package_name": "store.adityastudio.deliverymanage"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBrSOj0-A_m4-N17eMEDRmHBP2gti8W5Qo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
