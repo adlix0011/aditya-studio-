@@ -1809,7 +1809,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && urlPath === '/api/orderbro/logout') { res.setHeader('Set-Cookie','orderbro_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0'); return sendJSON(res,200,{ok:true}); }
   if (req.method === 'GET' && urlPath === '/api/orderbro/orders') {
     const member=orderBroSession(req); if(!member)return sendJSON(res,401,{ok:false,message:'पहले login करें।'}); let rows=[];try{rows=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_ORDERS_FILE,'utf8'))||[]}catch(_){};expireUnacceptedFoodOrders();const role=String(member.role||'shop');let own=[];
-    if(role==='delivery')own=rows.filter(o=>isFoodOrder(o)&&(o.status==='open'||String(o.providerMobile||'')===String(member.phone||'')||String(o.deliveryAcceptedById||'')===String(member.id))).map(o=>({...o,shopName:orderShopName(o)}));
+    if(role==='delivery')own=rows.filter(o=>isFoodOrder(o)&&String(o.status||'')==='open').map(o=>({...o,shopName:orderShopName(o)}));
     else own=rows.filter(o=>o&&o.directFoodOrder&&orderShopName(o).toLowerCase()===String(member.shopName||'').toLowerCase()).map(o=>({...o,shopName:orderShopName(o)}));
     return sendJSON(res,200,{ok:true,member:{role,name:member.displayName||member.shopName||'Delivery boy',shopName:member.shopName||''},orders:own});
   }
