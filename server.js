@@ -4012,6 +4012,22 @@ function computeOrderFees(subtotal, settingsFees) {
       return sendJSON(res,200,{ok:true,amount,recipient,order});
     } catch(e) { console.error('admin local delivery cancel:',e.message); return sendJSON(res,500,{ok:false,message:'Admin cancellation पूरी नहीं हुई।'}); }
   }
+  if (req.method === 'POST' && urlPath === '/admin/local-delivery-delete') {
+    if (!isAdminAuthed(req)) return requireAdminAuth(req, res);
+    try {
+      const body=await readBody(req),orderId=String(body.orderId||'').trim();
+      if(!orderId)return sendJSON(res,400,{ok:false,message:'Order ID missing है।'});
+      let orders=[];try{orders=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_ORDERS_FILE,'utf8'))||[]}catch(_){}
+      let locks=[];try{locks=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_LOCKS_FILE,'utf8'))||[]}catch(_){}
+      const order=orders.find(x=>String(x.id)===orderId);
+      if(!order)return sendJSON(res,404,{ok:false,message:'Order नहीं मिला।'});
+      if(!['completed','cancelled','rejected','expired'].includes(String(order.status||'')))return sendJSON(res,409,{ok:false,message:'Live order को delete नहीं कर सकते। पहले Admin settlement से cancel करें।'});
+      if(locks.some(x=>String(x.orderId)===orderId&&x.status==='locked'))return sendJSON(res,409,{ok:false,message:'Locked wallet amount पहले settle करें।'});
+      orders=orders.filter(x=>String(x.id)!==orderId);
+      fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));
+      return sendJSON(res,200,{ok:true});
+    }catch(e){console.error('admin local delivery delete:',e.message);return sendJSON(res,500,{ok:false,message:'Order delete नहीं हुआ।'});}
+  }
   if (req.method === 'POST' && urlPath === '/admin/local-delivery-help-resolve') {
     if (!isAdminAuthed(req)) return requireAdminAuth(req, res);
     try {
