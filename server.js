@@ -4020,7 +4020,7 @@ function computeOrderFees(subtotal, settingsFees) {
       let orders=[];try{orders=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_ORDERS_FILE,'utf8'))||[]}catch(_){}
       let locks=[];try{locks=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_LOCKS_FILE,'utf8'))||[]}catch(_){}
       const order=orders.find(x=>String(x.id)===orderId);
-      if(!order)return sendJSON(res,404,{ok:false,message:'Order नहीं मिला।'});
+      if(!order)return sendJSON(res,200,{ok:true,alreadyDeleted:true});
       if(!['booked','completed','cancelled','rejected','expired'].includes(String(order.status||'')))return sendJSON(res,409,{ok:false,message:'Live order को delete नहीं कर सकते। पहले Admin settlement से cancel करें।'});
       if(locks.some(x=>String(x.orderId)===orderId&&x.status==='locked'))return sendJSON(res,409,{ok:false,message:'Locked wallet amount पहले settle करें।'});
       if(order.paymentStatus==='wallet-paid'&&Number(order.walletPaid||0)>0){const accounts=loadAccounts(),owner=accounts.find(x=>String(x.mobile||'')===String(order.ownerMobile||''));if(!owner||!walletTxn(owner,'credit',Number(order.walletPaid),{reason:'Admin deleted food order refund · '+orderId,source:'food_order_admin_delete_refund',orderId,operationKey:'food-admin-delete-refund:'+orderId}))return sendJSON(res,500,{ok:false,message:'Wallet refund नहीं हुआ।'});saveAccounts(accounts);}
