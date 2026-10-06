@@ -3585,7 +3585,7 @@ function computeOrderFees(subtotal, settingsFees) {
         const next=body.order||{},nextDue=new Date(next.neededBy!==undefined?next.neededBy:o.neededBy||'').getTime();if(o.kind!=='delivery-service'&&(!Number.isFinite(nextDue)||nextDue<=Date.now()))return sendJSON(res,400,{ok:false,message:'पुराना समय नहीं चुन सकते। आगे का date और time चुनें।'});const keys=['title','description','area','address','district','deliveryVillage','quantity','lineItems','category','neededBy','items','fee','alreadyPurchased','photo','service'];for(const k of keys)if(next[k]!==undefined)o[k]=next[k];o.updatedAt=new Date().toISOString();writeOrders();return sendJSON(res,200,{ok:true,order:viewFor(o,acc.mobile)});
       }
       if(body.action==='create'){
-        const o=body.order||{}; if(!o.id||!o.title)return sendJSON(res,400,{ok:false,message:'Invalid order'});
+        const o=body.order||{}; if(!o.id||!o.title)return sendJSON(res,400,{ok:false,message:'Invalid order'}); const existing=orders.find(row=>String(row.id)===String(o.id)); if(existing){if(!sameMobile(existing.ownerMobile,acc.mobile))return sendJSON(res,409,{ok:false,message:'यह order ID पहले से उपयोग हो चुकी है।'});return sendJSON(res,200,{ok:true,order:existing,walletBalance:acc.walletBalance,duplicate:true});}
         // Local Delivery is limited to mobile-verified accounts.  This keeps
         // anonymous/newly-created accounts from flooding the post feed or
         // sending requests to delivery helpers.

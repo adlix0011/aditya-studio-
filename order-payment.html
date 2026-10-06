@@ -21,4 +21,48 @@ async function refreshWalletBalance(){
   }catch(_){/* Offline me saved wallet amount hi dikhega. */}
 }
 refreshWalletBalance();
-let cod=false;document.querySelectorAll('[name=method]').forEach(x=>x.onchange=()=>{document.querySelectorAll('.pay-option').forEach(a=>a.classList.remove('selected'));x.closest('.pay-option').classList.add('selected');const box=document.querySelector('#codBox');cod=false;box.innerHTML=x.value==='cash'?'<div class="cod-warning"><b>⚠️ Cash on Delivery confirmation</b><p>घर में सामान लेकर delivery boy आएगा तो आपको सामान की पूरी payment करनी पड़ेगी।</p><div class="choice-row"><button class="yes" id="yes">हां</button><button class="no" id="no">नहीं</button></div></div>':'';document.querySelector('#yes')?.addEventListener('click',()=>{cod=true;box.innerHTML='<div class="cod-warning">✓ Cash on Delivery स्वीकार किया गया।</div>'});document.querySelector('#no')?.addEventListener('click',()=>{c.checked=false;c.closest('.pay-option').classList.remove('selected');box.innerHTML=''})});document.querySelector('#confirm').onclick=()=>{const method=document.querySelector('[name=method]:checked')?.value,msg=document.querySelector('#message');if(!method){msg.textContent='पहले payment option चुनें।';return}if(method==='cash'&&!cod){msg.textContent='Cash on Delivery के लिए हां करें।';return}draft.paymentMethod=method==='cash'?'cash-on-delivery':'wallet';draft.confirmed=true;sessionStorage.setItem(KEY,JSON.stringify(draft));location.href=returnPage+'?checkout=confirmed'};function tick(){let left=Math.max(0,Number(draft.expiresAt||0)-Date.now()),m=Math.floor(left/60000),sec=Math.floor(left/1000)%60;document.querySelector('#timer').textContent=String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0');if(!left){document.querySelector('#confirm').disabled=true;document.querySelector('#message').textContent='Payment time पूरा हो गया। Form से फिर try करें।'}}tick();setInterval(tick,1000);</script></body></html>
+function safe(text){const el=document.createElement('div');el.textContent=String(text||'');return el.innerHTML;}
+function foodOrderNumber(order){const raw=String(order?.id||'').replace(/[^a-zA-Z0-9]/g,'').toUpperCase();return 'FD-'+(raw.slice(-8)||String(Date.now()).slice(-8));}
+function showFoodSuccess(order){const item=safe(order?.title||draft.title||'Food order'),date=safe(draft.neededDate||''),time=safe(draft.neededTime||'');document.body.innerHTML='<main class="payment-page"><section class="payment-card price-card" style="margin-top:34px;overflow:hidden;position:relative"><div style="font-size:48px;letter-spacing:9px;animation:foodPop .8s ease-out both">🎉🎊✨</div><p style="color:#86efac;font-weight:900;letter-spacing:.08em">ORDER CONFIRMED</p><h1 style="margin:4px 0 12px">आपका order सफल हुआ!</h1><p style="color:#cbd5e1">'+item+' का pre-order दर्ज हो गया है।</p><div style="margin:20px auto;padding:16px;background:#081426;border:1px dashed #62d3ff;border-radius:15px;max-width:340px"><small style="color:#9aaccc">ORDER NUMBER</small><strong style="display:block;font-size:26px;letter-spacing:1px;color:#fef08a;margin-top:5px">'+foodOrderNumber(order)+'</strong></div><p style="color:#cbd5e1">Delivery: '+date+(time?' · '+time:'')+'</p><p style="color:#a7f3d0;font-size:13px">यह screen तब तक रहेगी जब तक आप आगे नहीं जाते।</p><button id="foodOrders" class="confirm">मेरे orders देखें</button></section></main><style>@keyframes foodPop{0%{transform:scale(.2) rotate(-15deg);opacity:0}70%{transform:scale(1.18) rotate(6deg)}100%{transform:scale(1) rotate(0);opacity:1}}</style>';document.querySelector('#foodOrders').onclick=()=>{sessionStorage.removeItem(KEY);sessionStorage.removeItem('food_order_success_v1');location.href='/local-delivery.html?tab=orders'};}
+async function confirmFoodOrder(method){
+  const btn=document.querySelector('#confirm');
+  btn.disabled=true; btn.textContent='Order confirm हो रहा है…';
+  draft.paymentMethod=method==='cash'?'cash-on-delivery':'wallet';
+  draft.confirmed=true; draft.orderId=draft.orderId||crypto.randomUUID();
+  sessionStorage.setItem(KEY,JSON.stringify(draft));
+  const lines=Array.isArray(draft.lineItems)&&draft.lineItems.length?draft.lineItems:[{name:String(draft.title||'Food order'),quantity:String(draft.quantity||'1')}];
+  const neededBy=draft.neededDate&&draft.neededTime?new Date(draft.neededDate+'T'+draft.neededTime+':00').toISOString():new Date(Date.now()+3600000).toISOString();
+  const order={id:draft.orderId,title:String(draft.title||lines[0].name||'Food order').trim(),area:String(draft.area||'').trim(),address:String(draft.address||'').trim(),district:String(draft.district||'').trim(),deliveryVillage:String(draft.deliveryVillage||'').trim(),quantity:String(lines[0].quantity||'1'),lineItems:lines,description:String(draft.description||''),category:'Food',neededBy,items:Number(draft.items||0),fee:Number(draft.fee||0),paymentMode:draft.paymentMethod,directFoodOrder:true,customerHold:0,helperHold:0,alreadyPurchased:false,status:'open',messages:[]};
+  try{
+    const response=await fetch('/api/local-delivery/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mobile:s?.mobile||'',sessionToken:s?.sessionToken||'',action:'create',order})});
+    const out=await response.json();
+    if(!response.ok||!out?.ok)throw Error(out?.message||'Order confirm नहीं हुआ।');
+    if(Number.isFinite(Number(out.walletBalance))&&s){s.walletBalance=Number(out.walletBalance);localStorage.setItem('aditya_studio_session_v1',JSON.stringify(s));}
+    draft.completedOrder=out.order;
+    sessionStorage.setItem(KEY,JSON.stringify(draft));
+    sessionStorage.setItem('food_order_success_v1',JSON.stringify({order:out.order,d:draft,at:Date.now()}));
+    showFoodSuccess(out.order);
+  }catch(err){btn.disabled=false;btn.textContent='Order confirm करें';document.querySelector('#message').textContent=err.message||'Order confirm नहीं हुआ।';}
+}
+let cod=false;
+document.querySelectorAll('[name=method]').forEach(input=>{
+  input.onchange=()=>{
+    document.querySelectorAll('.pay-option').forEach(option=>option.classList.remove('selected'));
+    input.closest('.pay-option').classList.add('selected');
+    const box=document.querySelector('#codBox'); cod=false;
+    box.innerHTML=input.value==='cash'?'<div class="cod-warning"><b>⚠️ Cash on Delivery confirmation</b><p>घर में सामान लेकर delivery boy आएगा तो आपको सामान की पूरी payment करनी पड़ेगी।</p><div class="choice-row"><button class="yes" id="yes">हां</button><button class="no" id="no">नहीं</button></div></div>':'';
+    const yes=document.querySelector('#yes'), no=document.querySelector('#no');
+    if(yes)yes.onclick=()=>{cod=true;box.innerHTML='<div class="cod-warning">✓ Cash on Delivery स्वीकार किया गया।</div>';};
+    if(no)no.onclick=()=>{c.checked=false;c.closest('.pay-option').classList.remove('selected');box.innerHTML='';};
+  };
+});
+document.querySelector('#confirm').onclick=()=>{
+  const method=document.querySelector('[name=method]:checked')?.value, msg=document.querySelector('#message');
+  if(!method){msg.textContent='पहले payment option चुनें।';return;}
+  if(method==='cash'&&!cod){msg.textContent='Cash on Delivery के लिए हां करें।';return;}
+  if(returnPage==='/meal.html'){confirmFoodOrder(method);return;}
+  draft.paymentMethod=method==='cash'?'cash-on-delivery':'wallet';draft.confirmed=true;sessionStorage.setItem(KEY,JSON.stringify(draft));location.href=returnPage+'?checkout=confirmed';
+};
+function tick(){const left=Math.max(0,Number(draft.expiresAt||0)-Date.now()),m=Math.floor(left/60000),sec=Math.floor(left/1000)%60;document.querySelector('#timer').textContent=String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0');if(!left){document.querySelector('#confirm').disabled=true;document.querySelector('#message').textContent='Payment time पूरा हो गया। Form से फिर try करें।';}}
+if(draft?.completedOrder){showFoodSuccess(draft.completedOrder)}else{tick();setInterval(tick,1000);}
+</script></body></html>
