@@ -4021,10 +4021,12 @@ function computeOrderFees(subtotal, settingsFees) {
       let locks=[];try{locks=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_LOCKS_FILE,'utf8'))||[]}catch(_){}
       const order=orders.find(x=>String(x.id)===orderId);
       if(!order)return sendJSON(res,404,{ok:false,message:'Order नहीं मिला।'});
-      if(!['completed','cancelled','rejected','expired'].includes(String(order.status||'')))return sendJSON(res,409,{ok:false,message:'Live order को delete नहीं कर सकते। पहले Admin settlement से cancel करें।'});
+      if(!['booked','completed','cancelled','rejected','expired'].includes(String(order.status||'')))return sendJSON(res,409,{ok:false,message:'Live order को delete नहीं कर सकते। पहले Admin settlement से cancel करें।'});
       if(locks.some(x=>String(x.orderId)===orderId&&x.status==='locked'))return sendJSON(res,409,{ok:false,message:'Locked wallet amount पहले settle करें।'});
-      orders=orders.filter(x=>String(x.id)!==orderId);
+      if(order.paymentStatus==='wallet-paid'&&Number(order.walletPaid||0)>0){const accounts=loadAccounts(),owner=accounts.find(x=>String(x.mobile||'')===String(order.ownerMobile||''));if(!owner||!walletTxn(owner,'credit',Number(order.walletPaid),{reason:'Admin deleted food order refund · '+orderId,source:'food_order_admin_delete_refund',orderId,operationKey:'food-admin-delete-refund:'+orderId}))return sendJSON(res,500,{ok:false,message:'Wallet refund नहीं हुआ।'});saveAccounts(accounts);}
+      const wasBooked=order.status==='booked';orders=orders.filter(x=>String(x.id)!==orderId);
       fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));
+      if(wasBooked){notify(order.ownerMobile,'⚠️ Order cancelled by admin','Booked order admin ने cancel करके हटाया है।','local-delivery-admin-delete');if(order.providerMobile)notify(order.providerMobile,'⚠️ Order cancelled by admin','Booked order admin ने cancel करके हटाया है।','local-delivery-admin-delete');}
       return sendJSON(res,200,{ok:true});
     }catch(e){console.error('admin local delivery delete:',e.message);return sendJSON(res,500,{ok:false,message:'Order delete नहीं हुआ।'});}
   }
