@@ -1169,7 +1169,7 @@ function expireUnacceptedFoodOrders() {
   let orders = [];
   try { orders = JSON.parse(fs.readFileSync(LOCAL_DELIVERY_ORDERS_FILE, 'utf8')) || []; }
   catch (_) { return 0; }
-  const now = Date.now(); let changed = 0;
+  const now = Date.now(), accounts = loadAccounts(); let changed = 0, walletChanged = false;
   for (const order of orders) {
     if (!order || !order.directFoodOrder || order.status !== 'open') continue;
     const savedExpiry = new Date(order.foodExpiresAt || '').getTime();
@@ -1181,10 +1181,16 @@ function expireUnacceptedFoodOrders() {
     order.foodExpiresAt = new Date(expiry).toISOString();
     order.messages = Array.isArray(order.messages) ? order.messages : [];
     order.messages.push({ sender: 'system', text: '⌛ Food order 24 घंटे तक accept नहीं हुई, इसलिए अपने-आप expire हो गई।', time: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) });
+    if (order.paymentStatus === 'wallet-paid' && Number(order.walletPaid || 0) > 0) {
+      const owner = accounts.find(a => String(a.mobile || '').replace(/\D/g, '').slice(-10) === String(order.ownerMobile || '').replace(/\D/g, '').slice(-10));
+      if (owner && walletTxn(owner, 'credit', Number(order.walletPaid), { reason: 'Food preorder expired refund · ' + order.id, source: 'food_preorder_refund', orderId: order.id, operationKey: 'food-preorder-refund:' + order.id })) {
+        order.paymentStatus = 'wallet-refunded'; order.walletRefundedAt = at; walletChanged = true;
+      }
+    }
     addNotification({ title: '⌛ Food order expired', body: '“' + String(order.title || 'Food order').slice(0, 90) + '” 24 घंटे तक accept नहीं हुई, इसलिए History में भेज दी गई।', mobile: order.ownerMobile, kind: 'local-delivery-food-expired', orderId: order.id });
     changed++;
   }
-  if (changed) fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE, JSON.stringify(orders.slice(0, 5000), null, 2));
+  if (changed) { fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE, JSON.stringify(orders.slice(0, 5000), null, 2)); if (walletChanged) saveAccounts(accounts); }
   return changed;
 }
 setInterval(() => { try { expireUnacceptedFoodOrders(); } catch (e) { console.error('food order expiry:', e.message); } }, 5 * 60 * 1000).unref();
@@ -3586,7 +3592,7 @@ function computeOrderFees(subtotal, settingsFees) {
         if(!acc.mobileVerified)return sendJSON(res,403,{ok:false,error:'mobile-verification-required',message:'Local Delivery post बनाने के लिए पहले अपना mobile number verify करें।'});
         const postSpam = localDeliverySpamCheck(req, acc, 'post', { limit: 3, windowMs: 10 * 60 * 1000, duplicateMs: 10 * 60 * 1000, fingerprint: [o.kind, o.title, o.description, o.area, o.address, o.neededBy].join('|') });
         if(postSpam)return sendJSON(res,429,{ok:false,error:'too-many-requests',message:postSpam.message});
-        o.ownerMobile=acc.mobile;o.ownerName=acc.name;o.createdAt=new Date().toISOString(); if(o.directFoodOrder){if(/biryani/i.test(String(o.title||'')))return sendJSON(res,409,{ok:false,message:'Biryani फिलहाल Coming Soon है।'});const fixedFee=FOOD_DELIVERY_FEES[String(o.deliveryVillage||'').trim()];if(!fixedFee)return sendJSON(res,400,{ok:false,message:'Food order के लिए सूची में दिया गांव चुनें।'});const scheduleError=foodScheduleError(o.neededBy);if(scheduleError)return sendJSON(res,400,{ok:false,message:scheduleError});o.fee=fixedFee;o.category='Food';o.foodExpiresAt=new Date(Date.now()+24*60*60*1000).toISOString();}if(o.paymentMode==='cash-on-delivery'){o.customerHold=0;o.paymentStatus='cash-pending';}
+        o.ownerMobile=acc.mobile;o.ownerName=acc.name;o.createdAt=new Date().toISOString(); if(o.directFoodOrder){if(/biryani/i.test(String(o.title||'')))return sendJSON(res,409,{ok:false,message:'Biryani फिलहाल Coming Soon है।'});const fixedFee=FOOD_DELIVERY_FEES[String(o.deliveryVillage||'').trim()];if(!fixedFee)return sendJSON(res,400,{ok:false,message:'Food order के लिए सूची में दिया गांव चुनें।'});const scheduleError=foodScheduleError(o.neededBy);if(scheduleError)return sendJSON(res,400,{ok:false,message:scheduleError});o.fee=fixedFee;o.category='Food';o.foodExpiresAt=new Date(Date.now()+24*60*60*1000).toISOString();if(o.paymentMode==='wallet'){const foodWalletTotal=Math.round(Number(o.items||0))+Math.round(Number(o.fee||0));const payment=walletTxn(acc,'debit',foodWalletTotal,{reason:'Food preorder payment · '+o.id,source:'food_preorder_payment',orderId:o.id,operationKey:'food-preorder-payment:'+o.id});if(!payment)return sendJSON(res,400,{ok:false,message:'Wallet balance is insufficient for this food order.'});o.walletPaid=foodWalletTotal;o.customerHold=0;o.paymentStatus='wallet-paid';o.walletPaymentAt=new Date().toISOString();saveAccounts(accounts);}}if(o.paymentMode==='cash-on-delivery'){o.customerHold=0;o.paymentStatus='cash-pending';}
         const freePostLimit=500,postTotal=Math.round(Number(o.items||0))+Math.round(Number(o.fee||0));
         if(!o.alreadyPurchased&&o.paymentMode!=='cash-on-delivery'&&postTotal>freePostLimit&&Number(acc.walletBalance||0)<postTotal)return sendJSON(res,400,{ok:false,needsRecharge:true,requiredWallet:postTotal,message:'Product और delivery fee मिलाकर ₹500 से अधिक है। Post करने से पहले wallet में ₹'+postTotal+' add करें।'});
         if(o.kind==='delivery-service'){o.status='service';o.serviceActive=true;orders.unshift(o);fs.writeFileSync(LOCAL_DELIVERY_ORDERS_FILE,JSON.stringify(orders.slice(0,5000),null,2));addNotification({title:'🚚 नई delivery service',body:(acc.name||'Delivery boy')+' ने delivery service post की है।',kind:'local-delivery-service'});return sendJSON(res,200,{ok:true,order:o});}
@@ -3610,7 +3616,7 @@ function computeOrderFees(subtotal, settingsFees) {
           });
           addNotification({ title:'📣 नई Local Delivery requirement', body:(acc.name||'एक customer')+' ने “'+String(o.title).slice(0,90)+'” पोस्ट किया है। आसपास के delivery users को alert भेज दिया गया है।', kind:'local-delivery-new' });
         }
-        return sendJSON(res,200,{ok:true,order:o});
+        return sendJSON(res,200,{ok:true,order:o,walletBalance:acc.walletBalance});
       }
       if(body.action==='accept'){
         const orderId=String(body.orderId||''); const o=orders.find(x=>String(x.id)===orderId);
