@@ -1,7 +1,8 @@
 const hindiCategories={Food:'खाने का सामान',Groceries:'राशन का सामान',Care:'दवा और care',Pickup:'सामान लाना',Shopping:'खरीदारी',Other:'अन्य'};
 // Mobile website layout adapted from the supplied Stitch home-page reference.
 // A stale food choice must never prefill an unrelated local-delivery request.
-if(!new URLSearchParams(location.search).has('menu')){window.__pizzaMenuSelection=null;try{sessionStorage.removeItem('local_delivery_home_item_v1')}catch(_){}}
+// Clear stale choices only when returning to the Local Delivery home. The food checkout page must keep the menu choice.
+if(location.pathname.endsWith('/local-delivery.html')&&!new URLSearchParams(location.search).has('menu')){window.__pizzaMenuSelection=null;try{sessionStorage.removeItem('local_delivery_home_item_v1')}catch(_){}}
 let marketFilter='All',attachment=null,marketPostType='needs';
 let lightTheme=false;
 function foodShopOpenNow(){const h=new Date().getHours();return h>=14&&h<20}function foodShopOrderLabel(){return foodShopOpenNow()?'Order Now →':'📅 Pre-book for next day →'}
