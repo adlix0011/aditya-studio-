@@ -1798,7 +1798,7 @@ const server = http.createServer(async (req, res) => {
     'styles.css', 'mobile-design.css', 'home-design.css', 'profile-page.css', 'delivery-flow.css', 'food-checkout.css',
     'item-icons.js', 'delivery-engine.js', 'app.js', 'request-summary.js', 'home-design.js',
     'order-items.js', 'post-page.js', 'food-checkout.js', 'profile-page.js', 'edit-order.js', 'delivery-flow.js', 'delivery-contact.js',
-    'post-wallet.js', 'paid-product-policy.js', 'post-recharge-guard.js', 'language.js', 'notifications-page.js', 'notification-alerts.js', 'repost-order.js', 'messages-hub.js', 'chat-room.js', 'confirmation-wait.js', 'order-tracking.js', 'local-delivery-admin.js', 'local-delivery-admin.css', 'orderbro.js', 'deliverybro.js'
+    'post-wallet.js', 'paid-product-policy.js', 'post-recharge-guard.js', 'language.js', 'notifications-page.js', 'notification-alerts.js', 'repost-order.js', 'messages-hub.js', 'chat-room.js', 'confirmation-wait.js', 'order-tracking.js', 'local-delivery-admin.js', 'local-delivery-admin.css', 'orderbro.js', 'deliverybro.js', 'location-picker.js'
   ]);
   if (req.method === 'GET' && (urlPath === '/orderbro' || urlPath === '/deliverybro')) {
     const file=urlPath==='/deliverybro'?'deliverybro.html':'orderbro.html';
