@@ -1798,7 +1798,7 @@ const server = http.createServer(async (req, res) => {
     'styles.css', 'mobile-design.css', 'home-design.css', 'profile-page.css', 'delivery-flow.css', 'food-checkout.css',
     'item-icons.js', 'delivery-engine.js', 'app.js', 'request-summary.js', 'home-design.js',
     'order-items.js', 'post-page.js', 'food-checkout.js', 'profile-page.js', 'edit-order.js', 'delivery-flow.js', 'delivery-contact.js',
-    'post-wallet.js', 'paid-product-policy.js', 'post-recharge-guard.js', 'language.js', 'notifications-page.js', 'notification-alerts.js', 'repost-order.js', 'messages-hub.js', 'chat-room.js', 'confirmation-wait.js', 'order-tracking.js', 'local-delivery-admin.js', 'local-delivery-admin.css', 'orderbro.js', 'deliverybro.js'
+    'post-wallet.js', 'paid-product-policy.js', 'post-recharge-guard.js', 'language.js', 'notifications-page.js', 'notification-alerts.js', 'repost-order.js', 'messages-hub.js', 'chat-room.js', 'confirmation-wait.js', 'order-tracking.js', 'local-delivery-admin.js', 'local-delivery-admin.css', 'admin-marketplace.js', 'admin-marketplace.css', 'orderbro.js', 'deliverybro.js'
   ]);
   if (req.method === 'GET' && (urlPath === '/orderbro' || urlPath === '/deliverybro')) {
     const file=urlPath==='/deliverybro'?'deliverybro.html':'orderbro.html';
@@ -3973,6 +3973,19 @@ function computeOrderFees(subtotal, settingsFees) {
       res.writeHead(200, { 'Content-Type':'text/html; charset=utf-8', 'Cache-Control':'no-store' });
       res.end(data);
     });
+  }
+  if (req.method === 'GET' && urlPath === '/admin/marketplace-posts') {
+    const page = path.join(__dirname, 'admin-marketplace.html');
+    return fs.readFile(page, (err,data)=>{if(err)return sendJSON(res,404,{ok:false,message:'Marketplace admin page not found'});res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'});res.end(data);});
+  }
+  if (req.method === 'GET' && urlPath === '/admin/marketplace-json') {
+    if (!isAdminAuthed(req)) return requireAdminAuth(req,res);
+    let list=[];try{list=JSON.parse(fs.readFileSync(USED_LISTINGS_FILE,'utf8'))||[]}catch(_){}
+    return sendJSON(res,200,{ok:true,listings:list.slice(0,2000)});
+  }
+  if (req.method === 'POST' && urlPath === '/admin/marketplace-delete') {
+    if (!isAdminAuthed(req)) return requireAdminAuth(req,res);
+    try{const body=await readBody(req),id=String(body.id||'');let list=[];try{list=JSON.parse(fs.readFileSync(USED_LISTINGS_FILE,'utf8'))||[]}catch(_){}const before=list.length;list=list.filter(x=>String(x?.id)!==id);if(list.length===before)return sendJSON(res,404,{ok:false,message:'Post नहीं मिली।'});fs.writeFileSync(USED_LISTINGS_FILE,JSON.stringify(list.slice(0,2000),null,2));return sendJSON(res,200,{ok:true});}catch(_){return sendJSON(res,400,{ok:false,message:'Post delete नहीं हुई।'});}
   }
   if (req.method === 'GET' && urlPath === '/admin/local-delivery-json') {
     if (!isAdminAuthed(req)) return requireAdminAuth(req, res);
