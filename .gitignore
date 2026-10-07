@@ -32,3 +32,5 @@ unbilled-charges.csv
 # Firebase server credential (private)
 firebase-service-account.json
 
+/android/app/google-services.json
+/android/.android-user-home/
