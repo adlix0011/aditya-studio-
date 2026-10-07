@@ -1819,6 +1819,16 @@ const server = http.createServer(async (req, res) => {
     else own=rows.filter(o=>o&&o.directFoodOrder&&orderShopName(o).toLowerCase()===String(member.shopName||'').toLowerCase()).map(o=>({...o,shopName:orderShopName(o)}));
     return sendJSON(res,200,{ok:true,member:{role,name:member.displayName||member.shopName||'Delivery boy',shopName:member.shopName||''},orders:own});
   }
+  if (req.method === 'GET' && urlPath === '/api/orderbro/delivery-dashboard') {
+    const member=orderBroSession(req); if(!member||String(member.role||'')!=='delivery')return sendJSON(res,401,{ok:false,message:'पहले Delivery login करें।'});
+    let rows=[]; try{rows=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_ORDERS_FILE,'utf8'))||[]}catch(_){}
+    const mine=rows.filter(o=>isFoodOrder(o)&&(String(o.deliveryAcceptedById||'')===String(member.id)||String(o.providerMobile||'')===String(member.phone||''))).map(o=>({...o,shopName:orderShopName(o)}));
+    const completed=mine.filter(o=>['completed','delivered'].includes(String(o.status||'').toLowerCase()));
+    const active=mine.filter(o=>!['completed','delivered','cancelled'].includes(String(o.status||'').toLowerCase()));
+    const scores=mine.map(o=>Number(o.customerRating?.score||0)).filter(x=>x>=1&&x<=5);
+    const rating=scores.length?scores.reduce((a,b)=>a+b,0)/scores.length:0;
+    return sendJSON(res,200,{ok:true,member:{id:member.id,name:member.displayName||member.shopName||'Delivery boy',phone:member.phone||''},orders:mine,wallet:{available:completed.reduce((n,o)=>n+Number(o.fee||0),0),pending:active.reduce((n,o)=>n+Number(o.fee||0),0)},rating:{average:rating,count:scores.length}});
+  }
   if (req.method === 'POST' && urlPath === '/api/orderbro/accept') {
     const member=orderBroSession(req); if(!member)return sendJSON(res,401,{ok:false,message:'पहले login करें।'}); try{const body=await readBody(req),id=String(body.orderId||''),orders=JSON.parse(fs.readFileSync(LOCAL_DELIVERY_ORDERS_FILE,'utf8'))||[],o=orders.find(x=>String(x.id)===id&&isFoodOrder(x));if(!o)return sendJSON(res,404,{ok:false,message:'Order नहीं मिला'});const role=String(member.role||'shop');
       if(role==='delivery'){
