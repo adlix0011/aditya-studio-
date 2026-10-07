@@ -10,3 +10,13 @@ function card(o){const mine=String(o.deliveryAcceptedById||'');const accepted=!!
 async function acceptOrder(id){let r=await fetch('/api/orderbro/accept',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({orderId:id})}),d=await r.json();if(!r.ok)return alert(d.message||'Accept नहीं हुआ');load(false)}
 async function load(first){setupAlerts();let r=await fetch('/api/orderbro/orders'),d=await r.json();if(r.status===401){$('login').hidden=false;$('panel').hidden=true;return}if(!r.ok)return;let rows=d.orders||[];if(!first){let fresh=rows.find(o=>!known.has(o.id)&&!o.deliveryAcceptedById);if(fresh)showOrderAlert({title:'New delivery: '+fresh.title,pickup:fresh.shopName||'Food shop',drop:fresh.address||fresh.deliveryVillage||fresh.area||'—',earning:fresh.fee||0})}known=new Set(rows.map(o=>o.id));$('orders').innerHTML=rows.length?rows.sort((a,b)=>Number(!!a.deliveryAcceptedById)-Number(!!b.deliveryAcceptedById)).map(card).join(''):'<div class="card empty">अभी कोई food delivery open नहीं है।</div>'}
 $('signin').onclick=login;$('pass').onkeydown=e=>{if(e.key==='Enter')login()};$('logout').onclick=async()=>{await fetch('/api/orderbro/logout',{method:'POST'});location.reload()};load(true);setInterval(()=>load(false),5000);
+// Food orders clearly show whether they are a scheduled pre-book or an immediate order.
+(() => {
+  const baseCard=card;
+  card=o=>{
+    const pre=String(o.foodOrderType||'')==='pre-book'||(!o.foodOrderType&&new Date(o.neededBy||0).toDateString()!==new Date(o.createdAt||0).toDateString());
+    const label=pre?'📅 PRE-BOOK · scheduled time':'⚡ ORDER NOW · immediate';
+    const color=pre?'background:#064e3b;border:1px solid #34d399;color:#d1fae5':'background:#522006;border:1px solid #fbbf24;color:#fef3c7';
+    return baseCard(o).replace('<div class="details">','<div style="'+color+';padding:9px;border-radius:9px;margin:12px 0;font-weight:800;font-size:13px">'+label+'</div><div class="details">');
+  };
+})();
