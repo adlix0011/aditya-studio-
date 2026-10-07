@@ -1,7 +1,7 @@
 /* Private Marketplace threads inside the Local Delivery बातचीत tab. */
 (function(){
   const before=render, escHub=x=>String(x||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  let threads=[],openKey='',lastLoad=0,loading=false;
+  let threads=[],openKey='',lastLoad=0,loading=false;try{const u=new URLSearchParams(location.search),id=u.get('marketChat'),peer=u.get('peer');if(id){openKey=String(id)+'|'+String(peer||'');tab='messages';history.replaceState({},'',location.pathname)}}catch(_){}
   const session=()=>{try{return JSON.parse(localStorage.getItem('aditya_studio_session_v1')||localStorage.getItem('aditya_studio_persistent_login_v2')||'null')}catch(_){return null}};
   const key=t=>String(t.id)+'|'+String(t.peerMobile||'');
   async function loadMarket(force=false){const s=session();if(!s?.sessionToken||loading||(!force&&Date.now()-lastLoad<6000))return;loading=true;try{const r=await fetch('/api/marketplace-inbox?sessionToken='+encodeURIComponent(s.sessionToken)),d=await r.json();if(r.ok&&d.ok){const next=Array.isArray(d.threads)?d.threads:[];if(JSON.stringify(next)!==JSON.stringify(threads)){threads=next;if(tab==='messages'&&!active)render()}lastLoad=Date.now()}}catch(_){}finally{loading=false}}
