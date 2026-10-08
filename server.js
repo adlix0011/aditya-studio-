@@ -408,6 +408,7 @@ const FRAMES_HTML_FILE = path.join(__dirname, 'frames-home.html'); // 3D frames 
 const PLACE_ORDER_HTML_FILE = path.join(__dirname, 'place-order.html');
 const FRAME_DETAIL_HTML_FILE = path.join(__dirname, 'frame-detail.html');
 const BOOK_SERVICE_HTML_FILE = path.join(__dirname, 'book-service-sample.html');
+const BOOKINGS_HTML_FILE = path.join(__dirname, 'bookings.html');
 const ADD_MONEY_HTML_FILE = path.join(__dirname, 'add-money.html');
 const PHOTO_ADJUST_HTML_FILE = path.join(__dirname, 'photo-adjust.html');
 const PAYMENT_QR_FILE = path.join(__dirname, 'payment-qr.png');
@@ -2103,6 +2104,16 @@ const server = http.createServer(async (req, res) => {
     fs.readFile(BOOK_SERVICE_HTML_FILE, (err, data) => {
       if (err) { res.writeHead(404); return res.end('Book service page missing'); }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      serveLiveHtml(res, data);
+    });
+    return;
+  }
+
+  // Photography booking catalogue opened from the home-page 3D experience.
+  if (req.method === 'GET' && (urlPath === '/bookings' || urlPath === '/bookings.html')) {
+    fs.readFile(BOOKINGS_HTML_FILE, (err, data) => {
+      if (err) { res.writeHead(404); return res.end('Bookings page missing'); }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store, max-age=0' });
       serveLiveHtml(res, data);
     });
     return;
