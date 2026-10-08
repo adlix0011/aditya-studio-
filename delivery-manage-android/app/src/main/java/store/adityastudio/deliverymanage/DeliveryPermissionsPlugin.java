@@ -7,6 +7,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.PowerManager;
 import android.provider.Settings;
+import android.content.ComponentName;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.PermissionState;
@@ -58,6 +59,17 @@ public class DeliveryPermissionsPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void requestOverlay(PluginCall call) {
+        Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getContext().getPackageName()));
+        getActivity().startActivity(intent); call.resolve(status());
+    }
+
+    @PluginMethod
+    public void goOnline(PluginCall call) { DeliveryOnlineService.start(getContext()); call.resolve(status()); }
+    @PluginMethod
+    public void goOffline(PluginCall call) { DeliveryOnlineService.stop(getContext()); call.resolve(status()); }
+
+    @PluginMethod
     public void requestFullScreenIntent(PluginCall call) {
         if (Build.VERSION.SDK_INT < 34) { call.resolve(status()); return; }
         Intent intent = new Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT);
@@ -92,6 +104,8 @@ public class DeliveryPermissionsPlugin extends Plugin {
         value.put("backgroundLocation", Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || getPermissionState("backgroundLocation") == PermissionState.GRANTED);
         NotificationManager notifications = (NotificationManager) getContext().getSystemService(Context.NOTIFICATION_SERVICE);
         value.put("fullScreenIntent", Build.VERSION.SDK_INT < 34 || (notifications != null && notifications.canUseFullScreenIntent()));
+        value.put("overlay", Settings.canDrawOverlays(getContext()));
+        value.put("online", DeliveryOnlineService.isOnline(getContext()));
         PowerManager power = (PowerManager) getContext().getSystemService(Context.POWER_SERVICE);
         value.put("batteryUnrestricted", power != null && power.isIgnoringBatteryOptimizations(getContext().getPackageName()));
         return value;
