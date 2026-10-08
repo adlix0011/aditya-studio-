@@ -710,7 +710,45 @@
           </span>
         </div>
       </a>
-    </section><section id="more-services" class="glass-panel rounded-3xl border border-primary/35 px-6 py-7 text-center shadow-[0_0_28px_rgba(212,175,55,.12)]" style="background:linear-gradient(135deg,#251b0a,#17100b 55%,#24112a)">
+    </section>
+    <section class="flex flex-col gap-6" id="gallery-samples">
+      <div class="flex items-end justify-between gap-4 flex-wrap">
+        <div>
+          <p class="text-primary font-label-md text-xs uppercase tracking-[.18em] mb-2">Photography gallery</p>
+          <h2 class="font-headline-md text-headline-md text-on-surface m-0">Gallery Samples</h2>
+          <p class="text-on-surface-variant text-sm mt-2">Wedding, birthday aur special moments ki latest photos.</p>
+        </div>
+        <a href="/bookings" class="text-primary font-label-md text-label-md hover:underline">Book a session →</a>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5">
+        <article class="overflow-hidden rounded-2xl border border-primary/30 bg-surface shadow-[0_0_22px_rgba(212,175,55,.10)] group">
+          <div class="relative h-52 overflow-hidden bg-surface-variant"><img data-gallery="wedding" class="w-full h-full object-cover transition-opacity duration-300 group-hover:scale-105 transition-transform" alt="Wedding gallery sample"><div class="absolute inset-0 bg-gradient-to-t from-[#100d08]/90 via-transparent to-transparent"></div><span class="absolute left-3 bottom-3 rounded-full bg-primary px-3 py-1 text-[11px] font-extrabold text-on-primary">💍 Wedding</span></div>
+        </article>
+        <article class="overflow-hidden rounded-2xl border border-primary/30 bg-surface shadow-[0_0_22px_rgba(212,175,55,.10)] group">
+          <div class="relative h-52 overflow-hidden bg-surface-variant"><img data-gallery="birthday" class="w-full h-full object-cover transition-opacity duration-300 group-hover:scale-105 transition-transform" alt="Birthday shoot gallery sample"><div class="absolute inset-0 bg-gradient-to-t from-[#100d08]/90 via-transparent to-transparent"></div><span class="absolute left-3 bottom-3 rounded-full bg-primary px-3 py-1 text-[11px] font-extrabold text-on-primary">🎂 Birthday Shoot</span></div>
+        </article>
+        <article class="overflow-hidden rounded-2xl border border-primary/30 bg-surface shadow-[0_0_22px_rgba(212,175,55,.10)] group">
+          <div class="relative h-52 overflow-hidden bg-surface-variant"><img data-gallery="baby" class="w-full h-full object-cover transition-opacity duration-300 group-hover:scale-105 transition-transform" alt="Baby shower gallery sample"><div class="absolute inset-0 bg-gradient-to-t from-[#100d08]/90 via-transparent to-transparent"></div><span class="absolute left-3 bottom-3 rounded-full bg-primary px-3 py-1 text-[11px] font-extrabold text-on-primary">🍼 Baby Shower</span></div>
+        </article>
+        <article class="overflow-hidden rounded-2xl border border-primary/30 bg-surface shadow-[0_0_22px_rgba(212,175,55,.10)] group">
+          <div class="relative h-52 overflow-hidden bg-surface-variant"><img data-gallery="prewedding" class="w-full h-full object-cover transition-opacity duration-300 group-hover:scale-105 transition-transform" alt="Pre-wedding gallery sample"><div class="absolute inset-0 bg-gradient-to-t from-[#100d08]/90 via-transparent to-transparent"></div><span class="absolute left-3 bottom-3 rounded-full bg-primary px-3 py-1 text-[11px] font-extrabold text-on-primary">✨ Pre-Wedding</span></div>
+        </article>
+      </div>
+      <script>
+      (async function(){
+        try {
+          var res=await fetch('/api/home-gallery-samples',{cache:'no-store'}), data=await res.json(), gallery=data.gallery||{}, pos={};
+          document.querySelectorAll('[data-gallery]').forEach(function(img){
+            var key=img.dataset.gallery, list=gallery[key]||[]; pos[key]=0;
+            if(list.length){ img.src=list[0]; img.style.opacity='1'; }
+            else { img.style.display='none'; img.parentElement.insertAdjacentHTML('afterbegin','<div class="absolute inset-0 grid place-items-center px-4 text-center text-sm text-on-surface-variant">Admin se photos upload karein</div>'); }
+          });
+          setInterval(function(){ document.querySelectorAll('[data-gallery]').forEach(function(img){ var list=gallery[img.dataset.gallery]||[]; if(list.length>1){ pos[img.dataset.gallery]=(pos[img.dataset.gallery]+1)%list.length; img.style.opacity='0'; setTimeout(function(){ img.src=list[pos[img.dataset.gallery]]; img.style.opacity='1'; },180); } }); },2000);
+        } catch(e) { console.warn('Gallery samples unavailable',e); }
+      })();
+      </script>
+    </section>
+    <section id="more-services" class="glass-panel rounded-3xl border border-primary/35 px-6 py-7 text-center shadow-[0_0_28px_rgba(212,175,55,.12)]" style="background:linear-gradient(135deg,#251b0a,#17100b 55%,#24112a)">
       <p class="text-[10px] uppercase tracking-[.22em] text-primary/80 font-bold">Photography &amp; Bookings</p>
       <h2 class="mt-2 text-xl font-black text-yellow-100">Aur services dekhni hain?</h2>
       <p class="mt-2 text-sm text-on-surface-variant">Wedding, birthday, event aur studio packages ek hi jagah dekhein.</p>

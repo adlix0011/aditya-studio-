@@ -296,7 +296,7 @@ function isSafeR2PhotoKey(key, mobile) {
   return new RegExp('^customer-photos/' + safeMobile + '/[a-zA-Z0-9._-]+\\.(jpg|jpeg|png|webp)$', 'i').test(String(key || ''));
 }
 function isSafeAdminR2ImageKey(key) {
-  return /^studio-images\/(banner|deal|frame3d|home-frame|hero-bg|book)\/[a-zA-Z0-9._-]+\.(jpg|jpeg|png|webp)$/i.test(String(key || ''));
+  return /^studio-images\/(banner|deal|frame3d|home-frame|hero-bg|book|gallery-[a-z]+)\/[a-zA-Z0-9._-]+\.(jpg|jpeg|png|webp)$/i.test(String(key || ''));
 }
 function mediaUrl(value) {
   const raw = String(value || '');
@@ -334,6 +334,7 @@ function publicSettings(settings) {
   out.homeHeroFramePhotos = mapItems(out.homeHeroFramePhotos);
   out.heroSideBgPhotos = mapItems(out.heroSideBgPhotos);
   out.bookImages = Object.fromEntries(Object.entries(out.bookImages || {}).map(([k, v]) => [k, mediaUrl(v)]));
+  out.gallerySamples = Object.fromEntries(Object.entries(out.gallerySamples || {}).map(([k, list]) => [k, mapItems(list)]));
   return out;
 }
 async function moveDataImageToR2(value, group) {
@@ -1255,6 +1256,7 @@ function defaultSettings() {
     // Hero SECTION background slideshow (sides visible) — admin 4–6 photos + duration
     heroSideBgPhotos: [],
     heroSideBgDurationSec: 5,
+    gallerySamples: { wedding: [], birthday: [], baby: [], prewedding: [] },
     marketplacePosters: [],
     fees: {
       platformFee: 10,
@@ -1301,6 +1303,7 @@ function loadSettings() {
     frames3dPhotos: Array.isArray(data.frames3dPhotos) ? data.frames3dPhotos : defaults.frames3dPhotos,
     homeHeroFramePhotos: Array.isArray(data.homeHeroFramePhotos) ? data.homeHeroFramePhotos : defaults.homeHeroFramePhotos,
     heroSideBgPhotos: Array.isArray(data.heroSideBgPhotos) ? data.heroSideBgPhotos : defaults.heroSideBgPhotos,
+    gallerySamples: Object.fromEntries(['wedding','birthday','baby','prewedding'].map(k => [k, Array.isArray(data.gallerySamples?.[k]) ? data.gallerySamples[k] : []])),
     heroSideBgDurationSec: Math.max(2, Math.min(20, Number(data.heroSideBgDurationSec) || defaults.heroSideBgDurationSec)),
     marketplacePosters: Array.isArray(data.marketplacePosters) ? data.marketplacePosters.slice(0,5) : defaults.marketplacePosters,
     fees: { ...defaults.fees, ...(data.fees || {}) },
@@ -2158,7 +2161,7 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req, 20000);
       const group = String(body.group || '').trim().toLowerCase();
       const type = String(body.contentType || '').toLowerCase();
-      const validGroups = ['banner','deal','frame3d','home-frame','hero-bg','book'];
+      const validGroups = ['banner','deal','frame3d','home-frame','hero-bg','book','gallery-wedding','gallery-birthday','gallery-baby','gallery-prewedding'];
       const ext = ({ 'image/jpeg':'jpg', 'image/jpg':'jpg', 'image/png':'png', 'image/webp':'webp' })[type];
       if (!validGroups.includes(group) || !ext) return sendJSON(res, 400, { ok:false, error:'invalid-image' });
       const key = 'studio-images/' + group + '/' + Date.now() + '-' + crypto.randomBytes(10).toString('hex') + '.' + ext;
@@ -4973,6 +4976,22 @@ function computeOrderFees(subtotal, settingsFees) {
     }
   }
 
+  if (req.method === 'GET' && urlPath === '/api/home-gallery-samples') {
+    const gallery = publicSettings(loadSettings()).gallerySamples || {};
+    return sendJSON(res, 200, { ok: true, gallery });
+  }
+
+  if (req.method === 'POST' && urlPath === '/admin/gallery-samples-save') {
+    try {
+      const body = await readBody(req, 35e6);
+      const category = String(body.category || '').toLowerCase();
+      if (!['wedding','birthday','baby','prewedding'].includes(category)) return sendJSON(res, 400, { ok:false, message:'Invalid gallery category' });
+      const images = (Array.isArray(body.images) ? body.images : []).slice(0, 12).map(storedMediaValue).filter(v => /^data:image\/(png|jpe?g|webp);base64,/i.test(v) || (v.startsWith('r2:') && isSafeAdminR2ImageKey(v.slice(3))));
+      const cur = loadSettings(); cur.gallerySamples = cur.gallerySamples || {}; cur.gallerySamples[category] = images; saveSettings(cur);
+      return sendJSON(res, 200, { ok:true, count:images.length });
+    } catch (e) { return sendJSON(res, 500, { ok:false, message:'Gallery save नहीं हुई' }); }
+  }
+
 
   if (req.method === 'POST' && urlPath === '/admin/coupon-action') {
     try {
@@ -5375,6 +5394,7 @@ loadOrdersPage();setInterval(loadOrdersPage,20000);
     const settingsView = publicSettings(settings);
     const adminHidden = (settings.adminUi && settings.adminUi.hidden) || {};
     const bi = settingsView.bookImages || {};
+    const gallerySamples = settingsView.gallerySamples || {};
     const pendingResets = accounts.filter(a => a.pinResetRequested);
     const pendingOtps = loadOtpRequests().filter(r => !r.verified);
     const codes = loadCodes().slice().reverse();
@@ -5631,6 +5651,7 @@ label.muted{display:block;font-size:12px;margin-bottom:2px}
   <a class="nav-link" href="#sec-hero">✨ Hero Text + BG Photos</a>
   <a class="nav-link" href="#sec-home-frame">🖼️ Home 3D Frame (5 photos)</a>
   <a class="nav-link" href="#sec-book">📷 Book Cards</a>
+  <a class="nav-link" href="#sec-gallery-samples">🖼️ Gallery Samples</a>
   <a class="nav-link" href="#sec-otp">📱 OTP / PIN</a>
   <a class="nav-link" href="#sec-registration-limit">🛡️ Registration Limit</a>
   <a class="nav-link" href="#sec-codes">🎫 Spin Codes</a>
@@ -5955,6 +5976,23 @@ document.querySelectorAll('.book-up-btn').forEach(function(btn){
 <label class="muted">Other URL<input class="inp" name="other" value="${esc((bi.other||'').startsWith('data:')?'':(bi.other||''))}" placeholder="https://..."></label>
 <button class="gen-btn" type="submit">💾 Save URLs</button>
 </form>
+</section>
+\n<section class="panel" id="sec-gallery-samples">
+<h2>🖼️ Home Gallery Samples</h2>
+<p class="sub">Home page par Custom Photo Frames ke niche Wedding, Birthday Shoot, Baby Shower aur Pre-Wedding cards dikhte hain. Har card ki photo 2 seconds me badalti hai. Har category me maximum 12 photos upload karein.</p>
+<div class="form-grid" id="gallerySamplesUploadGrid">
+${[['wedding','💍 Wedding'],['birthday','🎂 Birthday Shoot'],['baby','🍼 Baby Shower'],['prewedding','✨ Pre-Wedding']].map(row => {
+  const key=row[0], label=row[1], list=Array.isArray(gallerySamples[key]) ? gallerySamples[key] : [];
+  const previews=list.length ? list.map((src, i) => '<img src="'+esc(src)+'" alt="'+label+' '+(i+1)+'" style="width:54px;height:54px;object-fit:cover;border-radius:9px;border:1px solid rgba(212,175,55,.35)"/>').join('') : '<span class="muted" style="font-size:11px">No photos yet</span>';
+  return '<div style="padding:14px;border:1px solid rgba(212,175,55,.20);border-radius:12px;background:#17120d">'
+    + '<div style="font-weight:800;color:#f2ca50;margin-bottom:9px">'+label+' <span class="muted" style="font-size:11px">('+list.length+'/12)</span></div>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;max-height:118px;overflow:auto">'+previews+'</div>'
+    + '<input type="file" accept="image/*" multiple class="field-file" id="galleryFiles_'+key+'"/>'
+    + '<div style="display:flex;gap:8px;align-items:center;margin-top:9px"><button type="button" class="gen-btn" style="padding:8px 12px" onclick="adminSaveGallerySamples(&quot;'+key+'&quot;)">📤 Upload / Replace</button><span id="gallerySt_'+key+'" class="muted" style="font-size:11px"></span></div>'
+    + '</div>';
+}).join('')}
+</div>
+<p class="muted" style="margin-top:10px">Nayi photos upload karne par us category ki purani list replace hogi. Home page refresh karte hi slideshow chal padega.</p>
 </section>
 
 <section class="panel" id="sec-otp">
@@ -6777,6 +6815,37 @@ async function adminUploadBookImage(key) {
   }
 }
 
+
+async function adminSaveGallerySamples(category) {
+  var input = document.getElementById('galleryFiles_' + category);
+  var st = document.getElementById('gallerySt_' + category);
+  var files = input && input.files ? Array.from(input.files) : [];
+  if (!files.length) { alert('Pehle ' + category + ' ki photos choose karo'); return; }
+  if (files.length > 12) { alert('Maximum 12 photos select karo'); return; }
+  try {
+    var images = [];
+    for (var i = 0; i < files.length; i++) {
+      if (st) st.textContent = 'Photo ' + (i + 1) + '/' + files.length + ' upload ho rahi hai…';
+      var dataUrl = await compressImageFile(files[i], 1200, 0.82);
+      images.push(await uploadAdminImageToR2(dataUrl, 'gallery-' + category));
+    }
+    var res = await fetch('/admin/gallery-samples-save', {
+      method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ category:category, images:images })
+    });
+    var data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.message || data.error || 'Save fail');
+    if (st) st.textContent = 'Saved ✅ ' + data.count + ' photos';
+    alert('Gallery saved ✅ Home page refresh par photos har 2 seconds me change hongi.');
+    location.href = '/admin#sec-gallery-samples';
+    location.reload();
+  } catch (e) {
+    console.error(e);
+    if (st) st.textContent = 'Upload fail';
+    alert('Upload fail: ' + (e.message || 'Network error'));
+  }
+}
+
 /* ---- Photo Frames admin ---- */
 var _frImageData = '';
 var _frKeepExistingImage = false;
@@ -7302,6 +7371,7 @@ var ADMIN_SECTIONS = [
   { id: 'sec-hero', label: 'Hero Text + BG' },
   { id: 'sec-home-frame', label: 'Home 3D Frame' },
   { id: 'sec-book', label: 'Book Cards' },
+  { id: 'sec-gallery-samples', label: 'Gallery Samples' },
   { id: 'sec-otp', label: 'OTP / PIN' },
   { id: 'sec-registration-limit', label: 'Registration Limit' },
   { id: 'sec-codes', label: 'Spin Codes' },
@@ -7441,7 +7511,7 @@ adminInitUi();
     dashboard:{label:'📊 Dashboard',ids:['sec-overview','sec-order-stats']},
     help:{label:'🆘 User Help & OTP',ids:['sec-otp','sec-registration-limit','sec-customers','sec-codes']},
     orders:{label:'📦 Orders & Wallet',ids:['sec-order-stats','sec-orders','sec-wallet-recharges']},
-    site:{label:'🎨 Site UI & Frames',ids:['sec-fees','sec-quality','sec-frames','sec-banner','sec-hero','sec-home-frame','sec-book','sec-ui-panel']},
+    site:{label:'🎨 Site UI & Frames',ids:['sec-fees','sec-quality','sec-frames','sec-banner','sec-hero','sec-home-frame','sec-book','sec-gallery-samples','sec-ui-panel']},
     alerts:{label:'🔔 Alert Center',ids:['sec-overview','sec-notif']},
     backup:{label:'💾 Backup',ids:['sec-backup']}
   };
