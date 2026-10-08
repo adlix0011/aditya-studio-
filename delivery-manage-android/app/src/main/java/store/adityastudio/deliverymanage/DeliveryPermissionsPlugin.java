@@ -60,8 +60,15 @@ public class DeliveryPermissionsPlugin extends Plugin {
 
     @PluginMethod
     public void requestOverlay(PluginCall call) {
-        Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getContext().getPackageName()));
-        getActivity().startActivity(intent); call.resolve(status());
+        // Android 11+ ignores an app-specific package URI here and expects the
+        // user to choose the app from the system "Display over other apps" list.
+        // Sending the generic intent also works on OEM settings applications.
+        try {
+            getActivity().startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION));
+            call.resolve(status());
+        } catch (Exception error) {
+            call.reject("Overlay settings इस phone में उपलब्ध नहीं हैं", error);
+        }
     }
 
     @PluginMethod
