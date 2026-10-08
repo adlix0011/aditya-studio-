@@ -27,6 +27,7 @@ function loadLocalEnv() {
 loadLocalEnv();
 let sharp = null; try { sharp = require('sharp'); } catch (e) { console.warn('Sharp image processor is not installed:', e.message); }
 let firebaseAdmin = null;
+let latestDeliveryPopupAlert = null;
 
 const PORT = process.env.PORT || 8000;
 // PINs are hashed individually; this is only retained for legacy deployments.
@@ -1812,8 +1813,10 @@ const server = http.createServer(async (req, res) => {
     try {
       const body=await readBody(req), title=String(body.title||'🧪 Delivery Manage test alert').trim().slice(0,90)||'🧪 Delivery Manage test alert', message=String(body.message||'यदि यह notification दिखा है, तो Firebase alert सही चल रहा है।').trim().slice(0,180)||'यदि यह notification दिखा है, तो Firebase alert सही चल रहा है।';
       const tokens=orderBroPushTokens().filter(x=>x&&x.enabled!==false&&x.token&&x.role==='delivery').length;
-      const result=await sendFoodDeliveryPush({title,pickup:'Admin test',drop:message,earning:0,orderId:'test-'+Date.now()});
-      return sendJSON(res,result.configured?200:503,{ok:result.configured,sent:result.sent,registered:tokens,message:result.configured?(result.sent?`${result.sent}/${tokens} registered Delivery Manage APK को test alert भेजा गया।`:'कोई delivery APK अभी notification के लिए registered नहीं है। पहले APK में permissions allow करके delivery boy login करें।'):'Firebase server configuration pending है।'});
+      const alertId='test-'+Date.now();
+      latestDeliveryPopupAlert={id:alertId,title,pickup:'Admin demo',drop:message,earning:0,price:0,createdAt:Date.now()};
+      const result=await sendFoodDeliveryPush({title,pickup:'Admin demo',drop:message,earning:0,orderId:alertId});
+      return sendJSON(res,result.configured?200:503,{ok:result.configured,sent:result.sent,registered:tokens,message:result.configured?(result.sent?`${result.sent}/${tokens} registered Delivery Manage APK को test alert भेजा गया। App खुला हो तो full popup भी 5 seconds में दिखेगा।`:'कोई delivery APK अभी notification के लिए registered नहीं है। पहले APK में permissions allow करके delivery boy login करें।'):'Firebase server configuration pending है।'});
     } catch (_) { return sendJSON(res,400,{ok:false,message:'Test alert नहीं भेजा गया।'}); }
   }  if (req.method === 'POST' && urlPath === '/api/orderbro/login') {
     try { const body=await readBody(req), username=String(body.username||'').trim().toLowerCase(), pass=String(body.password||''), requestedRole=String(body.role||'shop'); const row=orderBroAccounts().find(x=>String(x.username||'').toLowerCase()===username&&x.active!==false); const role=String(row?.role||'shop'); if(!row||!orderBroVerify(row,pass))return sendJSON(res,401,{ok:false,message:'Login ID या password सही नहीं है।'}); if(role!==requestedRole)return sendJSON(res,403,{ok:false,message:role==='delivery'?'यह Delivery Boy ID है। DeliveryBro login में डालें।':'यह Shop ID है। OrderBro Shop Login में डालें।'}); res.setHeader('Set-Cookie','orderbro_session='+encodeURIComponent(String(row.id)+'.'+orderBroToken(row))+'; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000'); return sendJSON(res,200,{ok:true,role,shopName:row.shopName,displayName:row.displayName||row.shopName||'Delivery boy'}); }catch(_){return sendJSON(res,400,{ok:false,message:'Login नहीं हुआ'});}
@@ -1833,7 +1836,7 @@ const server = http.createServer(async (req, res) => {
     const active=mine.filter(o=>!['completed','delivered','cancelled'].includes(String(o.status||'').toLowerCase()));
     const scores=mine.map(o=>Number(o.customerRating?.score||0)).filter(x=>x>=1&&x<=5);
     const rating=scores.length?scores.reduce((a,b)=>a+b,0)/scores.length:0;
-    return sendJSON(res,200,{ok:true,member:{id:member.id,name:member.displayName||member.shopName||'Delivery boy',phone:member.phone||''},orders:mine,wallet:{available:Number(member.walletBalance||0),pending:active.reduce((n,o)=>n+Number(o.fee||0),0)},rating:{average:rating,count:scores.length}});
+    const testAlert=latestDeliveryPopupAlert&&Date.now()-Number(latestDeliveryPopupAlert.createdAt||0)<5*60*1000?latestDeliveryPopupAlert:null; return sendJSON(res,200,{ok:true,member:{id:member.id,name:member.displayName||member.shopName||'Delivery boy',phone:member.phone||''},orders:mine,wallet:{available:Number(member.walletBalance||0),pending:active.reduce((n,o)=>n+Number(o.fee||0),0)},rating:{average:rating,count:scores.length},testAlert});
   }
   if (req.method === 'POST' && urlPath === '/api/orderbro/delivery-otp-verify') {
     const member=orderBroSession(req); if(!member||String(member.role||'')!=='delivery')return sendJSON(res,401,{ok:false,message:'Delivery login required'});
