@@ -8,7 +8,43 @@ async function loadChats(){for(const o of dashboard.orders||[]){try{const r=awai
 async function loadDashboard(first){setupAlerts();const [a,b]=await Promise.all([fetch('/api/orderbro/orders'),fetch('/api/orderbro/delivery-dashboard')]);const openData=await a.json(),d=await b.json();if(a.status===401||b.status===401){const saved=savedLogin();if(saved&&!restoringLogin){restoringLogin=true;return login(true)}$('login').hidden=false;$('panel').hidden=true;$('bottom').hidden=true;return}if(!a.ok||!b.ok)return;const wasHidden=$('panel').hidden;member=d.member?.name||member;$('login').hidden=true;$('panel').hidden=false;$('bottom').hidden=false;if(wasHidden)showTab(localStorage.getItem('deliverybro_tab')||'home');dashboard={...d,openOrders:openData.orders||[]};if(!first){const fresh=(dashboard.openOrders||[]).find(o=>!known.has(o.id));if(fresh)showOrderAlert({title:'New delivery: '+fresh.title,pickup:fresh.shopName,drop:fresh.address||fresh.deliveryVillage,price:fresh.items,earning:fresh.fee})}known=new Set((dashboard.openOrders||[]).map(o=>o.id));render()}
 async function login(silent=false){$('err').textContent='';const saved=silent?savedLogin():null,username=String(saved?.username??$('user').value??'').trim(),password=String(saved?.password??$('pass').value??'');if(!username||!password)return;const r=await fetch('/api/orderbro/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password,role:'delivery'})}),d=await r.json();if(!r.ok){if(silent)localStorage.removeItem(LOGIN_KEY);else $('err').textContent=d.message||'Login नहीं हुआ';restoringLogin=false;return}localStorage.setItem(LOGIN_KEY,JSON.stringify({username,password}));member=d.displayName||d.shopName||'Delivery boy';$('login').hidden=true;$('panel').hidden=false;$('bottom').hidden=false;restoringLogin=false;await enableNativeAlerts();showTab(localStorage.getItem('deliverybro_tab')||'home');loadDashboard(true)}
 async function acceptOrder(id){const r=await fetch('/api/orderbro/accept',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({orderId:id})}),d=await r.json();if(!r.ok)return alert(d.message||'Accept नहीं हुआ');showTab('orders');await loadDashboard(true)}async function verifyOtp(id){const code=String($('otp-'+id)?.value||'').replace(/\D/g,'');if(!/^\d{6}$/.test(code))return alert('6 digit OTP डालें');const r=await fetch('/api/orderbro/delivery-otp-verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({orderId:id,code})}),d=await r.json();if(!r.ok)return alert(d.message||'OTP verify नहीं हुआ');alert('🎉 Delivery complete हो गई');await loadDashboard(true)}async function foodProgress(id,action){const minutes=action==='delivery-start'?Number($('eta-'+id)?.value||30):undefined;const r=await fetch('/api/orderbro/food-progress',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({orderId:id,action,minutes})}),d=await r.json();if(!r.ok)return alert(d.message||'Update नहीं हुआ');if(action==='delivery-out'||action==='delivery-start')shareLocation(id);await loadDashboard(true)}function shareLocation(id){if(!navigator.geolocation)return;navigator.geolocation.watchPosition(p=>fetch('/api/orderbro/food-progress',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({orderId:id,action:'location',lat:p.coords.latitude,lng:p.coords.longitude,accuracy:p.coords.accuracy})}).catch(()=>{}),()=>{},{enableHighAccuracy:true,maximumAge:10000,timeout:20000})}
-document.querySelectorAll('.nav').forEach(x=>x.onclick=()=>showTab(x.dataset.tab));$('signin').onclick=()=>login(false);$('pass').onkeydown=e=>{if(e.key==='Enter')login(false)};$('logout').onclick=async()=>{localStorage.removeItem(LOGIN_KEY);await fetch('/api/orderbro/logout',{method:'POST'});location.reload()};loadDashboard(true);setInterval(()=>loadDashboard(false),5000);
+let permissionSetupComplete=false;
+function deliveryPermissionPlugin(){return window.Capacitor?.Plugins?.DeliveryPermissions||null}
+function nativeDeliveryApp(){return !!deliveryPermissionPlugin()}
+function permissionText(key){return ({notifications:'Notification alerts',location:'Precise live location',backgroundLocation:'Background location',batteryUnrestricted:'Background activity'})[key]||key}
+function paintPermissionStatus(status){
+  const keys=['notifications','location','backgroundLocation','batteryUnrestricted'];
+  const allReady=keys.every(key=>status[key]===true);
+  keys.forEach(key=>{const row=document.querySelector('[data-permission="'+key+'"]');if(row)row.classList.toggle('ready',status[key]===true)});
+  $('setupContinue').disabled=!allReady;
+  $('setupContinue').textContent=allReady?'✓ सभी permissions allow हैं — आगे बढ़ें':'पहले सभी permissions allow करें';
+  $('setupStatus').textContent=allReady?'सभी जरूरी permissions चालू हैं। अब Delivery Manage खोलें।':'जिस permission पर ✓ नहीं है, उसका Allow करें button दबाएँ।';
+  $('setupStatus').classList.toggle('ready',allReady);
+  return allReady;
+}
+async function refreshPermissionSetup(){
+  const plugin=deliveryPermissionPlugin();
+  if(!plugin){return true}
+  try{return paintPermissionStatus(await plugin.getStatus())}catch(_){$('setupStatus').textContent='Permission status नहीं मिला। App फिर से खोलकर try करें।';return false}
+}
+async function askDeliveryPermission(key){
+  const plugin=deliveryPermissionPlugin();
+  if(!plugin)return;
+  const method={notifications:'requestNotifications',location:'requestLocation',backgroundLocation:'requestBackgroundLocation',batteryUnrestricted:'requestBatteryUnrestricted'}[key];
+  if(!method)return;
+  $('setupStatus').textContent=key==='batteryUnrestricted'?'Phone Settings में “Allow” / “Don’t optimize” चुनें, फिर app में वापस आएँ।':permissionText(key)+' permission मांगी जा रही है…';
+  try{await plugin[method]();await new Promise(resolve=>setTimeout(resolve,450));await refreshPermissionSetup()}catch(_){$('setupStatus').textContent='Permission allow नहीं हुई। Settings से allow करके फिर check करें।'}
+}
+async function beginPermissionSetup(){
+  if(!nativeDeliveryApp()){permissionSetupComplete=true;loadDashboard(true);setInterval(()=>loadDashboard(false),5000);return}
+  $('permissionSetup').hidden=false;$('login').hidden=true;$('panel').hidden=true;$('bottom').hidden=true;
+  await refreshPermissionSetup();
+  document.querySelectorAll('[data-request]').forEach(button=>button.onclick=()=>askDeliveryPermission(button.dataset.request));
+  $('setupContinue').onclick=async()=>{if(await refreshPermissionSetup()){permissionSetupComplete=true;$('permissionSetup').hidden=true;loadDashboard(true);setInterval(()=>loadDashboard(false),5000)}};
+  document.addEventListener('resume',()=>setTimeout(refreshPermissionSetup,400));
+  window.addEventListener('focus',()=>setTimeout(refreshPermissionSetup,200));
+}
+document.querySelectorAll('.nav').forEach(x=>x.onclick=()=>showTab(x.dataset.tab));$('signin').onclick=()=>login(false);$('pass').onkeydown=e=>{if(e.key==='Enter')login(false)};$('logout').onclick=async()=>{localStorage.removeItem(LOGIN_KEY);await fetch('/api/orderbro/logout',{method:'POST'});location.reload()};beginPermissionSetup();
 // Food delivery pickup workflow screen.
 let deliveryWorkId='';
 function foodWorkSteps(o){return [['foodPickupStartedAt','🛵 दुकान के लिए निकला'],['foodShopArrivedAt','🏪 दुकान पहुंचा · सामान बन रहा है'],['foodReadyAt','✅ सामान बन गया'],['foodCollectedAt','🍽️ सामान ले लिया'],['deliveryStartedAt','🚚 ग्राहक के लिए निकला']].map(([key,label])=>'<div class="work-step '+(o[key]?'done':'')+'"><i>'+(o[key]?'✓':'○')+'</i>'+label+'</div>').join('')}

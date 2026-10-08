@@ -1,0 +1,16 @@
+{
+	"appId": "store.adityastudio.deliverymanage",
+	"appName": "Delivery Manage",
+	"webDir": "www",
+	"server": {
+		"url": "https://www.adityastudio.store/deliverybro",
+		"cleartext": false,
+		"allowNavigation": [
+			"adityastudio.store",
+			"www.adityastudio.store"
+		]
+	},
+	"android": {
+		"allowMixedContent": false
+	}
+}
