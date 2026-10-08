@@ -1,6 +1,7 @@
 package store.adityastudio.deliverymanage;
 
 import android.content.Context;
+import android.app.NotificationManager;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
@@ -57,6 +58,15 @@ public class DeliveryPermissionsPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void requestFullScreenIntent(PluginCall call) {
+        if (Build.VERSION.SDK_INT < 34) { call.resolve(status()); return; }
+        Intent intent = new Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT);
+        intent.setData(Uri.parse("package:" + getContext().getPackageName()));
+        getActivity().startActivity(intent);
+        call.resolve(status());
+    }
+
+    @PluginMethod
     public void requestBatteryUnrestricted(PluginCall call) {
         try {
             Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
@@ -80,6 +90,8 @@ public class DeliveryPermissionsPlugin extends Plugin {
         value.put("notifications", Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || getPermissionState("notifications") == PermissionState.GRANTED);
         value.put("location", getPermissionState("location") == PermissionState.GRANTED);
         value.put("backgroundLocation", Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || getPermissionState("backgroundLocation") == PermissionState.GRANTED);
+        NotificationManager notifications = (NotificationManager) getContext().getSystemService(Context.NOTIFICATION_SERVICE);
+        value.put("fullScreenIntent", Build.VERSION.SDK_INT < 34 || (notifications != null && notifications.canUseFullScreenIntent()));
         PowerManager power = (PowerManager) getContext().getSystemService(Context.POWER_SERVICE);
         value.put("batteryUnrestricted", power != null && power.isIgnoringBatteryOptimizations(getContext().getPackageName()));
         return value;

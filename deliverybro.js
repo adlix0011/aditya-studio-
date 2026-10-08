@@ -11,9 +11,9 @@ async function acceptOrder(id){const r=await fetch('/api/orderbro/accept',{metho
 let permissionSetupComplete=false;
 function deliveryPermissionPlugin(){return window.Capacitor?.Plugins?.DeliveryPermissions||null}
 function nativeDeliveryApp(){return !!deliveryPermissionPlugin()}
-function permissionText(key){return ({notifications:'Notification alerts',location:'Precise live location',backgroundLocation:'Background location',batteryUnrestricted:'Background activity'})[key]||key}
+function permissionText(key){return ({notifications:'Notification alerts',location:'Precise live location',backgroundLocation:'Background location',fullScreenIntent:'Full-screen delivery popup',batteryUnrestricted:'Background activity'})[key]||key}
 function paintPermissionStatus(status){
-  const keys=['notifications','location','backgroundLocation','batteryUnrestricted'];
+  const keys=['notifications','location','backgroundLocation','fullScreenIntent','batteryUnrestricted'];
   const allReady=keys.every(key=>status[key]===true);
   keys.forEach(key=>{const row=document.querySelector('[data-permission="'+key+'"]');if(row)row.classList.toggle('ready',status[key]===true)});
   $('setupContinue').disabled=!allReady;
@@ -30,7 +30,7 @@ async function refreshPermissionSetup(){
 async function askDeliveryPermission(key){
   const plugin=deliveryPermissionPlugin();
   if(!plugin)return;
-  const method={notifications:'requestNotifications',location:'requestLocation',backgroundLocation:'requestBackgroundLocation',batteryUnrestricted:'requestBatteryUnrestricted'}[key];
+  const method={notifications:'requestNotifications',location:'requestLocation',backgroundLocation:'requestBackgroundLocation',fullScreenIntent:'requestFullScreenIntent',batteryUnrestricted:'requestBatteryUnrestricted'}[key];
   if(!method)return;
   $('setupStatus').textContent=key==='batteryUnrestricted'?'Phone Settings में “Allow” / “Don’t optimize” चुनें, फिर app में वापस आएँ।':permissionText(key)+' permission मांगी जा रही है…';
   try{await plugin[method]();await new Promise(resolve=>setTimeout(resolve,450));await refreshPermissionSetup()}catch(_){$('setupStatus').textContent='Permission allow नहीं हुई। Settings से allow करके फिर check करें।'}
