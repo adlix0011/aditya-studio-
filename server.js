@@ -1256,7 +1256,39 @@ function defaultSettings() {
     // Hero SECTION background slideshow (sides visible) — admin 4–6 photos + duration
     heroSideBgPhotos: [],
     heroSideBgDurationSec: 5,
-    gallerySamples: { wedding: [], birthday: [], baby: [], prewedding: [] },
+    // Five starter photos in every home-gallery category. Admin can add or
+    // remove them individually; these make the gallery look complete on day one.
+    gallerySamples: {
+      wedding: [
+        'https://images.unsplash.com/photo-1519741497674-611481863552?w=1200&q=86',
+        'https://images.unsplash.com/photo-1606216794074-735e91aa2c92?w=1200&q=86',
+        'https://images.unsplash.com/photo-1591604466107-ec97de577aff?w=1200&q=86',
+        'https://images.unsplash.com/photo-1583939003579-730e3918a45a?w=1200&q=86',
+        'https://images.unsplash.com/photo-1511285560929-80b456fea0bc?w=1200&q=86'
+      ],
+      birthday: [
+        'https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=1200&q=86',
+        'https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?w=1200&q=86',
+        'https://images.unsplash.com/photo-1527529482837-4698179dc6ce?w=1200&q=86',
+        'https://images.unsplash.com/photo-1507504031003-b417219a0fde?w=1200&q=86',
+        'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=1200&q=86'
+      ],
+      baby: [
+        'https://images.unsplash.com/photo-1546015720-b8b30df5aa27?w=1200&q=86',
+        'https://images.unsplash.com/photo-1519689680058-324335c77eba?w=1200&q=86',
+        'https://images.unsplash.com/photo-1522771930-78848d9293e8?w=1200&q=86',
+        'https://images.unsplash.com/photo-1607453998774-d533f65dac99?w=1200&q=86',
+        'https://images.unsplash.com/photo-1503919545889-aef636e10ad4?w=1200&q=86'
+      ],
+      prewedding: [
+        'https://images.unsplash.com/photo-1529634806980-85c3dd6d34ac?w=1200&q=86',
+        'https://images.unsplash.com/photo-1544078751-58fee2d8a03b?w=1200&q=86',
+        'https://images.unsplash.com/photo-1606800052052-a08af7148866?w=1200&q=86',
+        'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=1200&q=86',
+        'https://images.unsplash.com/photo-1511285560929-80b456fea0bc?w=1200&q=86'
+      ]
+    },
+    gallerySamplesConfigured: false,
     marketplacePosters: [],
     fees: {
       platformFee: 10,
@@ -1303,7 +1335,12 @@ function loadSettings() {
     frames3dPhotos: Array.isArray(data.frames3dPhotos) ? data.frames3dPhotos : defaults.frames3dPhotos,
     homeHeroFramePhotos: Array.isArray(data.homeHeroFramePhotos) ? data.homeHeroFramePhotos : defaults.homeHeroFramePhotos,
     heroSideBgPhotos: Array.isArray(data.heroSideBgPhotos) ? data.heroSideBgPhotos : defaults.heroSideBgPhotos,
-    gallerySamples: Object.fromEntries(['wedding','birthday','baby','prewedding'].map(k => [k, Array.isArray(data.gallerySamples?.[k]) ? data.gallerySamples[k] : []])),
+    gallerySamples: Object.fromEntries(['wedding','birthday','baby','prewedding'].map(k => {
+      const saved = data.gallerySamples?.[k];
+      // Older installs have empty lists. Show starter photos until the admin
+      // saves their own list; after that even an intentionally empty list stays empty.
+      return [k, Array.isArray(saved) && (data.gallerySamplesConfigured === true || saved.length) ? saved : defaults.gallerySamples[k]];
+    })),
     heroSideBgDurationSec: Math.max(2, Math.min(20, Number(data.heroSideBgDurationSec) || defaults.heroSideBgDurationSec)),
     marketplacePosters: Array.isArray(data.marketplacePosters) ? data.marketplacePosters.slice(0,5) : defaults.marketplacePosters,
     fees: { ...defaults.fees, ...(data.fees || {}) },
@@ -4986,8 +5023,8 @@ function computeOrderFees(subtotal, settingsFees) {
       const body = await readBody(req, 35e6);
       const category = String(body.category || '').toLowerCase();
       if (!['wedding','birthday','baby','prewedding'].includes(category)) return sendJSON(res, 400, { ok:false, message:'Invalid gallery category' });
-      const images = (Array.isArray(body.images) ? body.images : []).slice(0, 12).map(storedMediaValue).filter(v => /^data:image\/(png|jpe?g|webp);base64,/i.test(v) || (v.startsWith('r2:') && isSafeAdminR2ImageKey(v.slice(3))));
-      const cur = loadSettings(); cur.gallerySamples = cur.gallerySamples || {}; cur.gallerySamples[category] = images; saveSettings(cur);
+      const images = (Array.isArray(body.images) ? body.images : []).slice(0, 12).map(storedMediaValue).filter(v => /^data:image\/(png|jpe?g|webp);base64,/i.test(v) || (v.startsWith('r2:') && isSafeAdminR2ImageKey(v.slice(3))) || /^https:\/\/images\.unsplash\.com\//i.test(v));
+      const cur = loadSettings(); cur.gallerySamples = cur.gallerySamples || {}; cur.gallerySamples[category] = images; cur.gallerySamplesConfigured = true; saveSettings(cur);
       return sendJSON(res, 200, { ok:true, count:images.length });
     } catch (e) { return sendJSON(res, 500, { ok:false, message:'Gallery save नहीं हुई' }); }
   }
@@ -5983,16 +6020,16 @@ document.querySelectorAll('.book-up-btn').forEach(function(btn){
 <div class="form-grid" id="gallerySamplesUploadGrid">
 ${[['wedding','💍 Wedding'],['birthday','🎂 Birthday Shoot'],['baby','🍼 Baby Shower'],['prewedding','✨ Pre-Wedding']].map(row => {
   const key=row[0], label=row[1], list=Array.isArray(gallerySamples[key]) ? gallerySamples[key] : [];
-  const previews=list.length ? list.map((src, i) => '<img src="'+esc(src)+'" alt="'+label+' '+(i+1)+'" style="width:54px;height:54px;object-fit:cover;border-radius:9px;border:1px solid rgba(212,175,55,.35)"/>').join('') : '<span class="muted" style="font-size:11px">No photos yet</span>';
+  const previews=list.length ? list.map((src, i) => '<div style="position:relative;width:66px;height:66px"><img src="'+esc(src)+'" alt="'+label+' '+(i+1)+'" style="width:66px;height:66px;object-fit:cover;border-radius:9px;border:1px solid rgba(212,175,55,.35)"/><button type="button" title="Remove this photo" onclick="adminRemoveGallerySample(&quot;'+key+'&quot;,'+i+')" style="position:absolute;right:-5px;top:-5px;width:22px;height:22px;border:0;border-radius:50%;background:#b91c1c;color:#fff;font-weight:900;cursor:pointer">×</button></div>').join('') : '<span class="muted" style="font-size:11px">No photos yet</span>';
   return '<div style="padding:14px;border:1px solid rgba(212,175,55,.20);border-radius:12px;background:#17120d">'
     + '<div style="font-weight:800;color:#f2ca50;margin-bottom:9px">'+label+' <span class="muted" style="font-size:11px">('+list.length+'/12)</span></div>'
     + '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;max-height:118px;overflow:auto">'+previews+'</div>'
     + '<input type="file" accept="image/*" multiple class="field-file" id="galleryFiles_'+key+'"/>'
-    + '<div style="display:flex;gap:8px;align-items:center;margin-top:9px"><button type="button" class="gen-btn" style="padding:8px 12px" onclick="adminSaveGallerySamples(&quot;'+key+'&quot;)">📤 Upload / Replace</button><span id="gallerySt_'+key+'" class="muted" style="font-size:11px"></span></div>'
+    + '<div style="display:flex;gap:8px;align-items:center;margin-top:9px"><button type="button" class="gen-btn" style="padding:8px 12px" onclick="adminSaveGallerySamples(&quot;'+key+'&quot;)">📤 Add photos</button><span id="gallerySt_'+key+'" class="muted" style="font-size:11px"></span></div>'
     + '</div>';
 }).join('')}
 </div>
-<p class="muted" style="margin-top:10px">Nayi photos upload karne par us category ki purani list replace hogi. Home page refresh karte hi slideshow chal padega.</p>
+<p class="muted" style="margin-top:10px">हर photo के ऊपर लाल × दबाकर केवल वही photo हटाएं। नई photos पुरानी photos के साथ जुड़ेंगी और Home page पर हर 2 seconds में बदलती रहेंगी।</p>
 </section>
 
 <section class="panel" id="sec-otp">
@@ -6823,11 +6860,16 @@ async function adminSaveGallerySamples(category) {
   if (!files.length) { alert('Pehle ' + category + ' ki photos choose karo'); return; }
   if (files.length > 12) { alert('Maximum 12 photos select karo'); return; }
   try {
-    var images = [];
+    var live = await fetch('/api/home-gallery-samples', { credentials:'same-origin', cache:'no-store' }).then(function(r){ return r.json(); });
+    var images = Array.isArray(live.gallery && live.gallery[category]) ? live.gallery[category].slice() : [];
+    if (images.length + files.length > 12) { alert('Is gallery me max 12 photos rah sakti hain. Pehle kuch photos × se hata dein.'); return; }
     for (var i = 0; i < files.length; i++) {
       if (st) st.textContent = 'Photo ' + (i + 1) + '/' + files.length + ' upload ho rahi hai…';
       var dataUrl = await compressImageFile(files[i], 1200, 0.82);
-      images.push(await uploadAdminImageToR2(dataUrl, 'gallery-' + category));
+      // R2 is preferred, but local/base64 storage keeps the admin upload
+      // functional when cloud storage is temporarily unavailable.
+      try { images.push(await uploadAdminImageToR2(dataUrl, 'gallery-' + category)); }
+      catch (uploadError) { console.warn('R2 gallery upload failed; saving fallback image', uploadError); images.push(dataUrl); }
     }
     var res = await fetch('/admin/gallery-samples-save', {
       method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
@@ -6836,13 +6878,36 @@ async function adminSaveGallerySamples(category) {
     var data = await res.json();
     if (!res.ok || !data.ok) throw new Error(data.message || data.error || 'Save fail');
     if (st) st.textContent = 'Saved ✅ ' + data.count + ' photos';
-    alert('Gallery saved ✅ Home page refresh par photos har 2 seconds me change hongi.');
+    alert('Gallery saved ✅ Home page par photos har 2 seconds me change hongi.');
     location.href = '/admin#sec-gallery-samples';
     location.reload();
   } catch (e) {
     console.error(e);
     if (st) st.textContent = 'Upload fail';
     alert('Upload fail: ' + (e.message || 'Network error'));
+  }
+}
+
+async function adminRemoveGallerySample(category, index) {
+  if (!confirm('Ye photo gallery se hata dein?')) return;
+  var st = document.getElementById('gallerySt_' + category);
+  try {
+    if (st) st.textContent = 'Removing…';
+    var live = await fetch('/api/home-gallery-samples', { credentials:'same-origin', cache:'no-store' }).then(function(r){ return r.json(); });
+    var images = Array.isArray(live.gallery && live.gallery[category]) ? live.gallery[category].slice() : [];
+    images.splice(index, 1);
+    var res = await fetch('/admin/gallery-samples-save', {
+      method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ category:category, images:images })
+    });
+    var data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.message || 'Remove fail');
+    if (st) st.textContent = 'Removed ✅';
+    location.href = '/admin#sec-gallery-samples';
+    location.reload();
+  } catch (e) {
+    if (st) st.textContent = 'Remove fail';
+    alert('Photo remove नहीं हुई: ' + (e.message || 'Network error'));
   }
 }
 
