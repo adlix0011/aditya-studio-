@@ -163,6 +163,12 @@
       opacity: 1;
       transform: scale(var(--hero-scale, 1));
     }
+    .hero-bg-video {
+      position:absolute; inset:0; width:100%; height:100%; object-fit:cover;
+      opacity:0; transform:scale(calc(var(--hero-scale, 1) + .06));
+      transition:opacity 1.2s ease, transform 6s ease-out;
+    }
+    .hero-bg-video.active { opacity:1; transform:scale(var(--hero-scale, 1)); }
     @keyframes pulse-ring {
       0% { transform: scale(0.8); opacity: 0.5; }
       100% { transform: scale(2); opacity: 0; }
@@ -1647,48 +1653,64 @@
         window.history.replaceState({}, '', '/');
       });
 
-      // Hero SECTION side background slideshow (admin: 4–6 photos + duration)
+      // Hero banner: photos show for selected duration; videos play fully before next media.
       (async function initHeroSideBg() {
         const box = document.getElementById('heroSideBg');
         if (!box) return;
-        let urls = [];
-        let durationMs = 5000;
+        let items = [], durationMs = 5000;
+        const isVideo = item => item.mediaType === 'video' || /\.(mp4|webm)(?:[?#]|$)/i.test(item.url || '');
         try {
           const res = await fetch('/api/settings');
           const data = await res.json();
           const st = data.settings || {};
-          urls = (st.heroSideBgPhotos || []).map(p => typeof p === 'string' ? { url:p, x:50, y:50, zoom:1 } : { url:p.url, x:Number(p.positionX ?? 50), y:Number(p.positionY ?? 50), zoom:Math.max(1, Number(p.zoom || 1)) }).filter(p => p.url).slice(0, 6);
+          items = (st.heroSideBgPhotos || []).map(p => typeof p === 'string'
+            ? { url:p, x:50, y:50, zoom:1, mediaType:'' }
+            : { url:p.url, x:Number(p.positionX ?? 50), y:Number(p.positionY ?? 50), zoom:Math.max(1, Number(p.zoom || 1)), mediaType:String(p.mediaType || '') }
+          ).filter(p => p.url).slice(0, 5);
           durationMs = Math.max(2000, Math.min(20000, (Number(st.heroSideBgDurationSec) || 5) * 1000));
         } catch (e) {}
-        if (!urls.length) return; // keep default single slide
-        // rebuild slides
+        if (!items.length) return;
         const veil = box.querySelector('div[style*="linear-gradient"]');
-        const bootSlide = box.querySelector('.bg-slide[data-hero-boot="1"]');
-        box.querySelectorAll('.bg-slide').forEach(el => { if (el !== bootSlide) el.remove(); });
-        urls.forEach((item, i) => {
-          // Reuse the server-rendered first image: no white/default flash.
-          const d = (i === 0 && bootSlide) ? bootSlide : document.createElement('div');
-          d.className = 'bg-slide' + (i === 0 ? ' active' : '');
-          d.style.backgroundImage = 'url("' + String(item.url).replace(/"/g, '\\"') + '")';
-          d.style.backgroundPosition = item.x + '% ' + item.y + '%';
-          d.style.setProperty('--hero-scale', item.zoom);
-          box.insertBefore(d, veil || null);
+        box.querySelectorAll('.bg-slide, .hero-bg-video').forEach(el => el.remove());
+        const media = items.map((item, i) => {
+          let el;
+          if (isVideo(item)) {
+            el = document.createElement('video');
+            el.className = 'hero-bg-video' + (i === 0 ? ' active' : '');
+            el.src = item.url; el.muted = true; el.playsInline = true; el.preload = 'auto';
+            el.setAttribute('aria-label', 'Studio hero video');
+          } else {
+            el = document.createElement('div');
+            el.className = 'bg-slide' + (i === 0 ? ' active' : '');
+            el.style.backgroundImage = 'url("' + String(item.url).replace(/"/g, '\\"') + '")';
+            el.style.backgroundPosition = item.x + '% ' + item.y + '%';
+          }
+          el.style.setProperty('--hero-scale', item.zoom);
+          box.insertBefore(el, veil || null);
+          return el;
         });
-        if (urls.length < 2) return;
-        let idx = 0;
-        const slides = () => [...box.querySelectorAll('.bg-slide')];
-        setInterval(() => {
-          const list = slides();
-          if (!list.length) return;
-          list[idx].classList.remove('active');
-          idx = (idx + 1) % list.length;
-          // reflow for zoom restart
-          list[idx].style.transition = 'none';
-          list[idx].style.transform = 'scale(1.06)';
-          void list[idx].offsetWidth;
-          list[idx].style.transition = '';
-          list[idx].classList.add('active');
-        }, durationMs);
+        let idx = 0, advanceTimer = null;
+        function activate(next) {
+          if (!media.length) return;
+          if (advanceTimer) { clearTimeout(advanceTimer); advanceTimer = null; }
+          media[idx].classList.remove('active');
+          if (media[idx].tagName === 'VIDEO') { media[idx].pause(); media[idx].currentTime = 0; }
+          idx = next % media.length;
+          const active = media[idx];
+          active.style.transition = 'none';
+          void active.offsetWidth;
+          active.style.transition = '';
+          active.classList.add('active');
+          if (active.tagName === 'VIDEO') {
+            active.onended = () => activate(idx + 1);
+            active.onerror = () => { advanceTimer = setTimeout(() => activate(idx + 1), durationMs); };
+            const play = active.play();
+            if (play && play.catch) play.catch(() => { advanceTimer = setTimeout(() => activate(idx + 1), durationMs); });
+          } else {
+            advanceTimer = setTimeout(() => activate(idx + 1), durationMs);
+          }
+        }
+        activate(0);
       })();
 
       // Home page floating 3D frame photos (admin: max 5, every 5s) — NOT frames shop

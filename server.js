@@ -296,7 +296,7 @@ function isSafeR2PhotoKey(key, mobile) {
   return new RegExp('^customer-photos/' + safeMobile + '/[a-zA-Z0-9._-]+\\.(jpg|jpeg|png|webp)$', 'i').test(String(key || ''));
 }
 function isSafeAdminR2ImageKey(key) {
-  return /^studio-images\/(banner|deal|frame3d|home-frame|hero-bg|book|gallery-[a-z]+)\/[a-zA-Z0-9._-]+\.(jpg|jpeg|png|webp)$/i.test(String(key || ''));
+  return /^studio-images\/(banner|deal|frame3d|home-frame|hero-bg|book|gallery-[a-z]+)\/[a-zA-Z0-9._-]+\.(jpg|jpeg|png|webp)$/i.test(String(key || '')) || /^studio-images\/hero-bg\/[a-zA-Z0-9._-]+\.(mp4|webm)$/i.test(String(key || ''));
 }
 function mediaUrl(value) {
   const raw = String(value || '');
@@ -2199,8 +2199,9 @@ const server = http.createServer(async (req, res) => {
       const group = String(body.group || '').trim().toLowerCase();
       const type = String(body.contentType || '').toLowerCase();
       const validGroups = ['banner','deal','frame3d','home-frame','hero-bg','book','gallery-wedding','gallery-birthday','gallery-baby','gallery-prewedding'];
-      const ext = ({ 'image/jpeg':'jpg', 'image/jpg':'jpg', 'image/png':'png', 'image/webp':'webp' })[type];
-      if (!validGroups.includes(group) || !ext) return sendJSON(res, 400, { ok:false, error:'invalid-image' });
+      const ext = ({ 'image/jpeg':'jpg', 'image/jpg':'jpg', 'image/png':'png', 'image/webp':'webp', 'video/mp4':'mp4', 'video/webm':'webm' })[type];
+      const videoAllowed = group === 'hero-bg' && (type === 'video/mp4' || type === 'video/webm');
+      if (!validGroups.includes(group) || !ext || ((type.startsWith('video/')) && !videoAllowed)) return sendJSON(res, 400, { ok:false, error:'invalid-image' });
       const key = 'studio-images/' + group + '/' + Date.now() + '-' + crypto.randomBytes(10).toString('hex') + '.' + ext;
       return sendJSON(res, 200, { ok:true, key, value:'r2:' + key, uploadUrl:r2PresignedUrl('PUT', key, 900), expiresIn:900 });
     } catch (e) {
@@ -4889,25 +4890,26 @@ function computeOrderFees(subtotal, settingsFees) {
     }
   }
 
-  // Hero section SIDE background photos (4–6) + duration
+  // Hero section SIDE background photos/videos (max 5) + duration
   if (req.method === 'POST' && urlPath === '/admin/hero-side-bg-upload') {
     try {
       const body = await readBody(req, 30e6);
       const cur = loadSettings();
       const items = Array.isArray(body.items) ? body.items : [];
       if (!items.length) return sendJSON(res, 400, { ok: false, error: 'no-items' });
-      const mapped = items.slice(0, 6).map((it, i) => ({
+      const mapped = items.slice(0, 5).map((it, i) => ({
         url: String(it.url || it.dataUrl || '').slice(0, 2.5e6),
         title: String(it.title || ('BG ' + (i + 1))).slice(0, 80),
+        mediaType: String(it.mediaType || '').toLowerCase() === 'video' ? 'video' : 'image',
         positionX: Math.max(0, Math.min(100, Number(it.positionX ?? 50))),
         positionY: Math.max(0, Math.min(100, Number(it.positionY ?? 50))),
         zoom: Math.max(1, Math.min(2.5, Number(it.zoom || 1)))
       })).filter(x => x.url);
       if (!mapped.length) return sendJSON(res, 400, { ok: false, error: 'invalid' });
       if (body.replace === true || body.replace === 'true') {
-        cur.heroSideBgPhotos = mapped.slice(0, 6);
+        cur.heroSideBgPhotos = mapped.slice(0, 5);
       } else {
-        cur.heroSideBgPhotos = (cur.heroSideBgPhotos || []).concat(mapped).slice(0, 6);
+        cur.heroSideBgPhotos = (cur.heroSideBgPhotos || []).concat(mapped).slice(0, 5);
       }
       if (body.durationSec != null) {
         cur.heroSideBgDurationSec = Math.max(2, Math.min(20, Number(body.durationSec) || 5));
@@ -5891,7 +5893,7 @@ label.muted{display:block;font-size:12px;margin-bottom:2px}
 
 <section class="panel" id="sec-hero">
 <h2>✨ Home Hero Text + Side Background</h2>
-<p class="sub">Text cycle + hero section ke <b>sides</b> pe background photos (slideshow).</p>
+<p class="sub">Hero banner me photos aur videos dono upload karein. Photo selected duration tak dikhegi; video poori chalne ke baad next item aayega.</p>
 
 <form method="POST" action="/admin/save-hero-intro" class="form-grid">
 <label class="muted">Welcome text (sparkly)
@@ -5911,22 +5913,26 @@ label.muted{display:block;font-size:12px;margin-bottom:2px}
 
 <hr style="border:none;border-top:1px solid rgba(212,175,55,.2);margin:20px 0">
 
-<h3 style="color:#f2ca50;margin:0 0 8px;font-size:1.05rem">🖼️ Hero Side Background Photos</h3>
-<p class="sub">Sirf hero block ke peeche / sides pe dikhengi. Max <b>6</b> · duration set kar sakte ho.</p>
-<p class="muted">Abhi: <b>${(settings.heroSideBgPhotos||[]).length}</b> / 6 · Duration: <b>${settings.heroSideBgDurationSec||5}</b>s</p>
+<h3 style="color:#f2ca50;margin:0 0 8px;font-size:1.05rem">🎞️ Hero Banner Photos & Videos</h3>
+<p class="sub">Sirf hero block ke peeche dikhenge. Max <b>5</b> photo/video · photo duration set kar sakte ho · video poora chalne ke baad next media aayega.</p>
+<p class="muted">Abhi: <b>${(settings.heroSideBgPhotos||[]).length}</b> / 5 · Photo duration: <b>${settings.heroSideBgDurationSec||5}</b>s</p>
 <div style="display:flex;flex-wrap:wrap;gap:10px;margin:12px 0">
 ${(function(){
   const list = settingsView.heroSideBgPhotos || [];
-  if (!list.length) return '<span class="muted">Abhi koi photo nahi — neeche se upload karo</span>';
+  if (!list.length) return '<span class="muted">Abhi koi photo/video nahi — neeche se upload karo</span>';
   return list.map((p,i)=>{
     const u = typeof p === 'string' ? p : (p&&p.url)||'';
     if (!u) return '';
     const x = Math.max(0, Math.min(100, Number((p&&p.positionX) ?? 50)));
     const y = Math.max(0, Math.min(100, Number((p&&p.positionY) ?? 50)));
     const z = Math.max(1, Math.min(2.5, Number((p&&p.zoom) || 1)));
+    const isVideo = (p && p.mediaType === 'video') || /\.(mp4|webm)(?:[?#]|$)/i.test(u);
+    const mediaPreview = isVideo
+      ? '<video src="'+esc(u)+'" muted playsinline preload="metadata" style="width:100%;height:100%;object-fit:cover"></video>'
+      : '<div id="heroBgPreview'+i+'" style="position:absolute;inset:0;background-image:url(\''+esc(u).replace(/\'/g,'%27')+'\');background-size:cover;background-position:'+x+'% '+y+'%;transform:scale('+z+');transform-origin:center"></div>';
     return '<div style="width:220px;border:1px solid rgba(212,175,55,.4);border-radius:9px;padding:7px;background:#15120b;position:relative">'
       + '<button type="button" onclick="adminDeleteHeroBg('+i+')" title="Is photo ko remove karo" style="position:absolute;right:5px;top:5px;z-index:3;width:25px;height:25px;border:1px solid #fb7185;border-radius:50%;background:#7f1d1d;color:#fff;font-size:17px;line-height:20px;font-weight:800;cursor:pointer">×</button>'
-      + '<div style="height:126px;border-radius:6px;overflow:hidden;outline:1px solid rgba(125,211,252,.5);position:relative;background:#111"><div id="heroBgPreview'+i+'" style="position:absolute;inset:0;background-image:url(\''+esc(u).replace(/'/g,'%27')+'\');background-size:cover;background-position:'+x+'% '+y+'%;transform:scale('+z+');transform-origin:center"></div></div>'
+      + '<div style="height:126px;border-radius:6px;overflow:hidden;outline:1px solid rgba(125,211,252,.5);position:relative;background:#111">'+mediaPreview+'</div>'
       + '<div style="font-size:11px;color:#f2ca50;margin-top:8px">#'+(i+1)+' · Home hero ka same crop</div>'
       + '<label class="muted" style="display:block;font-size:10px">Left / Right <b id="heroBgXVal'+i+'">'+x+'%</b><input type="range" id="heroBgX'+i+'" min="0" max="100" value="'+x+'" oninput="adminPreviewHeroBgCrop('+i+')"></label>'
       + '<label class="muted" style="display:block;font-size:10px">Up / Down <b id="heroBgYVal'+i+'">'+y+'%</b><input type="range" id="heroBgY'+i+'" min="0" max="100" value="'+y+'" oninput="adminPreviewHeroBgCrop('+i+')"></label>'
@@ -5936,13 +5942,13 @@ ${(function(){
 })()}
 </div>
 <div class="form-grid">
-<label class="muted">Photos choose (multiple · max 6)
-<input type="file" id="heroBgFiles" accept="image/*" multiple class="field-file"></label>
+<label class="muted">Photos / videos choose (multiple · max 5)
+<input type="file" id="heroBgFiles" accept="image/*,video/mp4,video/webm" multiple class="field-file"></label>
 <label class="muted">BG change duration (seconds)
 <input class="inp" type="number" id="heroBgDuration" min="2" max="20" value="${esc(settings.heroSideBgDurationSec||5)}" style="max-width:120px"></label>
 <label class="muted" style="display:flex;align-items:center;gap:8px;cursor:pointer">
 <input type="checkbox" id="heroBgReplace" checked> Purani hata ke nayi</label>
-<button class="gen-btn" type="button" onclick="adminUploadHeroSideBg()">📤 Upload Background Photos</button>
+<button class="gen-btn" type="button" onclick="adminUploadHeroSideBg()">📤 Upload Banner Media</button>
 <button type="button" onclick="adminSaveHeroBgDuration()" style="padding:8px 12px;background:#2a2418;color:#f2ca50;border:1px solid rgba(212,175,55,.4);border-radius:8px;cursor:pointer">⏱ Only duration save</button>
 <button type="button" onclick="adminClearHeroSideBg()" style="padding:8px 12px;background:#5a1a1a;color:#fca5a5;border:1px solid #7f1d1d;border-radius:8px;cursor:pointer">🗑 Clear BG</button>
 <p id="heroBgStatus" class="muted"></p>
@@ -6724,32 +6730,34 @@ async function adminUploadHeroSideBg() {
   var input = document.getElementById('heroBgFiles');
   var status = document.getElementById('heroBgStatus');
   var files = input && input.files ? Array.from(input.files) : [];
-  if (!files.length) { alert('Pehle 4–6 photos choose karo'); return; }
-  if (files.length > 6) { alert('Maximum 6 photos'); return; }
+  if (!files.length) { alert('Pehle photo ya video choose karo'); return; }
+  if (files.length > 5) { alert('Maximum 5 photo/video select karo'); return; }
   var replace = !!(document.getElementById('heroBgReplace') || {}).checked;
   var durationSec = Number((document.getElementById('heroBgDuration') || {}).value || 5);
-  status.textContent = 'Uploading ' + files.length + '…';
+  status.textContent = 'Uploading ' + files.length + ' media…';
   try {
     var items = [];
     for (var i = 0; i < files.length; i++) {
-      status.textContent = 'Photo ' + (i+1) + '/' + files.length + '…';
-      var dataUrl = await compressImageFile(files[i], 1400, 0.8);
-      items.push({ url: await uploadAdminImageToR2(dataUrl, 'hero-bg'), title: files[i].name });
+      var file = files[i], isVideo = /^video\/(mp4|webm)$/i.test(file.type || '');
+      if (!isVideo && !/^image\//i.test(file.type || '')) throw new Error('Sirf image, MP4 ya WebM select karein');
+      status.textContent = (isVideo ? 'Video ' : 'Photo ') + (i+1) + '/' + files.length + ' upload ho raha hai…';
+      var blob = isVideo ? file : await fetch(await compressImageFile(file, 1400, 0.8)).then(function(r){ return r.blob(); });
+      var signRes = await fetch('/admin/r2-image-upload', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({group:'hero-bg',contentType:blob.type || file.type}) });
+      var signed = await signRes.json();
+      if (!signRes.ok || !signed.ok) throw new Error(signed.message || signed.error || 'Cloud upload link fail');
+      var put = await fetch(signed.uploadUrl, { method:'PUT', headers:{'Content-Type':blob.type || file.type}, body:blob });
+      if (!put.ok) throw new Error('Cloud upload fail');
+      items.push({ url:signed.value, title:file.name, mediaType:isVideo ? 'video' : 'image' });
     }
-    var res = await fetch('/admin/hero-side-bg-upload', {
-      method: 'POST', credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items: items, replace: replace, durationSec: durationSec })
-    });
+    var res = await fetch('/admin/hero-side-bg-upload', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({items:items,replace:replace,durationSec:durationSec}) });
     var data = await res.json();
-    if (!data.ok) { status.textContent = 'Fail'; alert('Upload fail'); return; }
-    status.textContent = 'Saved ✅ ' + data.count + ' photos · ' + data.durationSec + 's';
-    alert('Hero side BG saved! Home page refresh karo.');
-    location.href = '/admin#sec-hero';
-    location.reload();
+    if (!data.ok) throw new Error(data.error || 'Upload fail');
+    status.textContent = 'Saved ✅ ' + data.count + ' / 5 media';
+    alert('Hero banner media saved! Home page refresh karo.');
+    location.href = '/admin#sec-hero'; location.reload();
   } catch (e) {
-    status.textContent = 'Error';
-    alert('Upload error');
+    status.textContent = 'Error: ' + (e.message || 'Upload fail');
+    alert('Upload error: ' + (e.message || 'Photo/video size check karo'));
   }
 }
 async function adminSaveHeroBgDuration() {
