@@ -1755,6 +1755,9 @@
           }
         } catch (e) {}
 
+        // Mobile hero par welcome message nahi dikhana hai; sirf service heading rahegi.
+        if (window.matchMedia('(max-width: 767px)').matches) phrases = [phrases[1]];
+
         const typeSpeed = 52;
         function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
