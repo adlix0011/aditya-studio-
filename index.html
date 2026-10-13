@@ -1685,9 +1685,9 @@
           const st = data.settings || {};
           items = (st.heroSideBgPhotos || []).map(p => typeof p === 'string'
             ? { url:p, x:50, y:50, zoom:1, mediaType:'' }
-            : { url:p.url, x:Number(p.positionX ?? 50), y:Number(p.positionY ?? 50), zoom:Math.max(1, Number(p.zoom || 1)), mediaType:String(p.mediaType || '') }
+            : { url:p.url, x:Number(p.positionX ?? 50), y:Number(p.positionY ?? 50), zoom:Math.max(1, Number(p.zoom || 1)), durationSec:Math.max(2, Number(p.durationSec || 0)), mediaType:String(p.mediaType || '') }
           ).filter(p => p.url).slice(0, 5);
-          durationMs = Math.max(2000, Math.min(20000, (Number(st.heroSideBgDurationSec) || 5) * 1000));
+          durationMs = Math.max(2000, Math.min(30000, (Number(st.heroSideBgDurationSec) || 5) * 1000));
         } catch (e) {}
         if (!items.length) return;
         const veil = box.querySelector('div[style*="linear-gradient"]');
@@ -1727,7 +1727,8 @@
             const play = active.play();
             if (play && play.catch) play.catch(() => { advanceTimer = setTimeout(() => activate(idx + 1), durationMs); });
           } else {
-            advanceTimer = setTimeout(() => activate(idx + 1), durationMs);
+            const itemMs = Math.max(2000, Math.min(30000, (Number(items[idx].durationSec) || durationMs / 1000) * 1000));
+            advanceTimer = setTimeout(() => activate(idx + 1), itemMs);
           }
         }
         activate(0);

@@ -4903,7 +4903,8 @@ function computeOrderFees(subtotal, settingsFees) {
         mediaType: String(it.mediaType || '').toLowerCase() === 'video' ? 'video' : 'image',
         positionX: Math.max(0, Math.min(100, Number(it.positionX ?? 50))),
         positionY: Math.max(0, Math.min(100, Number(it.positionY ?? 50))),
-        zoom: Math.max(1, Math.min(2.5, Number(it.zoom || 1)))
+        zoom: Math.max(1, Math.min(2.5, Number(it.zoom || 1))),
+        durationSec: Math.max(2, Math.min(30, Number(it.durationSec || body.durationSec || 5)))
       })).filter(x => x.url);
       if (!mapped.length) return sendJSON(res, 400, { ok: false, error: 'invalid' });
       if (body.replace === true || body.replace === 'true') {
@@ -4960,12 +4961,19 @@ function computeOrderFees(subtotal, settingsFees) {
     try {
       const body = await readBody(req, 1e5);
       const cur = loadSettings();
-      cur.heroSideBgDurationSec = Math.max(2, Math.min(20, Number(body.durationSec) || 5));
+      const durationSec = Math.max(2, Math.min(30, Number(body.durationSec) || 5));
+      const index = Number(body.index);
+      const list = Array.isArray(cur.heroSideBgPhotos) ? cur.heroSideBgPhotos : [];
+      if (Number.isInteger(index)) {
+        if (!list[index]) return sendJSON(res, 404, { ok:false, error:'not-found' });
+        const old = typeof list[index] === 'string' ? { url:list[index] } : list[index];
+        if (String(old.mediaType || '').toLowerCase() === 'video') return sendJSON(res, 400, { ok:false, error:'video-full-length' });
+        list[index] = { ...old, durationSec };
+        cur.heroSideBgPhotos = list;
+      } else cur.heroSideBgDurationSec = durationSec;
       saveSettings(cur);
-      return sendJSON(res, 200, { ok: true, durationSec: cur.heroSideBgDurationSec });
-    } catch (e) {
-      return sendJSON(res, 500, { ok: false, error: 'server-error' });
-    }
+      return sendJSON(res, 200, { ok: true, durationSec, index: Number.isInteger(index) ? index : null });
+    } catch (e) { return sendJSON(res, 500, { ok: false, error: 'server-error' }); }
   }
   if (req.method === 'POST' && urlPath === '/admin/hero-side-bg-clear') {
     try {
@@ -5936,25 +5944,29 @@ ${(function(){
     const y = Math.max(0, Math.min(100, Number((p&&p.positionY) ?? 50)));
     const z = Math.max(1, Math.min(2.5, Number((p&&p.zoom) || 1)));
     const isVideo = (p && p.mediaType === 'video') || /\.(mp4|webm)(?:[?#]|$)/i.test(u);
+    const duration = Math.max(2, Math.min(30, Number((p&&p.durationSec) || settings.heroSideBgDurationSec || 5)));
     const mediaPreview = isVideo
-      ? '<video src="'+esc(u)+'" muted playsinline preload="metadata" style="width:100%;height:100%;object-fit:cover"></video>'
+      ? '<video id="heroBgPreview'+i+'" src="'+esc(u)+'" muted playsinline controls preload="metadata" style="width:100%;height:100%;object-fit:cover;object-position:'+x+'% '+y+'%;transform:scale('+z+');transform-origin:center"></video>'
       : '<div id="heroBgPreview'+i+'" style="position:absolute;inset:0;background-image:url(\''+esc(u).replace(/\'/g,'%27')+'\');background-size:cover;background-position:'+x+'% '+y+'%;transform:scale('+z+');transform-origin:center"></div>';
-    return '<div style="width:220px;border:1px solid rgba(212,175,55,.4);border-radius:9px;padding:7px;background:#15120b;position:relative">'
-      + '<button type="button" onclick="adminDeleteHeroBg('+i+')" title="Is photo ko remove karo" style="position:absolute;right:5px;top:5px;z-index:3;width:25px;height:25px;border:1px solid #fb7185;border-radius:50%;background:#7f1d1d;color:#fff;font-size:17px;line-height:20px;font-weight:800;cursor:pointer">×</button>'
-      + '<div style="height:126px;border-radius:6px;overflow:hidden;outline:1px solid rgba(125,211,252,.5);position:relative;background:#111">'+mediaPreview+'</div>'
-      + '<div style="font-size:11px;color:#f2ca50;margin-top:8px">#'+(i+1)+' · Home hero ka same crop</div>'
+    return '<div style="width:235px;border:1px solid '+(isVideo?'rgba(168,85,247,.7)':'rgba(212,175,55,.4)')+';border-radius:10px;padding:8px;background:#15120b;position:relative">'
+      + '<button type="button" onclick="adminDeleteHeroBg('+i+')" title="Is media ko remove karo" style="position:absolute;right:5px;top:5px;z-index:3;width:25px;height:25px;border:1px solid #fb7185;border-radius:50%;background:#7f1d1d;color:#fff;font-size:17px;line-height:20px;font-weight:800;cursor:pointer">×</button>'
+      + '<div style="height:132px;border-radius:6px;overflow:hidden;outline:1px solid '+(isVideo?'rgba(168,85,247,.7)':'rgba(125,211,252,.5)')+';position:relative;background:#111">'+mediaPreview+'</div>'
+      + '<div style="font-size:11px;color:'+(isVideo?'#d8b4fe':'#f2ca50')+';margin-top:8px">#'+(i+1)+' · '+(isVideo?'🎬 Video · poora chalega':'🖼️ Photo · '+duration+' seconds')+'</div>'
       + '<label class="muted" style="display:block;font-size:10px">Left / Right <b id="heroBgXVal'+i+'">'+x+'%</b><input type="range" id="heroBgX'+i+'" min="0" max="100" value="'+x+'" oninput="adminPreviewHeroBgCrop('+i+')"></label>'
       + '<label class="muted" style="display:block;font-size:10px">Up / Down <b id="heroBgYVal'+i+'">'+y+'%</b><input type="range" id="heroBgY'+i+'" min="0" max="100" value="'+y+'" oninput="adminPreviewHeroBgCrop('+i+')"></label>'
       + '<label class="muted" style="display:block;font-size:10px">Zoom <b id="heroBgZVal'+i+'">'+Math.round(z*100)+'%</b><input type="range" id="heroBgZ'+i+'" min="100" max="250" value="'+Math.round(z*100)+'" oninput="adminPreviewHeroBgCrop('+i+')"></label>'
-      + '<button type="button" onclick="adminSaveHeroBgCrop('+i+')" style="margin-top:6px;width:100%;padding:6px;border:1px solid #38bdf8;border-radius:6px;background:#0c2636;color:#bae6fd;font-weight:700;cursor:pointer">✥ Save Photo Adjustment</button></div>';
+      + (isVideo ? '<div class="muted" style="font-size:10px;margin:8px 0;color:#d8b4fe">▶ Video full length tak chalega, duration set nahi karna hai.</div>' : '<label class="muted" style="display:block;font-size:10px">Screen par kitne seconds<input class="inp" id="heroBgDuration'+i+'" type="number" min="2" max="30" value="'+duration+'" style="width:66px;margin-left:7px;padding:4px"></label><button type="button" onclick="adminSaveHeroBgDuration('+i+')" style="margin-top:6px;width:100%;padding:6px;border:1px solid #f2ca50;border-radius:6px;background:#33240a;color:#fef3c7;font-weight:700;cursor:pointer">⏱ Save '+duration+' sec</button>')
+      + '<button type="button" onclick="adminSaveHeroBgCrop('+i+')" style="margin-top:6px;width:100%;padding:6px;border:1px solid #38bdf8;border-radius:6px;background:#0c2636;color:#bae6fd;font-weight:700;cursor:pointer">✥ Save view adjustment</button></div>';
   }).join('');
 })()}
 </div>
 <div class="form-grid">
-<label class="muted">Photos / videos choose (multiple · max 5)
-<input type="file" id="heroBgFiles" accept="image/*,video/mp4,video/webm" multiple class="field-file"></label>
-<label class="muted">Photo display duration (seconds)
-<input class="inp" type="number" id="heroBgDuration" min="2" max="20" value="${esc(settings.heroSideBgDurationSec||5)}" style="max-width:120px"></label>
+<label class="muted">🖼️ Photos choose (multiple · max 5 total)
+<input type="file" id="heroBgPhotoFiles" accept="image/jpeg,image/png,image/webp" multiple class="field-file"></label>
+<label class="muted">🎬 Videos choose (MP4 / WebM · max 5 total)
+<input type="file" id="heroBgVideoFiles" accept="video/mp4,video/webm" multiple class="field-file"></label>
+<label class="muted">New photos ka default duration (seconds)
+<input class="inp" type="number" id="heroBgDuration" min="2" max="30" value="${esc(settings.heroSideBgDurationSec||5)}" style="max-width:120px"></label>
 <label class="muted" style="display:flex;align-items:center;gap:8px;cursor:pointer">
 <input type="checkbox" id="heroBgReplace" checked> Purani hata ke nayi</label>
 <button class="gen-btn" type="button" onclick="adminUploadHeroSideBg()">📤 Upload Banner Media</button>
@@ -6736,9 +6748,10 @@ async function adminClearHomeFrame() {
 }
 
 async function adminUploadHeroSideBg() {
-  var input = document.getElementById('heroBgFiles');
+  var photoInput = document.getElementById('heroBgPhotoFiles');
+  var videoInput = document.getElementById('heroBgVideoFiles');
   var status = document.getElementById('heroBgStatus');
-  var files = input && input.files ? Array.from(input.files) : [];
+  var files = [].concat(photoInput && photoInput.files ? Array.from(photoInput.files) : [], videoInput && videoInput.files ? Array.from(videoInput.files) : []);
   if (!files.length) { alert('Pehle photo ya video choose karo'); return; }
   if (files.length > 5) { alert('Maximum 5 photo/video select karo'); return; }
   var replace = !!(document.getElementById('heroBgReplace') || {}).checked;
@@ -6756,7 +6769,7 @@ async function adminUploadHeroSideBg() {
       if (!signRes.ok || !signed.ok) throw new Error(signed.message || signed.error || 'Cloud upload link fail');
       var put = await fetch(signed.uploadUrl, { method:'PUT', headers:{'Content-Type':blob.type || file.type}, body:blob });
       if (!put.ok) throw new Error('Cloud upload fail');
-      items.push({ url:signed.value, title:file.name, mediaType:isVideo ? 'video' : 'image' });
+      items.push({ url:signed.value, title:file.name, mediaType:isVideo ? 'video' : 'image', durationSec:durationSec });
     }
     var res = await fetch('/admin/hero-side-bg-upload', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({items:items,replace:replace,durationSec:durationSec}) });
     var data = await res.json();
@@ -6769,16 +6782,18 @@ async function adminUploadHeroSideBg() {
     alert('Upload error: ' + (e.message || 'Photo/video size check karo'));
   }
 }
-async function adminSaveHeroBgDuration() {
-  var sec = Number((document.getElementById('heroBgDuration') || {}).value || 5);
-  var res = await fetch('/admin/hero-side-bg-duration', {
-    method: 'POST', credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ durationSec: sec })
-  });
-  var data = await res.json();
+async function adminSaveHeroBgDuration(index) {
+  var specific = Number.isInteger(index);
+  var field = document.getElementById(specific ? ('heroBgDuration' + index) : 'heroBgDuration');
+  var sec = Number((field || {}).value || 5);
   var st = document.getElementById('heroBgStatus');
-  if (st) st.textContent = data.ok ? ('Duration: ' + data.durationSec + 's saved') : 'Fail';
+  try {
+    var res = await fetch('/admin/hero-side-bg-duration', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ durationSec:sec, index:specific ? index : undefined }) });
+    var data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || 'Save fail');
+    if (st) st.textContent = '✅ ' + (specific ? ('Photo ' + (index+1) + ' ab ' + data.durationSec + ' seconds dikhegi.') : ('New photos default duration: ' + data.durationSec + 's saved'));
+    if (specific) setTimeout(function(){ location.reload(); }, 500);
+  } catch(e) { if (st) st.textContent = 'Duration save nahi hua'; }
 }
 function adminPreviewHeroBgCrop(index) {
   var x = Number((document.getElementById('heroBgX' + index) || {}).value || 50);
@@ -6786,7 +6801,8 @@ function adminPreviewHeroBgCrop(index) {
   var zoom = Number((document.getElementById('heroBgZ' + index) || {}).value || 100) / 100;
   var preview = document.getElementById('heroBgPreview' + index);
   if (preview) {
-    preview.style.backgroundPosition = x + '% ' + y + '%';
+    if (preview.tagName === 'VIDEO') preview.style.objectPosition = x + '% ' + y + '%';
+    else preview.style.backgroundPosition = x + '% ' + y + '%';
     preview.style.transform = 'scale(' + zoom + ')';
   }
   var xv = document.getElementById('heroBgXVal' + index), yv = document.getElementById('heroBgYVal' + index), zv = document.getElementById('heroBgZVal' + index);
