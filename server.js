@@ -5616,6 +5616,7 @@ a{color:#D4AF37;text-decoration:none}
 .sidebar .brand-sub{font-size:11px;color:#8a7a62;margin-bottom:20px}
 .nav-link{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:8px;color:#c4b496;font-size:13px;margin-bottom:3px;transition:.15s}
 .nav-link:hover,.nav-link.active{background:rgba(212,175,55,.12);color:#F3DE9A}
+.module-nav{display:grid;gap:7px;margin:18px 0}.module-nav a{display:block;padding:10px 11px;border-radius:9px;color:#d8d0c4;text-decoration:none;background:#1b1511;border:1px solid rgba(212,175,55,.13);font-size:13px}.module-nav a:hover,.module-nav a.active{background:linear-gradient(135deg,#6d4b12,#2a2010);color:#ffe38b;border-color:#d4af37}.module-nav a.offline-alert-link{background:linear-gradient(135deg,#064e3b,#164e63);color:#a7f3d0;border-color:#34d399;font-weight:800}.admin-module-focus .main>section.panel{display:none}.admin-module-focus .main>section.panel.module-show{display:block}
 .main{margin-left:240px;flex:1;padding:24px 28px 80px;max-width:1100px}
 .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px;flex-wrap:wrap;gap:12px}
 .topbar h1{margin:0;font-size:1.35rem;color:#F4EAD6;font-weight:600}
@@ -5684,28 +5685,28 @@ label.muted{display:block;font-size:12px;margin-bottom:2px}
 <div class="layout">
 <aside class="sidebar">
   <div class="brand">Aditya Studio</div>
-  <div class="brand-sub">Studio Control Center · Latest</div>
-  <a class="nav-link" href="#sec-overview">📊 Overview</a>
-  <a class="nav-link" href="#sec-order-stats">📦 Orders Summary</a>
-  <a class="nav-link" href="#sec-orders">📋 Order List</a>
-  <a class="nav-link" href="/admin/local-delivery" style="color:#67e8f9">🚚 Local Delivery</a>
-  <a class="nav-link" href="/admin/activity" style="color:#67e8f9">📊 User Activity Tracker</a>
-  <a class="nav-link" href="#sec-frames">🖼️ Frame Types</a>
-  <a class="nav-link" href="#sec-banner">🎬 Home Banner</a>
-  <a class="nav-link" href="#sec-hero">🎞️ Hero Photos &amp; Videos</a>
-  <a class="nav-link" href="#sec-home-frame">🖼️ Home 3D Frame (5 photos)</a>
-  <a class="nav-link" href="#sec-book">📷 Book Cards</a>
-  <a class="nav-link" href="#sec-gallery-samples">🖼️ Gallery Samples</a>
-  <a class="nav-link" href="#sec-otp">📱 OTP / PIN</a>
-  <a class="nav-link" href="#sec-registration-limit">🛡️ Registration Limit</a>
-  <a class="nav-link" href="#sec-codes">🎫 Spin Codes</a>
-  <a class="nav-link" href="#sec-customers">👥 Customers</a>
-  <a class="nav-link" href="#sec-notif">🔔 Notifications</a>
-  <a class="nav-link" href="#sec-backup">💾 Backup</a>
-  <div style="margin-top:20px;padding-top:14px;border-top:1px solid rgba(212,175,55,.12)">
-    <a class="nav-link" href="/" target="_blank">↗ Open storefront</a>
-  </div>
+  <div class="brand-sub">Admin Dashboard</div>
+  <nav class="module-nav" aria-label="Admin sections">
+    <a class="active" data-module="dashboard" href="#dashboard">📊 Dashboard</a>
+    <a data-module="help" href="#help">🆘 User Help &amp; OTP</a>
+    <a data-module="orders" href="#orders">📦 Orders &amp; Wallet</a>
+    <a data-module="site" href="#site">🎨 Site UI &amp; Frames</a>
+    <a data-module="alerts" href="#alerts">🔔 Alert Center</a>
+    <a data-module="backup" href="#backup">💾 Backup</a>
+    <a href="/admin/local-delivery">🚚 Local Delivery</a>
+    <a href="/admin/orderbro">🍽️ Shop &amp; Delivery Management</a>
+    <a class="offline-alert-link" href="/admin/local-delivery#whatsappQueue">📱 Offline WhatsApp Alerts</a>
+    <a href="/admin/activity">📍 User activity</a>
+    <a href="/admin/two-factor">🔐 Google Authenticator</a>
+  </nav>
 </aside>
+<script>
+(function(){
+  var groups={dashboard:['sec-overview','sec-order-stats'],help:['sec-otp','sec-registration-limit','sec-customers','sec-codes'],orders:['sec-order-stats','sec-orders','sec-wallet-recharges'],site:['sec-fees','sec-quality','sec-frames','sec-banner','sec-home-deals','sec-login-promo','sec-hero','sec-home-frame','sec-book','sec-gallery-samples','sec-ui-panel'],alerts:['sec-overview','sec-notif'],backup:['sec-backup']};
+  function selectModule(){var key=(location.hash||'#dashboard').slice(1);if(!groups[key])key='dashboard';document.body.classList.add('admin-module-focus');document.querySelectorAll('.main>section.panel').forEach(function(x){x.classList.remove('module-show')});(groups[key]||[]).forEach(function(id){var el=document.getElementById(id);if(el)el.classList.add('module-show')});document.querySelectorAll('.module-nav [data-module]').forEach(function(a){a.classList.toggle('active',a.dataset.module===key)});}
+  document.addEventListener('DOMContentLoaded',selectModule);window.addEventListener('hashchange',selectModule);
+})();
+</script>
 <main class="main">
 <div class="admin-hero">
   <div class="admin-hero-copy"><span class="admin-eyebrow">ADITYA STUDIO · ADMIN</span><h1>Studio Control Center</h1><p>Orders, website media, customers aur alerts ek hi jagah se manage karein.</p></div>
@@ -7584,30 +7585,6 @@ function adminShowAllSections() {
 })();
 
 adminInitUi();
-// Admin modules: each button opens a focused URL while keeping the existing controls and data intact.
-(function(){
-  var groups={
-    dashboard:{label:'📊 Dashboard',ids:['sec-overview','sec-order-stats']},
-    help:{label:'🆘 User Help & OTP',ids:['sec-otp','sec-registration-limit','sec-customers','sec-codes']},
-    orders:{label:'📦 Orders & Wallet',ids:['sec-order-stats','sec-orders','sec-wallet-recharges']},
-    site:{label:'🎨 Site UI & Frames',ids:['sec-fees','sec-quality','sec-frames','sec-banner','sec-hero','sec-home-frame','sec-book','sec-gallery-samples','sec-ui-panel']},
-    alerts:{label:'🔔 Alert Center',ids:['sec-overview','sec-notif']},
-    backup:{label:'💾 Backup',ids:['sec-backup']}
-  };
-  var current=new URLSearchParams(location.search).get('module')||'dashboard';if(!groups[current])current='dashboard';
-  var side=document.querySelector('.sidebar');if(!side)return;
-  var nav=document.createElement('nav');nav.className='module-nav';nav.innerHTML=Object.keys(groups).map(function(k){return '<a href="/admin?module='+k+'" class="'+(k===current?'active':'')+'">'+groups[k].label+'</a>'}).join('')+'<a href="/admin/local-delivery">🚚 Local Delivery</a><a href="/admin/orderbro">🍽️ Shop & Delivery Management</a><a class="offline-alert-link" href="/admin/local-delivery#whatsappQueue">📱 Offline WhatsApp Alerts</a><a href="/admin/activity">📍 User activity</a><a href="/admin/two-factor">🔐 Google Authenticator</a>';
-  var anchor=side.querySelector('.brand-sub');anchor.insertAdjacentElement('afterend',nav);
-  var style=document.createElement('style');style.textContent='.module-nav{display:grid;gap:7px;margin:18px 0}.module-nav a{display:block;padding:10px 11px;border-radius:9px;color:#d8d0c4;text-decoration:none;background:#1b1511;border:1px solid rgba(212,175,55,.13);font-size:13px}.module-nav a.active{background:linear-gradient(135deg,#6d4b12,#2a2010);color:#ffe38b;border-color:#d4af37}.module-nav a.offline-alert-link{background:linear-gradient(135deg,#064e3b,#164e63);color:#a7f3d0;border-color:#34d399;font-weight:800}.sidebar>.nav-link{display:none}body.admin-module-focus .main>section.panel{display:none}body.admin-module-focus .main>section.panel.module-show{display:block}';document.head.appendChild(style);
-  document.body.classList.add('admin-module-focus');
-  (groups[current].ids||[]).forEach(function(id){var el=document.getElementById(id);if(el)el.classList.add('module-show')});
-  var h=document.querySelector('.topbar h1');if(h)h.textContent=groups[current].label;
-})();
-
-
-
-
-
 loadAdminFrames();
 setInterval(loadAdminFrames, 15000);
 
