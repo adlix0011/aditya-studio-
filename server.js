@@ -5679,7 +5679,7 @@ label.muted{display:block;font-size:12px;margin-bottom:2px}
 <div class="layout">
 <aside class="sidebar">
   <div class="brand">Aditya Studio</div>
-  <div class="brand-sub">Admin Dashboard</div>
+  <div class="brand-sub">Studio Control Center · Latest</div>
   <a class="nav-link" href="#sec-overview">📊 Overview</a>
   <a class="nav-link" href="#sec-order-stats">📦 Orders Summary</a>
   <a class="nav-link" href="#sec-orders">📋 Order List</a>
@@ -5687,7 +5687,7 @@ label.muted{display:block;font-size:12px;margin-bottom:2px}
   <a class="nav-link" href="/admin/activity" style="color:#67e8f9">📊 User Activity Tracker</a>
   <a class="nav-link" href="#sec-frames">🖼️ Frame Types</a>
   <a class="nav-link" href="#sec-banner">🎬 Home Banner</a>
-  <a class="nav-link" href="#sec-hero">✨ Hero Text + BG Photos</a>
+  <a class="nav-link" href="#sec-hero">🎞️ Hero Photos &amp; Videos</a>
   <a class="nav-link" href="#sec-home-frame">🖼️ Home 3D Frame (5 photos)</a>
   <a class="nav-link" href="#sec-book">📷 Book Cards</a>
   <a class="nav-link" href="#sec-gallery-samples">🖼️ Gallery Samples</a>
@@ -5703,7 +5703,7 @@ label.muted{display:block;font-size:12px;margin-bottom:2px}
 </aside>
 <main class="main">
 <div class="topbar">
-  <h1>Dashboard</h1>
+  <h1>Studio Control Center</h1>
   <div class="links"><button type="button" class="gen-btn" style="padding:7px 10px;font-size:12px" title="Registered Delivery Manage APK को Firebase push notification भेजें" onclick="fetch('/admin/orderbro/test-alert',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:'🛵 Demo delivery alert',message:'Demo customer को सामान पहुंचाना है'})}).then(r=>r.json()).then(x=>alert(x.message||'Push test result नहीं मिला')).catch(()=>alert('Push test नहीं भेजा गया'))">🔔 Push Test</button><span class="wa-health" id="waHealth"><i class="dot"></i><span>WhatsApp Cloud API: checking…</span></span><a href="/">Home</a><a href="/book-now">Studio page</a></div>
 </div>
 <div class="wa-test" style="margin:-8px 0 18px"><input class="inp" id="waTestMobile" inputmode="numeric" maxlength="10" placeholder="10-digit WhatsApp number"><button type="button" class="gen-btn wa-link" onclick="sendWhatsAppRelayTest()">💬 Test message bhejein</button><small class="muted" id="waTestStatus">Cloud API connected ho to test message turant jayega.</small></div>
@@ -5892,7 +5892,7 @@ label.muted{display:block;font-size:12px;margin-bottom:2px}
 </section>
 
 <section class="panel" id="sec-hero">
-<h2>✨ Home Hero Text + Side Background</h2>
+<h2>🎞️ Home Hero Photos &amp; Videos</h2>
 <p class="sub">Hero banner me photos aur videos dono upload karein. Photo selected duration tak dikhegi; video poori chalne ke baad next item aayega.</p>
 
 <form method="POST" action="/admin/save-hero-intro" class="form-grid">
@@ -5944,13 +5944,13 @@ ${(function(){
 <div class="form-grid">
 <label class="muted">Photos / videos choose (multiple · max 5)
 <input type="file" id="heroBgFiles" accept="image/*,video/mp4,video/webm" multiple class="field-file"></label>
-<label class="muted">BG change duration (seconds)
+<label class="muted">Photo display duration (seconds)
 <input class="inp" type="number" id="heroBgDuration" min="2" max="20" value="${esc(settings.heroSideBgDurationSec||5)}" style="max-width:120px"></label>
 <label class="muted" style="display:flex;align-items:center;gap:8px;cursor:pointer">
 <input type="checkbox" id="heroBgReplace" checked> Purani hata ke nayi</label>
 <button class="gen-btn" type="button" onclick="adminUploadHeroSideBg()">📤 Upload Banner Media</button>
 <button type="button" onclick="adminSaveHeroBgDuration()" style="padding:8px 12px;background:#2a2418;color:#f2ca50;border:1px solid rgba(212,175,55,.4);border-radius:8px;cursor:pointer">⏱ Only duration save</button>
-<button type="button" onclick="adminClearHeroSideBg()" style="padding:8px 12px;background:#5a1a1a;color:#fca5a5;border:1px solid #7f1d1d;border-radius:8px;cursor:pointer">🗑 Clear BG</button>
+<button type="button" onclick="adminClearHeroSideBg()" style="padding:8px 12px;background:#5a1a1a;color:#fca5a5;border:1px solid #7f1d1d;border-radius:8px;cursor:pointer">🗑 Clear banner media</button>
 <p id="heroBgStatus" class="muted"></p>
 </div>
 </section>
@@ -7441,7 +7441,7 @@ var ADMIN_SECTIONS = [
   { id: 'sec-quality', label: 'Photo Quality' },
   { id: 'sec-frames', label: 'Frame Types' },
   { id: 'sec-banner', label: 'Home Banner' },
-  { id: 'sec-hero', label: 'Hero Text + BG' },
+  { id: 'sec-hero', label: 'Hero Photos & Videos' },
   { id: 'sec-home-frame', label: 'Home 3D Frame' },
   { id: 'sec-book', label: 'Book Cards' },
   { id: 'sec-gallery-samples', label: 'Gallery Samples' },
