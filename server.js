@@ -5621,6 +5621,10 @@ a{color:#D4AF37;text-decoration:none}
 .topbar h1{margin:0;font-size:1.35rem;color:#F4EAD6;font-weight:600}
 .topbar .links a{margin-left:12px;font-size:13px;color:#B7A480}
 .topbar .links a:hover{color:#D4AF37}
+.admin-hero{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;gap:22px;padding:27px 30px;margin-bottom:14px;border:1px solid rgba(251,191,36,.34);border-radius:20px;background:radial-gradient(circle at 86% 8%,rgba(245,158,11,.19),transparent 27%),radial-gradient(circle at 64% 100%,rgba(20,184,166,.15),transparent 32%),linear-gradient(125deg,#20150d,#110e0b 60%,#101a19)}
+.admin-hero:after{content:'';position:absolute;width:190px;height:190px;border:1px solid rgba(251,191,36,.18);border-radius:50%;right:-75px;bottom:-105px;box-shadow:0 0 0 28px rgba(251,191,36,.035),0 0 0 56px rgba(251,191,36,.025)}
+.admin-hero-copy,.admin-hero-actions{position:relative;z-index:1}.admin-eyebrow{display:inline-block;color:#f9c74f;font-weight:900;font-size:10px;letter-spacing:.16em;padding:5px 9px;border-radius:99px;background:rgba(251,191,36,.11);border:1px solid rgba(251,191,36,.22)}
+.admin-hero h1{margin:10px 0 5px;font-size:clamp(1.55rem,3vw,2.2rem);line-height:1;color:#fff7e6;letter-spacing:-.04em}.admin-hero p{margin:0;color:#c9bba4;font-size:13px}.admin-hero-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap;max-width:430px}.admin-status{display:flex;align-items:center;gap:7px;padding:8px 11px;border-radius:99px;border:1px solid rgba(45,212,191,.35);background:rgba(6,78,59,.25);font-size:12px;color:#a7f3d0;font-weight:800}.admin-status i{height:8px;width:8px;background:#34d399;border-radius:50%;box-shadow:0 0 10px #34d399}.admin-push{padding:9px 13px}.admin-shortcuts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:0 0 18px}.admin-shortcuts a{display:flex;align-items:center;gap:10px;padding:13px;border:1px solid rgba(212,175,55,.16);border-radius:13px;background:linear-gradient(145deg,#1c1711,#120f0c);font-size:19px;color:#f7cf57;transition:.18s}.admin-shortcuts a:hover{transform:translateY(-2px);border-color:rgba(251,191,36,.5);box-shadow:0 9px 22px rgba(0,0,0,.22)}.admin-shortcuts b,.admin-shortcuts small{display:block}.admin-shortcuts b{font-size:12px;color:#f5e8d1}.admin-shortcuts small{font-size:10px;color:#95866d;margin-top:2px}.admin-message-test{padding:11px 13px;margin:0 0 19px!important;border:1px solid rgba(34,197,94,.18);border-radius:13px;background:linear-gradient(100deg,rgba(10,47,31,.55),rgba(18,14,10,.85))}
 .wa-health{display:flex;align-items:center;gap:8px;padding:8px 11px;border-radius:999px;background:#3a1515;border:1px solid #7f1d1d;color:#fecaca;font-size:12px;font-weight:800}.wa-health.online{background:#103c26;border-color:#22c55e;color:#bbf7d0}.wa-health .dot{width:10px;height:10px;border-radius:50%;background:#ef4444;box-shadow:0 0 10px #ef4444}.wa-health.online .dot{background:#22c55e;box-shadow:0 0 10px #22c55e}.wa-test{display:flex;gap:7px;align-items:center;flex-wrap:wrap}.wa-test input{width:170px}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:28px}
 .card{background:linear-gradient(160deg,#1a1410,#120e0a);border:1px solid rgba(212,175,55,.18);border-radius:14px;padding:16px}
@@ -5665,6 +5669,7 @@ label.muted{display:block;font-size:12px;margin-bottom:2px}
   .sidebar{width:100%;position:relative;border-right:none;border-bottom:1px solid rgba(212,175,55,.15)}
   .layout{flex-direction:column}
   .main{margin-left:0;padding:16px}
+  .admin-hero{padding:20px;align-items:flex-start;flex-direction:column}.admin-hero-actions{justify-content:flex-start}.admin-shortcuts{grid-template-columns:repeat(2,minmax(0,1fr))}
   .nav-link{display:inline-flex;margin:2px}
 }
 
@@ -5702,11 +5707,12 @@ label.muted{display:block;font-size:12px;margin-bottom:2px}
   </div>
 </aside>
 <main class="main">
-<div class="topbar">
-  <h1>Studio Control Center</h1>
-  <div class="links"><button type="button" class="gen-btn" style="padding:7px 10px;font-size:12px" title="Registered Delivery Manage APK को Firebase push notification भेजें" onclick="fetch('/admin/orderbro/test-alert',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:'🛵 Demo delivery alert',message:'Demo customer को सामान पहुंचाना है'})}).then(r=>r.json()).then(x=>alert(x.message||'Push test result नहीं मिला')).catch(()=>alert('Push test नहीं भेजा गया'))">🔔 Push Test</button><span class="wa-health" id="waHealth"><i class="dot"></i><span>WhatsApp Cloud API: checking…</span></span><a href="/">Home</a><a href="/book-now">Studio page</a></div>
+<div class="admin-hero">
+  <div class="admin-hero-copy"><span class="admin-eyebrow">ADITYA STUDIO · ADMIN</span><h1>Studio Control Center</h1><p>Orders, website media, customers aur alerts ek hi jagah se manage karein.</p></div>
+  <div class="admin-hero-actions"><div class="admin-status"><i></i><span id="adminLiveStatus">Live dashboard</span></div><button type="button" class="gen-btn admin-push" title="Registered Delivery Manage APK को Firebase push notification भेजें" onclick="fetch('/admin/orderbro/test-alert',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:'🛵 Demo delivery alert',message:'Demo customer को सामान पहुंचाना है'})}).then(r=>r.json()).then(x=>alert(x.message||'Push test result नहीं मिला')).catch(()=>alert('Push test नहीं भेजा गया'))">🔔 Send push test</button><span class="wa-health" id="waHealth"><i class="dot"></i><span>WhatsApp Cloud API: checking…</span></span></div>
 </div>
-<div class="wa-test" style="margin:-8px 0 18px"><input class="inp" id="waTestMobile" inputmode="numeric" maxlength="10" placeholder="10-digit WhatsApp number"><button type="button" class="gen-btn wa-link" onclick="sendWhatsAppRelayTest()">💬 Test message bhejein</button><small class="muted" id="waTestStatus">Cloud API connected ho to test message turant jayega.</small></div>
+<div class="admin-shortcuts"><a href="#sec-orders">📦 <span><b>Orders</b><small>Manage bookings</small></span></a><a href="#sec-hero">🎞️ <span><b>Home media</b><small>Photos & videos</small></span></a><a href="#sec-notif">🔔 <span><b>Alerts</b><small>Send notification</small></span></a><a href="/">↗ <span><b>Open website</b><small>View storefront</small></span></a></div>
+<div class="wa-test admin-message-test"><input class="inp" id="waTestMobile" inputmode="numeric" maxlength="10" placeholder="10-digit WhatsApp number"><button type="button" class="gen-btn wa-link" onclick="sendWhatsAppRelayTest()">💬 Test WhatsApp message</button><small class="muted" id="waTestStatus">Cloud API connected ho to test message turant jayega.</small></div>
 <div id="newOrderBanner" onclick="location.hash='sec-orders'"></div>
 
 <section class="panel" id="sec-overview">
