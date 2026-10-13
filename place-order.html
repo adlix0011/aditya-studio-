@@ -5,7 +5,7 @@
 window.alert=function(message){function show(){var old=document.getElementById('adityaPageAlert');if(old)old.remove();var text=String(message||''),bad=/(fail|error|wrong|network|nahi|नहीं|गलत|invalid|missing|expire|chhoti|required|check|reject|denied|access)/i.test(text),box=document.createElement('div');box.id='adityaPageAlert';box.style.cssText='position:fixed;left:16px;right:16px;top:18px;z-index:99999;max-width:520px;margin:auto;padding:14px 42px 14px 16px;border-radius:14px;font:700 14px Arial,sans-serif;line-height:1.45;color:'+(bad?'#fff1f2':'#f0fdf4')+';background:'+(bad?'linear-gradient(135deg,#991b1b,#450a0a)':'linear-gradient(135deg,#15803d,#064e3b)')+';border:1px solid '+(bad?'#fb7185':'#4ade80')+';box-shadow:0 0 24px '+(bad?'rgba(251,113,133,.5)':'rgba(74,222,128,.48)');box.innerHTML=(bad?'⚠️ ':'✅ ')+text+'<button style="position:absolute;right:10px;top:8px;border:0;background:transparent;color:inherit;font-size:22px">×</button>';box.querySelector('button').onclick=function(){box.remove()};document.body.appendChild(box);setTimeout(function(){box.remove()},5000)}if(document.body)show();else document.addEventListener('DOMContentLoaded',show,{once:true})};
 </script>
 <meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport"/>
+<meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport"/, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no>
 <title>Place Order — Aditya Studio</title>
 <script>
 /* STRICT: bina valid session ke place-order nahi khulega */
