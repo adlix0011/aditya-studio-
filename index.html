@@ -366,7 +366,7 @@
       #gift-shop .home-deal-sub{font-size:.78rem!important;line-height:1.25!important;margin-top:4px}
       #gift-shop .home-deal-copy{padding:14px!important}
     }
-  
+
     /* Gallery: compact landscape thumbnails with the same moving RGB edge as New Future. */
     #galleryStories{display:flex!important;flex-direction:column!important;gap:28px;padding:2px 0 14px;overflow:visible}
     .gallery-story{width:100%;display:flex;flex-direction:column;gap:12px;padding:0;border:0;background:transparent;box-shadow:none}
@@ -388,6 +388,12 @@
     .gallery-reel-badge{position:absolute;left:12px;bottom:12px;z-index:2;padding:6px 10px;border-radius:999px;background:rgba(5,5,8,.72);backdrop-filter:blur(7px);color:#fff;font-size:11px;font-weight:900;letter-spacing:.05em}
     .gallery-reel-empty{display:grid;place-items:center;min-height:160px;border:1px dashed rgba(34,211,238,.55);border-radius:18px;color:#a5f3fc;text-align:center;padding:18px}
     @media (min-width:768px){.gallery-story{max-width:760px;margin-inline:auto}.gallery-story-media{max-height:430px}.gallery-reels{max-width:760px;margin-inline:auto}.gallery-reel-card{flex-basis:245px}}
+
+    .gallery-story-media{cursor:pointer}
+    .gallery-lightbox{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(3,5,12,.86);backdrop-filter:blur(14px)}
+    .gallery-lightbox-panel{width:min(940px,100%);max-height:92vh;overflow:auto;border-radius:24px;padding:16px;background:linear-gradient(145deg,#21152d,#0c1423 55%,#20150f);border:1px solid rgba(103,232,249,.58);box-shadow:0 0 38px rgba(168,85,247,.42)}
+    .gallery-lightbox-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:2px 2px 14px}.gallery-lightbox-head h3{margin:0;font-family:'EB Garamond',serif;font-size:clamp(1.8rem,7vw,3rem);background:linear-gradient(100deg,#fef3c7,#fbbf24,#f472b6,#67e8f9);-webkit-background-clip:text;color:transparent}.gallery-lightbox-close{width:38px;height:38px;border:1px solid rgba(255,255,255,.45);border-radius:50%;background:rgba(0,0,0,.35);color:#fff;font-size:25px;cursor:pointer}
+    .gallery-lightbox-main{width:100%;max-height:min(59vh,560px);aspect-ratio:16/9;object-fit:contain;border-radius:16px;background:#050507;display:block}.gallery-lightbox-count{text-align:center;color:#fef3c7;font-size:12px;font-weight:800;margin:9px}.gallery-lightbox-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:9px}.gallery-lightbox-thumb{aspect-ratio:1;border:2px solid transparent;border-radius:10px;overflow:hidden;padding:0;background:#111;cursor:pointer}.gallery-lightbox-thumb.active{border-color:#67e8f9;box-shadow:0 0 12px rgba(34,211,238,.6)}.gallery-lightbox-thumb img{width:100%;height:100%;object-fit:cover}
 
 
     /* book-card-link */
@@ -775,7 +781,7 @@
           var pos={};
           document.querySelectorAll('[data-gallery]').forEach(function(img){
             var key=img.dataset.gallery, list=(gallery&&gallery[key])||[]; pos[key]=0;
-            if(list.length){ img.style.display='block'; img.src=list[0]; img.style.opacity='1'; }
+            if(list.length){ img.style.display='block'; img.src=list[0]; img.style.opacity='1'; img.onclick=function(){ openGalleryViewer(key,list,0); }; }
             else { img.style.display='none'; if(!img.parentElement.querySelector('.gallery-empty')) img.parentElement.insertAdjacentHTML('afterbegin','<div class="gallery-empty absolute inset-0 grid place-items-center px-4 text-center text-sm text-on-surface-variant">Admin se photos upload karein</div>'); }
           });
           if(timer) clearInterval(timer);
@@ -783,6 +789,17 @@
           var reelBox=document.getElementById('galleryReels'), reels=Array.isArray(gallery&&gallery.reel)?gallery.reel:[];
           if(reelBox){ reelBox.innerHTML=''; if(!reels.length) reelBox.innerHTML='<div class="gallery-reel-empty">Admin se Reel videos upload karein</div>'; else { var track=document.createElement('div'); track.className='gallery-reels-track'; reels.forEach(function(src,i){ var card=document.createElement('div'); card.className='gallery-reel-card'; var video=document.createElement('video'); video.src=src; video.muted=true; video.loop=true; video.playsInline=true; video.preload='metadata'; video.autoplay=true; card.appendChild(video); var badge=document.createElement('span'); badge.className='gallery-reel-badge'; badge.textContent='▶ Reel '+(i+1); card.appendChild(badge); track.appendChild(card); }); reelBox.appendChild(track); } }
         }
+        function openGalleryViewer(title, items, start){
+          var old=document.getElementById('galleryLightbox'); if(old) old.remove();
+          var box=document.createElement('div'); box.id='galleryLightbox'; box.className='gallery-lightbox'; box.setAttribute('role','dialog'); box.setAttribute('aria-modal','true');
+          box.innerHTML='<div class="gallery-lightbox-panel"><div class="gallery-lightbox-head"><h3></h3><button class="gallery-lightbox-close" aria-label="Close gallery">×</button></div><img class="gallery-lightbox-main" alt="Gallery photo"><div class="gallery-lightbox-count"></div><div class="gallery-lightbox-grid"></div></div>';
+          document.body.appendChild(box); var heading=box.querySelector('h3'),main=box.querySelector('.gallery-lightbox-main'),count=box.querySelector('.gallery-lightbox-count'),grid=box.querySelector('.gallery-lightbox-grid'),index=start||0;
+          heading.textContent=title==='prewedding'?'Pre-Wedding':title.charAt(0).toUpperCase()+title.slice(1)+(title==='birthday'?' Shoot':'');
+          function select(i){ index=i; main.src=items[i]; count.textContent=(i+1)+' / '+items.length; Array.prototype.forEach.call(grid.children,function(el,n){el.classList.toggle('active',n===i)}); }
+          items.forEach(function(src,i){ var b=document.createElement('button'); b.type='button'; b.className='gallery-lightbox-thumb'; b.innerHTML='<img alt="Photo '+(i+1)+'">'; b.querySelector('img').src=src; b.onclick=function(){select(i)}; grid.appendChild(b); }); select(index);
+          function close(){ box.remove(); document.removeEventListener('keydown',onKey); } function onKey(e){if(e.key==='Escape')close(); if(e.key==='ArrowRight')select((index+1)%items.length); if(e.key==='ArrowLeft')select((index-1+items.length)%items.length);} box.querySelector('.gallery-lightbox-close').onclick=close; box.onclick=function(e){if(e.target===box)close()}; document.addEventListener('keydown',onKey);
+        }
+
         // Cached URLs render immediately on every refresh. The network check runs after the page is usable.
         try { var cached=JSON.parse(localStorage.getItem(galleryCacheKey)||'null'); if(cached&&cached.gallery) renderGallery(cached.gallery); } catch(e) {}
         fetch('/api/home-gallery-samples',{cache:'force-cache'}).then(function(res){ return res.json(); }).then(function(data){ var gallery=data.gallery||{}; try { localStorage.setItem(galleryCacheKey,JSON.stringify({gallery:gallery,savedAt:Date.now()})); } catch(e) {} renderGallery(gallery); }).catch(function(e){ console.warn('Gallery samples unavailable',e); });
