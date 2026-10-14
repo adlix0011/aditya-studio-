@@ -2210,6 +2210,34 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  // Hero media uses the application server as an upload relay. Direct browser
+  // PUT requests to R2 can be blocked by a bucket's CORS policy, especially
+  // for videos. Keeping this route same-origin makes the admin uploader work
+  // without relying on a browser-to-R2 CORS configuration.
+  if (req.method === 'POST' && urlPath === '/admin/hero-media-upload-proxy') {
+    try {
+      if (!r2Ready()) return sendJSON(res, 503, { ok:false, error:'r2-not-configured', message:'Cloud image storage configured nahi hai' });
+      const body = await readBody(req, 45e6);
+      const type = String(body.contentType || '').toLowerCase();
+      const ext = ({ 'image/jpeg':'jpg', 'image/jpg':'jpg', 'image/png':'png', 'image/webp':'webp', 'video/mp4':'mp4', 'video/webm':'webm' })[type];
+      if (!ext) return sendJSON(res, 400, { ok:false, error:'invalid-media', message:'Sirf photo, MP4 ya WebM upload karein' });
+      const encoded = String(body.base64 || '').replace(/\s/g, '');
+      if (!/^[A-Za-z0-9+/=]+$/.test(encoded)) return sendJSON(res, 400, { ok:false, error:'invalid-media', message:'File data sahi nahi hai' });
+      const bytes = Buffer.from(encoded, 'base64');
+      const maxBytes = type.startsWith('video/') ? 30 * 1024 * 1024 : 8 * 1024 * 1024;
+      if (!bytes.length || bytes.length > maxBytes) return sendJSON(res, 400, { ok:false, error:'media-too-large', message:(type.startsWith('video/') ? 'Video 30 MB' : 'Photo 8 MB') + ' se chhoti select karein' });
+      const key = 'studio-images/hero-bg/' + Date.now() + '-' + crypto.randomBytes(10).toString('hex') + '.' + ext;
+      const put = await fetch(r2PresignedUrl('PUT', key, 900), {
+        method:'PUT', headers:{ 'Content-Type':type, 'Cache-Control':'public, max-age=31536000, immutable' }, body:bytes
+      });
+      if (!put.ok) throw new Error('R2 HTTP ' + put.status);
+      return sendJSON(res, 200, { ok:true, value:'r2:' + key });
+    } catch (e) {
+      console.error('hero-media-upload-proxy', e.message);
+      return sendJSON(res, 500, { ok:false, error:'upload-failed', message:'Cloud upload fail: ' + String(e.message || '').slice(0,120) });
+    }
+  }
+
   // One-time migration for older admin images that were stored inside settings
   // as base64 and therefore made every Render response unnecessarily large.
   if (req.method === 'POST' && urlPath === '/admin/migrate-images-to-r2') {
@@ -6768,12 +6796,19 @@ async function adminUploadHeroSideBg() {
       status.textContent = (isVideo ? 'Video ' : 'Photo ') + (i+1) + '/' + files.length + ' upload ho raha hai…';
       var blob = isVideo ? file : await fetch(await compressImageFile(file, 1400, 0.8)).then(function(r){ return r.blob(); });
       var contentType = String(blob.type || fileType || (isVideo && /\\.webm$/i.test(file.name || '') ? 'video/webm' : (isVideo ? 'video/mp4' : 'image/jpeg'))).toLowerCase();
-      var signRes = await fetch('/admin/r2-image-upload', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({group:'hero-bg',contentType:contentType}) });
-      var signed = await signRes.json();
-      if (!signRes.ok || !signed.ok) throw new Error(signed.message || signed.error || 'Cloud upload link fail');
-      var put = await fetch(signed.uploadUrl, { method:'PUT', headers:{'Content-Type':contentType}, body:blob });
-      if (!put.ok) throw new Error('Cloud upload fail (' + put.status + ')');
-      items.push({ url:signed.value, title:file.name, mediaType:isVideo ? 'video' : 'image', durationSec:durationSec });
+      var base64 = await new Promise(function(resolve, reject) {
+        var reader = new FileReader();
+        reader.onerror = function(){ reject(new Error('File read nahi ho saka')); };
+        reader.onload = function(){ resolve(String(reader.result || '').split(',')[1] || ''); };
+        reader.readAsDataURL(blob);
+      });
+      var uploadRes = await fetch('/admin/hero-media-upload-proxy', {
+        method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({contentType:contentType, base64:base64})
+      });
+      var uploaded = await uploadRes.json().catch(function(){ return {}; });
+      if (!uploadRes.ok || !uploaded.ok) throw new Error(uploaded.message || uploaded.error || ('Cloud upload fail (' + uploadRes.status + ')'));
+      items.push({ url:uploaded.value, title:file.name, mediaType:isVideo ? 'video' : 'image', durationSec:durationSec });
     }
     var res = await fetch('/admin/hero-side-bg-upload', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({items:items,replace:replace,durationSec:durationSec}) });
     var data = await res.json();
