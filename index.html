@@ -1604,6 +1604,10 @@
         };
         let deals = eventDefs.map(function(event){ return { url:fallbackImages[event.key], title:event.title, sub:event.sub, link:'/book?service='+event.key, active:true }; });
         let duration = 28;
+        // Render booking cards immediately, before the settings API returns. This prevents old offer thumbnails flashing after refresh.
+        track.innerHTML = deals.concat(deals).map(function(item){ return '<a class="home-deal-card" href="'+item.link+'" aria-label="'+item.title+' booking"><div class="home-deal-card-inner"><div class="home-deal-photo" style="background-image:url(\''+item.url+'\')"></div><div class="home-deal-copy"><h3 class="home-deal-title">'+item.title+'</h3><p class="home-deal-sub">'+item.sub+'</p></div></div></a>'; }).join('');
+        track.classList.add('home-deals-dynamic');
+        track.style.setProperty('--deal-duration', duration + 's');
         try {
           const res = await fetch('/api/settings');
           const data = await res.json();
