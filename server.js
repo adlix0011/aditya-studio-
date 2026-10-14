@@ -5962,9 +5962,9 @@ ${(function(){
 </div>
 <div class="form-grid">
 <label class="muted">🖼️ Photos choose (multiple · max 5 total)
-<input type="file" id="heroBgPhotoFiles" accept="image/jpeg,image/png,image/webp" multiple class="field-file"></label>
+<input type="file" id="heroBgPhotoFiles" accept="image/*" multiple class="field-file" onchange="adminHeroMediaSelected()"></label>
 <label class="muted">🎬 Videos choose (MP4 / WebM · max 5 total)
-<input type="file" id="heroBgVideoFiles" accept="video/mp4,video/webm" multiple class="field-file"></label>
+<input type="file" id="heroBgVideoFiles" accept="video/mp4,video/webm" multiple class="field-file" onchange="adminHeroMediaSelected()"></label>
 <label class="muted">New photos ka default duration (seconds)
 <input class="inp" type="number" id="heroBgDuration" min="2" max="30" value="${esc(settings.heroSideBgDurationSec||5)}" style="max-width:120px"></label>
 <label class="muted" style="display:flex;align-items:center;gap:8px;cursor:pointer">
@@ -5972,7 +5972,8 @@ ${(function(){
 <button class="gen-btn" type="button" onclick="adminUploadHeroSideBg()">📤 Upload Banner Media</button>
 <button type="button" onclick="adminSaveHeroBgDuration()" style="padding:8px 12px;background:#2a2418;color:#f2ca50;border:1px solid rgba(212,175,55,.4);border-radius:8px;cursor:pointer">⏱ Only duration save</button>
 <button type="button" onclick="adminClearHeroSideBg()" style="padding:8px 12px;background:#5a1a1a;color:#fca5a5;border:1px solid #7f1d1d;border-radius:8px;cursor:pointer">🗑 Clear banner media</button>
-<p id="heroBgStatus" class="muted"></p>
+<div id="heroBgSelection" style="grid-column:1/-1;padding:9px 11px;border:1px solid rgba(56,189,248,.4);border-radius:8px;background:rgba(14,116,144,.12);color:#bae6fd;font-size:12px">Photo/video choose karke <b>Upload Banner Media</b> dabayein.</div>
+<p id="heroBgStatus" class="muted" role="status" style="grid-column:1/-1;margin:0;color:#f8d66d;font-weight:700"></p>
 </div>
 </section>
 
@@ -6756,19 +6757,22 @@ async function adminUploadHeroSideBg() {
   if (files.length > 5) { alert('Maximum 5 photo/video select karo'); return; }
   var replace = !!(document.getElementById('heroBgReplace') || {}).checked;
   var durationSec = Number((document.getElementById('heroBgDuration') || {}).value || 5);
-  status.textContent = 'Uploading ' + files.length + ' media…';
+  status.textContent = 'Uploading ' + files.length + ' media… is page ko band mat karein.';
   try {
     var items = [];
     for (var i = 0; i < files.length; i++) {
-      var file = files[i], isVideo = /^video\/(mp4|webm)$/i.test(file.type || '');
-      if (!isVideo && !/^image\//i.test(file.type || '')) throw new Error('Sirf image, MP4 ya WebM select karein');
+      var file = files[i];
+      var fileType = String(file.type || '').toLowerCase();
+      var isVideo = /^video\/(mp4|webm)$/i.test(fileType) || /\.(mp4|webm)$/i.test(file.name || '');
+      if (!isVideo && !/^image\//i.test(fileType)) throw new Error('Sirf photo, MP4 ya WebM select karein: ' + file.name);
       status.textContent = (isVideo ? 'Video ' : 'Photo ') + (i+1) + '/' + files.length + ' upload ho raha hai…';
       var blob = isVideo ? file : await fetch(await compressImageFile(file, 1400, 0.8)).then(function(r){ return r.blob(); });
-      var signRes = await fetch('/admin/r2-image-upload', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({group:'hero-bg',contentType:blob.type || file.type}) });
+      var contentType = String(blob.type || fileType || (isVideo && /\.webm$/i.test(file.name || '') ? 'video/webm' : (isVideo ? 'video/mp4' : 'image/jpeg'))).toLowerCase();
+      var signRes = await fetch('/admin/r2-image-upload', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({group:'hero-bg',contentType:contentType}) });
       var signed = await signRes.json();
       if (!signRes.ok || !signed.ok) throw new Error(signed.message || signed.error || 'Cloud upload link fail');
-      var put = await fetch(signed.uploadUrl, { method:'PUT', headers:{'Content-Type':blob.type || file.type}, body:blob });
-      if (!put.ok) throw new Error('Cloud upload fail');
+      var put = await fetch(signed.uploadUrl, { method:'PUT', headers:{'Content-Type':contentType}, body:blob });
+      if (!put.ok) throw new Error('Cloud upload fail (' + put.status + ')');
       items.push({ url:signed.value, title:file.name, mediaType:isVideo ? 'video' : 'image', durationSec:durationSec });
     }
     var res = await fetch('/admin/hero-side-bg-upload', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({items:items,replace:replace,durationSec:durationSec}) });
@@ -6776,11 +6780,21 @@ async function adminUploadHeroSideBg() {
     if (!data.ok) throw new Error(data.error || 'Upload fail');
     status.textContent = 'Saved ✅ ' + data.count + ' / 5 media';
     alert('Hero banner media saved! Home page refresh karo.');
-    location.href = '/admin#sec-hero'; location.reload();
+    location.hash = 'site'; location.reload();
   } catch (e) {
     status.textContent = 'Error: ' + (e.message || 'Upload fail');
     alert('Upload error: ' + (e.message || 'Photo/video size check karo'));
   }
+}
+function adminHeroMediaSelected() {
+  var photoInput = document.getElementById('heroBgPhotoFiles');
+  var videoInput = document.getElementById('heroBgVideoFiles');
+  var selected = document.getElementById('heroBgSelection');
+  var photos = photoInput && photoInput.files ? photoInput.files.length : 0;
+  var videos = videoInput && videoInput.files ? videoInput.files.length : 0;
+  if (!selected) return;
+  if (!photos && !videos) { selected.innerHTML = 'Photo/video choose karke <b>Upload Banner Media</b> dabayein.'; return; }
+  selected.innerHTML = '✅ <b>' + photos + ' photo</b> aur <b>' + videos + ' video</b> selected. Ab <b>Upload Banner Media</b> dabayein.';
 }
 async function adminSaveHeroBgDuration(index) {
   var specific = Number.isInteger(index);
@@ -6825,16 +6839,21 @@ async function adminSaveHeroBgCrop(index) {
   } catch (e) { if (status) status.textContent = 'Adjustment save nahi hua'; }
 }
 async function adminDeleteHeroBg(index) {
-  if (!confirm('Photo ' + (index + 1) + ' ko hero background se hatana hai?')) return;
   var status = document.getElementById('heroBgStatus');
-  if (status) status.textContent = 'Photo remove ho rahi hai…';
+  var button = document.querySelector('button[onclick="adminDeleteHeroBg(' + index + ')"]');
+  if (button) { button.disabled = true; button.textContent = '…'; }
+  if (status) status.textContent = 'Media ' + (index + 1) + ' remove ho rahi hai…';
   try {
     var res = await fetch('/admin/hero-side-bg-delete', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ index:index }) });
     var data = await res.json();
-    if (!res.ok || !data.ok) throw new Error('Delete fail');
-    location.href = '/admin#sec-hero';
-    location.reload();
-  } catch (e) { if (status) status.textContent = 'Photo remove nahi hui'; }
+    if (!res.ok || !data.ok) throw new Error(data.error || 'Delete fail');
+    if (status) status.textContent = '✅ Media remove ho gayi. List refresh ho rahi hai…';
+    setTimeout(function(){ location.hash = 'site'; location.reload(); }, 350);
+  } catch (e) {
+    if (button) { button.disabled = false; button.textContent = '×'; }
+    if (status) status.textContent = 'Remove fail: ' + (e.message || 'dobara try karein');
+    alert('Media remove nahi hui: ' + (e.message || 'Unknown error'));
+  }
 }
 async function adminClearHeroSideBg() {
   if (!confirm('Hero BG photos clear?')) return;
