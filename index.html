@@ -367,21 +367,16 @@
       #gift-shop .home-deal-copy{padding:14px!important}
     }
   
-    /* Alternating gallery stories: compact photo + colourful story copy. */
-    .gallery-story{display:grid;grid-template-columns:minmax(118px,42%) minmax(0,1fr);align-items:center;gap:16px;padding:12px;border:1px solid rgba(242,202,80,.28);border-radius:24px;background:linear-gradient(135deg,rgba(44,34,17,.92),rgba(17,14,24,.96));box-shadow:0 13px 30px rgba(0,0,0,.2),0 0 22px rgba(212,175,55,.09)}
-    .gallery-story-media{height:158px;position:relative;overflow:hidden;border:1px solid rgba(250,204,21,.55);border-radius:19px;background:#19130d;box-shadow:0 8px 20px rgba(0,0,0,.32)}
+    /* Gallery: full-photo cards scroll horizontally from right to left on mobile. */
+    #galleryStories{display:flex!important;flex-direction:row!important;gap:16px;overflow-x:auto;padding:2px 2px 14px;scroll-snap-type:x mandatory;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+    #galleryStories::-webkit-scrollbar{display:none}
+    .gallery-story{flex:0 0 min(86vw,430px);scroll-snap-align:start;display:flex;flex-direction:column;gap:10px;padding:0;border:0;background:transparent;box-shadow:none}
+    .gallery-story-media{height:min(68vh,590px);position:relative;overflow:hidden;border:1px solid rgba(250,204,21,.5);border-radius:24px;background:#19130d;box-shadow:0 12px 28px rgba(0,0,0,.32),0 0 20px rgba(212,175,55,.1)}
     .gallery-story-media img{width:100%;height:100%;object-fit:cover;transition:opacity .5s ease,transform .5s ease}
-    .gallery-story:hover .gallery-story-media img{transform:scale(1.06)}
-    .gallery-story-copy{display:flex;flex-direction:column;align-items:flex-start;gap:8px;min-width:0}
-    .gallery-story.reverse .gallery-story-copy{align-items:flex-end;text-align:right}
-    .gallery-story-tag{font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:#67e8f9}
-    .gallery-story-title{margin:0;font-family:'EB Garamond',serif;font-size:clamp(1.75rem,6vw,2.45rem);font-weight:700;line-height:.95;background:linear-gradient(110deg,#fef3c7,#fbbf24 43%,#f472b6 74%,#67e8f9);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:0 0 18px rgba(250,204,21,.18)}
-    .gallery-story-copy p{margin:0;color:#ddd6c8;font-size:.78rem;line-height:1.45}
-    .gallery-story-label{position:absolute;left:9px;bottom:9px;border-radius:999px;padding:6px 9px;background:linear-gradient(90deg,#fbbf24,#fb7185);color:#271500;font-size:10px;font-weight:900;box-shadow:0 4px 13px rgba(0,0,0,.32)}
-    .gallery-story.reverse .gallery-story-label{left:auto;right:9px;background:linear-gradient(90deg,#67e8f9,#a78bfa);color:#101224}
-    .gallery-live-dot{position:absolute;left:9px;top:9px;border-radius:999px;padding:5px 8px;background:rgba(3,7,18,.68);backdrop-filter:blur(8px);color:#fff;font-size:9px;font-weight:800}
-    .gallery-story.reverse .gallery-live-dot{left:auto;right:9px}
-    @media (min-width:768px){.gallery-story{grid-template-columns:minmax(230px,38%) 1fr;gap:28px;padding:18px}.gallery-story-media{height:210px}.gallery-story-copy p{font-size:.95rem;max-width:30rem}.gallery-story-title{font-size:3rem}}
+    .gallery-story:hover .gallery-story-media img{transform:scale(1.03)}
+    .gallery-story-copy{display:block;text-align:center;padding:0 8px}
+    .gallery-story-title{margin:0;font-family:'EB Garamond',serif;font-size:clamp(1.8rem,8vw,2.6rem);font-weight:700;line-height:1;background:linear-gradient(110deg,#fef3c7,#fbbf24 43%,#f472b6 74%,#67e8f9);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:0 0 18px rgba(250,204,21,.18)}
+    @media (min-width:768px){.gallery-story{flex-basis:min(40vw,500px)}.gallery-story-media{height:440px}}
 
     /* book-card-link */
     a.glass-panel[href*="/book"] {
@@ -737,30 +732,23 @@
       </a>
     </section>
     <section class="flex flex-col gap-6" id="gallery-samples">
-      <div class="flex items-end justify-between gap-4 flex-wrap">
-        <div>
-          <p class="text-primary font-label-md text-xs uppercase tracking-[.18em] mb-2">Photography gallery</p>
-          <h2 class="font-headline-md text-headline-md text-on-surface m-0">Gallery Samples</h2>
-          <p class="text-on-surface-variant text-sm mt-2">Wedding, birthday aur special moments ki latest photos.</p>
-        </div>
-        <a href="/bookings" class="text-primary font-label-md text-label-md hover:underline">Book a session →</a>
-      </div>
-      <div class="flex flex-col gap-5" id="galleryStories">
+      <h2 class="font-headline-md text-headline-md text-on-surface m-0">Gallery Samples</h2>
+      <div id="galleryStories" aria-label="Photography gallery — swipe right to left">
         <article class="gallery-story group gallery-live-card">
           <div class="gallery-story-media"><img data-gallery="wedding" alt="Wedding gallery sample"></div>
-          <div class="gallery-story-copy"><span class="gallery-story-tag">Forever moments</span><h3 class="gallery-story-title">Wedding</h3><p>Two hearts, one timeless celebration — every ritual and smile captured with warmth.</p></div>
+          <div class="gallery-story-copy"><h3 class="gallery-story-title">Wedding</h3></div>
         </article>
-        <article class="gallery-story reverse group gallery-live-card">
-          <div class="gallery-story-copy"><span class="gallery-story-tag">Celebrate bright</span><h3 class="gallery-story-title">Birthday Shoot</h3><p>Cake cuts, laughter and candid joy — colourful memories made to replay forever.</p></div>
+        <article class="gallery-story group gallery-live-card">
           <div class="gallery-story-media"><img data-gallery="birthday" alt="Birthday shoot gallery sample"></div>
+          <div class="gallery-story-copy"><h3 class="gallery-story-title">Birthday Shoot</h3></div>
         </article>
         <article class="gallery-story group gallery-live-card">
           <div class="gallery-story-media"><img data-gallery="baby" alt="Baby shower gallery sample"></div>
-          <div class="gallery-story-copy"><span class="gallery-story-tag">Little beginnings</span><h3 class="gallery-story-title">Baby Shower</h3><p>Tiny smiles and beautiful beginnings, photographed with soft colours and love.</p></div>
+          <div class="gallery-story-copy"><h3 class="gallery-story-title">Baby Shower</h3></div>
         </article>
-        <article class="gallery-story reverse group gallery-live-card">
-          <div class="gallery-story-copy"><span class="gallery-story-tag">Before the vows</span><h3 class="gallery-story-title">Pre-Wedding</h3><p>Natural chemistry, dreamy locations and the little feelings before the big day.</p></div>
+        <article class="gallery-story group gallery-live-card">
           <div class="gallery-story-media"><img data-gallery="prewedding" alt="Pre-wedding gallery sample"></div>
+          <div class="gallery-story-copy"><h3 class="gallery-story-title">Pre-Wedding</h3></div>
         </article>
       </div>
       <script>
