@@ -6763,11 +6763,11 @@ async function adminUploadHeroSideBg() {
     for (var i = 0; i < files.length; i++) {
       var file = files[i];
       var fileType = String(file.type || '').toLowerCase();
-      var isVideo = /^video\/(mp4|webm)$/i.test(fileType) || /\.(mp4|webm)$/i.test(file.name || '');
-      if (!isVideo && !/^image\//i.test(fileType)) throw new Error('Sirf photo, MP4 ya WebM select karein: ' + file.name);
+      var isVideo = /^video\\/(mp4|webm)$/i.test(fileType) || /\\.(mp4|webm)$/i.test(file.name || '');
+      if (!isVideo && !/^image\\//i.test(fileType)) throw new Error('Sirf photo, MP4 ya WebM select karein: ' + file.name);
       status.textContent = (isVideo ? 'Video ' : 'Photo ') + (i+1) + '/' + files.length + ' upload ho raha hai…';
       var blob = isVideo ? file : await fetch(await compressImageFile(file, 1400, 0.8)).then(function(r){ return r.blob(); });
-      var contentType = String(blob.type || fileType || (isVideo && /\.webm$/i.test(file.name || '') ? 'video/webm' : (isVideo ? 'video/mp4' : 'image/jpeg'))).toLowerCase();
+      var contentType = String(blob.type || fileType || (isVideo && /\\.webm$/i.test(file.name || '') ? 'video/webm' : (isVideo ? 'video/mp4' : 'image/jpeg'))).toLowerCase();
       var signRes = await fetch('/admin/r2-image-upload', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({group:'hero-bg',contentType:contentType}) });
       var signed = await signRes.json();
       if (!signRes.ok || !signed.ok) throw new Error(signed.message || signed.error || 'Cloud upload link fail');
