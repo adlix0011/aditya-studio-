@@ -637,7 +637,7 @@
     <!-- Offer Carousel -->
     <section class="w-full overflow-hidden relative rounded-2xl glass-panel p-1 mt-4" id="gift-shop" aria-label="Current deals">
       <div class="absolute top-4 left-6 z-10">
-        <span class="future-offers-label font-label-md text-[10px] px-3 py-1.5 rounded-full uppercase shadow-lg">New Future</span>
+        <span class="future-offers-label font-label-md text-[10px] px-3 py-1.5 rounded-full uppercase shadow-lg">Book Events</span>
       </div>
       <div class="flex w-[200%] carousel-track">
         <div class="flex w-1/2">
@@ -1590,21 +1590,26 @@
       (async function initCurrentDeals() {
         const track = document.querySelector('#gift-shop .carousel-track');
         if (!track) return;
-        const fallback = Array.from(track.querySelectorAll('h3')).slice(0, 3).map(function (heading) {
-          const card = heading.closest('.w-1\\/3');
-          const photo = card && card.querySelector('[style*="background-image"]');
-          const sub = card && card.querySelector('p');
-          return { url: photo ? photo.style.backgroundImage : '', title: heading.textContent || 'Aditya Studio', sub: sub ? sub.textContent : '', link: '/frames', active: true, cssUrl: true };
-        });
-        let deals = fallback;
-        let duration = 20;
+        // New Future now shows the actual studio booking events, not product offers.
+        const eventDefs = [
+          { key:'wedding', title:'Wedding Book', sub:'Cinematic wedding storytelling.' },
+          { key:'birthday', title:'Birthday Shoot', sub:'Vibrant celebration coverage.' },
+          { key:'personal', title:'Personal Shoot', sub:'Portraits made for you.' },
+          { key:'reel', title:'Reel Shoot', sub:'Cinematic short-form video.' },
+          { key:'event', title:'Event Book', sub:'Professional event documentation.' },
+          { key:'other', title:'Other', sub:'Custom photography requests.' }
+        ];
+        const fallbackImages = {
+          wedding:'https://images.unsplash.com/photo-1519741497674-611481863552?w=800&q=82', birthday:'https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=800&q=82', personal:'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=800&q=82', reel:'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=800&q=82', event:'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&q=82', other:'https://images.unsplash.com/photo-1478144592103-25e218a04891?w=800&q=82'
+        };
+        let deals = eventDefs.map(function(event){ return { url:fallbackImages[event.key], title:event.title, sub:event.sub, link:'/book?service='+event.key, active:true }; });
+        let duration = 28;
         try {
           const res = await fetch('/api/settings');
           const data = await res.json();
           const settings = data && data.settings ? data.settings : {};
-          const saved = Array.isArray(settings.offerImages) ? settings.offerImages : [];
-          if (settings.homeDealsEnabled && saved.length) deals = saved.filter(function (item) { return typeof item === 'object' && item.url && item.active !== false; });
-          duration = Math.max(8, Math.min(60, Number(settings.homeDealsDurationSec) || 20));
+          const images = settings.bookImages || {};
+          deals = eventDefs.map(function(event){ return { url:images[event.key] || fallbackImages[event.key], title:event.title, sub:event.sub, link:'/book?service='+event.key, active:true }; });
         } catch (e) {}
         if (!deals.length) return;
         function cover(el, url, isCssUrl) {
