@@ -296,7 +296,7 @@ function isSafeR2PhotoKey(key, mobile) {
   return new RegExp('^customer-photos/' + safeMobile + '/[a-zA-Z0-9._-]+\\.(jpg|jpeg|png|webp)$', 'i').test(String(key || ''));
 }
 function isSafeAdminR2ImageKey(key) {
-  return /^studio-images\/(banner|deal|frame3d|home-frame|hero-bg|book|gallery-[a-z]+)\/[a-zA-Z0-9._-]+\.(jpg|jpeg|png|webp)$/i.test(String(key || '')) || /^studio-images\/hero-bg\/[a-zA-Z0-9._-]+\.(mp4|webm)$/i.test(String(key || ''));
+  return /^studio-images\/(banner|deal|frame3d|home-frame|hero-bg|book|gallery-[a-z]+)\/[a-zA-Z0-9._-]+\.(jpg|jpeg|png|webp)$/i.test(String(key || '')) || /^studio-images\/(hero-bg|gallery-reel)\/[a-zA-Z0-9._-]+\.(mp4|webm)$/i.test(String(key || ''));
 }
 function mediaUrl(value) {
   const raw = String(value || '');
@@ -1286,7 +1286,8 @@ function defaultSettings() {
         'https://images.unsplash.com/photo-1606800052052-a08af7148866?w=1200&q=86',
         'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=1200&q=86',
         'https://images.unsplash.com/photo-1511285560929-80b456fea0bc?w=1200&q=86'
-      ]
+      ],
+      reel: []
     },
     gallerySamplesConfigured: false,
     marketplacePosters: [],
@@ -1335,7 +1336,7 @@ function loadSettings() {
     frames3dPhotos: Array.isArray(data.frames3dPhotos) ? data.frames3dPhotos : defaults.frames3dPhotos,
     homeHeroFramePhotos: Array.isArray(data.homeHeroFramePhotos) ? data.homeHeroFramePhotos : defaults.homeHeroFramePhotos,
     heroSideBgPhotos: Array.isArray(data.heroSideBgPhotos) ? data.heroSideBgPhotos : defaults.heroSideBgPhotos,
-    gallerySamples: Object.fromEntries(['wedding','birthday','baby','prewedding'].map(k => {
+    gallerySamples: Object.fromEntries(['wedding','birthday','baby','prewedding','reel'].map(k => {
       const saved = data.gallerySamples?.[k];
       // Older installs have empty lists. Show starter photos until the admin
       // saves their own list; after that even an intentionally empty list stays empty.
@@ -2198,9 +2199,9 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req, 20000);
       const group = String(body.group || '').trim().toLowerCase();
       const type = String(body.contentType || '').toLowerCase();
-      const validGroups = ['banner','deal','frame3d','home-frame','hero-bg','book','gallery-wedding','gallery-birthday','gallery-baby','gallery-prewedding'];
+      const validGroups = ['banner','deal','frame3d','home-frame','hero-bg','book','gallery-wedding','gallery-birthday','gallery-baby','gallery-prewedding','gallery-reel'];
       const ext = ({ 'image/jpeg':'jpg', 'image/jpg':'jpg', 'image/png':'png', 'image/webp':'webp', 'video/mp4':'mp4', 'video/webm':'webm' })[type];
-      const videoAllowed = group === 'hero-bg' && (type === 'video/mp4' || type === 'video/webm');
+      const videoAllowed = (group === 'hero-bg' || group === 'gallery-reel') && (type === 'video/mp4' || type === 'video/webm');
       if (!validGroups.includes(group) || !ext || ((type.startsWith('video/')) && !videoAllowed)) return sendJSON(res, 400, { ok:false, error:'invalid-image' });
       const key = 'studio-images/' + group + '/' + Date.now() + '-' + crypto.randomBytes(10).toString('hex') + '.' + ext;
       return sendJSON(res, 200, { ok:true, key, value:'r2:' + key, uploadUrl:r2PresignedUrl('PUT', key, 900), expiresIn:900 });
@@ -2219,6 +2220,7 @@ const server = http.createServer(async (req, res) => {
       if (!r2Ready()) return sendJSON(res, 503, { ok:false, error:'r2-not-configured', message:'Cloud image storage configured nahi hai' });
       const body = await readBody(req, 45e6);
       const type = String(body.contentType || '').toLowerCase();
+      const group = String(body.group || 'hero-bg').toLowerCase() === 'gallery-reel' ? 'gallery-reel' : 'hero-bg';
       const ext = ({ 'image/jpeg':'jpg', 'image/jpg':'jpg', 'image/png':'png', 'image/webp':'webp', 'video/mp4':'mp4', 'video/webm':'webm' })[type];
       if (!ext) return sendJSON(res, 400, { ok:false, error:'invalid-media', message:'Sirf photo, MP4 ya WebM upload karein' });
       const encoded = String(body.base64 || '').replace(/\s/g, '');
@@ -2226,7 +2228,7 @@ const server = http.createServer(async (req, res) => {
       const bytes = Buffer.from(encoded, 'base64');
       const maxBytes = type.startsWith('video/') ? 30 * 1024 * 1024 : 8 * 1024 * 1024;
       if (!bytes.length || bytes.length > maxBytes) return sendJSON(res, 400, { ok:false, error:'media-too-large', message:(type.startsWith('video/') ? 'Video 30 MB' : 'Photo 8 MB') + ' se chhoti select karein' });
-      const key = 'studio-images/hero-bg/' + Date.now() + '-' + crypto.randomBytes(10).toString('hex') + '.' + ext;
+      const key = 'studio-images/' + group + '/' + Date.now() + '-' + crypto.randomBytes(10).toString('hex') + '.' + ext;
       const put = await fetch(r2PresignedUrl('PUT', key, 900), {
         method:'PUT', headers:{ 'Content-Type':type, 'Cache-Control':'public, max-age=31536000, immutable' }, body:bytes
       });
@@ -5060,8 +5062,8 @@ function computeOrderFees(subtotal, settingsFees) {
     try {
       const body = await readBody(req, 35e6);
       const category = String(body.category || '').toLowerCase();
-      if (!['wedding','birthday','baby','prewedding'].includes(category)) return sendJSON(res, 400, { ok:false, message:'Invalid gallery category' });
-      const images = (Array.isArray(body.images) ? body.images : []).slice(0, 12).map(storedMediaValue).filter(v => /^data:image\/(png|jpe?g|webp);base64,/i.test(v) || (v.startsWith('r2:') && isSafeAdminR2ImageKey(v.slice(3))) || /^https:\/\/images\.unsplash\.com\//i.test(v));
+      if (!['wedding','birthday','baby','prewedding','reel'].includes(category)) return sendJSON(res, 400, { ok:false, message:'Invalid gallery category' });
+      const images = (Array.isArray(body.images) ? body.images : []).slice(0, category === 'reel' ? 10 : 12).map(storedMediaValue).filter(v => category === 'reel' ? ((v.startsWith('r2:') && isSafeAdminR2ImageKey(v.slice(3))) || /^https:\/\//i.test(v)) : (/^data:image\/(png|jpe?g|webp);base64,/i.test(v) || (v.startsWith('r2:') && isSafeAdminR2ImageKey(v.slice(3))) || /^https:\/\/images\.unsplash\.com\//i.test(v)));
       const cur = loadSettings(); cur.gallerySamples = cur.gallerySamples || {}; cur.gallerySamples[category] = images; cur.gallerySamplesConfigured = true; saveSettings(cur);
       return sendJSON(res, 200, { ok:true, count:images.length });
     } catch (e) { return sendJSON(res, 500, { ok:false, message:'Gallery save नहीं हुई' }); }
@@ -6085,7 +6087,13 @@ ${[['wedding','💍 Wedding'],['birthday','🎂 Birthday Shoot'],['baby','🍼 B
     + '</div>';
 }).join('')}
 </div>
-<p class="muted" style="margin-top:10px">हर photo के ऊपर लाल × दबाकर केवल वही photo हटाएं। नई photos पुरानी photos के साथ जुड़ेंगी और Home page पर हर 2 seconds में बदलती रहेंगी।</p>
+<div style="margin-top:14px;padding:14px;border:1px solid rgba(34,211,238,.40);border-radius:12px;background:linear-gradient(135deg,#101a27,#15101d)">
+  <div style="font-weight:900;color:#67e8f9;margin-bottom:7px">🎬 Reels videos <span class="muted" style="font-size:11px">(${Array.isArray(gallerySamples.reel)?gallerySamples.reel.length:0}/10)</span></div>
+  <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px;max-height:140px;overflow:auto">${(Array.isArray(gallerySamples.reel)&&gallerySamples.reel.length)?gallerySamples.reel.map((src,i)=>'<div style="position:relative;width:72px;height:112px"><video src="'+esc(src)+'" muted playsinline preload="metadata" style="width:72px;height:112px;object-fit:cover;border-radius:9px;border:1px solid rgba(34,211,238,.5)"></video><button type="button" title="Remove this reel" onclick="adminRemoveGallerySample(&quot;reel&quot;,'+i+')" style="position:absolute;right:-5px;top:-5px;width:22px;height:22px;border:0;border-radius:50%;background:#b91c1c;color:#fff;font-weight:900;cursor:pointer">×</button></div>').join(''):'<span class="muted" style="font-size:11px">No reel videos yet</span>'}</div>
+  <input type="file" accept="video/mp4,video/webm" multiple class="field-file" id="galleryReelFiles"/>
+  <div style="display:flex;gap:8px;align-items:center;margin-top:9px"><button type="button" class="gen-btn" style="padding:8px 12px;background:linear-gradient(90deg,#0891b2,#7c3aed)" onclick="adminSaveGalleryReels()">🎬 Add Reel videos</button><span id="gallerySt_reel" class="muted" style="font-size:11px"></span></div>
+</div>
+<p class="muted" style="margin-top:10px">हर photo/video के ऊपर लाल × दबाकर केवल वही media हटाएं। Photos 2 seconds में बदलती हैं; Reels को Home पर left-right swipe करके देख सकते हैं।</p>
 </section>
 
 <section class="panel" id="sec-otp">
@@ -6973,6 +6981,27 @@ async function adminSaveGallerySamples(category) {
     if (st) st.textContent = 'Upload fail';
     alert('Upload fail: ' + (e.message || 'Network error'));
   }
+}
+
+async function adminUploadReelVideo(file) {
+  if (!file || !/^video\/(mp4|webm)$/i.test(file.type || '')) throw new Error('Sirf MP4 ya WebM video select karein');
+  if (file.size > 30 * 1024 * 1024) throw new Error('Har Reel video 30 MB se chhota rakhein');
+  var base64 = await new Promise(function(resolve,reject){ var r=new FileReader(); r.onload=function(){ resolve(String(r.result||'').split(',')[1]||''); }; r.onerror=function(){ reject(new Error('Video read fail')); }; r.readAsDataURL(file); });
+  var res=await fetch('/admin/hero-media-upload-proxy',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({group:'gallery-reel',contentType:file.type,base64:base64})});
+  var data=await res.json(); if(!res.ok||!data.ok) throw new Error(data.message||data.error||'Video upload fail'); return data.value;
+}
+async function adminSaveGalleryReels() {
+  var input=document.getElementById('galleryReelFiles'), st=document.getElementById('gallerySt_reel'), files=input&&input.files?Array.from(input.files):[];
+  if(!files.length){ alert('Pehle MP4/WebM Reel videos choose karein'); return; }
+  if(files.length>10){ alert('Maximum 10 Reels select karein'); return; }
+  try {
+    var live=await fetch('/api/home-gallery-samples',{credentials:'same-origin',cache:'no-store'}).then(function(r){return r.json()});
+    var videos=Array.isArray(live.gallery&&live.gallery.reel)?live.gallery.reel.slice():[];
+    if(videos.length+files.length>10){ alert('Maximum 10 Reels rah sakti hain. Pehle × se purani Reel hata dein.'); return; }
+    for(var i=0;i<files.length;i++){ if(st)st.textContent='Reel '+(i+1)+'/'+files.length+' upload ho rahi hai…'; videos.push(await adminUploadReelVideo(files[i])); }
+    var res=await fetch('/admin/gallery-samples-save',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({category:'reel',images:videos})});
+    var data=await res.json(); if(!res.ok||!data.ok)throw new Error(data.message||'Save fail'); if(st)st.textContent='Reels saved ✅'; alert('Reels saved ✅ Home page par swipe karke dekhein.'); location.href='/admin#sec-gallery-samples'; location.reload();
+  } catch(e) { if(st)st.textContent='Upload fail'; alert('Reel upload fail: '+(e.message||'Network error')); }
 }
 
 async function adminRemoveGallerySample(category, index) {
