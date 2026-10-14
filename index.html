@@ -17,6 +17,9 @@
     document.addEventListener('gesturechange', function(e){ e.preventDefault(); }, { passive:false });
     document.addEventListener('gestureend', function(e){ e.preventDefault(); }, { passive:false });
     document.addEventListener('touchmove', function(e){ if (e.touches && e.touches.length > 1) e.preventDefault(); }, { passive:false });
+    document.addEventListener('wheel', function(e){ if (e.ctrlKey) e.preventDefault(); }, { passive:false });
+    document.addEventListener('dblclick', function(e){ e.preventDefault(); }, { passive:false });
+    document.addEventListener('keydown', function(e){ if ((e.ctrlKey || e.metaKey) && ['+','-','=','0'].includes(e.key)) e.preventDefault(); }, { passive:false });
   </script>
   <script id="tailwind-config">
     tailwind.config = {
@@ -145,7 +148,7 @@
       50% { transform: perspective(1000px) rotateY(180deg) translateY(-20px); }
       100% { transform: perspective(1000px) rotateY(360deg) translateY(0px); }
     }
-    html,body{touch-action:pan-x pan-y;overscroll-behavior-x:none}
+    html,body{touch-action:pan-x pan-y;overscroll-behavior-x:none;-webkit-text-size-adjust:100%;text-size-adjust:100%}
     .hero-frame-container { perspective: 1000px; touch-action:pan-y; }
     .hero-frame {
       animation: float-spin 15s infinite linear;
