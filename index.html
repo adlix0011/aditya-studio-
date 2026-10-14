@@ -768,21 +768,24 @@
         </article>
       </div>
       <script>
-      (async function(){
-        try {
-          var res=await fetch('/api/home-gallery-samples',{cache:'no-store'}), data=await res.json(), gallery=data.gallery||{}, pos={};
+      (function(){
+        var galleryCacheKey='aditya-gallery-v4', current='', timer=null;
+        function renderGallery(gallery){
+          var signature=JSON.stringify(gallery||{}); if(signature===current) return; current=signature;
+          var pos={};
           document.querySelectorAll('[data-gallery]').forEach(function(img){
-            var key=img.dataset.gallery, list=gallery[key]||[]; pos[key]=0;
-            if(list.length){ img.src=list[0]; img.style.opacity='1'; }
-            else { img.style.display='none'; img.parentElement.insertAdjacentHTML('afterbegin','<div class="absolute inset-0 grid place-items-center px-4 text-center text-sm text-on-surface-variant">Admin se photos upload karein</div>'); }
+            var key=img.dataset.gallery, list=(gallery&&gallery[key])||[]; pos[key]=0;
+            if(list.length){ img.style.display='block'; img.src=list[0]; img.style.opacity='1'; }
+            else { img.style.display='none'; if(!img.parentElement.querySelector('.gallery-empty')) img.parentElement.insertAdjacentHTML('afterbegin','<div class="gallery-empty absolute inset-0 grid place-items-center px-4 text-center text-sm text-on-surface-variant">Admin se photos upload karein</div>'); }
           });
-          setInterval(function(){ document.querySelectorAll('[data-gallery]').forEach(function(img){ var list=gallery[img.dataset.gallery]||[]; if(list.length>1){ pos[img.dataset.gallery]=(pos[img.dataset.gallery]+1)%list.length; img.style.opacity='0'; img.style.transform='scale(1.08)'; setTimeout(function(){ img.src=list[pos[img.dataset.gallery]]; img.style.opacity='1'; img.style.transform='scale(1)'; },220); } }); },2000);
-          var reelBox=document.getElementById('galleryReels'), reels=Array.isArray(gallery.reel)?gallery.reel:[];
-          if(reelBox){
-            if(!reels.length) reelBox.innerHTML='<div class="gallery-reel-empty">Admin se Reel videos upload karein</div>';
-            else { var track=document.createElement('div'); track.className='gallery-reels-track'; reels.forEach(function(src,i){ var card=document.createElement('div'); card.className='gallery-reel-card'; var video=document.createElement('video'); video.src=src; video.muted=true; video.loop=true; video.playsInline=true; video.preload='metadata'; video.autoplay=true; card.appendChild(video); var badge=document.createElement('span'); badge.className='gallery-reel-badge'; badge.textContent='▶ Reel '+(i+1); card.appendChild(badge); track.appendChild(card); }); reelBox.appendChild(track); }
-          }
-        } catch(e) { console.warn('Gallery samples unavailable',e); }
+          if(timer) clearInterval(timer);
+          timer=setInterval(function(){ document.querySelectorAll('[data-gallery]').forEach(function(img){ var list=(gallery&&gallery[img.dataset.gallery])||[]; if(list.length>1){ pos[img.dataset.gallery]=(pos[img.dataset.gallery]+1)%list.length; img.style.opacity='0'; img.style.transform='scale(1.08)'; setTimeout(function(){ img.src=list[pos[img.dataset.gallery]]; img.style.opacity='1'; img.style.transform='scale(1)'; },220); } }); },2000);
+          var reelBox=document.getElementById('galleryReels'), reels=Array.isArray(gallery&&gallery.reel)?gallery.reel:[];
+          if(reelBox){ reelBox.innerHTML=''; if(!reels.length) reelBox.innerHTML='<div class="gallery-reel-empty">Admin se Reel videos upload karein</div>'; else { var track=document.createElement('div'); track.className='gallery-reels-track'; reels.forEach(function(src,i){ var card=document.createElement('div'); card.className='gallery-reel-card'; var video=document.createElement('video'); video.src=src; video.muted=true; video.loop=true; video.playsInline=true; video.preload='metadata'; video.autoplay=true; card.appendChild(video); var badge=document.createElement('span'); badge.className='gallery-reel-badge'; badge.textContent='▶ Reel '+(i+1); card.appendChild(badge); track.appendChild(card); }); reelBox.appendChild(track); } }
+        }
+        // Cached URLs render immediately on every refresh. The network check runs after the page is usable.
+        try { var cached=JSON.parse(localStorage.getItem(galleryCacheKey)||'null'); if(cached&&cached.gallery) renderGallery(cached.gallery); } catch(e) {}
+        fetch('/api/home-gallery-samples',{cache:'force-cache'}).then(function(res){ return res.json(); }).then(function(data){ var gallery=data.gallery||{}; try { localStorage.setItem(galleryCacheKey,JSON.stringify({gallery:gallery,savedAt:Date.now()})); } catch(e) {} renderGallery(gallery); }).catch(function(e){ console.warn('Gallery samples unavailable',e); });
       })();
       </script>
     </section>
