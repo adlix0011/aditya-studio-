@@ -2026,13 +2026,19 @@ const server = http.createServer(async (req, res) => {
       const first = (settings.heroSideBgPhotos || [])[0] || {};
       const rawUrl = mediaUrl(typeof first === 'string' ? first : String(first.url || ''));
       const safeUrl = rawUrl.replace(/["'<>]/g, '');
-      const heroFrameFirst = (settings.homeHeroFramePhotos || [])[0] || '';
-      const heroFrameRawUrl = mediaUrl(typeof heroFrameFirst === 'string' ? heroFrameFirst : String(heroFrameFirst.url || ''));
-      const heroFrameUrl = heroFrameRawUrl.replace(/["'<>]/g, '');
       const x = Math.max(0, Math.min(100, Number((first && first.positionX) ?? 50)));
       const y = Math.max(0, Math.min(100, Number((first && first.positionY) ?? 50)));
       const zoom = Math.max(1, Math.min(2.5, Number((first && first.zoom) || 1)));
+      const firstMediaType = typeof first === 'object' ? String(first.mediaType || '') : '';
+      const bootIsVideo = firstMediaType === 'video' || /\.(mp4|webm)(?:[?#]|$)/i.test(safeUrl);
+      const heroBootMedia = bootIsVideo
+        ? '<video class="hero-bg-video active" data-hero-boot="1" src="' + safeUrl + '" muted autoplay playsinline preload="auto" aria-label="Studio hero video"></video>'
+        : '<div class="bg-slide active" data-hero-boot="1" style="background-image:url(\'' + safeUrl + '\');background-position:' + x + '% ' + y + '%"></div>';
+      const heroFrameFirst = (settings.homeHeroFramePhotos || [])[0] || '';
+      const heroFrameRawUrl = mediaUrl(typeof heroFrameFirst === 'string' ? heroFrameFirst : String(heroFrameFirst.url || ''));
+      const heroFrameUrl = heroFrameRawUrl.replace(/["'<>]/g, '');
       const html = data.toString('utf8')
+        .replace(/__HERO_SIDE_BG_BOOT_MEDIA__/g, heroBootMedia)
         .replace(/__HERO_SIDE_BG_BOOT_URL__/g, safeUrl)
         .replace(/__HERO_SIDE_BG_BOOT_X__/g, String(x))
         .replace(/__HERO_SIDE_BG_BOOT_Y__/g, String(y))
