@@ -150,25 +150,12 @@
       100%{transform:translateZ(4px) rotateY(-360deg)}
     }
     /* Hero side BG slideshow — only inside #portfolio */
-    .bg-slide {
-      position: absolute;
-      inset: 0;
-      background-size: cover;
-      background-position: center;
-      opacity: 0;
-      transform: scale(calc(var(--hero-scale, 1) + .06));
-      transition: opacity 1.2s ease, transform 6s ease-out;
-    }
-    .bg-slide.active {
-      opacity: 1;
-      transform: scale(var(--hero-scale, 1));
-    }
-    .hero-bg-video {
-      position:absolute; inset:0; width:100%; height:100%; object-fit:cover;
-      opacity:0; transform:scale(calc(var(--hero-scale, 1) + .06));
-      transition:opacity 1.2s ease, transform 6s ease-out;
-    }
-    .hero-bg-video.active { opacity:1; transform:scale(var(--hero-scale, 1)); }
+    /* Hero media: clean 16:9 stage, no side veil or crop/zoom effect. */
+    #portfolio{min-height:0!important;height:auto!important;aspect-ratio:16/9;background:#050505}
+    .bg-slide { position:absolute; inset:0; background-size:contain; background-repeat:no-repeat; background-position:center; opacity:0; transition:opacity .35s ease; }
+    .bg-slide.active { opacity:1; transform:none!important; }
+    .hero-bg-video { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; background:#050505; opacity:0; transition:opacity .35s ease; }
+    .hero-bg-video.active { opacity:1; transform:none!important; }
     @keyframes pulse-ring {
       0% { transform: scale(0.8); opacity: 0.5; }
       100% { transform: scale(2); opacity: 0; }
@@ -339,9 +326,8 @@
       .header-notification { display:block; }
       #guestLoginBtn { padding:9px 10px!important; font-size:11px!important; letter-spacing:.02em; }
       main { padding-top:68px!important; padding-bottom:48px!important; gap:8px!important; }
-      #portfolio { min-height:340px!important; height:340px; margin-top:-28px!important; }
-      /* Banner image poori width me dikhe; mobile par cover se camera/text crop nahi honge. */
-      #portfolio .bg-slide { background-size:100% auto!important; background-repeat:no-repeat; background-position:center 14px!important; }
+      #portfolio { min-height:0!important; height:auto!important; aspect-ratio:16/9; margin-top:-28px!important; }
+      #portfolio .bg-slide { background-size:contain!important; background-repeat:no-repeat; background-position:center!important; }
       #portfolio > .grid { gap:0!important; padding-top:4px!important; padding-bottom:0!important; align-content:start; }
       #portfolio .hero-type-wrap { min-height:54px; align-items:flex-start; justify-content:center; text-align:center; }
       /* Mobile par hero ka welcome/premium text bilkul nahi dikhana hai. */
@@ -636,8 +622,7 @@
       <!-- Side-visible background slideshow (admin: Hero Side Background) -->
       <div class="absolute inset-0 z-0 bg-background" id="heroSideBg">
         <div class="bg-slide active" data-hero-boot="1" style="background-image:url('__HERO_SIDE_BG_BOOT_URL__');background-position:__HERO_SIDE_BG_BOOT_X__% __HERO_SIDE_BG_BOOT_Y__%;--hero-scale:__HERO_SIDE_BG_BOOT_ZOOM__"></div>
-        <div class="absolute inset-0 pointer-events-none"
-             style="background: linear-gradient(105deg, rgba(22,19,11,.92) 0%, rgba(22,19,11,.55) 42%, rgba(22,19,11,.25) 70%, rgba(22,19,11,.45) 100%);"></div>
+
       </div>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-12 items-center w-full max-w-container-max px-margin-mobile md:px-margin-desktop mx-auto z-10 py-16">
         <div class="flex flex-col z-10 relative min-h-[220px] md:min-h-[280px] justify-center">
