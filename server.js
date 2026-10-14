@@ -5996,7 +5996,7 @@ ${(function(){
 <label class="muted">New photos ka default duration (seconds)
 <input class="inp" type="number" id="heroBgDuration" min="2" max="30" value="${esc(settings.heroSideBgDurationSec||5)}" style="max-width:120px"></label>
 <label class="muted" style="display:flex;align-items:center;gap:8px;cursor:pointer">
-<input type="checkbox" id="heroBgReplace" checked> Purani hata ke nayi</label>
+<input type="checkbox" id="heroBgReplace"> Purani media hata kar sirf nayi rakhein</label>
 <button class="gen-btn" type="button" onclick="adminUploadHeroSideBg()">📤 Upload Banner Media</button>
 <button type="button" onclick="adminSaveHeroBgDuration()" style="padding:8px 12px;background:#2a2418;color:#f2ca50;border:1px solid rgba(212,175,55,.4);border-radius:8px;cursor:pointer">⏱ Only duration save</button>
 <button type="button" onclick="adminClearHeroSideBg()" style="padding:8px 12px;background:#5a1a1a;color:#fca5a5;border:1px solid #7f1d1d;border-radius:8px;cursor:pointer">🗑 Clear banner media</button>
