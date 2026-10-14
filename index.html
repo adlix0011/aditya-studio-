@@ -10,6 +10,14 @@
   <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
   <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600;700&amp;family=Hanken+Grotesk:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+  <script>
+    // Some Android/iOS browsers ignore user-scalable=no when a transformed 3D element receives a pinch.
+    // Keep one-finger scrolling/clicks normal but never allow page scale changes.
+    document.addEventListener('gesturestart', function(e){ e.preventDefault(); }, { passive:false });
+    document.addEventListener('gesturechange', function(e){ e.preventDefault(); }, { passive:false });
+    document.addEventListener('gestureend', function(e){ e.preventDefault(); }, { passive:false });
+    document.addEventListener('touchmove', function(e){ if (e.touches && e.touches.length > 1) e.preventDefault(); }, { passive:false });
+  </script>
   <script id="tailwind-config">
     tailwind.config = {
       darkMode: "class",
@@ -137,7 +145,8 @@
       50% { transform: perspective(1000px) rotateY(180deg) translateY(-20px); }
       100% { transform: perspective(1000px) rotateY(360deg) translateY(0px); }
     }
-    .hero-frame-container { perspective: 1000px; }
+    html,body{touch-action:pan-x pan-y;overscroll-behavior-x:none}
+    .hero-frame-container { perspective: 1000px; touch-action:pan-y; }
     .hero-frame {
       animation: float-spin 15s infinite linear;
       transform-style: preserve-3d;
