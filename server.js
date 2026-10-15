@@ -335,6 +335,7 @@ function publicSettings(settings) {
   out.heroSideBgPhotos = mapItems(out.heroSideBgPhotos);
   out.bookImages = Object.fromEntries(Object.entries(out.bookImages || {}).map(([k, v]) => [k, mediaUrl(v)]));
   out.gallerySamples = Object.fromEntries(Object.entries(out.gallerySamples || {}).map(([k, list]) => [k, mapItems(list)]));
+  out.liveWedding = { ...(out.liveWedding || {}), thumbnail: mediaUrl((out.liveWedding || {}).thumbnail || '') };
   return out;
 }
 async function moveDataImageToR2(value, group) {
@@ -1290,6 +1291,8 @@ function defaultSettings() {
       reel: []
     },
     gallerySamplesConfigured: false,
+    // One clickable live-wedding card. Admin uploads its thumbnail and pastes the Google Drive folder/file link.
+    liveWedding: { thumbnail: '', driveUrl: '' },
     marketplacePosters: [],
     fees: {
       platformFee: 10,
@@ -1336,6 +1339,7 @@ function loadSettings() {
     frames3dPhotos: Array.isArray(data.frames3dPhotos) ? data.frames3dPhotos : defaults.frames3dPhotos,
     homeHeroFramePhotos: Array.isArray(data.homeHeroFramePhotos) ? data.homeHeroFramePhotos : defaults.homeHeroFramePhotos,
     heroSideBgPhotos: Array.isArray(data.heroSideBgPhotos) ? data.heroSideBgPhotos : defaults.heroSideBgPhotos,
+    liveWedding: { ...defaults.liveWedding, ...(data.liveWedding || {}) },
     gallerySamples: Object.fromEntries(['wedding','birthday','baby','prewedding','reel'].map(k => {
       const saved = data.gallerySamples?.[k];
       // Older installs have empty lists. Show starter photos until the admin
@@ -5060,8 +5064,22 @@ function computeOrderFees(subtotal, settingsFees) {
   }
 
   if (req.method === 'GET' && urlPath === '/api/home-gallery-samples') {
-    const gallery = publicSettings(loadSettings()).gallerySamples || {};
-    return sendJSON(res, 200, { ok: true, gallery });
+    const publicSite = publicSettings(loadSettings());
+    const gallery = publicSite.gallerySamples || {};
+    return sendJSON(res, 200, { ok: true, gallery, liveWedding: publicSite.liveWedding || { thumbnail:'', driveUrl:'' } });
+  }
+
+  if (req.method === 'POST' && urlPath === '/admin/live-wedding-save') {
+    try {
+      const body = await readBody(req, 8e6);
+      const thumbnail = storedMediaValue(String(body.thumbnail || '').trim());
+      const driveUrl = String(body.driveUrl || '').trim();
+      const safeThumb = !thumbnail || /^data:image\/(png|jpe?g|webp);base64,/i.test(thumbnail) || (thumbnail.startsWith('r2:') && isSafeAdminR2ImageKey(thumbnail.slice(3))) || /^https:\/\//i.test(thumbnail);
+      const safeDrive = !driveUrl || /^https:\/\/(drive\.google\.com|docs\.google\.com)\//i.test(driveUrl);
+      if (!safeThumb || !safeDrive) return sendJSON(res, 400, { ok:false, message:'Valid thumbnail aur Google Drive link zaroori hai' });
+      const cur = loadSettings(); cur.liveWedding = { thumbnail, driveUrl }; saveSettings(cur);
+      return sendJSON(res, 200, { ok:true });
+    } catch (e) { return sendJSON(res, 500, { ok:false, message:'Live Wedding save nahi hua' }); }
   }
 
   if (req.method === 'POST' && urlPath === '/admin/gallery-samples-save') {
@@ -5478,6 +5496,7 @@ loadOrdersPage();setInterval(loadOrdersPage,20000);
     const adminHidden = (settings.adminUi && settings.adminUi.hidden) || {};
     const bi = settingsView.bookImages || {};
     const gallerySamples = settingsView.gallerySamples || {};
+    const liveWedding = settingsView.liveWedding || {};
     const pendingResets = accounts.filter(a => a.pinResetRequested);
     const pendingOtps = loadOtpRequests().filter(r => !r.verified);
     const codes = loadCodes().slice().reverse();
@@ -6081,6 +6100,13 @@ document.querySelectorAll('.book-up-btn').forEach(function(btn){
 \n<section class="panel" id="sec-gallery-samples">
 <h2>🖼️ Home Gallery Samples</h2>
 <p class="sub">Home page par Custom Photo Frames ke niche Wedding, Birthday Shoot, Baby Shower aur Pre-Wedding cards dikhte hain. Har card ki photo 2 seconds me badalti hai. Har category me maximum 12 photos upload karein.</p>
+<div style="margin:12px 0 16px;padding:14px;border:1px solid rgba(34,211,238,.55);border-radius:14px;background:linear-gradient(135deg,#102334,#1b1025)">
+  <div style="font-weight:900;color:#67e8f9;margin-bottom:6px">💒 Live Wedding <span class="muted" style="font-size:11px">Gallery ke sabse upar clickable card</span></div>
+  <div class="muted" style="font-size:12px;margin-bottom:10px">Thumbnail upload karein aur Google Drive ka folder/file link paste karein. User card par click karke photos download kar sakega.</div>
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">${liveWedding.thumbnail ? '<img src="'+esc(liveWedding.thumbnail)+'" alt="Live Wedding thumbnail" style="width:112px;height:64px;object-fit:cover;border-radius:9px;border:1px solid #67e8f9">' : '<span class="muted" style="font-size:11px">No thumbnail uploaded</span>'}<input type="file" accept="image/*" class="field-file" id="liveWeddingFile"></div>
+  <label class="muted" style="display:block">Google Drive link<input class="inp" id="liveWeddingDriveUrl" value="${esc(liveWedding.driveUrl || '')}" placeholder="https://drive.google.com/drive/folders/..." style="margin-top:5px"></label>
+  <div style="display:flex;gap:8px;align-items:center;margin-top:10px"><button type="button" class="gen-btn" style="padding:8px 12px;background:linear-gradient(90deg,#0891b2,#7c3aed)" onclick="adminSaveLiveWedding()">💾 Save Live Wedding</button><span id="liveWeddingSt" class="muted" style="font-size:11px"></span></div>
+</div>
 <div class="form-grid" id="gallerySamplesUploadGrid">
 ${[['wedding','💍 Wedding'],['birthday','🎂 Birthday Shoot'],['baby','🍼 Baby Shower'],['prewedding','✨ Pre-Wedding']].map(row => {
   const key=row[0], label=row[1], list=Array.isArray(gallerySamples[key]) ? gallerySamples[key] : [];
@@ -6953,6 +6979,22 @@ async function adminUploadBookImage(key) {
   }
 }
 
+
+async function adminSaveLiveWedding() {
+  var fileInput=document.getElementById('liveWeddingFile'), driveInput=document.getElementById('liveWeddingDriveUrl'), st=document.getElementById('liveWeddingSt');
+  var driveUrl=(driveInput&&driveInput.value||'').trim();
+  if(driveUrl && !/^https:\/\/(drive\.google\.com|docs\.google\.com)\//i.test(driveUrl)){ alert('Google Drive ka valid link paste karein'); return; }
+  try {
+    var live=await fetch('/api/home-gallery-samples',{credentials:'same-origin',cache:'no-store'}).then(function(r){return r.json()});
+    var thumbnail=(live.liveWedding&&live.liveWedding.thumbnail)||'';
+    var file=fileInput&&fileInput.files&&fileInput.files[0];
+    if(file){ if(st)st.textContent='Thumbnail upload ho raha hai…'; var dataUrl=await compressImageFile(file,1400,0.84); try{thumbnail=await uploadAdminImageToR2(dataUrl,'gallery-live');}catch(e){thumbnail=dataUrl;} }
+    if(!thumbnail){ alert('Pehle Live Wedding thumbnail upload karein'); return; }
+    if(!driveUrl){ alert('Google Drive download link paste karein'); return; }
+    var res=await fetch('/admin/live-wedding-save',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({thumbnail:thumbnail,driveUrl:driveUrl})});
+    var out=await res.json(); if(!res.ok||!out.ok) throw new Error(out.message||'Save fail'); if(st)st.textContent='Saved ✅'; alert('Live Wedding card saved ✅'); location.href='/admin#sec-gallery-samples'; location.reload();
+  } catch(e) { if(st)st.textContent='Upload fail'; alert('Live Wedding save fail: '+(e.message||'Network error')); }
+}
 
 async function adminSaveGallerySamples(category) {
   var input = document.getElementById('galleryFiles_' + category);

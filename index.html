@@ -391,6 +391,10 @@
     @media (min-width:768px){.gallery-story{max-width:760px;margin-inline:auto}.gallery-story-media{max-height:430px}.gallery-reels{max-width:760px;margin-inline:auto}.gallery-reel-card{flex-basis:245px}}
 
     .gallery-story-media{cursor:pointer}
+    .gallery-live-wedding{display:none}
+    .gallery-live-wedding.is-ready{display:flex}
+    .gallery-live-wedding .gallery-story-media{box-shadow:0 14px 32px rgba(0,0,0,.4),0 0 25px rgba(34,211,238,.36)}
+    .live-wedding-cta{position:absolute;right:14px;bottom:14px;z-index:3;padding:8px 12px;border-radius:999px;background:linear-gradient(90deg,#06b6d4,#7c3aed,#ec4899);color:#fff;font-size:11px;font-weight:900;box-shadow:0 0 16px rgba(34,211,238,.45)}
     .gallery-lightbox{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(3,5,12,.86);backdrop-filter:blur(14px)}
     .gallery-lightbox-panel{width:min(940px,100%);max-height:92vh;overflow:auto;border-radius:24px;padding:16px;background:linear-gradient(145deg,#21152d,#0c1423 55%,#20150f);border:1px solid rgba(103,232,249,.58);box-shadow:0 0 38px rgba(168,85,247,.42)}
     .gallery-lightbox-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:2px 2px 14px}.gallery-lightbox-head h3{margin:0;font-family:'EB Garamond',serif;font-size:clamp(1.8rem,7vw,3rem);background:linear-gradient(100deg,#fef3c7,#fbbf24,#f472b6,#67e8f9);-webkit-background-clip:text;color:transparent}.gallery-lightbox-close{width:38px;height:38px;border:1px solid rgba(255,255,255,.45);border-radius:50%;background:rgba(0,0,0,.35);color:#fff;font-size:25px;cursor:pointer}
@@ -733,6 +737,10 @@
     <section class="flex flex-col gap-6" id="gallery-samples">
       <h2 class="font-headline-md text-headline-md text-on-surface m-0">Gallery Samples</h2>
       <div id="galleryStories" aria-label="Photography gallery — swipe right to left">
+        <article class="gallery-story group gallery-live-wedding" id="liveWeddingCard">
+          <div class="gallery-story-media"><img id="liveWeddingImage" alt="Live Wedding photo downloads"><span class="live-wedding-cta">View &amp; Download Photos ↗</span></div>
+          <div class="gallery-story-copy"><h3 class="gallery-story-title">Live Wedding</h3></div>
+        </article>
         <article class="gallery-story group gallery-live-card">
           <div class="gallery-story-media"><img data-gallery="wedding" alt="Wedding gallery sample"></div>
           <div class="gallery-story-copy"><h3 class="gallery-story-title">Wedding</h3></div>
@@ -756,9 +764,9 @@
       </div>
       <script>
       (function(){
-        var galleryCacheKey='aditya-gallery-v5', current='', timers=[];
-        function renderGallery(gallery){
-          var signature=JSON.stringify(gallery||{}); if(signature===current) return; current=signature;
+        var galleryCacheKey='aditya-gallery-v6', current='', timers=[];
+        function renderGallery(gallery, liveWedding){
+          var signature=JSON.stringify({gallery:gallery||{},liveWedding:liveWedding||{}}); if(signature===current) return; current=signature;
           var pos={};
           document.querySelectorAll('[data-gallery]').forEach(function(img){
             var key=img.dataset.gallery, list=(gallery&&gallery[key])||[]; pos[key]=0;
@@ -766,6 +774,8 @@
             else { img.style.display='none'; if(!img.parentElement.querySelector('.gallery-empty')) img.parentElement.insertAdjacentHTML('afterbegin','<div class="gallery-empty absolute inset-0 grid place-items-center px-4 text-center text-sm text-on-surface-variant">Admin se photos upload karein</div>'); }
           });
           timers.forEach(function(id){ clearTimeout(id); }); timers=[];
+          var liveCard=document.getElementById('liveWeddingCard'), liveImage=document.getElementById('liveWeddingImage');
+          if(liveCard&&liveImage){ var liveThumb=liveWedding&&liveWedding.thumbnail, liveLink=liveWedding&&liveWedding.driveUrl; liveCard.classList.toggle('is-ready',!!(liveThumb&&liveLink)); if(liveThumb&&liveLink){ liveImage.src=liveThumb; liveCard.onclick=function(){ window.open(liveLink,'_blank','noopener'); }; liveCard.setAttribute('role','link'); liveCard.tabIndex=0; liveCard.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();window.open(liveLink,'_blank','noopener');}}; } }
           // Every category changes on its own clock with a different direction, never all together.
           document.querySelectorAll('[data-gallery]').forEach(function(img, cardIndex){
             var key=img.dataset.gallery, list=(gallery&&gallery[key])||[]; if(list.length<2) return;
@@ -793,8 +803,8 @@
         }
 
         // Cached URLs render immediately on every refresh. The network check runs after the page is usable.
-        try { var cached=JSON.parse(localStorage.getItem(galleryCacheKey)||'null'); if(cached&&cached.gallery) renderGallery(cached.gallery); } catch(e) {}
-        fetch('/api/home-gallery-samples',{cache:'force-cache'}).then(function(res){ return res.json(); }).then(function(data){ var gallery=data.gallery||{}; try { localStorage.setItem(galleryCacheKey,JSON.stringify({gallery:gallery,savedAt:Date.now()})); } catch(e) {} renderGallery(gallery); }).catch(function(e){ console.warn('Gallery samples unavailable',e); });
+        try { var cached=JSON.parse(localStorage.getItem(galleryCacheKey)||'null'); if(cached&&cached.gallery) renderGallery(cached.gallery,cached.liveWedding); } catch(e) {}
+        fetch('/api/home-gallery-samples',{cache:'force-cache'}).then(function(res){ return res.json(); }).then(function(data){ var gallery=data.gallery||{}, liveWedding=data.liveWedding||{}; try { localStorage.setItem(galleryCacheKey,JSON.stringify({gallery:gallery,liveWedding:liveWedding,savedAt:Date.now()})); } catch(e) {} renderGallery(gallery,liveWedding); }).catch(function(e){ console.warn('Gallery samples unavailable',e); });
       })();
       </script>
     </section>
