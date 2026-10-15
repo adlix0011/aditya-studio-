@@ -5001,6 +5001,8 @@ function computeOrderFees(subtotal, settingsFees) {
         const entry = typeof item === 'string' ? { url:item } : (item || {});
         return String(entry.mediaId || entry.url || '') === mediaId;
       }) : requestedIndex;
+      // Older media was saved before mediaId existed; its current card index is the safe fallback.
+      if (index < 0 && Number.isInteger(requestedIndex) && requestedIndex >= 0 && requestedIndex < list.length) index = requestedIndex;
       if (!Number.isInteger(index) || index < 0 || index >= list.length) return sendJSON(res, 404, { ok:false, error:'not-found' });
       list.splice(index, 1);
       cur.heroSideBgPhotos = list;
