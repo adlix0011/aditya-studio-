@@ -391,10 +391,11 @@
     @media (min-width:768px){.gallery-story{max-width:760px;margin-inline:auto}.gallery-story-media{max-height:430px}.gallery-reels{max-width:760px;margin-inline:auto}.gallery-reel-card{flex-basis:245px}}
 
     .gallery-story-media{cursor:pointer}
-    .gallery-live-wedding{display:flex}
-    .gallery-live-wedding.is-ready{display:flex}
-    .gallery-live-wedding .gallery-story-media{box-shadow:0 14px 32px rgba(0,0,0,.4),0 0 25px rgba(34,211,238,.36)}
-    .live-wedding-cta{position:absolute;right:14px;bottom:14px;z-index:3;padding:8px 12px;border-radius:999px;background:linear-gradient(90deg,#06b6d4,#7c3aed,#ec4899);color:#fff;font-size:11px;font-weight:900;box-shadow:0 0 16px rgba(34,211,238,.45)}
+    .live-wedding-showcase{position:relative;overflow:hidden;padding:18px;border:1px solid rgba(251,113,133,.52);border-radius:26px;background:radial-gradient(circle at 8% 8%,rgba(244,63,94,.36),transparent 31%),radial-gradient(circle at 95% 92%,rgba(34,211,238,.28),transparent 38%),linear-gradient(135deg,#31101f,#12172e 55%,#102c35);box-shadow:0 18px 34px rgba(0,0,0,.34),0 0 28px rgba(236,72,153,.23)}
+    .live-wedding-showcase::before{content:"";position:absolute;inset:-90px;pointer-events:none;background:conic-gradient(from 20deg,transparent,#fb718533,transparent,#22d3ee2b,transparent);animation:liveSweep 7s linear infinite}.live-wedding-showcase>*{position:relative;z-index:1}
+    .live-wedding-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 2px 14px}.live-wedding-heading{margin:0;color:#fff1ca;font-family:Georgia,serif;font-size:clamp(1.65rem,7vw,2.6rem);letter-spacing:.02em}.live-recording{display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border:1px solid #ffb0bd;border-radius:999px;background:#4b1022;color:#fff;font-size:10px;font-weight:900;letter-spacing:.12em}.live-recording i{width:8px;height:8px;border-radius:50%;background:#ff3657;box-shadow:0 0 10px #ff3657;animation:recordBlink 1s steps(2,end) infinite}@keyframes recordBlink{50%{opacity:.15}}@keyframes liveSweep{to{transform:rotate(360deg)}}
+    .gallery-live-wedding{display:flex;width:100%;flex-direction:column;gap:10px;padding:0;border:0;background:transparent;cursor:pointer}.gallery-live-wedding .gallery-story-media{box-shadow:0 14px 32px rgba(0,0,0,.48),0 0 25px rgba(34,211,238,.44)}
+    .live-wedding-cta{position:absolute;right:14px;bottom:14px;z-index:3;padding:8px 12px;border-radius:999px;background:linear-gradient(90deg,#f43f5e,#7c3aed,#06b6d4);color:#fff;font-size:11px;font-weight:900;box-shadow:0 0 16px rgba(34,211,238,.45)}
     .gallery-lightbox{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(3,5,12,.86);backdrop-filter:blur(14px)}
     .gallery-lightbox-panel{width:min(940px,100%);max-height:92vh;overflow:auto;border-radius:24px;padding:16px;background:linear-gradient(145deg,#21152d,#0c1423 55%,#20150f);border:1px solid rgba(103,232,249,.58);box-shadow:0 0 38px rgba(168,85,247,.42)}
     .gallery-lightbox-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:2px 2px 14px}.gallery-lightbox-head h3{margin:0;font-family:'EB Garamond',serif;font-size:clamp(1.8rem,7vw,3rem);background:linear-gradient(100deg,#fef3c7,#fbbf24,#f472b6,#67e8f9);-webkit-background-clip:text;color:transparent}.gallery-lightbox-close{width:38px;height:38px;border:1px solid rgba(255,255,255,.45);border-radius:50%;background:rgba(0,0,0,.35);color:#fff;font-size:25px;cursor:pointer}
@@ -734,13 +735,16 @@
       </a>
     </section>
 
+    <section class="live-wedding-showcase" id="live-wedding-showcase">
+      <div class="live-wedding-head"><h2 class="live-wedding-heading">Live Weddings</h2><span class="live-recording"><i></i> LIVE NOW</span></div>
+      <article class="gallery-live-wedding" id="liveWeddingCard" aria-label="Open Live Wedding album">
+        <div class="gallery-story-media"><img id="liveWeddingImage" alt="Live Wedding photo downloads"><span class="live-wedding-cta">View &amp; Download Photos ↗</span></div>
+      </article>
+    </section>
+
     <section class="flex flex-col gap-6" id="gallery-samples">
       <h2 class="font-headline-md text-headline-md text-on-surface m-0">Gallery Samples</h2>
       <div id="galleryStories" aria-label="Photography gallery — swipe right to left">
-        <article class="gallery-story group gallery-live-wedding" id="liveWeddingCard">
-          <div class="gallery-story-media"><img id="liveWeddingImage" alt="Live Wedding photo downloads"><span class="live-wedding-cta">View &amp; Download Photos ↗</span></div>
-          <div class="gallery-story-copy"><h3 class="gallery-story-title">Live Wedding</h3></div>
-        </article>
         <article class="gallery-story group gallery-live-card">
           <div class="gallery-story-media"><img data-gallery="wedding" alt="Wedding gallery sample"></div>
           <div class="gallery-story-copy"><h3 class="gallery-story-title">Wedding</h3></div>
