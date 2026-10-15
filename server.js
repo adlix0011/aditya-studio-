@@ -296,7 +296,7 @@ function isSafeR2PhotoKey(key, mobile) {
   return new RegExp('^customer-photos/' + safeMobile + '/[a-zA-Z0-9._-]+\\.(jpg|jpeg|png|webp)$', 'i').test(String(key || ''));
 }
 function isSafeAdminR2ImageKey(key) {
-  return /^studio-images\/(banner|deal|frame3d|home-frame|hero-bg|book|gallery-[a-z]+)\/[a-zA-Z0-9._-]+\.(jpg|jpeg|png|webp)$/i.test(String(key || '')) || /^studio-images\/(hero-bg|gallery-reel)\/[a-zA-Z0-9._-]+\.(mp4|webm)$/i.test(String(key || ''));
+  return /^studio-images\/(banner|deal|frame|frame3d|home-frame|hero-bg|book|gallery-[a-z]+)\/[a-zA-Z0-9._-]+\.(jpg|jpeg|png|webp)$/i.test(String(key || '')) || /^studio-images\/(hero-bg|gallery-reel)\/[a-zA-Z0-9._-]+\.(mp4|webm)$/i.test(String(key || ''));
 }
 function mediaUrl(value) {
   const raw = String(value || '');
@@ -1992,6 +1992,16 @@ const server = http.createServer(async (req, res) => {
     var st=document.getElementById('liveWeddingSt'),file=(document.getElementById('liveWeddingFile')||{}).files||[];
     try{var old=await fetch('/api/home-gallery-samples',{credentials:'same-origin',cache:'no-store'}).then(function(r){return r.json()}),current=old.liveWedding||{},thumbnail=current.thumbnail||'',albums=Object.assign({},current.albums||{});if(file[0]){if(st)st.textContent='Thumbnail upload ho raha hai…';thumbnail=await uploadDashboardFile(file[0],'gallery-live',false);}if(!thumbnail)throw Error('Pehle Live Wedding thumbnail choose karo');var keys=['chulmati','devpoojan','haldi','barat','reception'];for(var i=0;i<keys.length;i++){var f=(document.getElementById('liveWeddingAlbum_'+keys[i])||{}).files||[];if(f[0]){if(st)st.textContent=keys[i]+' photo upload ho rahi hai…';albums[keys[i]]=await uploadDashboardFile(f[0],'gallery-live',false);}}var r=await fetch('/admin/live-wedding-save',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({thumbnail:thumbnail,albums:albums,title:(document.getElementById('liveWeddingTitle')||{}).value||'',driveUrl:(document.getElementById('liveWeddingDriveUrl')||{}).value||''})}),o=await r.json();if(!r.ok||!o.ok)throw Error(o.message||'Save fail');if(st)st.textContent='Saved ✅';location.reload();}catch(e){if(st)st.textContent='Upload fail: '+(e.message||'Network error');}
   };
+  window.adminSaveFrame = async function(){
+    var file=(document.getElementById('frFile')||{}).files||[], st=document.getElementById('frPhotoStatus');
+    var size=(document.getElementById('frSize')||{}).value||'', title=(document.getElementById('frTitle')||{}).value||'';
+    if(!size||!title){ alert('Size aur Frame Type name likho'); return; }
+    try { var imageUrl=''; if(file[0]){if(st)st.textContent='Photo upload ho rahi hai…';imageUrl=await uploadDashboardFile(file[0],'frame',false);}
+      var sizes=Array.prototype.slice.call(document.querySelectorAll('.fr-size-tick:checked')).map(function(x){return x.value;});if(sizes.indexOf(size)<0)sizes.unshift(size);
+      var payload={id:(document.getElementById('frId')||{}).value||undefined,size:size,availableSizes:sizes,title:title,price:Number((document.getElementById('frPrice')||{}).value||0),discountPercent:Number((document.getElementById('frDisc')||{}).value||0),featuredRank:Number((document.getElementById('frPriority')||{}).value||100),stockQuantity:Number((document.getElementById('frStock')||{}).value||0),frameTags:String((document.getElementById('frTags')||{}).value||'').split(',').map(function(x){return x.trim()}).filter(Boolean),manualUnavailable:!!((document.getElementById('frManualUnavailable')||{}).checked),showOnFramePage:!!((document.getElementById('frShowPage')||{}).checked),showInBooking:!!((document.getElementById('frShowBooking')||{}).checked),active:!!((document.getElementById('frActive')||{}).checked),imageUrl:imageUrl};
+      var r=await fetch('/admin/frame-save',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}),o=await r.json();if(!r.ok||!o.ok)throw Error(o.message||o.error||'Save fail');if(st)st.textContent='Saved ✅';alert('Frame Type saved ✅');location.reload();
+    }catch(e){if(st)st.textContent='Upload fail: '+(e.message||'Network error');}
+  };
   var live = document.getElementById('liveStatus');
   async function refreshLive(){
     try { var response = await fetch('/admin/live-json', {credentials:'same-origin', cache:'no-store'}); var state = await response.json(); if (live) live.textContent = response.ok && state.ok ? 'connected' : 'offline'; }
@@ -2400,7 +2410,7 @@ const server = http.createServer(async (req, res) => {
       const isVideo = type.startsWith('video/');
       // All dashboard upload controls use this same-origin relay.  Direct
       // browser-to-R2 PUT requests are unreliable on some mobiles due to CORS.
-      const imageGroups = ['banner','deal','frame3d','home-frame','hero-bg','book','gallery-live','gallery-wedding','gallery-birthday','gallery-baby','gallery-prewedding'];
+      const imageGroups = ['banner','deal','frame','frame3d','home-frame','hero-bg','book','gallery-live','gallery-wedding','gallery-birthday','gallery-baby','gallery-prewedding'];
       const videoGroups = ['hero-bg','gallery-reel'];
       if (!ext || (isVideo ? !videoGroups.includes(group) : !imageGroups.includes(group))) return sendJSON(res, 400, { ok:false, error:'invalid-media', message:'Sirf sahi photo ya supported MP4/WebM upload karein' });
       const bytes = await readRawBody(req, isVideo ? 30 * 1024 * 1024 : 8 * 1024 * 1024);
@@ -2513,7 +2523,7 @@ const server = http.createServer(async (req, res) => {
       featuredRank: Number.isFinite(Number(f.featuredRank)) ? Number(f.featuredRank) : 100,
       productKind: f.productKind || '',
       frameTags: Array.isArray(f.frameTags) ? f.frameTags : [],
-      imageUrl: f.imageUrl || '', imageData: f.imageData || '', createdAt: f.createdAt
+      imageUrl: mediaUrl(f.imageUrl || ''), imageData: f.imageData || '', createdAt: f.createdAt
     }));
     return sendJSON(res, 200, { ok: true, frames });
   }
