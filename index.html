@@ -149,7 +149,10 @@
       100% { transform: perspective(1000px) rotateY(360deg) translateY(0px); }
     }
     html,body{touch-action:pan-x pan-y;overscroll-behavior-x:none;-webkit-text-size-adjust:100%;text-size-adjust:100%}
-    .hero-frame-container { perspective: 1000px; touch-action:pan-y; }
+    .home-frame-showcase{position:relative;isolation:isolate;min-height:344px;margin-top:8px;padding:22px 10px;border:1px solid rgba(250,204,21,.28);border-radius:28px;overflow:hidden;background:radial-gradient(circle at 50% 34%,rgba(212,175,55,.20),transparent 31%),radial-gradient(circle at 12% 74%,rgba(168,85,247,.22),transparent 38%),radial-gradient(circle at 88% 25%,rgba(34,211,238,.17),transparent 32%),linear-gradient(135deg,#22190d,#100d13 52%,#161026)}
+    .home-frame-showcase::before{content:"";position:absolute;inset:0;z-index:-1;opacity:.55;background:repeating-linear-gradient(125deg,transparent 0 25px,rgba(255,224,136,.035) 26px 27px,transparent 28px 52px)}
+    .hero-frame-container { perspective: 1000px; touch-action:pan-y; height:300px!important; }
+    .hero-frame-container .hero-frame{width:13rem!important;height:16rem!important;}
     .hero-frame {
       animation: float-spin 15s infinite linear;
       transform-style: preserve-3d;
@@ -714,9 +717,9 @@
     </section>
 
     <!-- 3D booking frame: placed directly below New Future offers -->
-    <section class="w-full flex justify-center -mt-8 md:-mt-12">
-      <a href="/bookings" class="hero-frame-container relative w-full max-w-md h-[400px] md:h-[500px] flex items-center justify-center group cursor-pointer" title="Photography bookings — Book Now">
-        <div class="hero-frame relative w-64 h-80 md:w-80 md:h-96 glass-panel rounded-xl flex items-center justify-center p-2 jewel-glow group-hover:shadow-[0_0_40px_rgba(212,175,55,0.45)] transition-shadow">
+    <section class="home-frame-showcase w-full flex justify-center">
+      <a href="/bookings" class="hero-frame-container relative w-full max-w-sm flex items-center justify-center group cursor-pointer" title="Photography bookings — Book Now">
+        <div class="hero-frame relative glass-panel rounded-xl flex items-center justify-center p-2 jewel-glow group-hover:shadow-[0_0_40px_rgba(212,175,55,0.45)] transition-shadow">
           <div class="w-full h-full rounded-lg overflow-hidden border border-primary/20 relative">
             <div id="heroFramePhoto" data-hero-frame-boot="__HERO_FRAME_BOOT_URL__" class="bg-cover bg-center w-full h-full absolute inset-0 transition-opacity duration-500" style="opacity:1;background-image:url('__HERO_FRAME_BOOT_URL__');background-color:#1a1510;" role="img" aria-label="Photography booking preview"></div>
             <div class="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent pointer-events-none"></div><div class="hero-frame-label absolute bottom-4 left-0 right-0 text-center z-10"><span class="inline-flex items-center justify-center px-4 py-2 rounded-full bg-[#f2ca50] text-[#3c2f00] text-[12px] font-bold shadow-[0_3px_10px_rgba(0,0,0,.38)]">Book Now</span></div>
