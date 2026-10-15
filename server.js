@@ -7755,6 +7755,10 @@ setInterval(pollLive, 5000);
 loadWhatsAppRelayHealth();
 setInterval(loadWhatsAppRelayHealth, 10_000);
 </script>
+<script>
+window.adminDeleteHeroBg=async function(b){var i=b&&b.nodeType===1?Number(b.getAttribute('data-index')):Number(b),id=b?String(b.getAttribute('data-media-id')||''):'' ,st=document.getElementById('heroBgStatus');if(!Number.isInteger(i)||i<0)return;if(b){b.disabled=true;b.textContent='…'}if(st)st.textContent='Selected media remove ho rahi hai…';try{var r=await fetch('/admin/hero-side-bg-delete',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({index:i,mediaId:id})}),d=await r.json();if(!r.ok||!d.ok)throw Error(d.error||'Delete fail');if(st)st.textContent='✅ Selected media remove ho gayi.';location.reload()}catch(e){if(b){b.disabled=false;b.textContent='×'}if(st)st.textContent='Remove fail: '+(e.message||'network')}};
+(function(){var st=document.getElementById('liveStatus');async function c(){try{var r=await fetch('/admin/live-json',{credentials:'same-origin',cache:'no-store'}),d=await r.json();if(st)st.textContent=r.ok&&d.ok?'connected':'offline'}catch(e){if(st)st.textContent='offline'}}c();setInterval(c,5000)})();
+</script>
 </body></html>`;
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store, max-age=0' });
     return res.end(html);
