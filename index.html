@@ -737,7 +737,7 @@
     <section class="live-wedding-showcase" id="live-wedding-showcase">
       <div class="live-wedding-head"><h2 class="live-wedding-heading">Live Wedding</h2></div>
       <article class="gallery-live-wedding" id="liveWeddingCard" aria-label="Open Live Wedding album">
-        <div class="gallery-story-media"><img id="liveWeddingImage" alt="Live Wedding photo downloads"></div>
+        <div class="gallery-story-media"><img id="liveWeddingImage" data-fallback="https://images.unsplash.com/photo-1519741497674-611481863552?w=1200&q=86" src="https://images.unsplash.com/photo-1519741497674-611481863552?w=1200&q=86" alt="Live Wedding photo downloads"></div>
       </article>
     </section>
 
@@ -745,19 +745,19 @@
       <h2 class="font-headline-md text-headline-md text-on-surface m-0">Gallery Samples</h2>
       <div id="galleryStories" aria-label="Photography gallery — swipe right to left">
         <article class="gallery-story group gallery-live-card">
-          <div class="gallery-story-media"><img data-gallery="wedding" alt="Wedding gallery sample"></div>
+          <div class="gallery-story-media"><img data-gallery="wedding" data-fallback="https://images.unsplash.com/photo-1519741497674-611481863552?w=1200&q=86" src="https://images.unsplash.com/photo-1519741497674-611481863552?w=1200&q=86" alt="Wedding gallery sample"></div>
           <div class="gallery-story-copy"><h3 class="gallery-story-title">Wedding</h3></div>
         </article>
         <article class="gallery-story group gallery-live-card">
-          <div class="gallery-story-media"><img data-gallery="prewedding" alt="Pre-wedding gallery sample"></div>
+          <div class="gallery-story-media"><img data-gallery="prewedding" data-fallback="https://images.unsplash.com/photo-1529634806980-85c3dd6d34ac?w=1200&q=86" src="https://images.unsplash.com/photo-1529634806980-85c3dd6d34ac?w=1200&q=86" alt="Pre-wedding gallery sample"></div>
           <div class="gallery-story-copy"><h3 class="gallery-story-title">Pre-Wedding</h3></div>
         </article>
         <article class="gallery-story group gallery-live-card">
-          <div class="gallery-story-media"><img data-gallery="baby" alt="Baby shower gallery sample"></div>
+          <div class="gallery-story-media"><img data-gallery="baby" data-fallback="https://images.unsplash.com/photo-1546015720-b8b30df5aa27?w=1200&q=86" src="https://images.unsplash.com/photo-1546015720-b8b30df5aa27?w=1200&q=86" alt="Baby shower gallery sample"></div>
           <div class="gallery-story-copy"><h3 class="gallery-story-title">Baby Shower</h3></div>
         </article>
         <article class="gallery-story group gallery-live-card">
-          <div class="gallery-story-media"><img data-gallery="birthday" alt="Birthday shoot gallery sample"></div>
+          <div class="gallery-story-media"><img data-gallery="birthday" data-fallback="https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=1200&q=86" src="https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=1200&q=86" alt="Birthday shoot gallery sample"></div>
           <div class="gallery-story-copy"><h3 class="gallery-story-title">Birthday Shoot</h3></div>
         </article>
         <article class="gallery-story gallery-live-card">
@@ -772,13 +772,13 @@
           var signature=JSON.stringify({gallery:gallery||{},liveWedding:liveWedding||{}}); if(signature===current) return; current=signature;
           var pos={};
           document.querySelectorAll('[data-gallery]').forEach(function(img){
-            var key=img.dataset.gallery, list=(gallery&&gallery[key])||[]; pos[key]=0;
+            var key=img.dataset.gallery, list=(gallery&&gallery[key])||[]; pos[key]=0; img.onerror=function(){ var fallback=img.dataset.fallback||''; if(fallback&&img.src!==fallback){ img.src=fallback; img.style.opacity='1'; img.style.transform='scale(1)'; } };
             if(list.length){ img.style.display='block'; img.src=list[0]; img.style.opacity='1'; img.onclick=function(){ openGalleryViewer(key,list,0); }; }
-            else { img.style.display='none'; if(!img.parentElement.querySelector('.gallery-empty')) img.parentElement.insertAdjacentHTML('afterbegin','<div class="gallery-empty absolute inset-0 grid place-items-center px-4 text-center text-sm text-on-surface-variant">Admin se photos upload karein</div>'); }
+            else { img.style.display='block'; img.src=img.dataset.fallback||img.src; img.style.opacity='1'; }
           });
           timers.forEach(function(id){ clearTimeout(id); }); timers=[];
           var liveCard=document.getElementById('liveWeddingCard'), liveImage=document.getElementById('liveWeddingImage');
-          if(liveCard&&liveImage){ var liveThumb=(liveWedding&&liveWedding.thumbnail)||((gallery&&gallery.wedding&&gallery.wedding[0])||'https://images.unsplash.com/photo-1519741497674-611481863552?w=1200&q=86'); liveCard.classList.add('is-ready'); liveImage.src=liveThumb; liveCard.onclick=function(){ window.location.href='/live-wedding'; }; liveCard.setAttribute('role','link'); liveCard.tabIndex=0; liveCard.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();window.location.href='/live-wedding';}}; }
+          if(liveCard&&liveImage){ var liveThumb=(liveWedding&&liveWedding.thumbnail)||((gallery&&gallery.wedding&&gallery.wedding[0])||liveImage.dataset.fallback); liveCard.classList.add('is-ready'); liveImage.onerror=function(){if(liveImage.src!==liveImage.dataset.fallback)liveImage.src=liveImage.dataset.fallback;}; liveImage.src=liveThumb; liveCard.onclick=function(){ window.location.href='/live-wedding'; }; liveCard.setAttribute('role','link'); liveCard.tabIndex=0; liveCard.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();window.location.href='/live-wedding';}}; }
           // Every category changes on its own clock with a different direction, never all together.
           document.querySelectorAll('[data-gallery]').forEach(function(img, cardIndex){
             var key=img.dataset.gallery, list=(gallery&&gallery[key])||[]; if(list.length<2) return;
@@ -806,8 +806,9 @@
         }
 
         // Cached URLs render immediately on every refresh. The network check runs after the page is usable.
-        try { var cached=JSON.parse(localStorage.getItem(galleryCacheKey)||'null'); if(cached&&cached.gallery) renderGallery(cached.gallery,cached.liveWedding); } catch(e) {}
-        fetch('/api/home-gallery-samples',{cache:'force-cache'}).then(function(res){ return res.json(); }).then(function(data){ var gallery=data.gallery||{}, liveWedding=data.liveWedding||{}; try { localStorage.setItem(galleryCacheKey,JSON.stringify({gallery:gallery,liveWedding:liveWedding,savedAt:Date.now()})); } catch(e) {} renderGallery(gallery,liveWedding); }).catch(function(e){ console.warn('Gallery samples unavailable',e); });
+        var cached=null, cacheFresh=false; try { cached=JSON.parse(localStorage.getItem(galleryCacheKey)||'null'); cacheFresh=!!(cached&&cached.gallery&&cached.savedAt&&(Date.now()-cached.savedAt<600000)); if(cached&&cached.gallery) renderGallery(cached.gallery,cached.liveWedding); } catch(e) {}
+        // For ten minutes refreshes use only the browser cache. This prevents blank cards and repeat API calls.
+        if(!cacheFresh) fetch('/api/home-gallery-samples',{cache:'force-cache'}).then(function(res){ return res.json(); }).then(function(data){ var gallery=data.gallery||{}, liveWedding=data.liveWedding||{}; try { localStorage.setItem(galleryCacheKey,JSON.stringify({gallery:gallery,liveWedding:liveWedding,savedAt:Date.now()})); } catch(e) {} renderGallery(gallery,liveWedding); }).catch(function(e){ console.warn('Gallery samples unavailable',e); });
       })();
       </script>
     </section>
