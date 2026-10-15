@@ -142,6 +142,23 @@
   .history-empty{padding:18px 14px; text-align:center; color:var(--muted); font-size:13px;}
 
   #wheelSection{display:none;}
+  /* Daily rewards stay directly below the live roller. */
+  .roller-token-panel{margin:24px auto 0;max-width:460px;padding:17px;border:1px solid rgba(212,175,55,.42);border-radius:20px;background:linear-gradient(145deg,rgba(36,25,8,.94),rgba(17,20,37,.96));box-shadow:0 14px 32px rgba(0,0,0,.32),0 0 25px rgba(212,175,55,.08);text-align:left;}
+  .roller-token-title{display:flex;align-items:center;justify-content:space-between;gap:10px;color:#ffe38a;font:800 17px 'Poppins',sans-serif;}
+  .roller-token-sub{margin:5px 0 13px;color:#d6cdbb;font-size:12px;line-height:1.45;}
+  .roller-token-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .roller-token-stat{padding:12px;border-radius:14px;border:1px solid rgba(120,220,255,.26);background:linear-gradient(135deg,rgba(24,67,95,.7),rgba(12,31,47,.8));}
+  .roller-token-stat.alt{border-color:rgba(239,145,255,.28);background:linear-gradient(135deg,rgba(75,31,91,.72),rgba(38,22,53,.85));}
+  .roller-token-label{display:block;color:#b9dff2;font-size:10px;letter-spacing:1.2px;font-weight:800;text-transform:uppercase;}
+  .roller-token-stat.alt .roller-token-label{color:#ecc6ff;}
+  .roller-token-number{display:block;margin-top:4px;color:#ffe05b;font-size:28px;line-height:1;font-weight:900;}
+  .roller-token-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;}
+  .roller-token-actions button{min-height:43px;border-radius:11px;border:1px solid rgba(255,255,255,.34);font-weight:800;cursor:pointer;}
+  #rollerClaimTokenBtn{background:linear-gradient(135deg,#f7d55b,#df8b1a);color:#281600;}
+  #rollerExchangeTokenBtn{background:linear-gradient(135deg,#ba44e8,#4d58e9);color:#fff;}
+  .roller-token-actions button:disabled{opacity:.5;cursor:not-allowed;filter:grayscale(.25);}
+  .roller-token-msg{min-height:18px;margin:10px 2px 0;color:#c9d9e7;font-size:12px;text-align:center;}
+  @media(max-width:420px){.roller-token-panel{padding:14px;margin-top:18px}.roller-token-title{font-size:15px}.roller-token-actions{grid-template-columns:1fr}.roller-token-actions button{min-height:40px}}
   #codeCard{display:none;}
   .tier-badge{display:inline-block; padding:6px 16px; border:1px solid var(--gold-dim); border-radius:999px; font-size:12px; color:var(--gold-light); letter-spacing:0.5px; margin-bottom:8px; font-family:'Poppins',sans-serif;}
   .cust-id{font-size:12px; color:var(--muted); margin-bottom:22px;}
@@ -1492,6 +1509,13 @@
         <button type="button" class="btn-secondary" id="freeWheelSkipBtn" style="flex:1;min-width:120px">Skip</button>
         <a href="/" class="btn-secondary" style="flex:1;min-width:120px;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center">🏠 Home</a>
       </div>
+      <section class="roller-token-panel" aria-label="Spin Wheel and AD Tokens">
+        <div class="roller-token-title"><span>🎁 Spin Wheel &amp; AD Tokens</span><span style="font-size:11px;color:#aee8ff">Daily rewards</span></div>
+        <p class="roller-token-sub">Daily AD Token claim karein. <b style="color:#ffe05b">10 tokens = 1 spin</b> — token se spin add karke roller ke liye ready rahen.</p>
+        <div class="roller-token-grid"><div class="roller-token-stat"><span class="roller-token-label">AD Tokens</span><strong class="roller-token-number" id="rollerTokenCount">0</strong></div><div class="roller-token-stat alt"><span class="roller-token-label">Your Spins</span><strong class="roller-token-number" id="rollerSpinBalance">0</strong></div></div>
+        <div class="roller-token-actions"><button type="button" id="rollerClaimTokenBtn">🎁 Claim AD Token</button><button type="button" id="rollerExchangeTokenBtn">⚡ 10 Tokens → 1 Spin</button></div>
+        <p class="roller-token-msg" id="rollerTokenMsg">Login ke baad aaj ka daily token claim karein.</p>
+      </section>
     </div>
   </div>
 
@@ -1766,6 +1790,27 @@ function showCouponResult(prizeValue){
 let currentAccount = null;
 let currentTier = null;
 
+/* Daily token controls stay directly below the real roller. */
+function updateRollerTokenUI(message){
+  const tokenEl=document.getElementById('rollerTokenCount'), spinEl=document.getElementById('rollerSpinBalance'), claimBtn=document.getElementById('rollerClaimTokenBtn'), exchangeBtn=document.getElementById('rollerExchangeTokenBtn'), msg=document.getElementById('rollerTokenMsg');
+  const logged=!!(currentAccount && currentAccount.sessionToken), tokens=logged?Number(currentAccount.adTokens||0):0, spins=logged?Number(currentAccount.spinBalance||0):0;
+  if(tokenEl) tokenEl.textContent=String(tokens); if(spinEl) spinEl.textContent=String(spins);
+  if(claimBtn){claimBtn.disabled=!logged||!currentAccount.canClaimAdToken;claimBtn.textContent=!logged?'Login to claim':(currentAccount.canClaimAdToken?'🎁 Claim AD Token':'✓ Claimed today');}
+  if(exchangeBtn){exchangeBtn.disabled=!logged||tokens<10;exchangeBtn.textContent=tokens>=10?'⚡ 10 Tokens → 1 Spin':'⚡ Need '+Math.max(0,10-tokens)+' more tokens';}
+  if(msg) msg.textContent=message||(!logged?'Login ke baad aaj ka daily token claim karein.':(currentAccount.canClaimAdToken?'Aaj ka 1 AD Token ready hai.':'Aaj ka token claimed hai. Kal phir claim kar sakte hain.'));
+}
+async function refreshRollerTokens(){
+  const saved=loadSession(); if(!saved||!saved.sessionToken){updateRollerTokenUI();return;}
+  try{const res=await fetch(API_BASE+'/api/restore-session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionToken:saved.sessionToken})});const out=await res.json();if(out&&out.ok){currentAccount=Object.assign({},currentAccount||{},out,{sessionToken:out.sessionToken||saved.sessionToken});saveSession(currentAccount,currentAccount._pin||'');}}catch(e){}
+  updateRollerTokenUI();
+}
+async function rollerTokenAction(endpoint){
+  const saved=loadSession();if(!saved||!saved.sessionToken){alert('Pehle login karein');return;}const msg=document.getElementById('rollerTokenMsg');if(msg)msg.textContent='Please wait…';
+  try{const res=await fetch(API_BASE+endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionToken:saved.sessionToken})});const out=await res.json();if(out&&out.ok){currentAccount=Object.assign({},currentAccount||{},out,{sessionToken:out.sessionToken||saved.sessionToken});saveSession(currentAccount,currentAccount._pin||'');updateRollerTokenUI(out.message||'Updated');}else{if(out&&out.adTokens!==undefined)currentAccount=Object.assign({},currentAccount||{},out);updateRollerTokenUI((out&&out.message)||'Action complete nahi hua');}}catch(e){updateRollerTokenUI('Network error — dobara try karein.');}
+}
+document.getElementById('rollerClaimTokenBtn')?.addEventListener('click',function(){rollerTokenAction('/api/claim-ad-token');});
+document.getElementById('rollerExchangeTokenBtn')?.addEventListener('click',function(){rollerTokenAction('/api/exchange-ad-tokens');});
+
 /* ===== Persistent login (localStorage) ===== */
 const SESSION_KEY = 'aditya_studio_session_v1';
 const PERSIST_SESSION_KEY = 'aditya_studio_persistent_login_v2';
@@ -1848,6 +1893,7 @@ function enterDashboard(){
       if(typeof refreshHomeAvatar === 'function') refreshHomeAvatar();
       if(typeof updateTierBadge === 'function') updateTierBadge();
       if(typeof loadBookImages === 'function') loadBookImages();
+setTimeout(refreshRollerTokens, 0);
       if(typeof loadNotifications === 'function') loadNotifications();
       if(typeof refreshFreeSpinUI === 'function') refreshFreeSpinUI();
       const ap = document.getElementById('amountPanel');
