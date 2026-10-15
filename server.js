@@ -1992,6 +1992,19 @@ const server = http.createServer(async (req, res) => {
     var st=document.getElementById('liveWeddingSt'),file=(document.getElementById('liveWeddingFile')||{}).files||[];
     try{var old=await fetch('/api/home-gallery-samples',{credentials:'same-origin',cache:'no-store'}).then(function(r){return r.json()}),current=old.liveWedding||{},thumbnail=current.thumbnail||'',albums=Object.assign({},current.albums||{});if(file[0]){if(st)st.textContent='Thumbnail upload ho raha hai…';thumbnail=await uploadDashboardFile(file[0],'gallery-live',false);}if(!thumbnail)throw Error('Pehle Live Wedding thumbnail choose karo');var keys=['chulmati','devpoojan','haldi','barat','reception'];for(var i=0;i<keys.length;i++){var f=(document.getElementById('liveWeddingAlbum_'+keys[i])||{}).files||[];if(f[0]){if(st)st.textContent=keys[i]+' photo upload ho rahi hai…';albums[keys[i]]=await uploadDashboardFile(f[0],'gallery-live',false);}}var r=await fetch('/admin/live-wedding-save',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({thumbnail:thumbnail,albums:albums,title:(document.getElementById('liveWeddingTitle')||{}).value||'',driveUrl:(document.getElementById('liveWeddingDriveUrl')||{}).value||''})}),o=await r.json();if(!r.ok||!o.ok)throw Error(o.message||'Save fail');if(st)st.textContent='Saved ✅';location.reload();}catch(e){if(st)st.textContent='Upload fail: '+(e.message||'Network error');}
   };
+  window.adminRemoveGallerySample = async function(category, index){
+    var st=document.getElementById('gallerySt_'+category);
+    if(!['wedding','birthday','baby','prewedding','reel'].includes(String(category))) return;
+    if(!confirm('Sirf ye selected photo remove ho jayegi.')) return;
+    try { if(st)st.textContent='Photo remove ho rahi hai…';
+      var current=await fetch('/api/home-gallery-samples',{credentials:'same-origin',cache:'no-store'}).then(function(r){return r.json()}), list=Array.isArray(current.gallery&&current.gallery[category])?current.gallery[category].slice():[];
+      index=Number(index); if(!Number.isInteger(index)||index<0||index>=list.length)throw Error('Photo nahi mili');
+      list.splice(index,1);
+      var response=await fetch('/admin/gallery-samples-save',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({category:category,images:list})}), result=await response.json();
+      if(!response.ok||!result.ok)throw Error(result.message||'Remove fail');
+      if(st)st.textContent='Photo removed ✅'; location.reload();
+    }catch(error){if(st)st.textContent='Remove fail: '+(error.message||'Network error');}
+  };
   window.adminSaveFrame = async function(){
     var file=(document.getElementById('frFile')||{}).files||[], st=document.getElementById('frPhotoStatus');
     var size=(document.getElementById('frSize')||{}).value||'', title=(document.getElementById('frTitle')||{}).value||'';
