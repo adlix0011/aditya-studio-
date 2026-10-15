@@ -784,8 +784,15 @@
             var effects=[['translateX(-10%) scale(1.06)','translateX(10%) scale(1.04)'],['translateY(9%) scale(1.08)','translateY(-9%) scale(1.04)'],['translateX(10%) scale(1.06)','translateX(-10%) scale(1.04)'],['scale(1.14) rotate(.8deg)','scale(.92) rotate(-.8deg)']];
             var effect=effects[cardIndex%effects.length], delay=2700+(cardIndex*780);
             function changeOne(){
-              pos[key]=(pos[key]+1)%list.length; img.style.transition='opacity .38s ease,transform .38s cubic-bezier(.4,0,.2,1)'; img.style.opacity='0'; img.style.transform=effect[0];
-              var swap=setTimeout(function(){ img.src=list[pos[key]]; img.style.transition='none'; img.style.transform=effect[1]; img.style.opacity='0'; requestAnimationFrame(function(){ requestAnimationFrame(function(){ img.style.transition='opacity .58s ease,transform .82s cubic-bezier(.16,1,.3,1)'; img.style.opacity='1'; img.style.transform='scale(1)'; }); }); },390); timers.push(swap);
+              // Keep the current image visible until the next one has loaded.
+              // A second layer then cross-fades in, so no black frame appears.
+              pos[key]=(pos[key]+1)%list.length;
+              var nextUrl=list[pos[key]], layer=document.createElement('img'), parent=img.parentNode, started=false;
+              layer.className='gallery-transition-layer'; layer.alt=''; layer.setAttribute('aria-hidden','true');
+              layer.style.cssText='position:absolute;inset:2px;width:calc(100% - 4px);height:calc(100% - 4px);border-radius:18px;object-fit:cover;opacity:0;z-index:3;transform:'+effect[1]+';transition:opacity .72s ease,transform .9s cubic-bezier(.16,1,.3,1);pointer-events:none;';
+              function reveal(){ if(started)return; started=true; parent.appendChild(layer); requestAnimationFrame(function(){ requestAnimationFrame(function(){ img.style.transition='opacity .72s ease,transform .72s ease'; img.style.opacity='0'; img.style.transform=effect[0]; layer.style.opacity='1'; layer.style.transform='scale(1)'; }); }); var finish=setTimeout(function(){ img.src=nextUrl; img.style.transition='none'; img.style.opacity='1'; img.style.transform='scale(1)'; layer.remove(); },780); timers.push(finish); }
+              layer.onload=reveal; layer.onerror=function(){ layer.remove(); };
+              layer.src=nextUrl; if(layer.complete&&layer.naturalWidth)reveal();
               var next=setTimeout(changeOne,delay); timers.push(next);
             }
             var first=setTimeout(changeOne,1300+(cardIndex*690)); timers.push(first);
