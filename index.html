@@ -1642,7 +1642,10 @@
         const fallbackImages = {
           wedding:'https://images.unsplash.com/photo-1519741497674-611481863552?w=800&q=82', birthday:'https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=800&q=82', personal:'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=800&q=82', reel:'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=800&q=82', event:'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&q=82', other:'https://images.unsplash.com/photo-1478144592103-25e218a04891?w=800&q=82'
         };
-        let deals = eventDefs.map(function(event){ return { url:fallbackImages[event.key], title:event.title, sub:event.sub, link:'/book?service='+event.key, active:true }; });
+        // Server embeds the current book-card photos into the page, so refresh
+        // never flashes the old/default thumbnails before the API responds.
+        const bootBookImages = __BOOK_IMAGES_BOOT__;
+        let deals = eventDefs.map(function(event){ return { url:bootBookImages[event.key] || fallbackImages[event.key], title:event.title, sub:event.sub, link:'/book?service='+event.key, active:true }; });
         let duration = 28;
         // Render booking cards immediately, before the settings API returns. This prevents old offer thumbnails flashing after refresh.
         track.innerHTML = deals.concat(deals).map(function(item){ return '<a class="home-deal-card" href="'+item.link+'" aria-label="'+item.title+' booking"><div class="home-deal-card-inner"><div class="home-deal-photo" style="background-image:url(\''+item.url+'\')"></div><div class="home-deal-copy"><h3 class="home-deal-title">'+item.title+'</h3><p class="home-deal-sub">'+item.sub+'</p></div></div></a>'; }).join('');

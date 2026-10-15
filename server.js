@@ -2219,13 +2219,16 @@ const server = http.createServer(async (req, res) => {
       const heroFrameFirst = (settings.homeHeroFramePhotos || [])[0] || '';
       const heroFrameRawUrl = mediaUrl(typeof heroFrameFirst === 'string' ? heroFrameFirst : String(heroFrameFirst.url || ''));
       const heroFrameUrl = heroFrameRawUrl.replace(/["'<>]/g, '');
+      const bookBootImages = Object.fromEntries(Object.entries(settings.bookImages || {}).map(([key, value]) => [key, mediaUrl(value)]));
+      const bookBootJson = JSON.stringify(bookBootImages).replace(/</g, '\\u003c');
       const html = data.toString('utf8')
         .replace(/__HERO_SIDE_BG_BOOT_MEDIA__/g, heroBootMedia)
         .replace(/__HERO_SIDE_BG_BOOT_URL__/g, safeUrl)
         .replace(/__HERO_SIDE_BG_BOOT_X__/g, String(x))
         .replace(/__HERO_SIDE_BG_BOOT_Y__/g, String(y))
         .replace(/__HERO_SIDE_BG_BOOT_ZOOM__/g, String(zoom))
-        .replace(/__HERO_FRAME_BOOT_URL__/g, heroFrameUrl);
+        .replace(/__HERO_FRAME_BOOT_URL__/g, heroFrameUrl)
+        .replace(/__BOOK_IMAGES_BOOT__/g, bookBootJson);
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' });
       serveLiveHtml(res, html);
     });
