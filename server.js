@@ -4948,7 +4948,8 @@ function computeOrderFees(subtotal, settingsFees) {
         positionX: Math.max(0, Math.min(100, Number(it.positionX ?? 50))),
         positionY: Math.max(0, Math.min(100, Number(it.positionY ?? 50))),
         zoom: Math.max(1, Math.min(2.5, Number(it.zoom || 1))),
-        durationSec: Math.max(2, Math.min(30, Number(it.durationSec || body.durationSec || 5)))
+        durationSec: Math.max(2, Math.min(30, Number(it.durationSec || body.durationSec || 5))),
+        mediaId: String(it.mediaId || crypto.randomBytes(12).toString('hex')).replace(/[^a-z0-9_-]/gi, '').slice(0, 48) || crypto.randomBytes(12).toString('hex')
       })).filter(x => x.url);
       if (!mapped.length) return sendJSON(res, 400, { ok: false, error: 'invalid' });
       if (body.replace === true || body.replace === 'true') {
@@ -4991,9 +4992,15 @@ function computeOrderFees(subtotal, settingsFees) {
   if (req.method === 'POST' && urlPath === '/admin/hero-side-bg-delete') {
     try {
       const body = await readBody(req, 1e5);
-      const index = Number(body.index);
+      const requestedIndex = Number(body.index);
+      const mediaId = String(body.mediaId || '');
       const cur = loadSettings();
       const list = Array.isArray(cur.heroSideBgPhotos) ? cur.heroSideBgPhotos : [];
+      // Delete the exact card that was clicked. Index alone can change after a concurrent edit.
+      let index = mediaId ? list.findIndex(item => {
+        const entry = typeof item === 'string' ? { url:item } : (item || {});
+        return String(entry.mediaId || entry.url || '') === mediaId;
+      }) : requestedIndex;
       if (!Number.isInteger(index) || index < 0 || index >= list.length) return sendJSON(res, 404, { ok:false, error:'not-found' });
       list.splice(index, 1);
       cur.heroSideBgPhotos = list;
@@ -6007,11 +6014,12 @@ ${(function(){
     const z = Math.max(1, Math.min(2.5, Number((p&&p.zoom) || 1)));
     const isVideo = (p && p.mediaType === 'video') || /\.(mp4|webm)(?:[?#]|$)/i.test(u);
     const duration = Math.max(2, Math.min(30, Number((p&&p.durationSec) || settings.heroSideBgDurationSec || 5)));
+    const mediaId = String((p&&p.mediaId) || u || '');
     const mediaPreview = isVideo
       ? '<video id="heroBgPreview'+i+'" src="'+esc(u)+'" muted playsinline controls preload="metadata" style="width:100%;height:100%;object-fit:cover;object-position:'+x+'% '+y+'%;transform:scale('+z+');transform-origin:center"></video>'
       : '<div id="heroBgPreview'+i+'" style="position:absolute;inset:0;background-image:url(\''+esc(u).replace(/\'/g,'%27')+'\');background-size:cover;background-position:'+x+'% '+y+'%;transform:scale('+z+');transform-origin:center"></div>';
     return '<div style="width:235px;border:1px solid '+(isVideo?'rgba(168,85,247,.7)':'rgba(212,175,55,.4)')+';border-radius:10px;padding:8px;background:#15120b;position:relative">'
-      + '<button type="button" onclick="adminDeleteHeroBg('+i+')" title="Is media ko remove karo" style="position:absolute;right:5px;top:5px;z-index:3;width:25px;height:25px;border:1px solid #fb7185;border-radius:50%;background:#7f1d1d;color:#fff;font-size:17px;line-height:20px;font-weight:800;cursor:pointer">×</button>'
+      + '<button type="button" data-index="'+i+'" data-media-id="'+esc(mediaId)+'" onclick="event.preventDefault();event.stopPropagation();adminDeleteHeroBg(this)" title="Is media ko remove karo" style="position:absolute;right:5px;top:5px;z-index:3;width:25px;height:25px;border:1px solid #fb7185;border-radius:50%;background:#7f1d1d;color:#fff;font-size:17px;line-height:20px;font-weight:800;cursor:pointer">×</button>'
       + '<div style="height:132px;border-radius:6px;overflow:hidden;outline:1px solid '+(isVideo?'rgba(168,85,247,.7)':'rgba(125,211,252,.5)')+';position:relative;background:#111">'+mediaPreview+'</div>'
       + '<div style="font-size:11px;color:'+(isVideo?'#d8b4fe':'#f2ca50')+';margin-top:8px">#'+(i+1)+' · '+(isVideo?'🎬 Video · poora chalega':'🖼️ Photo · '+duration+' seconds')+'</div>'
       + '<label class="muted" style="display:block;font-size:10px">Left / Right <b id="heroBgXVal'+i+'">'+x+'%</b><input type="range" id="heroBgX'+i+'" min="0" max="100" value="'+x+'" oninput="adminPreviewHeroBgCrop('+i+')"></label>'
@@ -6921,17 +6929,20 @@ async function adminSaveHeroBgCrop(index) {
     if (status) status.textContent = '✅ Photo ' + (index + 1) + ' adjustment saved — Home page refresh par same view dikhega.';
   } catch (e) { if (status) status.textContent = 'Adjustment save nahi hua'; }
 }
-async function adminDeleteHeroBg(index) {
+async function adminDeleteHeroBg(buttonOrIndex) {
+  var button = (buttonOrIndex && buttonOrIndex.nodeType === 1) ? buttonOrIndex : null;
+  var index = button ? Number(button.getAttribute('data-index')) : Number(buttonOrIndex);
+  var mediaId = button ? String(button.getAttribute('data-media-id') || '') : '';
   var status = document.getElementById('heroBgStatus');
-  var button = document.querySelector('button[onclick="adminDeleteHeroBg(' + index + ')"]');
+  if (!Number.isInteger(index) || index < 0) { alert('Sahi media card nahi mila. Page refresh karke dobara try karein.'); return; }
   if (button) { button.disabled = true; button.textContent = '…'; }
-  if (status) status.textContent = 'Media ' + (index + 1) + ' remove ho rahi hai…';
+  if (status) status.textContent = 'Selected media remove ho rahi hai…';
   try {
-    var res = await fetch('/admin/hero-side-bg-delete', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ index:index }) });
-    var data = await res.json();
+    var res = await fetch('/admin/hero-side-bg-delete', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ index:index, mediaId:mediaId }) });
+    var data = await res.json().catch(function(){ return {}; });
     if (!res.ok || !data.ok) throw new Error(data.error || 'Delete fail');
-    if (status) status.textContent = '✅ Media remove ho gayi. List refresh ho rahi hai…';
-    setTimeout(function(){ location.hash = 'site'; location.reload(); }, 350);
+    if (status) status.textContent = '✅ Selected media remove ho gayi. List refresh ho rahi hai…';
+    setTimeout(function(){ location.hash = 'site'; location.reload(); }, 250);
   } catch (e) {
     if (button) { button.disabled = false; button.textContent = '×'; }
     if (status) status.textContent = 'Remove fail: ' + (e.message || 'dobara try karein');
