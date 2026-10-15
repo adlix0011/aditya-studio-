@@ -6562,17 +6562,12 @@ async function adminClearOtps() {
   }
 }
 
-// Unlock audio on first click (browser policy)
-document.addEventListener('click', function once() {
-  try {
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    audioCtx.resume();
-  } catch(e) {}
-  if (window.Notification && Notification.permission === 'default') {
-    Notification.requestPermission().catch(function(){});
+// Audio unlock is intentionally lazy; keeping this block simple avoids blocking admin controls.
+document.addEventListener('click', function() {
+  if (!audioCtx && (window.AudioContext || window.webkitAudioContext)) {
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); audioCtx.resume(); } catch (e) {}
   }
-  document.removeEventListener('click', once);
-});
+}, { once:true });
 
 /* ---- Home banner photo upload ---- */
 async function adminUploadBanners() {
