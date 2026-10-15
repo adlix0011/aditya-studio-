@@ -1780,7 +1780,7 @@ const STUDIO_BOTTOM_NAV = `<style id="studio-bottom-nav-style">
     body:has(#order-btn-m){padding-bottom:88px!important}
   }
   @media (min-width:768px){.studio-bottom-nav{display:none}}
-</style><nav class="studio-bottom-nav" aria-label="Quick navigation"><a href="/" data-studio-nav="home"><span class="studio-bottom-nav-icon">⌂</span><span>Home</span></a><a href="/my-orders" data-studio-nav="orders"><span class="studio-bottom-nav-icon">▣</span><span>Orders</span></a><a href="/local-delivery.html" data-studio-nav="delivery"><span class="studio-bottom-nav-icon">🚚</span><span>Local Delivery</span></a></nav><script>(function(){var p=location.pathname;var k=p==='/local-delivery.html'?'delivery':(p==='/my-orders'||p==='/my-orders.html'?'orders':'home');var a=document.querySelector('[data-studio-nav="'+k+'"]');if(a)a.setAttribute('aria-current','page');})();</script>`;
+</style><nav class="studio-bottom-nav" aria-label="Quick navigation"><a href="/" data-studio-nav="home"><span class="studio-bottom-nav-icon">⌂</span><span>Home</span></a><a href="/my-orders" data-studio-nav="orders"><span class="studio-bottom-nav-icon">▣</span><span>Orders</span></a></nav><script>(function(){var p=location.pathname;var k=(p==='/my-orders'||p==='/my-orders.html')?'orders':'home';var a=document.querySelector('[data-studio-nav="'+k+'"]');if(a)a.setAttribute('aria-current','page');})();</script>`;
 function serveLiveHtml(res, data, includeLiveSync) {
   const html = Buffer.isBuffer(data) ? data.toString('utf8') : String(data || '');
   const isLocalDelivery = /<title>\s*Local Delivery\s*<\/title>/i.test(html);
