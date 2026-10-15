@@ -1919,6 +1919,29 @@ const server = http.createServer(async (req, res) => {
       if (message) message.textContent = 'Upload error: ' + (error.message || 'try again');
     }
   };
+  window.adminUploadBookImage = async function(key){
+    var input = document.getElementById('bookFile_' + key);
+    var message = document.getElementById('bookSt_' + key);
+    var allowed = ['wedding','birthday','personal','reel','event','other'];
+    if (!allowed.includes(String(key)) || !input || !input.files || !input.files[0]) { if (message) message.textContent = 'Pehle photo choose karo'; return; }
+    var file = input.files[0];
+    if (!String(file.type || '').startsWith('image/')) { if (message) message.textContent = 'Sirf image file choose karo'; return; }
+    if (file.size > 8 * 1024 * 1024) { if (message) message.textContent = 'Photo 8 MB se chhoti choose karo'; return; }
+    if (message) message.textContent = 'Uploading…';
+    try {
+      var contentType = file.type || 'image/jpeg';
+      var upload = await fetch('/admin/hero-media-upload-stream', { method:'POST', credentials:'same-origin', headers:{'Content-Type':contentType, 'X-Admin-Media-Group':'book'}, body:file });
+      var text = await upload.text(), uploaded;
+      try { uploaded = JSON.parse(text); } catch (_) { throw Error('Server upload error (' + upload.status + ')'); }
+      if (!upload.ok || !uploaded.ok) throw Error(uploaded.message || uploaded.error || 'Upload fail');
+      var saved = await fetch('/admin/book-image-upload', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({key:key, url:uploaded.value}) });
+      var result = await saved.json();
+      if (!saved.ok || !result.ok) throw Error(result.error || 'Save fail');
+      if (message) message.textContent = 'Saved ✅';
+      location.href = '/admin#sec-book';
+      location.reload();
+    } catch (error) { if (message) message.textContent = 'Upload error: ' + (error.message || 'try again'); }
+  };
   var live = document.getElementById('liveStatus');
   async function refreshLive(){
     try { var response = await fetch('/admin/live-json', {credentials:'same-origin', cache:'no-store'}); var state = await response.json(); if (live) live.textContent = response.ok && state.ok ? 'connected' : 'offline'; }
@@ -2322,11 +2345,13 @@ const server = http.createServer(async (req, res) => {
     try {
       if (!r2Ready()) return sendJSON(res, 503, { ok:false, error:'r2-not-configured', message:'Cloud storage configured nahi hai' });
       const type = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+      const group = String(req.headers['x-admin-media-group'] || 'hero-bg').toLowerCase();
       const ext = ({ 'image/jpeg':'jpg', 'image/jpg':'jpg', 'image/png':'png', 'image/webp':'webp', 'video/mp4':'mp4', 'video/webm':'webm' })[type];
-      if (!ext) return sendJSON(res, 400, { ok:false, error:'invalid-media', message:'Sirf photo, MP4 ya WebM upload karein' });
-      const bytes = await readRawBody(req, type.startsWith('video/') ? 30 * 1024 * 1024 : 8 * 1024 * 1024);
+      const isVideo = type.startsWith('video/');
+      if (!ext || (isVideo && group !== 'hero-bg') || !['hero-bg', 'book'].includes(group)) return sendJSON(res, 400, { ok:false, error:'invalid-media', message:'Sirf sahi photo ya hero MP4/WebM upload karein' });
+      const bytes = await readRawBody(req, isVideo ? 30 * 1024 * 1024 : 8 * 1024 * 1024);
       if (!bytes.length) return sendJSON(res, 400, { ok:false, error:'empty-media', message:'File khaali hai' });
-      const key = 'studio-images/hero-bg/' + Date.now() + '-' + crypto.randomBytes(10).toString('hex') + '.' + ext;
+      const key = 'studio-images/' + group + '/' + Date.now() + '-' + crypto.randomBytes(10).toString('hex') + '.' + ext;
       const put = await fetch(r2PresignedUrl('PUT', key, 900), { method:'PUT', headers:{ 'Content-Type':type, 'Cache-Control':'public, max-age=31536000, immutable' }, body:bytes });
       if (!put.ok) throw new Error('R2 HTTP ' + put.status);
       return sendJSON(res, 200, { ok:true, value:'r2:' + key });
