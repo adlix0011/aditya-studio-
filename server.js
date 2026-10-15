@@ -335,7 +335,7 @@ function publicSettings(settings) {
   out.heroSideBgPhotos = mapItems(out.heroSideBgPhotos);
   out.bookImages = Object.fromEntries(Object.entries(out.bookImages || {}).map(([k, v]) => [k, mediaUrl(v)]));
   out.gallerySamples = Object.fromEntries(Object.entries(out.gallerySamples || {}).map(([k, list]) => [k, mapItems(list)]));
-  out.liveWedding = { ...(out.liveWedding || {}), thumbnail: mediaUrl((out.liveWedding || {}).thumbnail || '') };
+  out.liveWedding = { ...(out.liveWedding || {}), thumbnail: mediaUrl((out.liveWedding || {}).thumbnail || ''), albums: Object.fromEntries(Object.entries((out.liveWedding || {}).albums || {}).map(([k,v]) => [k, mediaUrl(v)])) };
   return out;
 }
 async function moveDataImageToR2(value, group) {
@@ -1292,7 +1292,7 @@ function defaultSettings() {
     },
     gallerySamplesConfigured: false,
     // One clickable live-wedding card. Admin uploads its thumbnail and pastes the Google Drive folder/file link.
-    liveWedding: { thumbnail: '', driveUrl: '' },
+    liveWedding: { title: 'Rahul Sharan & Anita Sharma', thumbnail: '', driveUrl: '', albums: { chulmati:'', devpoojan:'', haldi:'', barat:'', reception:'' } },
     marketplacePosters: [],
     fees: {
       platformFee: 10,
@@ -2021,6 +2021,10 @@ const server = http.createServer(async (req, res) => {
   }
 
   // New luxury homepage (Artisan Collection)
+  if (req.method === 'GET' && (urlPath === '/live-wedding' || urlPath === '/live-wedding.html')) {
+    return fs.readFile(path.join(__dirname, 'live-wedding.html'), (err, data) => { if(err){res.writeHead(404);return res.end('Live wedding page missing');} res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-cache'});res.end(data); });
+  }
+
   if (req.method === 'GET' && (urlPath === '/' || urlPath === '/index.html')) {
     fs.readFile(INDEX_HTML_FILE, (err, data) => {
       if (err) { res.writeHead(404); return res.end('index.html missing'); }
@@ -5074,10 +5078,13 @@ function computeOrderFees(subtotal, settingsFees) {
       const body = await readBody(req, 8e6);
       const thumbnail = storedMediaValue(String(body.thumbnail || '').trim());
       const driveUrl = String(body.driveUrl || '').trim();
-      const safeThumb = !thumbnail || /^data:image\/(png|jpe?g|webp);base64,/i.test(thumbnail) || (thumbnail.startsWith('r2:') && isSafeAdminR2ImageKey(thumbnail.slice(3))) || /^https:\/\//i.test(thumbnail);
+      const title = String(body.title || 'Rahul Sharan & Anita Sharma').trim().slice(0,100);
+      const inputAlbums = body.albums && typeof body.albums === 'object' ? body.albums : {};
+      const albums = Object.fromEntries(['chulmati','devpoojan','haldi','barat','reception'].map(key => [key, storedMediaValue(String(inputAlbums[key] || '').trim())]));
+      const isImage = value => !value || /^data:image\/(png|jpe?g|webp);base64,/i.test(value) || (value.startsWith('r2:') && isSafeAdminR2ImageKey(value.slice(3))) || /^https:\/\//i.test(value);
       const safeDrive = !driveUrl || /^https:\/\/(drive\.google\.com|docs\.google\.com)\//i.test(driveUrl);
-      if (!safeThumb || !safeDrive) return sendJSON(res, 400, { ok:false, message:'Valid thumbnail aur Google Drive link zaroori hai' });
-      const cur = loadSettings(); cur.liveWedding = { thumbnail, driveUrl }; saveSettings(cur);
+      if (!isImage(thumbnail) || !Object.values(albums).every(isImage) || !safeDrive) return sendJSON(res, 400, { ok:false, message:'Valid images aur Google Drive link zaroori hai' });
+      const cur = loadSettings(); cur.liveWedding = { title, thumbnail, driveUrl, albums }; saveSettings(cur);
       return sendJSON(res, 200, { ok:true });
     } catch (e) { return sendJSON(res, 500, { ok:false, message:'Live Wedding save nahi hua' }); }
   }
@@ -6104,8 +6111,9 @@ document.querySelectorAll('.book-up-btn').forEach(function(btn){
   <div style="font-weight:900;color:#67e8f9;margin-bottom:6px">💒 Live Wedding <span class="muted" style="font-size:11px">Gallery ke sabse upar clickable card</span></div>
   <div class="muted" style="font-size:12px;margin-bottom:10px">Thumbnail upload karein aur Google Drive ka folder/file link paste karein. User card par click karke photos download kar sakega.</div>
   <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">${liveWedding.thumbnail ? '<img src="'+esc(liveWedding.thumbnail)+'" alt="Live Wedding thumbnail" style="width:112px;height:64px;object-fit:cover;border-radius:9px;border:1px solid #67e8f9">' : '<span class="muted" style="font-size:11px">No thumbnail uploaded</span>'}<input type="file" accept="image/*" class="field-file" id="liveWeddingFile"></div>
-  <label class="muted" style="display:block">Google Drive link<input class="inp" id="liveWeddingDriveUrl" value="${esc(liveWedding.driveUrl || '')}" placeholder="https://drive.google.com/drive/folders/..." style="margin-top:5px"></label>
-  <div style="display:flex;gap:8px;align-items:center;margin-top:10px"><button type="button" class="gen-btn" style="padding:8px 12px;background:linear-gradient(90deg,#0891b2,#7c3aed)" onclick="adminSaveLiveWedding()">💾 Save Live Wedding</button><span id="liveWeddingSt" class="muted" style="font-size:11px"></span></div>
+  <label class="muted" style="display:block">Bride &amp; Groom names<input class="inp" id="liveWeddingTitle" value="${esc(liveWedding.title || 'Rahul Sharan & Anita Sharma')}" placeholder="Rahul Sharan & Anita Sharma" style="margin-top:5px"></label>
+  <label class="muted" style="display:block;margin-top:9px">Google Drive link<input class="inp" id="liveWeddingDriveUrl" value="${esc(liveWedding.driveUrl || '')}" placeholder="https://drive.google.com/drive/folders/..." style="margin-top:5px"></label>
+  <div class="muted" style="margin-top:10px;font-size:12px">Event thumbnails (optional):</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:7px;margin-top:7px">${[['chulmati','Chulmati'],['devpoojan','Devpoojan'],['haldi','Haldi'],['barat','Barat'],['reception','Reception']].map(x=>'<label class="muted" style="font-size:11px">'+x[1]+'<input type="file" accept="image/*" class="field-file" id="liveWeddingAlbum_'+x[0]+'">'+((liveWedding.albums||{})[x[0]]?'<span style="color:#67e8f9">✓ saved</span>':'')+'</label>').join('')}</div><div style="display:flex;gap:8px;align-items:center;margin-top:10px"><button type="button" class="gen-btn" style="padding:8px 12px;background:linear-gradient(90deg,#0891b2,#7c3aed)" onclick="adminSaveLiveWedding()">💾 Save Live Wedding</button><span id="liveWeddingSt" class="muted" style="font-size:11px"></span></div>
 </div>
 <div class="form-grid" id="gallerySamplesUploadGrid">
 ${[['wedding','💍 Wedding'],['birthday','🎂 Birthday Shoot'],['baby','🍼 Baby Shower'],['prewedding','✨ Pre-Wedding']].map(row => {
@@ -6981,17 +6989,18 @@ async function adminUploadBookImage(key) {
 
 
 async function adminSaveLiveWedding() {
-  var fileInput=document.getElementById('liveWeddingFile'), driveInput=document.getElementById('liveWeddingDriveUrl'), st=document.getElementById('liveWeddingSt');
-  var driveUrl=(driveInput&&driveInput.value||'').trim();
+  var fileInput=document.getElementById('liveWeddingFile'), driveInput=document.getElementById('liveWeddingDriveUrl'), titleInput=document.getElementById('liveWeddingTitle'), st=document.getElementById('liveWeddingSt');
+  var driveUrl=(driveInput&&driveInput.value||'').trim(), title=(titleInput&&titleInput.value||'').trim();
   if(driveUrl && !/^https:\/\/(drive\.google\.com|docs\.google\.com)\//i.test(driveUrl)){ alert('Google Drive ka valid link paste karein'); return; }
   try {
     var live=await fetch('/api/home-gallery-samples',{credentials:'same-origin',cache:'no-store'}).then(function(r){return r.json()});
-    var thumbnail=(live.liveWedding&&live.liveWedding.thumbnail)||'';
+    var thumbnail=(live.liveWedding&&live.liveWedding.thumbnail)||'', albums=Object.assign({},(live.liveWedding&&live.liveWedding.albums)||{});
     var file=fileInput&&fileInput.files&&fileInput.files[0];
     if(file){ if(st)st.textContent='Thumbnail upload ho raha hai…'; var dataUrl=await compressImageFile(file,1400,0.84); try{thumbnail=await uploadAdminImageToR2(dataUrl,'gallery-live');}catch(e){thumbnail=dataUrl;} }
+    for(var ai=0,ak=['chulmati','devpoojan','haldi','barat','reception'];ai<ak.length;ai++){var af=document.getElementById('liveWeddingAlbum_'+ak[ai]);if(af&&af.files&&af.files[0]){if(st)st.textContent=ak[ai]+' thumbnail upload ho raha hai…';var ad=await compressImageFile(af.files[0],1200,0.82);try{albums[ak[ai]]=await uploadAdminImageToR2(ad,'gallery-live');}catch(e){albums[ak[ai]]=ad;}}}
     if(!thumbnail){ alert('Pehle Live Wedding thumbnail upload karein'); return; }
     if(!driveUrl){ alert('Google Drive download link paste karein'); return; }
-    var res=await fetch('/admin/live-wedding-save',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({thumbnail:thumbnail,driveUrl:driveUrl})});
+    var res=await fetch('/admin/live-wedding-save',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:title,thumbnail:thumbnail,driveUrl:driveUrl,albums:albums})});
     var out=await res.json(); if(!res.ok||!out.ok) throw new Error(out.message||'Save fail'); if(st)st.textContent='Saved ✅'; alert('Live Wedding card saved ✅'); location.href='/admin#sec-gallery-samples'; location.reload();
   } catch(e) { if(st)st.textContent='Upload fail'; alert('Live Wedding save fail: '+(e.message||'Network error')); }
 }

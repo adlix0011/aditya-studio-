@@ -775,7 +775,7 @@
           });
           timers.forEach(function(id){ clearTimeout(id); }); timers=[];
           var liveCard=document.getElementById('liveWeddingCard'), liveImage=document.getElementById('liveWeddingImage');
-          if(liveCard&&liveImage){ var liveThumb=liveWedding&&liveWedding.thumbnail, liveLink=liveWedding&&liveWedding.driveUrl; liveCard.classList.toggle('is-ready',!!(liveThumb&&liveLink)); if(liveThumb&&liveLink){ liveImage.src=liveThumb; liveCard.onclick=function(){ window.open(liveLink,'_blank','noopener'); }; liveCard.setAttribute('role','link'); liveCard.tabIndex=0; liveCard.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();window.open(liveLink,'_blank','noopener');}}; } }
+          if(liveCard&&liveImage){ var liveThumb=liveWedding&&liveWedding.thumbnail, liveLink=liveWedding&&liveWedding.driveUrl; liveCard.classList.toggle('is-ready',!!(liveThumb&&liveLink)); if(liveThumb&&liveLink){ liveImage.src=liveThumb; liveCard.onclick=function(){ window.location.href='/live-wedding'; }; liveCard.setAttribute('role','link'); liveCard.tabIndex=0; liveCard.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();window.location.href='/live-wedding';}}; } }
           // Every category changes on its own clock with a different direction, never all together.
           document.querySelectorAll('[data-gallery]').forEach(function(img, cardIndex){
             var key=img.dataset.gallery, list=(gallery&&gallery[key])||[]; if(list.length<2) return;
