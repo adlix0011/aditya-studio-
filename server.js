@@ -1839,6 +1839,87 @@ const server = http.createServer(async (req, res) => {
     return res.end();
   }
 
+  // This small standalone file intentionally stays outside the large inline
+  // admin template. It keeps hero media actions working even if unrelated UI
+  // code in the dashboard fails to parse.
+  if (req.method === 'GET' && urlPath === '/admin-hero-recovery.js') {
+    const script = String.raw`(function(){
+  function status(){ return document.getElementById('heroBgStatus'); }
+  window.adminDeleteHeroBg = async function(buttonOrIndex){
+    var button = buttonOrIndex && buttonOrIndex.nodeType === 1 ? buttonOrIndex : null;
+    var index = button ? Number(button.getAttribute('data-index')) : Number(buttonOrIndex);
+    var mediaId = button ? String(button.getAttribute('data-media-id') || '') : '';
+    var message = status();
+    if (!Number.isInteger(index) || index < 0) return;
+    if (button) { button.disabled = true; button.textContent = '…'; }
+    if (message) message.textContent = 'Selected media remove ho rahi hai…';
+    try {
+      var response = await fetch('/admin/hero-side-bg-delete', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({index:index, mediaId:mediaId}) });
+      var result = await response.json();
+      if (!response.ok || !result.ok) throw Error(result.error || 'Delete fail');
+      if (message) message.textContent = '✅ Selected media remove ho gayi.';
+      location.reload();
+    } catch (error) {
+      if (button) { button.disabled = false; button.textContent = '×'; }
+      if (message) message.textContent = 'Remove fail: ' + (error.message || 'network');
+    }
+  };
+  window.adminHeroMediaSelected = function(){
+    var photos = document.getElementById('heroBgPhotoFiles');
+    var videos = document.getElementById('heroBgVideoFiles');
+    var notice = document.getElementById('heroBgSelection');
+    var count = (photos && photos.files ? photos.files.length : 0) + (videos && videos.files ? videos.files.length : 0);
+    if (notice) notice.textContent = count ? '✅ ' + count + ' file selected. Ab Upload Banner Media dabayein.' : 'Photo/video choose karke Upload Banner Media dabayein.';
+  };
+  window.adminUploadHeroSideBg = async function(){
+    var photos = document.getElementById('heroBgPhotoFiles');
+    var videos = document.getElementById('heroBgVideoFiles');
+    var message = status();
+    var files = [].concat(photos && photos.files ? Array.from(photos.files) : [], videos && videos.files ? Array.from(videos.files) : []);
+    var replace = !!(document.getElementById('heroBgReplace') || {}).checked;
+    var duration = Number((document.getElementById('heroBgDuration') || {}).value || 5);
+    if (!files.length) { if (message) message.textContent = 'Pehle photo ya video choose karo'; return; }
+    if (files.length > 5) { if (message) message.textContent = 'Maximum 5 files select karo'; return; }
+    try {
+      var items = [];
+      for (var index = 0; index < files.length; index++) {
+        var file = files[index];
+        var name = String(file.name || '').toLowerCase();
+        var isVideo = String(file.type || '').indexOf('video/') === 0 || name.endsWith('.mp4') || name.endsWith('.webm');
+        var limit = isVideo ? 30 * 1024 * 1024 : 8 * 1024 * 1024;
+        if (file.size > limit) throw Error(isVideo ? 'Video 30 MB se chhoti select karein' : 'Photo 8 MB se chhoti select karein');
+        if (message) message.textContent = 'Uploading ' + (index + 1) + ' / ' + files.length + '…';
+        var base64 = await new Promise(function(resolve, reject){
+          var reader = new FileReader();
+          reader.onload = function(){ resolve(String(reader.result).split(',')[1] || ''); };
+          reader.onerror = function(){ reject(Error('File read nahi hua')); };
+          reader.readAsDataURL(file);
+        });
+        var upload = await fetch('/admin/hero-media-upload-proxy', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({contentType:file.type || (isVideo ? 'video/mp4' : 'image/jpeg'), base64:base64}) });
+        var uploaded = await upload.json();
+        if (!upload.ok || !uploaded.ok) throw Error(uploaded.message || uploaded.error || 'Upload fail');
+        items.push({url:uploaded.value, title:file.name, mediaType:isVideo ? 'video' : 'image', durationSec:duration});
+      }
+      var save = await fetch('/admin/hero-side-bg-upload', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({items:items, replace:replace, durationSec:duration}) });
+      var saved = await save.json();
+      if (!save.ok || !saved.ok) throw Error(saved.error || 'Save fail');
+      if (message) message.textContent = '✅ ' + saved.count + ' media saved';
+      location.reload();
+    } catch (error) {
+      if (message) message.textContent = 'Upload error: ' + (error.message || 'try again');
+    }
+  };
+  var live = document.getElementById('liveStatus');
+  async function refreshLive(){
+    try { var response = await fetch('/admin/live-json', {credentials:'same-origin', cache:'no-store'}); var state = await response.json(); if (live) live.textContent = response.ok && state.ok ? 'connected' : 'offline'; }
+    catch (_) { if (live) live.textContent = 'offline'; }
+  }
+  refreshLive(); setInterval(refreshLive, 5000);
+})();`;
+    res.writeHead(200, { 'Content-Type':'application/javascript; charset=utf-8', 'Cache-Control':'no-store, max-age=0' });
+    return res.end(script);
+  }
+
   // Local Delivery is a small client app. Keep its files explicitly allow-listed
   // so this server never exposes arbitrary files from the project folder.
   const localDeliveryAssets = new Set([
@@ -7757,12 +7838,7 @@ setInterval(pollLive, 5000);
 loadWhatsAppRelayHealth();
 setInterval(loadWhatsAppRelayHealth, 10_000);
 </script>
-<script>
-window.adminDeleteHeroBg=async function(b){var i=b&&b.nodeType===1?Number(b.getAttribute('data-index')):Number(b),id=b?String(b.getAttribute('data-media-id')||''):'' ,st=document.getElementById('heroBgStatus');if(!Number.isInteger(i)||i<0)return;if(b){b.disabled=true;b.textContent='…'}if(st)st.textContent='Selected media remove ho rahi hai…';try{var r=await fetch('/admin/hero-side-bg-delete',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({index:i,mediaId:id})}),d=await r.json();if(!r.ok||!d.ok)throw Error(d.error||'Delete fail');if(st)st.textContent='✅ Selected media remove ho gayi.';location.reload()}catch(e){if(b){b.disabled=false;b.textContent='×'}if(st)st.textContent='Remove fail: '+(e.message||'network')}};
-(function(){var st=document.getElementById('liveStatus');async function c(){try{var r=await fetch('/admin/live-json',{credentials:'same-origin',cache:'no-store'}),d=await r.json();if(st)st.textContent=r.ok&&d.ok?'connected':'offline'}catch(e){if(st)st.textContent='offline'}}c();setInterval(c,5000)})();
-window.adminHeroMediaSelected=function(){var p=document.getElementById('heroBgPhotoFiles'),v=document.getElementById('heroBgVideoFiles'),o=document.getElementById('heroBgSelection'),n=(p&&p.files?p.files.length:0)+(v&&v.files?v.files.length:0);if(o)o.textContent=n?'✅ '+n+' file selected. Ab Upload Banner Media dabayein.':'Photo/video choose karke Upload Banner Media dabayein.'};
-window.adminUploadHeroSideBg=async function(){var p=document.getElementById('heroBgPhotoFiles'),v=document.getElementById('heroBgVideoFiles'),st=document.getElementById('heroBgStatus'),files=[].concat(p&&p.files?Array.from(p.files):[],v&&v.files?Array.from(v.files):[]),replace=!!(document.getElementById('heroBgReplace')||{}).checked,duration=Number((document.getElementById('heroBgDuration')||{}).value||5);if(!files.length){if(st)st.textContent='Pehle photo ya video choose karo';return}if(files.length>5){if(st)st.textContent='Maximum 5 files select karo';return}try{var items=[];for(var i=0;i<files.length;i++){var f=files[i],isVideo=String(f.type||'').indexOf('video/')===0||String(f.name||'').toLowerCase().endsWith('.mp4')||String(f.name||'').toLowerCase().endsWith('.webm'),max=isVideo?30*1024*1024:8*1024*1024;if(f.size>max)throw Error((isVideo?'Video 30 MB':'Photo 8 MB')+' se chhoti select karein');if(st)st.textContent='Uploading '+(i+1)+' / '+files.length+'…';var data=await new Promise(function(ok,bad){var r=new FileReader();r.onload=function(){ok(String(r.result).split(',')[1]||'')};r.onerror=function(){bad(Error('File read nahi hua'))};r.readAsDataURL(f)}),up=await fetch('/admin/hero-media-upload-proxy',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({contentType:f.type|| (isVideo?'video/mp4':'image/jpeg'),base64:data})}),u=await up.json();if(!up.ok||!u.ok)throw Error(u.message||u.error||'Upload fail');items.push({url:u.value,title:f.name,mediaType:isVideo?'video':'image',durationSec:duration})}var save=await fetch('/admin/hero-side-bg-upload',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:items,replace:replace,durationSec:duration})}),out=await save.json();if(!save.ok||!out.ok)throw Error(out.error||'Save fail');if(st)st.textContent='✅ '+out.count+' media saved';location.reload()}catch(e){if(st)st.textContent='Upload error: '+(e.message||'try again')}};
-</script>
+<script src="/admin-hero-recovery.js" defer></script>
 </body></html>`;
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store, max-age=0' });
     return res.end(html);
