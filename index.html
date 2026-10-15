@@ -391,7 +391,7 @@
     @media (min-width:768px){.gallery-story{max-width:760px;margin-inline:auto}.gallery-story-media{max-height:430px}.gallery-reels{max-width:760px;margin-inline:auto}.gallery-reel-card{flex-basis:245px}}
 
     .gallery-story-media{cursor:pointer}
-    .gallery-live-wedding{display:none}
+    .gallery-live-wedding{display:flex}
     .gallery-live-wedding.is-ready{display:flex}
     .gallery-live-wedding .gallery-story-media{box-shadow:0 14px 32px rgba(0,0,0,.4),0 0 25px rgba(34,211,238,.36)}
     .live-wedding-cta{position:absolute;right:14px;bottom:14px;z-index:3;padding:8px 12px;border-radius:999px;background:linear-gradient(90deg,#06b6d4,#7c3aed,#ec4899);color:#fff;font-size:11px;font-weight:900;box-shadow:0 0 16px rgba(34,211,238,.45)}
@@ -775,7 +775,7 @@
           });
           timers.forEach(function(id){ clearTimeout(id); }); timers=[];
           var liveCard=document.getElementById('liveWeddingCard'), liveImage=document.getElementById('liveWeddingImage');
-          if(liveCard&&liveImage){ var liveThumb=liveWedding&&liveWedding.thumbnail, liveLink=liveWedding&&liveWedding.driveUrl; liveCard.classList.toggle('is-ready',!!(liveThumb&&liveLink)); if(liveThumb&&liveLink){ liveImage.src=liveThumb; liveCard.onclick=function(){ window.location.href='/live-wedding'; }; liveCard.setAttribute('role','link'); liveCard.tabIndex=0; liveCard.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();window.location.href='/live-wedding';}}; } }
+          if(liveCard&&liveImage){ var liveThumb=(liveWedding&&liveWedding.thumbnail)||((gallery&&gallery.wedding&&gallery.wedding[0])||'https://images.unsplash.com/photo-1519741497674-611481863552?w=1200&q=86'); liveCard.classList.add('is-ready'); liveImage.src=liveThumb; liveCard.onclick=function(){ window.location.href='/live-wedding'; }; liveCard.setAttribute('role','link'); liveCard.tabIndex=0; liveCard.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();window.location.href='/live-wedding';}}; }
           // Every category changes on its own clock with a different direction, never all together.
           document.querySelectorAll('[data-gallery]').forEach(function(img, cardIndex){
             var key=img.dataset.gallery, list=(gallery&&gallery[key])||[]; if(list.length<2) return;
