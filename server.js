@@ -1942,6 +1942,56 @@ const server = http.createServer(async (req, res) => {
       location.reload();
     } catch (error) { if (message) message.textContent = 'Upload error: ' + (error.message || 'try again'); }
   };
+  // Generic same-origin uploader used by every dashboard media section.
+  // It avoids the R2 CORS and base64-size failures that affected non-hero uploads.
+  async function uploadDashboardFile(file, group, allowVideo){
+    if (!file) throw Error('Pehle file choose karo');
+    var type = String(file.type || '').toLowerCase();
+    var name = String(file.name || '').toLowerCase();
+    var video = type.indexOf('video/') === 0 || /\.(mp4|webm)$/.test(name);
+    if (video && !allowVideo) throw Error('Is jagah sirf photo upload hoti hai');
+    if (!video && type.indexOf('image/') !== 0) throw Error('Sirf JPG, PNG ya WEBP photo choose karo');
+    var limit = video ? 30 * 1024 * 1024 : 8 * 1024 * 1024;
+    if (file.size > limit) throw Error(video ? 'Video 30 MB se chhoti choose karo' : 'Photo 8 MB se chhoti choose karo');
+    var contentType = type || (video ? 'video/mp4' : 'image/jpeg');
+    var response = await fetch('/admin/hero-media-upload-stream', {method:'POST',credentials:'same-origin',headers:{'Content-Type':contentType,'X-Admin-Media-Group':group},body:file});
+    var raw = await response.text(), result;
+    try { result = JSON.parse(raw); } catch (_) { throw Error('Server upload error (' + response.status + ')'); }
+    if (!response.ok || !result.ok) throw Error(result.message || result.error || 'Upload fail');
+    return result.value;
+  }
+  window.uploadAdminImageToR2 = async function(dataUrl, group){
+    var blob = await (await fetch(dataUrl)).blob();
+    return uploadDashboardFile(new File([blob], 'photo.' + (blob.type === 'image/png' ? 'png' : 'jpg'), {type:blob.type || 'image/jpeg'}), group, false);
+  };
+  window.adminUploadBanners = async function(){
+    var input=document.getElementById('bannerFiles'), st=document.getElementById('bannerUploadStatus'), files=input&&input.files?Array.from(input.files):[];
+    if(!files.length){ if(st)st.textContent='Pehle photos choose karo'; return; }
+    try { var items=[]; for(var i=0;i<files.length;i++){ if(st)st.textContent='Photo '+(i+1)+'/'+files.length+' upload ho rahi hai…'; items.push({url:await uploadDashboardFile(files[i],'banner',false),title:(document.getElementById('bannerTitle')||{}).value||'Aditya Studio',sub:(document.getElementById('bannerSub')||{}).value||''}); }
+      var res=await fetch('/admin/banner-upload',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:items,replace:!!((document.getElementById('bannerReplace')||{}).checked)})}), out=await res.json();
+      if(!res.ok||!out.ok)throw Error(out.error||'Save fail'); if(st)st.textContent='Saved ✅ Total banners: '+out.count; input.value='';
+    }catch(e){if(st)st.textContent='Upload fail: '+(e.message||'Network error');}
+  };
+  window.adminUpload3dPhotos = async function(){
+    var input=document.getElementById('f3dFiles'), st=document.getElementById('f3dStatus'), files=input&&input.files?Array.from(input.files):[];
+    if(!files.length){if(st)st.textContent='Pehle photos choose karo';return;} try{var items=[];for(var i=0;i<files.length;i++){if(st)st.textContent='Photo '+(i+1)+'/'+files.length+' upload ho rahi hai…';items.push({url:await uploadDashboardFile(files[i],'frame3d',false),title:files[i].name});}var r=await fetch('/admin/frames3d-upload',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:items,replace:!!((document.getElementById('f3dReplace')||{}).checked)})}),o=await r.json();if(!r.ok||!o.ok)throw Error(o.error||'Save fail');if(st)st.textContent='Saved ✅ '+o.count+' photos';}catch(e){if(st)st.textContent='Upload fail: '+(e.message||'Network error');}
+  };
+  window.adminUploadHomeFrame = async function(){
+    var input=document.getElementById('homeFrameFiles'),st=document.getElementById('homeFrameStatus'),files=input&&input.files?Array.from(input.files):[];
+    if(!files.length){if(st)st.textContent='Pehle photos choose karo';return;}if(files.length>5){if(st)st.textContent='Maximum 5 photos choose karo';return;}try{var items=[];for(var i=0;i<files.length;i++){if(st)st.textContent='Photo '+(i+1)+'/'+files.length+' upload ho rahi hai…';items.push({url:await uploadDashboardFile(files[i],'home-frame',false),title:files[i].name});}var r=await fetch('/admin/home-hero-frame-upload',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:items,replace:!!((document.getElementById('homeFrameReplace')||{}).checked)})}),o=await r.json();if(!r.ok||!o.ok)throw Error(o.error||'Save fail');if(st)st.textContent='Saved ✅';location.reload();}catch(e){if(st)st.textContent='Upload fail: '+(e.message||'Network error');}
+  };
+  window.adminSaveGallerySamples = async function(category){
+    var input=document.getElementById('galleryFiles_'+category),st=document.getElementById('gallerySt_'+category),files=input&&input.files?Array.from(input.files):[];
+    if(!files.length){if(st)st.textContent='Pehle photos choose karo';return;}try{var data=await fetch('/api/home-gallery-samples',{credentials:'same-origin',cache:'no-store'}).then(function(r){return r.json()}),images=Array.isArray(data.gallery&&data.gallery[category])?data.gallery[category].slice():[];if(images.length+files.length>12)throw Error('Maximum 12 photos allowed');for(var i=0;i<files.length;i++){if(st)st.textContent='Photo '+(i+1)+'/'+files.length+' upload ho rahi hai…';images.push(await uploadDashboardFile(files[i],'gallery-'+category,false));}var r=await fetch('/admin/gallery-samples-save',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({category:category,images:images})}),o=await r.json();if(!r.ok||!o.ok)throw Error(o.message||'Save fail');if(st)st.textContent='Saved ✅';location.reload();}catch(e){if(st)st.textContent='Upload fail: '+(e.message||'Network error');}
+  };
+  window.adminSaveGalleryReels = async function(){
+    var input=document.getElementById('galleryReelFiles'),st=document.getElementById('gallerySt_reel'),files=input&&input.files?Array.from(input.files):[];
+    if(!files.length){if(st)st.textContent='Pehle videos choose karo';return;}try{var data=await fetch('/api/home-gallery-samples',{credentials:'same-origin',cache:'no-store'}).then(function(r){return r.json()}),videos=Array.isArray(data.gallery&&data.gallery.reel)?data.gallery.reel.slice():[];if(videos.length+files.length>10)throw Error('Maximum 10 reels allowed');for(var i=0;i<files.length;i++){if(st)st.textContent='Reel '+(i+1)+'/'+files.length+' upload ho rahi hai…';videos.push(await uploadDashboardFile(files[i],'gallery-reel',true));}var r=await fetch('/admin/gallery-samples-save',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({category:'reel',images:videos})}),o=await r.json();if(!r.ok||!o.ok)throw Error(o.message||'Save fail');if(st)st.textContent='Reels saved ✅';location.reload();}catch(e){if(st)st.textContent='Upload fail: '+(e.message||'Network error');}
+  };
+  window.adminSaveLiveWedding = async function(){
+    var st=document.getElementById('liveWeddingSt'),file=(document.getElementById('liveWeddingFile')||{}).files||[];
+    try{var old=await fetch('/api/home-gallery-samples',{credentials:'same-origin',cache:'no-store'}).then(function(r){return r.json()}),current=old.liveWedding||{},thumbnail=current.thumbnail||'',albums=Object.assign({},current.albums||{});if(file[0]){if(st)st.textContent='Thumbnail upload ho raha hai…';thumbnail=await uploadDashboardFile(file[0],'gallery-live',false);}if(!thumbnail)throw Error('Pehle Live Wedding thumbnail choose karo');var keys=['chulmati','devpoojan','haldi','barat','reception'];for(var i=0;i<keys.length;i++){var f=(document.getElementById('liveWeddingAlbum_'+keys[i])||{}).files||[];if(f[0]){if(st)st.textContent=keys[i]+' photo upload ho rahi hai…';albums[keys[i]]=await uploadDashboardFile(f[0],'gallery-live',false);}}var r=await fetch('/admin/live-wedding-save',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({thumbnail:thumbnail,albums:albums,title:(document.getElementById('liveWeddingTitle')||{}).value||'',driveUrl:(document.getElementById('liveWeddingDriveUrl')||{}).value||''})}),o=await r.json();if(!r.ok||!o.ok)throw Error(o.message||'Save fail');if(st)st.textContent='Saved ✅';location.reload();}catch(e){if(st)st.textContent='Upload fail: '+(e.message||'Network error');}
+  };
   var live = document.getElementById('liveStatus');
   async function refreshLive(){
     try { var response = await fetch('/admin/live-json', {credentials:'same-origin', cache:'no-store'}); var state = await response.json(); if (live) live.textContent = response.ok && state.ok ? 'connected' : 'offline'; }
@@ -2348,7 +2398,11 @@ const server = http.createServer(async (req, res) => {
       const group = String(req.headers['x-admin-media-group'] || 'hero-bg').toLowerCase();
       const ext = ({ 'image/jpeg':'jpg', 'image/jpg':'jpg', 'image/png':'png', 'image/webp':'webp', 'video/mp4':'mp4', 'video/webm':'webm' })[type];
       const isVideo = type.startsWith('video/');
-      if (!ext || (isVideo && group !== 'hero-bg') || !['hero-bg', 'book'].includes(group)) return sendJSON(res, 400, { ok:false, error:'invalid-media', message:'Sirf sahi photo ya hero MP4/WebM upload karein' });
+      // All dashboard upload controls use this same-origin relay.  Direct
+      // browser-to-R2 PUT requests are unreliable on some mobiles due to CORS.
+      const imageGroups = ['banner','deal','frame3d','home-frame','hero-bg','book','gallery-live','gallery-wedding','gallery-birthday','gallery-baby','gallery-prewedding'];
+      const videoGroups = ['hero-bg','gallery-reel'];
+      if (!ext || (isVideo ? !videoGroups.includes(group) : !imageGroups.includes(group))) return sendJSON(res, 400, { ok:false, error:'invalid-media', message:'Sirf sahi photo ya supported MP4/WebM upload karein' });
       const bytes = await readRawBody(req, isVideo ? 30 * 1024 * 1024 : 8 * 1024 * 1024);
       if (!bytes.length) return sendJSON(res, 400, { ok:false, error:'empty-media', message:'File khaali hai' });
       const key = 'studio-images/' + group + '/' + Date.now() + '-' + crypto.randomBytes(10).toString('hex') + '.' + ext;
