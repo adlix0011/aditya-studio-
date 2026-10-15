@@ -6564,9 +6564,7 @@ async function adminClearOtps() {
 
 // Audio unlock is intentionally lazy; keeping this block simple avoids blocking admin controls.
 document.addEventListener('click', function() {
-  if (!audioCtx && (window.AudioContext || window.webkitAudioContext)) {
-    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); audioCtx.resume(); } catch (e) {}
-  }
+  if (!audioCtx && window.AudioContext) { audioCtx = new window.AudioContext(); audioCtx.resume(); }
 }, { once:true });
 
 /* ---- Home banner photo upload ---- */
