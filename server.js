@@ -1686,6 +1686,20 @@ function readBody(req, maxBytes) {
     req.on('error', reject);
   });
 }
+function readRawBody(req, maxBytes) {
+  const limit = maxBytes || 2e6;
+  return new Promise((resolve, reject) => {
+    const chunks = []; let total = 0; let stopped = false;
+    req.on('data', chunk => {
+      if (stopped) return;
+      total += chunk.length;
+      if (total > limit) { stopped = true; reject(new Error('too large')); return; }
+      chunks.push(chunk);
+    });
+    req.on('end', () => { if (!stopped) resolve(Buffer.concat(chunks, total)); });
+    req.on('error', reject);
+  });
+}
 function readFormBody(req) {
   return new Promise((resolve, reject) => {
     let body = '';
@@ -1889,14 +1903,10 @@ const server = http.createServer(async (req, res) => {
         var limit = isVideo ? 30 * 1024 * 1024 : 8 * 1024 * 1024;
         if (file.size > limit) throw Error(isVideo ? 'Video 30 MB se chhoti select karein' : 'Photo 8 MB se chhoti select karein');
         if (message) message.textContent = 'Uploading ' + (index + 1) + ' / ' + files.length + '…';
-        var base64 = await new Promise(function(resolve, reject){
-          var reader = new FileReader();
-          reader.onload = function(){ resolve(String(reader.result).split(',')[1] || ''); };
-          reader.onerror = function(){ reject(Error('File read nahi hua')); };
-          reader.readAsDataURL(file);
-        });
-        var upload = await fetch('/admin/hero-media-upload-proxy', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({contentType:file.type || (isVideo ? 'video/mp4' : 'image/jpeg'), base64:base64}) });
-        var uploaded = await upload.json();
+        var contentType = file.type || (isVideo ? 'video/mp4' : 'image/jpeg');
+        var upload = await fetch('/admin/hero-media-upload-stream', { method:'POST', credentials:'same-origin', headers:{'Content-Type':contentType}, body:file });
+        var uploadText = await upload.text(), uploaded;
+        try { uploaded = JSON.parse(uploadText); } catch (_) { throw Error(upload.status === 413 ? 'Video server limit se badi hai' : 'Server ne upload error diya (' + upload.status + ')'); }
         if (!upload.ok || !uploaded.ok) throw Error(uploaded.message || uploaded.error || 'Upload fail');
         items.push({url:uploaded.value, title:file.name, mediaType:isVideo ? 'video' : 'image', durationSec:duration});
       }
@@ -2303,6 +2313,26 @@ const server = http.createServer(async (req, res) => {
     } catch (e) {
       console.error('admin r2 image presign', e.message);
       return sendJSON(res, 500, { ok:false, error:'r2-upload-error' });
+    }
+  }
+
+  // Raw binary upload keeps a 29 MB video at 29 MB on the wire. The older
+  // base64 endpoint makes the same file ~39 MB and can be rejected by a proxy.
+  if (req.method === 'POST' && urlPath === '/admin/hero-media-upload-stream') {
+    try {
+      if (!r2Ready()) return sendJSON(res, 503, { ok:false, error:'r2-not-configured', message:'Cloud storage configured nahi hai' });
+      const type = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+      const ext = ({ 'image/jpeg':'jpg', 'image/jpg':'jpg', 'image/png':'png', 'image/webp':'webp', 'video/mp4':'mp4', 'video/webm':'webm' })[type];
+      if (!ext) return sendJSON(res, 400, { ok:false, error:'invalid-media', message:'Sirf photo, MP4 ya WebM upload karein' });
+      const bytes = await readRawBody(req, type.startsWith('video/') ? 30 * 1024 * 1024 : 8 * 1024 * 1024);
+      if (!bytes.length) return sendJSON(res, 400, { ok:false, error:'empty-media', message:'File khaali hai' });
+      const key = 'studio-images/hero-bg/' + Date.now() + '-' + crypto.randomBytes(10).toString('hex') + '.' + ext;
+      const put = await fetch(r2PresignedUrl('PUT', key, 900), { method:'PUT', headers:{ 'Content-Type':type, 'Cache-Control':'public, max-age=31536000, immutable' }, body:bytes });
+      if (!put.ok) throw new Error('R2 HTTP ' + put.status);
+      return sendJSON(res, 200, { ok:true, value:'r2:' + key });
+    } catch (error) {
+      const tooLarge = String(error.message || '') === 'too large';
+      return sendJSON(res, tooLarge ? 413 : 500, { ok:false, error:tooLarge ? 'media-too-large' : 'upload-failed', message:tooLarge ? 'Video 30 MB se chhoti select karein' : 'Cloud upload fail: ' + String(error.message || '').slice(0,120) });
     }
   }
 
