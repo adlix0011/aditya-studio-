@@ -1213,14 +1213,8 @@ function defaultSettings() {
     upiQr: '/payment-qr.png',
     // Add the studio's 10-digit WhatsApp number here when available.
     helpWhatsapp: '',
-    bookImages: {
-      wedding: 'https://images.unsplash.com/photo-1519741497674-611481863552?w=400&q=80',
-      birthday: 'https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=400&q=80',
-      personal: 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=400&q=80',
-      reel: 'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=400&q=80',
-      event: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=400&q=80',
-      other: 'https://images.unsplash.com/photo-1478144592103-25e218a04891?w=400&q=80'
-    },
+    // Book Event cards show only admin-uploaded photos.
+    bookImages: {},
     offerImages: [
       { url: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80', title: '🎡 स्पिन ऑफ़र चल रहा है!', sub: 'कोड डालो → व्हील → डिस्काउंट' },
       { url: 'https://images.unsplash.com/photo-1519741497674-611481863552?w=800&q=80', title: '📸 Book Your Day', sub: 'Wedding · Birthday · Event' }
@@ -1295,10 +1289,13 @@ function loadSettings() {
   }
   if (!data) return defaults;
   _cache.settings = data;
+  // Strip legacy demo URLs so only admin-uploaded media reaches the home page.
+  const realBookImages = Object.fromEntries(Object.entries(data.bookImages || {}).filter(([, value]) => !/images\.unsplash\.com/i.test(String(value || ''))));
+  const realGallery = Object.fromEntries(['wedding','birthday','baby','prewedding','reel'].map(key => [key, (Array.isArray(data.gallerySamples?.[key]) ? data.gallerySamples[key] : []).filter(value => !/images\.unsplash\.com/i.test(String(value || '')))]));
   return {
     ...defaults,
     ...data,
-    bookImages: { ...defaults.bookImages, ...(data.bookImages || {}) },
+    bookImages: { ...defaults.bookImages, ...realBookImages },
     offerImages: data.offerImages || defaults.offerImages,
     homeDealsEnabled: data.homeDealsEnabled === true,
     homeDealsDurationSec: Math.max(8, Math.min(60, Number(data.homeDealsDurationSec) || defaults.homeDealsDurationSec)),
@@ -1309,12 +1306,7 @@ function loadSettings() {
     homeHeroFramePhotos: Array.isArray(data.homeHeroFramePhotos) ? data.homeHeroFramePhotos : defaults.homeHeroFramePhotos,
     heroSideBgPhotos: Array.isArray(data.heroSideBgPhotos) ? data.heroSideBgPhotos : defaults.heroSideBgPhotos,
     liveWedding: { ...defaults.liveWedding, ...(data.liveWedding || {}) },
-    gallerySamples: Object.fromEntries(['wedding','birthday','baby','prewedding','reel'].map(k => {
-      const saved = data.gallerySamples?.[k];
-      // Older installs have empty lists. Show starter photos until the admin
-      // saves their own list; after that even an intentionally empty list stays empty.
-      return [k, Array.isArray(saved) && (data.gallerySamplesConfigured === true || saved.length) ? saved : defaults.gallerySamples[k]];
-    })),
+    gallerySamples: Object.fromEntries(['wedding','birthday','baby','prewedding','reel'].map(k => [k, realGallery[k] || defaults.gallerySamples[k]])),
     heroSideBgDurationSec: Math.max(2, Math.min(20, Number(data.heroSideBgDurationSec) || defaults.heroSideBgDurationSec)),
     marketplacePosters: Array.isArray(data.marketplacePosters) ? data.marketplacePosters.slice(0,5) : defaults.marketplacePosters,
     fees: { ...defaults.fees, ...(data.fees || {}) },
