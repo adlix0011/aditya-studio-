@@ -411,6 +411,7 @@ const PLACE_ORDER_HTML_FILE = path.join(__dirname, 'place-order.html');
 const FRAME_DETAIL_HTML_FILE = path.join(__dirname, 'frame-detail.html');
 const BOOK_SERVICE_HTML_FILE = path.join(__dirname, 'book-service-sample.html');
 const BOOKINGS_HTML_FILE = path.join(__dirname, 'bookings.html');
+const PHOTOGRAPHER_HTML_FILE = path.join(__dirname, 'photographer.html');
 const ADD_MONEY_HTML_FILE = path.join(__dirname, 'add-money.html');
 const PHOTO_ADJUST_HTML_FILE = path.join(__dirname, 'photo-adjust.html');
 const PAYMENT_QR_FILE = path.join(__dirname, 'payment-qr.png');
@@ -2319,6 +2320,15 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Photographer profile opened from the home-page 3D View.
+  if (req.method === 'GET' && (urlPath === '/photographer' || urlPath === '/photographer.html')) {
+    return fs.readFile(PHOTOGRAPHER_HTML_FILE, (err, data) => {
+      if (err) { res.writeHead(404); return res.end('Photographer profile missing'); }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control':'no-store, max-age=0' });
+      serveLiveHtml(res, data);
+    });
+  }
+
   // Photography booking catalogue opened from the home-page 3D experience.
   if (req.method === 'GET' && (urlPath === '/bookings' || urlPath === '/bookings.html')) {
     fs.readFile(BOOKINGS_HTML_FILE, (err, data) => {
@@ -2347,6 +2357,22 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' });
       res.end(data);
     });
+  }
+
+  // Public photographer rating wall. Comments are short and capped so the profile stays lightweight.
+  if (urlPath === '/api/photographer-ratings' && req.method === 'GET') {
+    const ratings = Array.isArray(loadSettings().photographerRatings) ? loadSettings().photographerRatings : [];
+    const count = ratings.length, average = count ? ratings.reduce((sum, row) => sum + Number(row.rating || 0), 0) / count : 0;
+    return sendJSON(res, 200, { ok:true, count, average: Number(average.toFixed(1)), ratings: ratings.slice(0, 30) });
+  }
+  if (urlPath === '/api/photographer-ratings' && req.method === 'POST') {
+    try {
+      const body = await readBody(req, 10000), rating = Math.max(1, Math.min(5, Math.round(Number(body.rating) || 0))), comment = String(body.comment || '').trim().slice(0, 280);
+      if (!rating || !comment) return sendJSON(res, 400, { ok:false, message:'Rating aur comment likhein' });
+      const settings = loadSettings(); settings.photographerRatings = Array.isArray(settings.photographerRatings) ? settings.photographerRatings : [];
+      settings.photographerRatings.unshift({ rating, comment, createdAt:new Date().toISOString() }); settings.photographerRatings = settings.photographerRatings.slice(0, 100); saveSettings(settings);
+      return sendJSON(res, 200, { ok:true });
+    } catch (e) { return sendJSON(res, 500, { ok:false, message:'Rating save nahi hui' }); }
   }
 
   // ---- Public APIs ----
