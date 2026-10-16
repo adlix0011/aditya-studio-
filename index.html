@@ -800,7 +800,7 @@
             var first=setTimeout(changeOne,1300+(cardIndex*690)); timers.push(first);
           });
           var reelBox=document.getElementById('galleryReels'), reels=Array.isArray(gallery&&gallery.reel)?gallery.reel:[];
-          if(reelBox){ reelBox.innerHTML=''; if(!reels.length) reelBox.innerHTML='<div class="gallery-reel-empty">Admin se Reel videos upload karein</div>'; else { var track=document.createElement('div'); track.className='gallery-reels-track'; reels.forEach(function(src,i){ var card=document.createElement('div'); card.className='gallery-reel-card'; var video=document.createElement('video'); video.src=src; video.muted=true; video.loop=true; video.playsInline=true; video.preload='metadata'; video.autoplay=true; card.appendChild(video); var badge=document.createElement('span'); badge.className='gallery-reel-badge'; badge.textContent='▶ Reel '+(i+1); card.appendChild(badge); track.appendChild(card); }); reelBox.appendChild(track); } }
+          var reelCard=document.getElementById('galleryReelsCard'); if(reelCard) reelCard.hidden=!reels.length; if(reelBox){ reelBox.innerHTML=''; if(reels.length) { var track=document.createElement('div'); track.className='gallery-reels-track'; reels.forEach(function(src,i){ var card=document.createElement('div'); card.className='gallery-reel-card'; var video=document.createElement('video'); video.src=src; video.muted=true; video.loop=true; video.playsInline=true; video.preload='metadata'; video.autoplay=true; card.appendChild(video); var badge=document.createElement('span'); badge.className='gallery-reel-badge'; badge.textContent='▶ Reel '+(i+1); card.appendChild(badge); track.appendChild(card); }); reelBox.appendChild(track); } }
         }
         function openGalleryViewer(title, items, start){
           var old=document.getElementById('galleryLightbox'); if(old) old.remove();
@@ -821,12 +821,6 @@
         if(!cacheFresh) fetch('/api/home-gallery-samples',{cache:'force-cache'}).then(function(res){ return res.json(); }).then(function(data){ var gallery=data.gallery||{}, liveWedding=data.liveWedding||{}; try { localStorage.setItem(galleryCacheKey,JSON.stringify({gallery:gallery,liveWedding:liveWedding,savedAt:Date.now()})); } catch(e) {} renderGallery(gallery,liveWedding); }).catch(function(e){ console.warn('Gallery samples unavailable',e); });
       })();
       </script>
-    </section>
-    <section id="more-services" class="glass-panel rounded-3xl border border-primary/35 px-6 py-7 text-center shadow-[0_0_28px_rgba(212,175,55,.12)]" style="background:linear-gradient(135deg,#251b0a,#17100b 55%,#24112a)">
-      <p class="text-[10px] uppercase tracking-[.22em] text-primary/80 font-bold">Photography &amp; Bookings</p>
-      <h2 class="mt-2 text-xl font-black text-yellow-100">Aur services dekhni hain?</h2>
-      <p class="mt-2 text-sm text-on-surface-variant">Wedding, birthday, event aur studio packages ek hi jagah dekhein.</p>
-      <a href="/roller-spin" class="inline-flex mt-5 items-center justify-center gap-2 rounded-xl border border-cyan-100/60 bg-gradient-to-r from-fuchsia-600 via-violet-600 to-cyan-500 px-6 py-3 text-sm font-extrabold text-white shadow-[0_0_18px_rgba(34,211,238,.35)]">🎡 Open Roller Spin <span>→</span></a>
     </section>
 
     <!-- Live Spin Roller + AD Token -->
