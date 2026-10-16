@@ -653,7 +653,7 @@
     </section>
 
     <!-- Offer Carousel -->
-    <section class="w-full overflow-hidden relative rounded-2xl glass-panel p-1 mt-4" id="gift-shop" aria-label="Current deals">
+    <section class="w-full overflow-hidden relative rounded-2xl glass-panel p-1 mt-4" id="gift-shop" style="visibility:hidden" aria-label="Current deals">
       <div class="absolute top-4 left-6 z-10">
         <span class="future-offers-label font-label-md text-[10px] px-3 py-1.5 rounded-full uppercase shadow-lg">Book Events</span>
       </div>
@@ -736,7 +736,7 @@
     <section class="live-wedding-showcase" id="live-wedding-showcase">
       <div class="live-wedding-head"><h2 class="live-wedding-heading">Live Wedding</h2></div>
       <article class="gallery-live-wedding" id="liveWeddingCard" aria-label="Open Live Wedding album">
-        <div class="gallery-story-media"><img id="liveWeddingImage" data-fallback="https://images.unsplash.com/photo-1519741497674-611481863552?w=1200&q=86" src="https://images.unsplash.com/photo-1519741497674-611481863552?w=1200&q=86" alt="Live Wedding photo downloads"></div>
+        <div class="gallery-story-media"><img id="liveWeddingImage" data-fallback="" src="" alt="Live Wedding photo downloads"></div>
       </article>
     </section>
 
@@ -744,19 +744,19 @@
       <h2 class="font-headline-md text-headline-md text-on-surface m-0">Gallery Samples</h2>
       <div id="galleryStories" aria-label="Photography gallery — swipe right to left">
         <article class="gallery-story group gallery-live-card">
-          <div class="gallery-story-media"><img data-gallery="wedding" data-fallback="https://images.unsplash.com/photo-1519741497674-611481863552?w=1200&q=86" src="https://images.unsplash.com/photo-1519741497674-611481863552?w=1200&q=86" alt="Wedding gallery sample"></div>
+          <div class="gallery-story-media"><img data-gallery="wedding" data-fallback="" src="" alt="Wedding gallery sample"></div>
           <div class="gallery-story-copy"><h3 class="gallery-story-title">Wedding</h3></div>
         </article>
         <article class="gallery-story group gallery-live-card">
-          <div class="gallery-story-media"><img data-gallery="prewedding" data-fallback="https://images.unsplash.com/photo-1529634806980-85c3dd6d34ac?w=1200&q=86" src="https://images.unsplash.com/photo-1529634806980-85c3dd6d34ac?w=1200&q=86" alt="Pre-wedding gallery sample"></div>
+          <div class="gallery-story-media"><img data-gallery="prewedding" data-fallback="" src="" alt="Pre-wedding gallery sample"></div>
           <div class="gallery-story-copy"><h3 class="gallery-story-title">Pre-Wedding</h3></div>
         </article>
         <article class="gallery-story group gallery-live-card">
-          <div class="gallery-story-media"><img data-gallery="baby" data-fallback="https://images.unsplash.com/photo-1546015720-b8b30df5aa27?w=1200&q=86" src="https://images.unsplash.com/photo-1546015720-b8b30df5aa27?w=1200&q=86" alt="Baby shower gallery sample"></div>
+          <div class="gallery-story-media"><img data-gallery="baby" data-fallback="" src="" alt="Baby shower gallery sample"></div>
           <div class="gallery-story-copy"><h3 class="gallery-story-title">Baby Shower</h3></div>
         </article>
         <article class="gallery-story group gallery-live-card">
-          <div class="gallery-story-media"><img data-gallery="birthday" data-fallback="https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=1200&q=86" src="https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=1200&q=86" alt="Birthday shoot gallery sample"></div>
+          <div class="gallery-story-media"><img data-gallery="birthday" data-fallback="" src="" alt="Birthday shoot gallery sample"></div>
           <div class="gallery-story-copy"><h3 class="gallery-story-title">Birthday Shoot</h3></div>
         </article>
         <article class="gallery-story gallery-live-card">
@@ -766,7 +766,7 @@
       </div>
       <script>
       (function(){
-        var galleryCacheKey='aditya-gallery-v6', current='', timers=[];
+        var galleryCacheKey='aditya-gallery-v7', current='', timers=[], bootGallery=__GALLERY_BOOT__, bootLiveWedding=__LIVE_WEDDING_BOOT__;
         function renderGallery(gallery, liveWedding){
           var signature=JSON.stringify({gallery:gallery||{},liveWedding:liveWedding||{}}); if(signature===current) return; current=signature;
           var pos={};
@@ -777,7 +777,7 @@
           });
           timers.forEach(function(id){ clearTimeout(id); }); timers=[];
           var liveCard=document.getElementById('liveWeddingCard'), liveImage=document.getElementById('liveWeddingImage');
-          if(liveCard&&liveImage){ var liveThumb=(liveWedding&&liveWedding.thumbnail)||((gallery&&gallery.wedding&&gallery.wedding[0])||liveImage.dataset.fallback); liveCard.classList.add('is-ready'); liveImage.onerror=function(){if(liveImage.src!==liveImage.dataset.fallback)liveImage.src=liveImage.dataset.fallback;}; liveImage.src=liveThumb; liveCard.onclick=function(){ window.location.href='/live-wedding'; }; liveCard.setAttribute('role','link'); liveCard.tabIndex=0; liveCard.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();window.location.href='/live-wedding';}}; }
+          if(liveCard&&liveImage){ var liveThumb=(liveWedding&&liveWedding.thumbnail)||''; var liveSection=document.getElementById('live-wedding-showcase'); if(!liveThumb){ if(liveSection)liveSection.hidden=true; } else { if(liveSection)liveSection.hidden=false; liveCard.classList.add('is-ready'); liveImage.onerror=function(){ liveImage.removeAttribute('src'); }; liveImage.src=liveThumb; liveCard.onclick=function(){ window.location.href='/live-wedding'; }; liveCard.setAttribute('role','link'); liveCard.tabIndex=0; liveCard.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();window.location.href='/live-wedding';}}; } }
           // Every category changes on its own clock with a different direction, never all together.
           document.querySelectorAll('[data-gallery]').forEach(function(img, cardIndex){
             var key=img.dataset.gallery, list=(gallery&&gallery[key])||[]; if(list.length<2) return;
@@ -811,6 +811,8 @@
           function close(){ box.remove(); document.removeEventListener('keydown',onKey); } function onKey(e){if(e.key==='Escape')close(); if(e.key==='ArrowRight')select((index+1)%items.length); if(e.key==='ArrowLeft')select((index-1+items.length)%items.length);} box.querySelector('.gallery-lightbox-close').onclick=close; box.onclick=function(e){if(e.target===box)close()}; document.addEventListener('keydown',onKey);
         }
 
+        // Server-rendered admin media is available immediately, before any API request.
+        if(bootGallery) renderGallery(bootGallery,bootLiveWedding);
         // Cached URLs render immediately on every refresh. The network check runs after the page is usable.
         var cached=null, cacheFresh=false; try { cached=JSON.parse(localStorage.getItem(galleryCacheKey)||'null'); cacheFresh=!!(cached&&cached.gallery&&cached.savedAt&&(Date.now()-cached.savedAt<600000)); if(cached&&cached.gallery) renderGallery(cached.gallery,cached.liveWedding); } catch(e) {}
         // For ten minutes refreshes use only the browser cache. This prevents blank cards and repeat API calls.
@@ -1646,9 +1648,7 @@
           { key:'event', title:'Event Book', sub:'Professional event documentation.' },
           { key:'other', title:'Other', sub:'Custom photography requests.' }
         ];
-        const fallbackImages = {
-          wedding:'https://images.unsplash.com/photo-1519741497674-611481863552?w=800&q=82', birthday:'https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=800&q=82', personal:'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=800&q=82', reel:'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=800&q=82', event:'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&q=82', other:'https://images.unsplash.com/photo-1478144592103-25e218a04891?w=800&q=82'
-        };
+        const fallbackImages = { wedding:'', birthday:'', personal:'', reel:'', event:'', other:'' };
         // Server embeds the current book-card photos into the page, so refresh
         // never flashes the old/default thumbnails before the API responds.
         const bootBookImages = __BOOK_IMAGES_BOOT__;
@@ -1658,6 +1658,7 @@
         track.innerHTML = deals.concat(deals).map(function(item){ return '<a class="home-deal-card" href="'+item.link+'" aria-label="'+item.title+' booking"><div class="home-deal-card-inner"><div class="home-deal-photo" style="background-image:url(\''+item.url+'\')"></div><div class="home-deal-copy"><h3 class="home-deal-title">'+item.title+'</h3><p class="home-deal-sub">'+item.sub+'</p></div></div></a>'; }).join('');
         track.classList.add('home-deals-dynamic');
         track.style.setProperty('--deal-duration', duration + 's');
+        track.closest('#gift-shop').style.visibility='visible';
         try {
           const res = await fetch('/api/settings');
           const data = await res.json();

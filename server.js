@@ -1257,39 +1257,8 @@ function defaultSettings() {
     // Hero SECTION background slideshow (sides visible) — admin 4–6 photos + duration
     heroSideBgPhotos: [],
     heroSideBgDurationSec: 5,
-    // Five starter photos in every home-gallery category. Admin can add or
-    // remove them individually; these make the gallery look complete on day one.
-    gallerySamples: {
-      wedding: [
-        'https://images.unsplash.com/photo-1519741497674-611481863552?w=1200&q=86',
-        'https://images.unsplash.com/photo-1606216794074-735e91aa2c92?w=1200&q=86',
-        'https://images.unsplash.com/photo-1591604466107-ec97de577aff?w=1200&q=86',
-        'https://images.unsplash.com/photo-1583939003579-730e3918a45a?w=1200&q=86',
-        'https://images.unsplash.com/photo-1511285560929-80b456fea0bc?w=1200&q=86'
-      ],
-      birthday: [
-        'https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=1200&q=86',
-        'https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?w=1200&q=86',
-        'https://images.unsplash.com/photo-1527529482837-4698179dc6ce?w=1200&q=86',
-        'https://images.unsplash.com/photo-1507504031003-b417219a0fde?w=1200&q=86',
-        'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=1200&q=86'
-      ],
-      baby: [
-        'https://images.unsplash.com/photo-1546015720-b8b30df5aa27?w=1200&q=86',
-        'https://images.unsplash.com/photo-1519689680058-324335c77eba?w=1200&q=86',
-        'https://images.unsplash.com/photo-1522771930-78848d9293e8?w=1200&q=86',
-        'https://images.unsplash.com/photo-1607453998774-d533f65dac99?w=1200&q=86',
-        'https://images.unsplash.com/photo-1503919545889-aef636e10ad4?w=1200&q=86'
-      ],
-      prewedding: [
-        'https://images.unsplash.com/photo-1529634806980-85c3dd6d34ac?w=1200&q=86',
-        'https://images.unsplash.com/photo-1544078751-58fee2d8a03b?w=1200&q=86',
-        'https://images.unsplash.com/photo-1606800052052-a08af7148866?w=1200&q=86',
-        'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=1200&q=86',
-        'https://images.unsplash.com/photo-1511285560929-80b456fea0bc?w=1200&q=86'
-      ],
-      reel: []
-    },
+    // Gallery starts empty. Only photos uploaded from the admin are shown.
+    gallerySamples: { wedding: [], birthday: [], baby: [], prewedding: [], reel: [] },
     gallerySamplesConfigured: false,
     // One clickable live-wedding card. Admin uploads its thumbnail and pastes the Google Drive folder/file link.
     liveWedding: { title: 'Rahul Sharan & Anita Sharma', thumbnail: '', driveUrl: '', albums: { chulmati:'', devpoojan:'', haldi:'', barat:'', reception:'' } },
@@ -2234,6 +2203,8 @@ const server = http.createServer(async (req, res) => {
       const heroFrameUrl = heroFrameRawUrl.replace(/["'<>]/g, '');
       const bookBootImages = Object.fromEntries(Object.entries(settings.bookImages || {}).map(([key, value]) => [key, mediaUrl(value)]));
       const bookBootJson = JSON.stringify(bookBootImages).replace(/</g, '\\u003c');
+      const galleryBootJson = JSON.stringify(publicSettings(settings).gallerySamples || {}).replace(/</g, '\\u003c');
+      const liveWeddingBootJson = JSON.stringify(publicSettings(settings).liveWedding || {}).replace(/</g, '\\u003c');
       const html = data.toString('utf8')
         .replace(/__HERO_SIDE_BG_BOOT_MEDIA__/g, heroBootMedia)
         .replace(/__HERO_SIDE_BG_BOOT_URL__/g, safeUrl)
@@ -2241,7 +2212,9 @@ const server = http.createServer(async (req, res) => {
         .replace(/__HERO_SIDE_BG_BOOT_Y__/g, String(y))
         .replace(/__HERO_SIDE_BG_BOOT_ZOOM__/g, String(zoom))
         .replace(/__HERO_FRAME_BOOT_URL__/g, heroFrameUrl)
-        .replace(/__BOOK_IMAGES_BOOT__/g, bookBootJson);
+        .replace(/__BOOK_IMAGES_BOOT__/g, bookBootJson)
+        .replace(/__GALLERY_BOOT__/g, galleryBootJson)
+        .replace(/__LIVE_WEDDING_BOOT__/g, liveWeddingBootJson);
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' });
       serveLiveHtml(res, html);
     });
