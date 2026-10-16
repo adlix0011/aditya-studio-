@@ -210,6 +210,7 @@
     .home-deal-sub { margin:.35rem 0 0; color:#f6edcf; font-size:.86rem; line-height:1.25; }
     .future-offers-label{background:linear-gradient(100deg,#ff477e,#a92adb 46%,#26bff5);color:#fff9db;font-weight:900;letter-spacing:.08em;text-shadow:0 1px 7px #280019;box-shadow:0 0 18px rgba(239,82,205,.58),0 0 30px rgba(55,190,255,.22);animation:futureGlow 1.8s ease-in-out infinite alternate}
     @keyframes futureGlow{from{filter:brightness(.95);transform:scale(1)}to{filter:brightness(1.25);transform:scale(1.06)}}
+    .home-photographer-rating{display:flex;align-items:center;justify-content:center;gap:9px;width:min(330px,92%);margin:10px auto 4px;padding:10px 16px;border:1px solid rgba(250,204,21,.55);border-radius:999px;background:linear-gradient(100deg,rgba(27,21,43,.94),rgba(9,42,55,.9));color:#fff0b5;text-decoration:none;box-shadow:0 0 22px rgba(250,204,21,.16);font-size:13px;font-weight:800}.home-photographer-rating .rating-stars{color:#ffd149;font-size:16px;letter-spacing:1px}.home-photographer-rating .rating-detail{color:#b9efff;font-size:12px}
     /* Real spin wheel (same as /book-now landing) */
     .home-lw-stage{position:relative;width:min(280px,78vw);aspect-ratio:1/1;margin:0 auto}
     .home-lw-pointer{position:absolute;top:-12px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:12px solid transparent;border-right:12px solid transparent;border-top:24px solid #e9c349;z-index:5;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))}
@@ -1856,6 +1857,16 @@
         // 3D frame kabhi flash nahi hoga. Sirf alag photo ho to preload karo.
         if (bootUrl !== urls[0]) await setPhoto(urls[0], false);
         else { el.style.opacity = '1'; if (frameLink) frameLink.href = '/photographer?photo=' + encodeURIComponent(urls[0]); }
+        // Real customer rating is loaded independently of the 3D photo rotation.
+        const ratingEl = document.getElementById('homePhotographerRating');
+        if (ratingEl) {
+          fetch('/api/photographer-ratings', { cache: 'no-store' }).then(r => r.json()).then(d => {
+            const count = Number(d.count || 0), average = Number(d.average || 0);
+            const starText = count ? '★'.repeat(Math.round(average)) + '☆'.repeat(5 - Math.round(average)) : '☆ ☆ ☆ ☆ ☆';
+            ratingEl.innerHTML = '<span class="rating-stars">' + starText + '</span><span class="rating-detail">' + (count ? average.toFixed(1) + ' / 5 · ' + count + ' rating' + (count === 1 ? '' : 's') : 'No ratings yet') + '</span>';
+          }).catch(() => {});
+        }
+
         if (urls.length < 2) return;
         setInterval(function () {
           idx = (idx + 1) % urls.length;
