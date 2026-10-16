@@ -2207,7 +2207,7 @@ const server = http.createServer(async (req, res) => {
         .replace(/__BOOK_IMAGES_BOOT__/g, bookBootJson)
         .replace(/__GALLERY_BOOT__/g, galleryBootJson)
         .replace(/__LIVE_WEDDING_BOOT__/g, liveWeddingBootJson);
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' });
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store, max-age=0' });
       serveLiveHtml(res, html);
     });
     return;
