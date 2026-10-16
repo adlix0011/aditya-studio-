@@ -720,6 +720,8 @@
       </div>
     </section>
 
+    <section id="quickRating" class="home-photographer-rating" style="display:block;border-radius:20px;text-align:center"><b style="display:block;font-size:16px">Rate Anil Aditya</b><div id="quickStars" class="rating-stars" style="font-size:30px;cursor:pointer;margin:6px">☆ ☆ ☆ ☆ ☆</div><div id="quickSuggestions" style="display:none;gap:6px;flex-wrap:wrap;justify-content:center"><button data-msg="Amazing photography and editing">Amazing work</button><button data-msg="Beautiful memories captured">Beautiful memories</button><button data-msg="Great service and coordination">Great service</button></div><input id="quickName" placeholder="Your name" style="display:none;width:100%;margin-top:9px;padding:9px;border-radius:9px"><textarea id="quickComment" placeholder="Write a comment" style="display:none;width:100%;margin-top:8px;min-height:60px;padding:9px;border-radius:9px"></textarea><button id="quickSubmit" style="display:none;margin-top:8px;padding:10px 16px;border-radius:10px;background:linear-gradient(90deg,#fbbf24,#ec4899,#22d3ee);font-weight:900">Submit rating</button><small id="quickStatus" style="display:block;margin-top:5px">No ratings yet — tap stars to rate</small></section>
+
     <!-- 3D booking frame: placed directly below New Future offers -->
     <section class="home-frame-showcase w-full flex justify-center">
       <a id="heroFrameLink" href="/photographer" class="hero-frame-container relative w-full max-w-sm flex items-center justify-center group cursor-pointer" title="Photography bookings — Book Now">
@@ -1861,6 +1863,9 @@
             ratingEl.innerHTML = '<span class="rating-stars">' + starText + '</span><span class="rating-detail">' + (count ? average.toFixed(1) + ' / 5 · ' + count + ' rating' + (count === 1 ? '' : 's') : 'No ratings yet') + '</span>';
           }).catch(() => {});
         }
+
+        let quickSelected=0; const qs=document.getElementById('quickStars'), qn=document.getElementById('quickName'), qc=document.getElementById('quickComment'), qsu=document.getElementById('quickSuggestions'), qb=document.getElementById('quickSubmit'), qst=document.getElementById('quickStatus');
+        if(qs){ qs.onclick=function(e){quickSelected=Math.max(1,Math.min(5,Math.ceil((e.offsetX/qs.clientWidth)*5)));qs.textContent='★'.repeat(quickSelected)+'☆'.repeat(5-quickSelected);qsu.style.display='flex';qn.style.display=qc.style.display=qb.style.display='block'};qsu.onclick=function(e){if(e.target.dataset.msg)qc.value=e.target.dataset.msg};qb.onclick=async function(){if(!quickSelected||!qc.value.trim())return;qst.textContent='Saving…';let r=await fetch('/api/photographer-ratings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({rating:quickSelected,name:qn.value,comment:qc.value})});qst.textContent=r.ok?'Thank you for your rating!':'Please try again';if(r.ok){qn.value=qc.value='';qsu.style.display='none';qn.style.display=qc.style.display=qb.style.display='none';quickSelected=0;qs.textContent='☆ ☆ ☆ ☆ ☆'}}}
 
         if (urls.length < 2) return;
         setInterval(function () {

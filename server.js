@@ -2367,10 +2367,10 @@ const server = http.createServer(async (req, res) => {
   }
   if (urlPath === '/api/photographer-ratings' && req.method === 'POST') {
     try {
-      const body = await readBody(req, 10000), rating = Math.max(1, Math.min(5, Math.round(Number(body.rating) || 0))), comment = String(body.comment || '').trim().slice(0, 280);
+      const body = await readBody(req, 10000), rating = Math.max(1, Math.min(5, Math.round(Number(body.rating) || 0))), name = String(body.name || 'Guest').trim().slice(0, 50) || 'Guest', comment = String(body.comment || '').trim().slice(0, 280);
       if (!rating || !comment) return sendJSON(res, 400, { ok:false, message:'Rating aur comment likhein' });
       const settings = loadSettings(); settings.photographerRatings = Array.isArray(settings.photographerRatings) ? settings.photographerRatings : [];
-      settings.photographerRatings.unshift({ rating, comment, createdAt:new Date().toISOString() }); settings.photographerRatings = settings.photographerRatings.slice(0, 100); saveSettings(settings);
+      settings.photographerRatings.unshift({ rating, name, comment, createdAt:new Date().toISOString() }); settings.photographerRatings = settings.photographerRatings.slice(0, 100); saveSettings(settings);
       return sendJSON(res, 200, { ok:true });
     } catch (e) { return sendJSON(res, 500, { ok:false, message:'Rating save nahi hui' }); }
   }
