@@ -381,13 +381,13 @@
     .gallery-story-title{margin:0;font-family:'EB Garamond',serif;font-size:clamp(1.8rem,8vw,2.6rem);font-weight:700;line-height:1;background:linear-gradient(110deg,#fef3c7,#fbbf24 43%,#f472b6 74%,#67e8f9);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:0 0 18px rgba(250,204,21,.18)}
     @keyframes galleryRgbSpin{to{transform:rotate(360deg)}}
     .gallery-reels{width:100%;padding-top:2px;overflow:hidden}
-    .gallery-reels-track{display:flex;gap:14px;overflow-x:auto;padding:2px 4px 12px;scroll-snap-type:x mandatory;scrollbar-width:none;touch-action:pan-x;overscroll-behavior-x:contain}
+    .gallery-reels-track{display:flex;gap:14px;overflow-x:auto;padding:2px 4px 12px;scroll-snap-type:x mandatory;scrollbar-width:none;touch-action:pan-x;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;cursor:grab}
     .gallery-reels-track::-webkit-scrollbar{display:none}
     .gallery-reel-card{position:relative;flex:0 0 min(68vw,270px);aspect-ratio:9/16;overflow:hidden;border-radius:18px;scroll-snap-align:center;background:#111;isolation:isolate;box-shadow:0 10px 24px rgba(0,0,0,.44),0 0 17px rgba(34,211,238,.25)}
     .gallery-reel-card::before{content:"";position:absolute;z-index:-2;width:220%;height:220%;left:-60%;top:-60%;background:conic-gradient(#22d3ee,#a855f7,#ff3e8d,#facc15,#4ade80,#22d3ee);animation:galleryRgbSpin 3.5s linear infinite}
     .gallery-reel-card::after{content:"";position:absolute;z-index:-1;inset:2px;border-radius:16px;background:#090909}
-    .gallery-reel-card video{position:absolute;inset:2px;width:calc(100% - 4px);height:calc(100% - 4px);border-radius:16px;object-fit:cover;background:#090909}
-    .gallery-reel-badge{position:absolute;left:12px;bottom:12px;z-index:2;padding:6px 10px;border-radius:999px;background:rgba(5,5,8,.72);backdrop-filter:blur(7px);color:#fff;font-size:11px;font-weight:900;letter-spacing:.05em}
+    .gallery-reel-card video{position:absolute;inset:2px;width:calc(100% - 4px);height:calc(100% - 4px);border-radius:16px;object-fit:cover;background:#090909;pointer-events:none}.gallery-reel-card:focus-visible{outline:3px solid #facc15;outline-offset:3px}
+    .gallery-reel-badge{position:absolute;left:12px;bottom:12px;z-index:2;padding:6px 10px;border-radius:999px;background:rgba(5,5,8,.72);backdrop-filter:blur(7px);color:#fff;font-size:11px;font-weight:900;letter-spacing:.05em;pointer-events:none}
     .gallery-reel-empty{display:grid;place-items:center;min-height:160px;border:1px dashed rgba(34,211,238,.55);border-radius:18px;color:#a5f3fc;text-align:center;padding:18px}
     @media (min-width:768px){.gallery-story{max-width:760px;margin-inline:auto}.gallery-story-media{max-height:430px}.gallery-reels{max-width:760px;margin-inline:auto}.gallery-reel-card{flex-basis:245px}}
 
@@ -801,7 +801,35 @@
             var first=setTimeout(changeOne,1300+(cardIndex*690)); timers.push(first);
           });
           var reelBox=document.getElementById('galleryReels'), reels=Array.isArray(gallery&&gallery.reel)?gallery.reel:[];
-          var reelCard=document.getElementById('galleryReelsCard'); if(reelCard) reelCard.hidden=!reels.length; if(reelBox){ reelBox.innerHTML=''; if(reels.length) { var track=document.createElement('div'); track.className='gallery-reels-track'; reels.forEach(function(src,i){ var card=document.createElement('div'); card.className='gallery-reel-card'; var video=document.createElement('video'); video.src=src; video.muted=true; video.loop=true; video.playsInline=true; video.preload='metadata'; video.autoplay=true; card.appendChild(video); var badge=document.createElement('span'); badge.className='gallery-reel-badge'; badge.textContent='▶ Reel '+(i+1); card.appendChild(badge); track.appendChild(card); }); reelBox.appendChild(track); } }
+          var reelCard=document.getElementById('galleryReelsCard'); if(reelCard) reelCard.hidden=!reels.length;
+          if(reelBox){
+            reelBox.innerHTML='';
+            if(reels.length) {
+              var track=document.createElement('div'); track.className='gallery-reels-track';
+              var touchStartX=0;
+              track.addEventListener('touchstart',function(event){ touchStartX=event.touches[0].clientX; },{passive:true});
+              track.addEventListener('touchend',function(event){
+                var delta=touchStartX-event.changedTouches[0].clientX;
+                if(Math.abs(delta)>42) track.scrollBy({left:delta>0?track.clientWidth*.86:-track.clientWidth*.86,behavior:'smooth'});
+              },{passive:true});
+              reels.forEach(function(src,i){
+                var card=document.createElement('button'); card.type='button'; card.className='gallery-reel-card'; card.setAttribute('aria-label','Play Reel '+(i+1)+' with sound');
+                var video=document.createElement('video'); video.src=src; video.muted=true; video.loop=true; video.playsInline=true; video.preload='auto'; video.autoplay=true;
+                video.play().catch(function(){});
+                var badge=document.createElement('span'); badge.className='gallery-reel-badge'; badge.textContent='🔇 Tap for sound · Reel '+(i+1);
+                card.appendChild(video); card.appendChild(badge);
+                card.addEventListener('click',function(){
+                  var enabled=video.muted;
+                  Array.prototype.forEach.call(track.querySelectorAll('video'),function(other){ if(other!==video){other.muted=true; other.pause();} });
+                  video.muted=!enabled; video.volume=1; video.play().catch(function(){});
+                  badge.textContent=enabled?'🔊 Sound on · Reel '+(i+1):'🔇 Tap for sound · Reel '+(i+1);
+                  card.setAttribute('aria-label',enabled?'Mute Reel '+(i+1):'Play Reel '+(i+1)+' with sound');
+                });
+                track.appendChild(card);
+              });
+              reelBox.appendChild(track);
+            }
+          }
         }
         function openGalleryViewer(title, items, start){
           var old=document.getElementById('galleryLightbox'); if(old) old.remove();
