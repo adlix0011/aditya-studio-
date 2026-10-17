@@ -381,15 +381,15 @@
     .gallery-story-title{margin:0;font-family:'EB Garamond',serif;font-size:clamp(1.8rem,8vw,2.6rem);font-weight:700;line-height:1;background:linear-gradient(110deg,#fef3c7,#fbbf24 43%,#f472b6 74%,#67e8f9);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:0 0 18px rgba(250,204,21,.18)}
     @keyframes galleryRgbSpin{to{transform:rotate(360deg)}}
     .gallery-reels{width:100%;padding-top:2px;overflow:hidden}
-    .gallery-reels-track{display:flex;gap:14px;overflow-x:auto;padding:2px 4px 12px;scroll-snap-type:x mandatory;scrollbar-width:none;touch-action:pan-x;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;cursor:grab}
+    .gallery-reels-track{--reel-card-w:min(68vw,270px);display:flex;gap:14px;overflow-x:auto;padding:2px calc((100% - var(--reel-card-w))/2) 12px;scroll-padding-inline:calc((100% - var(--reel-card-w))/2);scroll-snap-type:x mandatory;scrollbar-width:none;touch-action:pan-x;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;cursor:grab}
     .gallery-reels-track::-webkit-scrollbar{display:none}
     .gallery-reel-card{position:relative;flex:0 0 min(68vw,270px);aspect-ratio:9/16;overflow:hidden;border:0;padding:0;border-radius:18px;scroll-snap-align:center;background:#111;isolation:isolate;cursor:pointer;touch-action:pan-x;box-shadow:0 10px 24px rgba(0,0,0,.44),0 0 17px rgba(34,211,238,.25)}
     .gallery-reel-card::before{content:"";position:absolute;z-index:-2;width:220%;height:220%;left:-60%;top:-60%;background:conic-gradient(#22d3ee,#a855f7,#ff3e8d,#facc15,#4ade80,#22d3ee);animation:galleryRgbSpin 3.5s linear infinite}
     .gallery-reel-card::after{content:"";position:absolute;z-index:-1;inset:2px;border-radius:16px;background:#090909}
     .gallery-reel-card video{position:absolute;inset:2px;width:calc(100% - 4px);height:calc(100% - 4px);border-radius:16px;object-fit:cover;background:#090909;pointer-events:none}.gallery-reel-card:focus-visible{outline:3px solid #facc15;outline-offset:3px}
-    .gallery-reel-badge{position:absolute;left:12px;bottom:12px;z-index:2;padding:6px 10px;border-radius:999px;background:rgba(5,5,8,.72);backdrop-filter:blur(7px);color:#fff;font-size:11px;font-weight:900;letter-spacing:.05em;pointer-events:none}
+    .gallery-reel-badge{position:absolute;left:12px;bottom:12px;z-index:2;padding:6px 10px;border-radius:999px;background:rgba(5,5,8,.72);backdrop-filter:blur(7px);color:#fff;font-size:11px;font-weight:900;letter-spacing:.05em;pointer-events:none}.gallery-reel-play{position:absolute;left:50%;top:50%;z-index:3;display:grid;place-items:center;width:62px;height:62px;transform:translate(-50%,-50%) scale(.9);border:1px solid rgba(255,255,255,.72);border-radius:50%;background:rgba(7,8,18,.58);box-shadow:0 8px 26px rgba(0,0,0,.36);backdrop-filter:blur(7px);color:#fff;font-size:24px;line-height:1;pointer-events:none;opacity:0;transition:opacity .22s ease,transform .22s ease}.gallery-reel-card.is-paused .gallery-reel-play,.gallery-reel-card.show-control .gallery-reel-play{opacity:1;transform:translate(-50%,-50%) scale(1)}
     .gallery-reel-empty{display:grid;place-items:center;min-height:160px;border:1px dashed rgba(34,211,238,.55);border-radius:18px;color:#a5f3fc;text-align:center;padding:18px}
-    @media (min-width:768px){.gallery-story{max-width:760px;margin-inline:auto}.gallery-story-media{max-height:430px}.gallery-reels{max-width:760px;margin-inline:auto}.gallery-reel-card{flex-basis:245px}}
+    @media (min-width:768px){.gallery-story{max-width:760px;margin-inline:auto}.gallery-story-media{max-height:430px}.gallery-reels{max-width:760px;margin-inline:auto}.gallery-reels-track{--reel-card-w:245px}.gallery-reel-card{flex-basis:245px}}
 
     .gallery-story-media{cursor:pointer}
     .live-wedding-showcase{position:relative;overflow:hidden;padding:18px;border:1px solid rgba(251,113,133,.52);border-radius:26px;background:radial-gradient(circle at 8% 8%,rgba(244,63,94,.36),transparent 31%),radial-gradient(circle at 95% 92%,rgba(34,211,238,.28),transparent 38%),linear-gradient(135deg,#31101f,#12172e 55%,#102c35);box-shadow:0 18px 34px rgba(0,0,0,.34),0 0 28px rgba(236,72,153,.23)}
@@ -817,17 +817,24 @@
                 var video=document.createElement('video'); video.src=src; video.muted=true; video.loop=true; video.playsInline=true; video.preload='auto'; video.autoplay=true;
                 video.play().catch(function(){});
                 var badge=document.createElement('span'); badge.className='gallery-reel-badge'; badge.textContent='🔇 Tap for sound · Reel '+(i+1);
-                card.appendChild(video); card.appendChild(badge);
-                var dragStartX=0, dragged=false;
+                var playControl=document.createElement('span'); playControl.className='gallery-reel-play'; playControl.textContent='❚❚';
+                card.appendChild(video); card.appendChild(badge); card.appendChild(playControl);
+                var dragStartX=0, dragged=false, indicatorTimer=0;
+                function showControl(icon){
+                  playControl.textContent=icon; card.classList.add('show-control'); clearTimeout(indicatorTimer);
+                  indicatorTimer=setTimeout(function(){ if(!video.paused) card.classList.remove('show-control'); },650);
+                }
                 card.addEventListener('touchstart',function(event){ dragStartX=event.touches[0].clientX; dragged=false; },{passive:true});
                 card.addEventListener('touchmove',function(event){ if(Math.abs(event.touches[0].clientX-dragStartX)>12) dragged=true; },{passive:true});
                 card.addEventListener('click',function(){
                   if(dragged) return;
-                  var enabled=video.muted;
-                  Array.prototype.forEach.call(track.querySelectorAll('video'),function(other){ if(other!==video){other.muted=true; other.pause();} });
-                  video.muted=!enabled; video.volume=1; video.play().catch(function(){});
-                  badge.textContent=enabled?'🔊 Sound on · Reel '+(i+1):'🔇 Tap for sound · Reel '+(i+1);
-                  card.setAttribute('aria-label',enabled?'Mute Reel '+(i+1):'Play Reel '+(i+1)+' with sound');
+                  if(video.paused){
+                    Array.prototype.forEach.call(track.querySelectorAll('video'),function(other){ if(other!==video){other.muted=true; other.pause();} });
+                    video.muted=false; video.volume=1; video.play().catch(function(){}); card.classList.remove('is-paused'); badge.textContent='🔊 Sound on · Reel '+(i+1); showControl('❚❚');
+                  } else {
+                    video.pause(); card.classList.add('is-paused'); badge.textContent='▶ Paused · Reel '+(i+1); showControl('▶');
+                  }
+                  card.setAttribute('aria-label',video.paused?'Play Reel '+(i+1):'Pause Reel '+(i+1));
                 });
                 card.addEventListener('keydown',function(event){ if(event.key==='Enter'||event.key===' '){ event.preventDefault(); card.click(); } });
                 track.appendChild(card);
