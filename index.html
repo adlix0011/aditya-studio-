@@ -383,7 +383,7 @@
     .gallery-reels{width:100%;padding-top:2px;overflow:hidden}
     .gallery-reels-track{display:flex;gap:14px;overflow-x:auto;padding:2px 4px 12px;scroll-snap-type:x mandatory;scrollbar-width:none;touch-action:pan-x;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;cursor:grab}
     .gallery-reels-track::-webkit-scrollbar{display:none}
-    .gallery-reel-card{position:relative;flex:0 0 min(68vw,270px);aspect-ratio:9/16;overflow:hidden;border:0;padding:0;border-radius:18px;scroll-snap-align:center;background:#111;isolation:isolate;cursor:pointer;box-shadow:0 10px 24px rgba(0,0,0,.44),0 0 17px rgba(34,211,238,.25)}
+    .gallery-reel-card{position:relative;flex:0 0 min(68vw,270px);aspect-ratio:9/16;overflow:hidden;border:0;padding:0;border-radius:18px;scroll-snap-align:center;background:#111;isolation:isolate;cursor:pointer;touch-action:pan-x;box-shadow:0 10px 24px rgba(0,0,0,.44),0 0 17px rgba(34,211,238,.25)}
     .gallery-reel-card::before{content:"";position:absolute;z-index:-2;width:220%;height:220%;left:-60%;top:-60%;background:conic-gradient(#22d3ee,#a855f7,#ff3e8d,#facc15,#4ade80,#22d3ee);animation:galleryRgbSpin 3.5s linear infinite}
     .gallery-reel-card::after{content:"";position:absolute;z-index:-1;inset:2px;border-radius:16px;background:#090909}
     .gallery-reel-card video{position:absolute;inset:2px;width:calc(100% - 4px);height:calc(100% - 4px);border-radius:16px;object-fit:cover;background:#090909;pointer-events:none}.gallery-reel-card:focus-visible{outline:3px solid #facc15;outline-offset:3px}
@@ -813,18 +813,23 @@
                 if(Math.abs(delta)>42) track.scrollBy({left:delta>0?track.clientWidth*.86:-track.clientWidth*.86,behavior:'smooth'});
               },{passive:true});
               reels.forEach(function(src,i){
-                var card=document.createElement('button'); card.type='button'; card.className='gallery-reel-card'; card.setAttribute('aria-label','Play Reel '+(i+1)+' with sound');
+                var card=document.createElement('div'); card.className='gallery-reel-card'; card.tabIndex=0; card.setAttribute('role','button'); card.setAttribute('aria-label','Play Reel '+(i+1)+' with sound');
                 var video=document.createElement('video'); video.src=src; video.muted=true; video.loop=true; video.playsInline=true; video.preload='auto'; video.autoplay=true;
                 video.play().catch(function(){});
                 var badge=document.createElement('span'); badge.className='gallery-reel-badge'; badge.textContent='🔇 Tap for sound · Reel '+(i+1);
                 card.appendChild(video); card.appendChild(badge);
+                var dragStartX=0, dragged=false;
+                card.addEventListener('touchstart',function(event){ dragStartX=event.touches[0].clientX; dragged=false; },{passive:true});
+                card.addEventListener('touchmove',function(event){ if(Math.abs(event.touches[0].clientX-dragStartX)>12) dragged=true; },{passive:true});
                 card.addEventListener('click',function(){
+                  if(dragged) return;
                   var enabled=video.muted;
                   Array.prototype.forEach.call(track.querySelectorAll('video'),function(other){ if(other!==video){other.muted=true; other.pause();} });
                   video.muted=!enabled; video.volume=1; video.play().catch(function(){});
                   badge.textContent=enabled?'🔊 Sound on · Reel '+(i+1):'🔇 Tap for sound · Reel '+(i+1);
                   card.setAttribute('aria-label',enabled?'Mute Reel '+(i+1):'Play Reel '+(i+1)+' with sound');
                 });
+                card.addEventListener('keydown',function(event){ if(event.key==='Enter'||event.key===' '){ event.preventDefault(); card.click(); } });
                 track.appendChild(card);
               });
               reelBox.appendChild(track);
