@@ -427,7 +427,7 @@
         <a class="text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md hover:backdrop-blur-2xl hover:bg-surface/60 rounded-sm px-1" href="#portfolio">Portfolio</a>
         <a class="text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md hover:backdrop-blur-2xl hover:bg-surface/60 rounded-sm px-1" href="#gift-shop">Gift Shop</a>
         <a class="text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md hover:backdrop-blur-2xl hover:bg-surface/60 rounded-sm px-1" href="/frames">Photo Frames</a>
-        <a class="text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md hover:backdrop-blur-2xl hover:bg-surface/60 rounded-sm px-1" href="#more-services">More Services</a>
+        <a class="text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md hover:backdrop-blur-2xl hover:bg-surface/60 rounded-sm px-1" href="/roller-spin">More Services</a>
         <a class="text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md hover:backdrop-blur-2xl hover:bg-surface/60 rounded-sm px-1" href="#galleries">Galleries</a>
       </nav>
       <div class="header-actions flex items-center gap-3 md:gap-4">
@@ -825,7 +825,7 @@
     </section>
 
     <!-- Live Spin Roller + AD Token -->
-    <section class="glass-panel rounded-3xl p-8 md:p-12 relative overflow-hidden border-primary/20 shadow-[0_0_40px_rgba(212,175,55,0.05)]" id="galleries" style="display:none" aria-hidden="true">
+    <section class="glass-panel rounded-3xl p-8 md:p-12 relative overflow-hidden border-primary/20 shadow-[0_0_40px_rgba(212,175,55,0.05)]" id="galleries">
       <div class="absolute -right-20 -top-20 w-64 h-64 bg-primary/10 rounded-full blur-3xl"></div>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-12 relative z-10 items-center">
         <div>
@@ -1862,10 +1862,6 @@
             ratingEl.innerHTML = '<span class="rating-stars">' + starText + '</span><span class="rating-detail">' + (count ? average.toFixed(1) + ' / 5 · ' + count + ' rating' + (count === 1 ? '' : 's') : 'No ratings yet') + '</span>';
           }).catch(() => {});
         }
-
-        let quickSelected=0; const qs=document.getElementById('quickStars'), qn=document.getElementById('quickName'), qc=document.getElementById('quickComment'), qsu=document.getElementById('quickSuggestions'), qb=document.getElementById('quickSubmit'), qst=document.getElementById('quickStatus');
-        if(qs){ qs.onclick=function(e){quickSelected=Math.max(1,Math.min(5,Math.ceil((e.offsetX/qs.clientWidth)*5)));qs.innerHTML=['#ff4d6d','#ff9f1c','#ffe66d','#41ead4','#a78bfa'].map((c,i)=>'<span style=\"color:'+(i<quickSelected?c:'#61566b')+';animation:starPop .45s '+(i*.12)+'s both\">★</span>').join('');qsu.style.display='flex';qc.style.display=qb.style.display='block'};qsu.onclick=function(e){if(e.target.dataset.msg)qc.value=e.target.dataset.msg};qb.onclick=async function(){if(!quickSelected||!qc.value.trim())return;qst.textContent='Saving…';let r=await fetch('/api/photographer-ratings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({rating:quickSelected,name:name:(function(){try{let x=JSON.parse(localStorage.getItem('aditya_studio_session_v1')||localStorage.getItem('aditya_studio_persistent_login_v2')||'{}');return x.name||x.customerName||x.userName||'Aditya Studio customer'}catch(e){return 'Aditya Studio customer'}})(),comment:qc.value})});qst.textContent=r.ok?'Thank you for your rating!':'Please try again';if(r.ok){qn.value=qc.value='';qsu.style.display='none';qn.style.display=qc.style.display=qb.style.display='none';quickSelected=0;qs.textContent='☆ ☆ ☆ ☆ ☆'}}}
-
         if (urls.length < 2) return;
         setInterval(function () {
           idx = (idx + 1) % urls.length;
