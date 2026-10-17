@@ -1140,26 +1140,28 @@
         const tokens = user ? (user.adTokens || 0) : 0;
         const spins = user ? (user.spinBalance || 0) : 0;
         const canClaim = user ? !!user.canClaimAdToken : false;
-        document.getElementById('homeTokenCount').textContent = tokens;
-        document.getElementById('homeSpinCount').textContent = spins;
-        document.getElementById('homeSpinCount2').textContent = spins;
-        const claimBtn = document.getElementById('homeClaimTokenBtn');
-        const claimMsg = document.getElementById('homeClaimMsg');
-        if (!user) {
-          claimBtn.disabled = false;
-          claimBtn.classList.add('claimable');
-          claimBtn.textContent = 'Login & Claim AD Token';
-          claimMsg.textContent = '';
-        } else if (canClaim) {
-          claimBtn.disabled = false;
-          claimBtn.classList.add('claimable');
-          claimBtn.textContent = 'Claim AD Token';
-          claimMsg.textContent = 'Aaj ka free AD Token ready hai — chamakta button dabao';
-        } else {
-          claimBtn.disabled = true;
-          claimBtn.classList.remove('claimable');
-          claimBtn.textContent = 'Claimed today';
-          claimMsg.textContent = 'Kal phir 1 AD Token milega. 10 tokens = 1 spin.';
+        document.getElementById(''homeTokenCount'')?.replaceChildren(document.createTextNode(tokens));
+        document.getElementById(''homeSpinCount'')?.replaceChildren(document.createTextNode(spins));
+        document.getElementById(''homeSpinCount2'')?.replaceChildren(document.createTextNode(spins));
+        const claimBtn = document.getElementById(''homeClaimTokenBtn'');
+        const claimMsg = document.getElementById(''homeClaimMsg'');
+        if (claimBtn && claimMsg) {
+          if (!user) {
+            claimBtn.disabled = false;
+            claimBtn.classList.add(''claimable'');
+            claimBtn.textContent = ''Login & Claim AD Token'';
+            claimMsg.textContent = '''';
+          } else if (canClaim) {
+            claimBtn.disabled = false;
+            claimBtn.classList.add(''claimable'');
+            claimBtn.textContent = ''Claim AD Token'';
+            claimMsg.textContent = ''Aaj ka free AD Token ready hai — chamakta button dabao'';
+          } else {
+            claimBtn.disabled = true;
+            claimBtn.classList.remove(''claimable'');
+            claimBtn.textContent = ''Claimed today'';
+            claimMsg.textContent = ''Kal phir 1 AD Token milega. 10 tokens = 1 spin.'';
+          }
         }
         // profile
         if (user) {
