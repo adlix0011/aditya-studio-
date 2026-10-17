@@ -831,6 +831,9 @@
                   if(video.paused){
                     Array.prototype.forEach.call(track.querySelectorAll('video'),function(other){ if(other!==video){other.muted=true; other.pause();} });
                     video.muted=false; video.volume=1; video.play().catch(function(){}); card.classList.remove('is-paused'); badge.textContent='🔊 Sound on · Reel '+(i+1); showControl('❚❚');
+                  } else if(video.muted) {
+                    Array.prototype.forEach.call(track.querySelectorAll('video'),function(other){ if(other!==video){other.muted=true; other.pause();} });
+                    video.muted=false; video.volume=1; badge.textContent='🔊 Sound on · Reel '+(i+1); showControl('❚❚');
                   } else {
                     video.pause(); card.classList.add('is-paused'); badge.textContent='▶ Paused · Reel '+(i+1); showControl('▶');
                   }
