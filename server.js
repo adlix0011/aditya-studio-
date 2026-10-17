@@ -2375,6 +2375,15 @@ const server = http.createServer(async (req, res) => {
     } catch (e) { return sendJSON(res, 500, { ok:false, message:'Rating save nahi hui' }); }
   }
 
+  if (urlPath === '/api/studio-ratings' && req.method === 'GET') {
+    const ratings = Array.isArray(loadSettings().studioRatings) ? loadSettings().studioRatings : [];
+    const count=ratings.length, average=count?ratings.reduce((sum,row)=>sum+Number(row.rating||0),0)/count:0;
+    return sendJSON(res,200,{ok:true,count,average:Number(average.toFixed(1)),ratings:ratings.slice(0,30)});
+  }
+  if (urlPath === '/api/studio-ratings' && req.method === 'POST') {
+    try { const body=await readBody(req,10000),rating=Math.max(1,Math.min(5,Math.round(Number(body.rating)||0))),comment=String(body.comment||'').trim().slice(0,280),name=String(body.name||'Aditya Studio customer').trim().slice(0,50)||'Aditya Studio customer'; if(!rating||!comment)return sendJSON(res,400,{ok:false,message:'Rating aur comment likhein'}); const settings=loadSettings();settings.studioRatings=Array.isArray(settings.studioRatings)?settings.studioRatings:[];settings.studioRatings.unshift({rating,name,comment,createdAt:new Date().toISOString()});settings.studioRatings=settings.studioRatings.slice(0,100);saveSettings(settings);return sendJSON(res,200,{ok:true}); } catch(e){return sendJSON(res,500,{ok:false,message:'Rating save nahi hui'});}
+  }
+
   // ---- Public APIs ----
   if (req.method === 'GET' && urlPath === '/api/live-revision') {
     return sendJSON(res, 200, { ok: true, revision: liveRevision() });
