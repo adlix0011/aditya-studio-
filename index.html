@@ -383,7 +383,7 @@
     .gallery-reels{width:100%;padding-top:2px;overflow:hidden}
     .gallery-reels-track{display:flex;gap:14px;overflow-x:auto;padding:2px 4px 12px;scroll-snap-type:x mandatory;scrollbar-width:none;touch-action:pan-x;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;cursor:grab}
     .gallery-reels-track::-webkit-scrollbar{display:none}
-    .gallery-reel-card{position:relative;flex:0 0 min(68vw,270px);aspect-ratio:9/16;overflow:hidden;border-radius:18px;scroll-snap-align:center;background:#111;isolation:isolate;box-shadow:0 10px 24px rgba(0,0,0,.44),0 0 17px rgba(34,211,238,.25)}
+    .gallery-reel-card{position:relative;flex:0 0 min(68vw,270px);aspect-ratio:9/16;overflow:hidden;border:0;padding:0;border-radius:18px;scroll-snap-align:center;background:#111;isolation:isolate;cursor:pointer;box-shadow:0 10px 24px rgba(0,0,0,.44),0 0 17px rgba(34,211,238,.25)}
     .gallery-reel-card::before{content:"";position:absolute;z-index:-2;width:220%;height:220%;left:-60%;top:-60%;background:conic-gradient(#22d3ee,#a855f7,#ff3e8d,#facc15,#4ade80,#22d3ee);animation:galleryRgbSpin 3.5s linear infinite}
     .gallery-reel-card::after{content:"";position:absolute;z-index:-1;inset:2px;border-radius:16px;background:#090909}
     .gallery-reel-card video{position:absolute;inset:2px;width:calc(100% - 4px);height:calc(100% - 4px);border-radius:16px;object-fit:cover;background:#090909;pointer-events:none}.gallery-reel-card:focus-visible{outline:3px solid #facc15;outline-offset:3px}
