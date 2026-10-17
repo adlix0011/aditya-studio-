@@ -824,63 +824,6 @@
       </script>
     </section>
 
-    <!-- Live Spin Roller + AD Token -->
-    <section class="glass-panel rounded-3xl p-8 md:p-12 relative overflow-hidden border-primary/20 shadow-[0_0_40px_rgba(212,175,55,0.05)]" id="galleries">
-      <div class="absolute -right-20 -top-20 w-64 h-64 bg-primary/10 rounded-full blur-3xl"></div>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-12 relative z-10 items-center">
-        <div>
-          <span class="inline-block px-3 py-1 rounded-full bg-surface-variant text-primary font-label-md text-xs mb-4 border border-primary/20">Daily Rewards</span>
-          <h2 class="font-headline-md text-headline-md text-on-surface mb-4">Spin Wheel &amp; AD Tokens</h2>
-          <p class="text-on-surface-variant font-body-md text-body-md mb-4">Live roller auto-spin ho raha hai. Click karke full spin page kholo. Har din <b class="text-primary">1 AD Token</b> claim karo — <b class="text-primary">10 tokens = 1 spin</b>.</p>
-          <div class="grid grid-cols-2 gap-3 mb-6 max-w-[310px]">
-            <div class="relative overflow-hidden rounded-2xl px-4 py-4 min-w-0 border border-sky-300/25 shadow-[0_0_18px_rgba(56,125,180,0.16)]" style="background:linear-gradient(145deg,#1d3040,#17242e 60%,#132028)">
-              <div class="absolute -right-4 -top-4 w-16 h-16 rounded-full bg-sky-300/10 blur-xl"></div>
-              <p class="text-[10px] uppercase tracking-[0.16em] text-sky-200/80 font-label-md">Your Spins</p>
-              <p class="text-3xl font-bold text-gradient-gold mt-1" id="homeSpinCount">0</p>
-              <p class="text-[10px] text-on-surface-variant mt-1">Ready to play</p>
-            </div>
-            <button type="button" id="homeAddSpinBtn" class="relative overflow-hidden rounded-2xl px-4 py-4 min-w-0 text-left border border-fuchsia-300/25 shadow-[0_0_18px_rgba(147,79,170,0.15)]" style="background:linear-gradient(145deg,#38203d,#2a1b31 60%,#211724)">
-              <div class="absolute -right-4 -top-4 w-16 h-16 rounded-full bg-fuchsia-300/10 blur-xl"></div>
-              <p class="text-[10px] uppercase tracking-[0.16em] text-fuchsia-200/80 font-label-md">Add Spin</p>
-              <p class="text-3xl font-bold text-gradient-gold mt-1">+</p>
-              <p class="text-[10px] text-on-surface-variant mt-1"><span id="homeTokenCount">0</span> tokens = 1 spin</p>
-            </button>
-          </div>
-          <form class="flex flex-col sm:flex-row gap-4" id="spinCodeForm">
-            <div class="relative flex-1">
-              <input class="w-full bg-surface border-b-2 border-outline-variant focus:border-primary text-on-surface font-body-md px-4 py-3 rounded-t-md outline-none transition-colors placeholder:text-on-surface-variant/50 focus:bg-surface-variant/50" id="spinCode" placeholder="Spin code (optional)" type="text" autocomplete="off"/>
-            </div>
-            <button class="bg-surface-bright text-primary border border-primary/30 font-label-md text-label-md px-6 py-3 rounded-lg hover:bg-primary hover:text-on-primary transition-all whitespace-nowrap" type="submit">
-              Verify Code
-            </button>
-          </form>
-          <div class="mt-4 hidden items-center gap-3" id="codeVerifyAlert" role="status">
-            <p class="text-sm font-label-md text-sky-200" id="codeResult"></p>
-            <button type="button" id="codeMobileVerifyBtn" class="shrink-0 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-blue-500/25">✓ Verify</button>
-          </div>
-        </div>
-        <div class="flex flex-col items-center gap-4">
-          <button type="button" class="home-lw-link" title="Tap to spin" id="homeRealWheelLink" aria-label="Spin the reward wheel" style="background:transparent;border:0;padding:0;cursor:pointer">
-            <div class="home-lw-stage">
-              <div class="home-lw-pointer"></div>
-              <div class="home-lw-outer">
-                <div class="home-lw-rim"></div>
-                <div class="home-lw-wheel" id="homeLwWheel">
-                  <div class="home-lw-segments" id="homeLwSegments"></div>
-                </div>
-              </div>
-              <div class="home-lw-hub">📷</div>
-            </div>
-          </button>
-          <p class="text-primary font-label-md text-label-md tracking-wider">Spins left: <span id="homeSpinCount2">0</span></p>
-          <p id="homeSpinHint" class="text-xs text-on-surface-variant text-center">🎡 Roller ghumane ke liye wheel par tap karein</p>
-          <button type="button" id="homeClaimTokenBtn" class="btn-claim-token claimable font-label-md text-label-md px-8 py-3 rounded-full">
-            Claim AD Token
-          </button>
-          <p id="homeClaimMsg" class="text-xs text-on-surface-variant text-center max-w-xs"></p>
-        </div>
-      </div>
-    </section>
     <!-- Photo Frames → full frames shop -->
     <section class="flex flex-col gap-6" id="photo-frames-cta">
       <div class="flex items-center justify-between flex-wrap gap-3">
