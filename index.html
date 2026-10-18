@@ -922,6 +922,7 @@
     document.addEventListener('DOMContentLoaded', () => {
       const SESSION_KEY = 'aditya_studio_session_v1';
       const PERSIST_SESSION_KEY = 'aditya_studio_persistent_login_v2';
+      const RECOVERY_SESSION_KEY = 'aditya_studio_login_recovery_v1';
       const profileBtn = document.getElementById('profileBtn');
       const guestLoginBtn = document.getElementById('guestLoginBtn');
       const verifyNudge = document.getElementById('verifyNudge');
@@ -1061,15 +1062,17 @@
 
       function loadSession() {
         try {
-          const primary = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
-          const persistent = JSON.parse(localStorage.getItem(PERSIST_SESSION_KEY) || 'null');
-          // Spin page se kabhi incomplete save ho jaye to token wala saved login choose karo.
-          const session = (primary && primary.mobile && primary.sessionToken) ? primary
-            : ((persistent && persistent.mobile && persistent.sessionToken) ? persistent : (primary || persistent));
+          const read = function (key) { try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch (_) { return null; } };
+          const primary = read(SESSION_KEY), persistent = read(PERSIST_SESSION_KEY), recovery = read(RECOVERY_SESSION_KEY);
+          // Refresh ya kisi doosre page ke incomplete write ke baad bhi valid saved login kabhi na khoye.
+          const list = [primary, persistent, recovery];
+          const session = list.find(function (item) { return item && item.mobile && item.sessionToken; }) || primary || persistent || recovery || null;
           if (session && session.pin) delete session.pin;
           if (session && session.mobile && session.sessionToken) {
-            localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-            localStorage.setItem(PERSIST_SESSION_KEY, JSON.stringify(session));
+            const value = JSON.stringify(session);
+            localStorage.setItem(SESSION_KEY, value);
+            localStorage.setItem(PERSIST_SESSION_KEY, value);
+            localStorage.setItem(RECOVERY_SESSION_KEY, value);
           }
           return session;
         } catch (e) { return null; }
@@ -1078,10 +1081,16 @@
         const prev = loadSession() || {};
         const next = { ...prev, ...data };
         delete next.pin;
-        localStorage.setItem(SESSION_KEY, JSON.stringify(next));
-        localStorage.setItem(PERSIST_SESSION_KEY, JSON.stringify(next));
+        const value = JSON.stringify(next);
+        localStorage.setItem(SESSION_KEY, value);
+        localStorage.setItem(PERSIST_SESSION_KEY, value);
+        localStorage.setItem(RECOVERY_SESSION_KEY, value);
       }
-      function clearSession() { localStorage.removeItem(SESSION_KEY); localStorage.removeItem(PERSIST_SESSION_KEY); }
+      function clearSession() {
+        localStorage.removeItem(SESSION_KEY);
+        localStorage.removeItem(PERSIST_SESSION_KEY);
+        localStorage.removeItem(RECOVERY_SESSION_KEY);
+      }
 
       let user = null;
 
@@ -1397,7 +1406,7 @@
       // Agar Book Now, Frames ya kisi aur tab se logout kiya gaya ho to Home
       // bhi turant guest mode me aa jaye.
       window.addEventListener('storage', (event) => {
-        if (event.key === SESSION_KEY && !event.newValue) {
+        if ([SESSION_KEY, PERSIST_SESSION_KEY, RECOVERY_SESSION_KEY].includes(event.key) && !event.newValue && !loadSession()) {
           user = null;
           updateTokenUI();
         }
