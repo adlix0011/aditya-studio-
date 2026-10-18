@@ -381,9 +381,9 @@
     .gallery-story-title{margin:0;font-family:'EB Garamond',serif;font-size:clamp(1.8rem,8vw,2.6rem);font-weight:700;line-height:1;background:linear-gradient(110deg,#fef3c7,#fbbf24 43%,#f472b6 74%,#67e8f9);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:0 0 18px rgba(250,204,21,.18)}
     @keyframes galleryRgbSpin{to{transform:rotate(360deg)}}
     .gallery-reels{width:100%;padding-top:2px;overflow:hidden}
-    .gallery-reels-track{--reel-card-w:min(68vw,270px);display:flex;gap:14px;overflow-x:auto;padding:2px calc((100% - var(--reel-card-w))/2) 12px;scroll-padding-inline:calc((100% - var(--reel-card-w))/2);scroll-snap-type:x mandatory;scrollbar-width:none;touch-action:pan-x;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;cursor:grab}
+    .gallery-reels-track{--reel-card-w:min(68vw,270px);display:flex;gap:14px;overflow-x:auto;padding:2px calc((100% - var(--reel-card-w))/2) 12px;scroll-padding-inline:calc((100% - var(--reel-card-w))/2);scroll-snap-type:x mandatory;scrollbar-width:none;touch-action:pan-x pan-y;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;cursor:grab}
     .gallery-reels-track::-webkit-scrollbar{display:none}
-    .gallery-reel-card{position:relative;flex:0 0 min(68vw,270px);aspect-ratio:9/16;overflow:hidden;border:0;padding:0;border-radius:18px;scroll-snap-align:center;background:#111;isolation:isolate;cursor:pointer;touch-action:pan-x;box-shadow:0 10px 24px rgba(0,0,0,.44),0 0 17px rgba(34,211,238,.25)}
+    .gallery-reel-card{position:relative;flex:0 0 min(68vw,270px);aspect-ratio:9/16;overflow:hidden;border:0;padding:0;border-radius:18px;scroll-snap-align:center;background:#111;isolation:isolate;cursor:pointer;touch-action:pan-x pan-y;box-shadow:0 10px 24px rgba(0,0,0,.44),0 0 17px rgba(34,211,238,.25)}
     .gallery-reel-card::before{content:"";position:absolute;z-index:-2;width:220%;height:220%;left:-60%;top:-60%;background:conic-gradient(#22d3ee,#a855f7,#ff3e8d,#facc15,#4ade80,#22d3ee);animation:galleryRgbSpin 3.5s linear infinite}
     .gallery-reel-card::after{content:"";position:absolute;z-index:-1;inset:2px;border-radius:16px;background:#090909}
     .gallery-reel-card video{position:absolute;inset:2px;width:calc(100% - 4px);height:calc(100% - 4px);border-radius:16px;object-fit:cover;background:#090909;pointer-events:none}.gallery-reel-card:focus-visible{outline:3px solid #facc15;outline-offset:3px}
@@ -1183,27 +1183,27 @@
         const tokens = user ? (user.adTokens || 0) : 0;
         const spins = user ? (user.spinBalance || 0) : 0;
         const canClaim = user ? !!user.canClaimAdToken : false;
-        document.getElementById(''homeTokenCount'')?.replaceChildren(document.createTextNode(tokens));
-        document.getElementById(''homeSpinCount'')?.replaceChildren(document.createTextNode(spins));
-        document.getElementById(''homeSpinCount2'')?.replaceChildren(document.createTextNode(spins));
-        const claimBtn = document.getElementById(''homeClaimTokenBtn'');
-        const claimMsg = document.getElementById(''homeClaimMsg'');
+        document.getElementById('homeTokenCount')?.replaceChildren(document.createTextNode(tokens));
+        document.getElementById('homeSpinCount')?.replaceChildren(document.createTextNode(spins));
+        document.getElementById('homeSpinCount2')?.replaceChildren(document.createTextNode(spins));
+        const claimBtn = document.getElementById('homeClaimTokenBtn');
+        const claimMsg = document.getElementById('homeClaimMsg');
         if (claimBtn && claimMsg) {
           if (!user) {
             claimBtn.disabled = false;
-            claimBtn.classList.add(''claimable'');
-            claimBtn.textContent = ''Login & Claim AD Token'';
-            claimMsg.textContent = '''';
+            claimBtn.classList.add('claimable');
+            claimBtn.textContent = 'Login & Claim AD Token';
+            claimMsg.textContent = '';
           } else if (canClaim) {
             claimBtn.disabled = false;
-            claimBtn.classList.add(''claimable'');
-            claimBtn.textContent = ''Claim AD Token'';
-            claimMsg.textContent = ''Aaj ka free AD Token ready hai — chamakta button dabao'';
+            claimBtn.classList.add('claimable');
+            claimBtn.textContent = 'Claim AD Token';
+            claimMsg.textContent = 'Aaj ka free AD Token ready hai — chamakta button dabao';
           } else {
             claimBtn.disabled = true;
-            claimBtn.classList.remove(''claimable'');
-            claimBtn.textContent = ''Claimed today'';
-            claimMsg.textContent = ''Kal phir 1 AD Token milega. 10 tokens = 1 spin.'';
+            claimBtn.classList.remove('claimable');
+            claimBtn.textContent = 'Claimed today';
+            claimMsg.textContent = 'Kal phir 1 AD Token milega. 10 tokens = 1 spin.';
           }
         }
         // profile
