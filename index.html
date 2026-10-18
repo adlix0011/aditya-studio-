@@ -1825,9 +1825,23 @@
             active.onplay = function(){ active.controls = false; };
             active.onended = () => activate(idx + 1);
             active.onerror = () => { advanceTimer = setTimeout(() => activate(idx + 1), durationMs); };
-            // Video has already been preloaded. If a slow connection still needs data, start instantly on canplay.
-            const startVideo = () => { const play = active.play(); if (play && play.catch) play.catch(() => { advanceTimer = setTimeout(() => activate(idx + 1), durationMs); }); };
-            if (active.readyState >= 3) startVideo(); else { active.oncanplay = function(){ active.oncanplay=null; startVideo(); }; }
+            // Retry at every valid media-ready point. Safari can fire canplay before a
+            // dynamically-created hero video becomes active, which previously left it hidden.
+            let playRequested = false;
+            const startVideo = () => {
+              if (playRequested || !active.classList.contains('active')) return;
+              playRequested = true;
+              const play = active.play();
+              if (play && play.catch) play.catch(() => {
+                playRequested = false;
+                // Keep the clean first-frame fallback visible if iOS blocks autoplay.
+                if (active.readyState >= 2) paintPoster();
+                advanceTimer = setTimeout(() => activate(idx + 1), durationMs);
+              });
+            };
+            active.addEventListener('loadeddata', startVideo, { once:true });
+            active.addEventListener('canplay', startVideo, { once:true });
+            if (active.readyState >= 2) startVideo();
           } else {
             const itemMs = Math.max(2000, Math.min(30000, (Number(items[idx].durationSec) || durationMs / 1000) * 1000));
             advanceTimer = setTimeout(() => activate(idx + 1), itemMs);
