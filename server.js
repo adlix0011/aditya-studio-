@@ -332,15 +332,7 @@ function publicSettings(settings) {
   out.offerImages = mapItems(out.offerImages);
   out.frames3dPhotos = mapItems(out.frames3dPhotos);
   out.homeHeroFramePhotos = mapItems(out.homeHeroFramePhotos);
-  // Hero videos are served through the same site so iPhone can safely paint a
-  // first-frame canvas fallback without exposing its native paused-video button.
-  out.heroSideBgPhotos = (Array.isArray(out.heroSideBgPhotos) ? out.heroSideBgPhotos : []).map(item => {
-    const raw = typeof item === 'string' ? item : String((item && item.url) || '');
-    const key = raw.startsWith('r2:') ? raw.slice(3) : '';
-    const heroVideo = /^studio-images\/hero-bg\/[a-zA-Z0-9._-]+\.(mp4|webm)$/i.test(key);
-    const url = heroVideo ? '/api/hero-media?key=' + encodeURIComponent(key) : mediaUrl(raw);
-    return typeof item === 'string' ? url : { ...item, url };
-  });
+  out.heroSideBgPhotos = mapItems(out.heroSideBgPhotos);
   out.bookImages = Object.fromEntries(Object.entries(out.bookImages || {}).map(([k, v]) => [k, mediaUrl(v)]));
   out.gallerySamples = Object.fromEntries(Object.entries(out.gallerySamples || {}).map(([k, list]) => [k, mapItems(list)]));
   out.liveWedding = { ...(out.liveWedding || {}), thumbnail: mediaUrl((out.liveWedding || {}).thumbnail || ''), albums: Object.fromEntries(Object.entries((out.liveWedding || {}).albums || {}).map(([k,v]) => [k, mediaUrl(v)])) };
@@ -2197,7 +2189,7 @@ const server = http.createServer(async (req, res) => {
       const firstMediaType = typeof first === 'object' ? String(first.mediaType || '') : '';
       const bootIsVideo = firstMediaType === 'video' || /\.(mp4|webm)(?:[?#]|$)/i.test(safeUrl);
       const heroBootMedia = bootIsVideo
-        ? '<div class="hero-video-fallback active" data-hero-boot="1" aria-hidden="true"></div>'
+        ? '<video class="hero-bg-video active" data-hero-boot="1" src="' + safeUrl + '" muted autoplay playsinline preload="auto" aria-label="Studio hero video"></video>'
         : '<div class="bg-slide active" data-hero-boot="1" style="background-image:url(\'' + safeUrl + '\');background-position:' + x + '% ' + y + '%"></div>';
       const heroFrameFirst = (settings.homeHeroFramePhotos || [])[0] || '';
       const heroFrameRawUrl = mediaUrl(typeof heroFrameFirst === 'string' ? heroFrameFirst : String(heroFrameFirst.url || ''));
@@ -2375,63 +2367,22 @@ const server = http.createServer(async (req, res) => {
   }
   if (urlPath === '/api/photographer-ratings' && req.method === 'POST') {
     try {
-      const body = await readBody(req, 10000), rating = Math.max(1, Math.min(5, Math.round(Number(body.rating) || 0))), name = String(body.name || 'Guest').trim().slice(0, 50) || 'Guest', comment = String(body.comment || '').trim().slice(0, 280);
+      const body = await readBody(req, 10000), rating = Math.max(1, Math.min(5, Math.round(Number(body.rating) || 0))), comment = String(body.comment || '').trim().slice(0, 280);
       if (!rating || !comment) return sendJSON(res, 400, { ok:false, message:'Rating aur comment likhein' });
       const settings = loadSettings(); settings.photographerRatings = Array.isArray(settings.photographerRatings) ? settings.photographerRatings : [];
-      settings.photographerRatings.unshift({ rating, name, comment, createdAt:new Date().toISOString() }); settings.photographerRatings = settings.photographerRatings.slice(0, 100); saveSettings(settings);
+      settings.photographerRatings.unshift({ rating, comment, createdAt:new Date().toISOString() }); settings.photographerRatings = settings.photographerRatings.slice(0, 100); saveSettings(settings);
       return sendJSON(res, 200, { ok:true });
     } catch (e) { return sendJSON(res, 500, { ok:false, message:'Rating save nahi hui' }); }
-  }
-
-  if (urlPath === '/api/studio-ratings' && req.method === 'GET') {
-    const ratings = Array.isArray(loadSettings().studioRatings) ? loadSettings().studioRatings : [];
-    const count=ratings.length, average=count?ratings.reduce((sum,row)=>sum+Number(row.rating||0),0)/count:0;
-    return sendJSON(res,200,{ok:true,count,average:Number(average.toFixed(1)),ratings:ratings.slice(0,30)});
-  }
-  if (urlPath === '/api/studio-ratings' && req.method === 'POST') {
-    try { const body=await readBody(req,10000),rating=Math.max(1,Math.min(5,Math.round(Number(body.rating)||0))),comment=String(body.comment||'').trim().slice(0,280),name=String(body.name||'Aditya Studio customer').trim().slice(0,50)||'Aditya Studio customer'; if(!rating||!comment)return sendJSON(res,400,{ok:false,message:'Rating aur comment likhein'}); const settings=loadSettings();settings.studioRatings=Array.isArray(settings.studioRatings)?settings.studioRatings:[];settings.studioRatings.unshift({rating,name,comment,createdAt:new Date().toISOString()});settings.studioRatings=settings.studioRatings.slice(0,100);saveSettings(settings);return sendJSON(res,200,{ok:true}); } catch(e){return sendJSON(res,500,{ok:false,message:'Rating save nahi hui'});}
   }
 
   // ---- Public APIs ----
   if (req.method === 'GET' && urlPath === '/api/live-revision') {
     return sendJSON(res, 200, { ok: true, revision: liveRevision() });
   }
-  // Same-origin hero media lets the browser draw a clean still-frame fallback on
-  // iPhone when Low Power Mode blocks muted autoplay. Range requests keep video
-  // startup and seeking responsive without exposing R2 credentials to the page.
-  if (req.method === 'GET' && urlPath === '/api/hero-media') {
-    const key = String(new URL(req.url || '/', 'http://localhost').searchParams.get('key') || '');
-    if (!/^studio-images\/hero-bg\/[a-zA-Z0-9._-]+\.(mp4|webm)$/i.test(key) || !r2Ready()) return sendJSON(res, 404, { ok:false });
-    try {
-      const headers = {};
-      if (req.headers.range) headers.Range = String(req.headers.range);
-      const upstream = await fetch(r2PresignedUrl('GET', key, 900), { headers });
-      if (!upstream.ok || !upstream.body) return sendJSON(res, upstream.status || 502, { ok:false });
-      const responseHeaders = {
-        'Content-Type': upstream.headers.get('content-type') || (/.webm$/i.test(key) ? 'video/webm' : 'video/mp4'),
-        'Cache-Control': 'public, max-age=600',
-        'Accept-Ranges': 'bytes'
-      };
-      for (const name of ['content-length', 'content-range']) { const value = upstream.headers.get(name); if (value) responseHeaders[name.replace(/(^|-)([a-z])/g, (_,a,b) => a + b.toUpperCase())] = value; }
-      res.writeHead(upstream.status === 206 ? 206 : 200, responseHeaders);
-      const reader = upstream.body.getReader();
-      while (true) {
-        const chunk = await reader.read();
-        if (chunk.done) break;
-        if (!res.write(Buffer.from(chunk.value))) await new Promise(resolve => res.once('drain', resolve));
-      }
-      return res.end();
-    } catch (error) {
-      console.error('hero-media proxy:', error.message);
-      return sendJSON(res, 502, { ok:false });
-    }
-  }
-
   if (req.method === 'GET' && urlPath === '/api/settings') {
-    // Admin media changes must be visible immediately. Media files themselves
-    // are immutable, but this settings manifest must never overwrite a new card
-    // with a cached old URL after refresh.
-    res.setHeader('Cache-Control', 'no-store, max-age=0');
+    // Keep settings short-cached: image bytes remain cached in R2, while admin
+    // crop/text changes become visible to customers quickly after refresh.
+    res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
     return sendJSON(res, 200, { ok: true, settings: publicSettings(loadSettings()) });
   }
 
@@ -8102,7 +8053,6 @@ server.listen(PORT, '0.0.0.0', () => {
     setInterval(createDailyAutomaticBackup, 60 * 60 * 1000);
   }
 })();
-
 
 
 

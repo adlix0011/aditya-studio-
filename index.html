@@ -169,13 +169,8 @@
     #portfolio{min-height:0!important;height:auto!important;aspect-ratio:16/9;background:#050505}
     .bg-slide { position:absolute; inset:0; background-size:contain; background-repeat:no-repeat; background-position:center; opacity:0; transition:opacity .35s ease; }
     .bg-slide.active { opacity:1; transform:none!important; }
-    /* Hero video stays hidden until it is truly playing: iOS must never expose its native play glyph. */
-    .hero-video-fallback{position:absolute;z-index:2;inset:0;background:radial-gradient(circle at 50% 45%,rgba(212,175,55,.24),transparent 30%),linear-gradient(115deg,#080705 0%,#251806 45%,#050505 100%);opacity:0;transition:opacity .2s ease;pointer-events:none}
-    .hero-video-fallback.active{opacity:1}
-    .hero-bg-video { position:absolute; z-index:3; inset:0; width:100%; height:100%; object-fit:contain; background:#050505; opacity:0; transition:opacity .2s ease; }
-    .hero-bg-video.active.playing { opacity:1; transform:none!important; }
-    .hero-video-poster{position:absolute;z-index:4;inset:0;width:100%;height:100%;object-fit:contain;background:#050505;opacity:0;transition:opacity .2s ease;pointer-events:none}
-    .hero-video-poster.active{opacity:1}
+    .hero-bg-video { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; background:#050505; opacity:0; transition:opacity .35s ease; }
+    .hero-bg-video.active { opacity:1; transform:none!important; }
     @keyframes pulse-ring {
       0% { transform: scale(0.8); opacity: 0.5; }
       100% { transform: scale(2); opacity: 0; }
@@ -386,15 +381,15 @@
     .gallery-story-title{margin:0;font-family:'EB Garamond',serif;font-size:clamp(1.8rem,8vw,2.6rem);font-weight:700;line-height:1;background:linear-gradient(110deg,#fef3c7,#fbbf24 43%,#f472b6 74%,#67e8f9);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:0 0 18px rgba(250,204,21,.18)}
     @keyframes galleryRgbSpin{to{transform:rotate(360deg)}}
     .gallery-reels{width:100%;padding-top:2px;overflow:hidden}
-    .gallery-reels-track{--reel-card-w:min(68vw,270px);display:flex;gap:14px;overflow-x:auto;padding:2px calc((100% - var(--reel-card-w))/2) 12px;scroll-padding-inline:calc((100% - var(--reel-card-w))/2);scroll-snap-type:x mandatory;scrollbar-width:none;touch-action:pan-x pan-y;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;cursor:grab}
+    .gallery-reels-track{display:flex;gap:14px;overflow-x:auto;padding:2px 4px 12px;scroll-snap-type:x mandatory;scrollbar-width:none;touch-action:pan-x;overscroll-behavior-x:contain}
     .gallery-reels-track::-webkit-scrollbar{display:none}
-    .gallery-reel-card{position:relative;flex:0 0 min(68vw,270px);aspect-ratio:9/16;overflow:hidden;border:0;padding:0;border-radius:18px;scroll-snap-align:center;background:#111;isolation:isolate;cursor:pointer;touch-action:pan-x pan-y;box-shadow:0 10px 24px rgba(0,0,0,.44),0 0 17px rgba(34,211,238,.25)}
+    .gallery-reel-card{position:relative;flex:0 0 min(68vw,270px);aspect-ratio:9/16;overflow:hidden;border-radius:18px;scroll-snap-align:center;background:#111;isolation:isolate;box-shadow:0 10px 24px rgba(0,0,0,.44),0 0 17px rgba(34,211,238,.25)}
     .gallery-reel-card::before{content:"";position:absolute;z-index:-2;width:220%;height:220%;left:-60%;top:-60%;background:conic-gradient(#22d3ee,#a855f7,#ff3e8d,#facc15,#4ade80,#22d3ee);animation:galleryRgbSpin 3.5s linear infinite}
     .gallery-reel-card::after{content:"";position:absolute;z-index:-1;inset:2px;border-radius:16px;background:#090909}
-    .gallery-reel-card video{position:absolute;inset:2px;width:calc(100% - 4px);height:calc(100% - 4px);border-radius:16px;object-fit:cover;background:#090909;pointer-events:none}.gallery-reel-card:focus-visible{outline:3px solid #facc15;outline-offset:3px}
-    .gallery-reel-badge{position:absolute;left:12px;bottom:12px;z-index:2;padding:6px 10px;border-radius:999px;background:rgba(5,5,8,.72);backdrop-filter:blur(7px);color:#fff;font-size:11px;font-weight:900;letter-spacing:.05em;pointer-events:none}.gallery-reel-play{position:absolute;left:50%;top:50%;z-index:3;display:grid;place-items:center;width:62px;height:62px;transform:translate(-50%,-50%) scale(.9);border:1px solid rgba(255,255,255,.72);border-radius:50%;background:rgba(7,8,18,.58);box-shadow:0 8px 26px rgba(0,0,0,.36);backdrop-filter:blur(7px);color:#fff;font-size:24px;line-height:1;pointer-events:none;opacity:0;transition:opacity .22s ease,transform .22s ease}.gallery-reel-card.is-paused .gallery-reel-play,.gallery-reel-card.show-control .gallery-reel-play{opacity:1;transform:translate(-50%,-50%) scale(1)}
+    .gallery-reel-card video{position:absolute;inset:2px;width:calc(100% - 4px);height:calc(100% - 4px);border-radius:16px;object-fit:cover;background:#090909}
+    .gallery-reel-badge{position:absolute;left:12px;bottom:12px;z-index:2;padding:6px 10px;border-radius:999px;background:rgba(5,5,8,.72);backdrop-filter:blur(7px);color:#fff;font-size:11px;font-weight:900;letter-spacing:.05em}
     .gallery-reel-empty{display:grid;place-items:center;min-height:160px;border:1px dashed rgba(34,211,238,.55);border-radius:18px;color:#a5f3fc;text-align:center;padding:18px}
-    @media (min-width:768px){.gallery-story{max-width:760px;margin-inline:auto}.gallery-story-media{max-height:430px}.gallery-reels{max-width:760px;margin-inline:auto}.gallery-reels-track{--reel-card-w:245px}.gallery-reel-card{flex-basis:245px}}
+    @media (min-width:768px){.gallery-story{max-width:760px;margin-inline:auto}.gallery-story-media{max-height:430px}.gallery-reels{max-width:760px;margin-inline:auto}.gallery-reel-card{flex-basis:245px}}
 
     .gallery-story-media{cursor:pointer}
     .live-wedding-showcase{position:relative;overflow:hidden;padding:18px;border:1px solid rgba(251,113,133,.52);border-radius:26px;background:radial-gradient(circle at 8% 8%,rgba(244,63,94,.36),transparent 31%),radial-gradient(circle at 95% 92%,rgba(34,211,238,.28),transparent 38%),linear-gradient(135deg,#31101f,#12172e 55%,#102c35);box-shadow:0 18px 34px rgba(0,0,0,.34),0 0 28px rgba(236,72,153,.23)}
@@ -419,7 +414,7 @@
       pointer-events: none;
     }
 
-  @keyframes starPop{0%{transform:scale(0);opacity:0}70%{transform:scale(1.35)}100%{transform:scale(1);opacity:1}}#quickStars span{display:inline-block;margin:0 3px}.studio-rate-title{font-size:23px;font-weight:1000;letter-spacing:.06em;background:linear-gradient(90deg,#ff4d6d,#ff9f1c,#ffe66d,#41ead4,#a78bfa);background-size:300% 100%;color:transparent;background-clip:text;animation:studioShine 3s linear infinite}@keyframes studioShine{to{background-position:300% 0}}</style>
+  </style>
 </head>
 <body class="bg-background text-on-background min-h-screen flex flex-col font-body-md text-body-md overflow-x-hidden selection:bg-primary/30 selection:text-primary">
 
@@ -432,7 +427,7 @@
         <a class="text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md hover:backdrop-blur-2xl hover:bg-surface/60 rounded-sm px-1" href="#portfolio">Portfolio</a>
         <a class="text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md hover:backdrop-blur-2xl hover:bg-surface/60 rounded-sm px-1" href="#gift-shop">Gift Shop</a>
         <a class="text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md hover:backdrop-blur-2xl hover:bg-surface/60 rounded-sm px-1" href="/frames">Photo Frames</a>
-        <a class="text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md hover:backdrop-blur-2xl hover:bg-surface/60 rounded-sm px-1" href="/roller-spin">More Services</a>
+        <a class="text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md hover:backdrop-blur-2xl hover:bg-surface/60 rounded-sm px-1" href="#more-services">More Services</a>
         <a class="text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md hover:backdrop-blur-2xl hover:bg-surface/60 rounded-sm px-1" href="#galleries">Galleries</a>
       </nav>
       <div class="header-actions flex items-center gap-3 md:gap-4">
@@ -659,7 +654,7 @@
     </section>
 
     <!-- Offer Carousel -->
-    <section class="w-full overflow-hidden relative rounded-2xl glass-panel p-1 mt-4" id="gift-shop" aria-label="Book Events">
+    <section class="w-full overflow-hidden relative rounded-2xl glass-panel p-1 mt-4" id="gift-shop" style="visibility:hidden" aria-label="Current deals">
       <div class="absolute top-4 left-6 z-10">
         <span class="future-offers-label font-label-md text-[10px] px-3 py-1.5 rounded-full uppercase shadow-lg">Book Events</span>
       </div>
@@ -725,8 +720,6 @@
       </div>
     </section>
 
-    <section id="quickRating" class="home-photographer-rating" style="display:block;position:relative;border-radius:20px;text-align:center"><b style="display:block;font-size:16px"><span class="studio-rate-title">Aditya Studio</span><b style="display:block;margin-top:3px">Rate our Studio</b><div id="quickStars" class="rating-stars" style="font-size:30px;cursor:pointer;margin:6px">☆ ☆ ☆ ☆ ☆</div><div id="quickSuggestions" style="display:none;gap:6px;flex-wrap:wrap;justify-content:center"><button data-msg="Amazing photography and editing">Amazing work</button><button data-msg="Beautiful memories captured">Beautiful memories</button><button data-msg="Great service and coordination">Great service</button></div><textarea id="quickComment" placeholder="Write a comment" style="display:none;width:100%;margin-top:8px;min-height:70px;padding:12px;border-radius:10px;background:#fff;color:#172033!important;font-size:16px;font-weight:700;line-height:1.45;opacity:1"></textarea><button id="quickSubmit" style="display:none;margin-top:8px;padding:10px 16px;border-radius:10px;background:linear-gradient(90deg,#fbbf24,#ec4899,#22d3ee);font-weight:900">Submit rating</button><button type="button" id="quickShareReview" aria-label="Share review request" title="Share review request" style="display:grid;place-items:center;position:absolute;top:12px;right:12px;width:34px;height:34px;padding:0;border:1px solid rgba(255,255,255,.55);border-radius:50%;background:linear-gradient(135deg,#7c3aed,#06b6d4);color:#fff;font-size:19px;font-weight:900">↗</button><small id="quickStatus" style="display:block;margin-top:5px">Aditya Studio rating · tap stars to rate</small></section>
-
     <!-- 3D booking frame: placed directly below New Future offers -->
     <section class="home-frame-showcase w-full flex justify-center">
       <a id="heroFrameLink" href="/photographer" class="hero-frame-container relative w-full max-w-sm flex items-center justify-center group cursor-pointer" title="Photography bookings — Book Now">
@@ -740,6 +733,7 @@
         <div class="absolute bottom-10 left-10 w-32 h-32 rounded-full bg-tertiary/20 blur-3xl -z-10"></div>
       </a>
     </section>
+    <a id="homePhotographerRating" class="home-photographer-rating" href="/photographer#client-ratings" aria-label="View photographer ratings"><span class="rating-stars">☆ ☆ ☆ ☆ ☆</span><span class="rating-detail">No ratings yet</span></a>
 
     <section class="live-wedding-showcase" id="live-wedding-showcase">
       <div class="live-wedding-head"><h2 class="live-wedding-heading">Live Wedding</h2></div>
@@ -767,7 +761,7 @@
           <div class="gallery-story-media"><img data-gallery="birthday" data-fallback="" src="" alt="Birthday shoot gallery sample"></div>
           <div class="gallery-story-copy"><h3 class="gallery-story-title">Birthday Shoot</h3></div>
         </article>
-        <article id="galleryReelsCard" class="gallery-story gallery-live-card" hidden>
+        <article class="gallery-story gallery-live-card">
           <div class="gallery-story-copy"><h3 class="gallery-story-title">Reels</h3></div>
           <div id="galleryReels" class="gallery-reels" aria-label="Reels — swipe left or right"></div>
         </article>
@@ -806,52 +800,7 @@
             var first=setTimeout(changeOne,1300+(cardIndex*690)); timers.push(first);
           });
           var reelBox=document.getElementById('galleryReels'), reels=Array.isArray(gallery&&gallery.reel)?gallery.reel:[];
-          var reelCard=document.getElementById('galleryReelsCard'); if(reelCard) reelCard.hidden=!reels.length;
-          if(reelBox){
-            reelBox.innerHTML='';
-            if(reels.length) {
-              var track=document.createElement('div'); track.className='gallery-reels-track';
-              var touchStartX=0;
-              track.addEventListener('touchstart',function(event){ touchStartX=event.touches[0].clientX; },{passive:true});
-              track.addEventListener('touchend',function(event){
-                var delta=touchStartX-event.changedTouches[0].clientX;
-                if(Math.abs(delta)>42) track.scrollBy({left:delta>0?track.clientWidth*.86:-track.clientWidth*.86,behavior:'smooth'});
-              },{passive:true});
-              reels.forEach(function(src,i){
-                var card=document.createElement('div'); card.className='gallery-reel-card is-paused'; card.tabIndex=0; card.setAttribute('role','button'); card.setAttribute('aria-label','Play Reel '+(i+1)+' with sound');
-                // Keep initial page data small: metadata gives the browser the video thumbnail/first frame,
-                // while the full Reel starts downloading only after this card is tapped.
-                var video=document.createElement('video'); video.src=src; video.muted=true; video.loop=true; video.playsInline=true; video.preload='metadata'; video.autoplay=false; video.controls=false;
-                video.setAttribute('playsinline',''); video.setAttribute('webkit-playsinline',''); video.setAttribute('preload','metadata');
-                var badge=document.createElement('span'); badge.className='gallery-reel-badge'; badge.textContent='▶ Tap to play · Reel '+(i+1);
-                var playControl=document.createElement('span'); playControl.className='gallery-reel-play'; playControl.textContent='▶';
-                card.appendChild(video); card.appendChild(badge); card.appendChild(playControl);
-                var dragStartX=0, dragged=false, indicatorTimer=0;
-                function showControl(icon){
-                  playControl.textContent=icon; card.classList.add('show-control'); clearTimeout(indicatorTimer);
-                  indicatorTimer=setTimeout(function(){ if(!video.paused) card.classList.remove('show-control'); },650);
-                }
-                card.addEventListener('touchstart',function(event){ dragStartX=event.touches[0].clientX; dragged=false; },{passive:true});
-                card.addEventListener('touchmove',function(event){ if(Math.abs(event.touches[0].clientX-dragStartX)>12) dragged=true; },{passive:true});
-                card.addEventListener('click',function(){
-                  if(dragged) return;
-                  if(video.paused){
-                    Array.prototype.forEach.call(track.querySelectorAll('video'),function(other){ if(other!==video){other.muted=true; other.pause();} });
-                    video.preload='auto'; video.muted=false; video.volume=1; video.play().then(function(){ card.classList.remove('is-paused'); badge.textContent='🔊 Sound on · Reel '+(i+1); showControl('❚❚'); }).catch(function(){ card.classList.add('is-paused'); badge.textContent='▶ Tap to play · Reel '+(i+1); showControl('▶'); });
-                  } else if(video.muted) {
-                    Array.prototype.forEach.call(track.querySelectorAll('video'),function(other){ if(other!==video){other.muted=true; other.pause();} });
-                    video.muted=false; video.volume=1; badge.textContent='🔊 Sound on · Reel '+(i+1); showControl('❚❚');
-                  } else {
-                    video.pause(); card.classList.add('is-paused'); badge.textContent='▶ Paused · Reel '+(i+1); showControl('▶');
-                  }
-                  card.setAttribute('aria-label',video.paused?'Play Reel '+(i+1):'Pause Reel '+(i+1));
-                });
-                card.addEventListener('keydown',function(event){ if(event.key==='Enter'||event.key===' '){ event.preventDefault(); card.click(); } });
-                track.appendChild(card);
-              });
-              reelBox.appendChild(track);
-            }
-          }
+          if(reelBox){ reelBox.innerHTML=''; if(!reels.length) reelBox.innerHTML='<div class="gallery-reel-empty">Admin se Reel videos upload karein</div>'; else { var track=document.createElement('div'); track.className='gallery-reels-track'; reels.forEach(function(src,i){ var card=document.createElement('div'); card.className='gallery-reel-card'; var video=document.createElement('video'); video.src=src; video.muted=true; video.loop=true; video.playsInline=true; video.preload='metadata'; video.autoplay=true; card.appendChild(video); var badge=document.createElement('span'); badge.className='gallery-reel-badge'; badge.textContent='▶ Reel '+(i+1); card.appendChild(badge); track.appendChild(card); }); reelBox.appendChild(track); } }
         }
         function openGalleryViewer(title, items, start){
           var old=document.getElementById('galleryLightbox'); if(old) old.remove();
@@ -873,7 +822,70 @@
       })();
       </script>
     </section>
+    <section id="more-services" class="glass-panel rounded-3xl border border-primary/35 px-6 py-7 text-center shadow-[0_0_28px_rgba(212,175,55,.12)]" style="background:linear-gradient(135deg,#251b0a,#17100b 55%,#24112a)">
+      <p class="text-[10px] uppercase tracking-[.22em] text-primary/80 font-bold">Photography &amp; Bookings</p>
+      <h2 class="mt-2 text-xl font-black text-yellow-100">Aur services dekhni hain?</h2>
+      <p class="mt-2 text-sm text-on-surface-variant">Wedding, birthday, event aur studio packages ek hi jagah dekhein.</p>
+      <a href="/roller-spin" class="inline-flex mt-5 items-center justify-center gap-2 rounded-xl border border-cyan-100/60 bg-gradient-to-r from-fuchsia-600 via-violet-600 to-cyan-500 px-6 py-3 text-sm font-extrabold text-white shadow-[0_0_18px_rgba(34,211,238,.35)]">🎡 Open Roller Spin <span>→</span></a>
+    </section>
 
+    <!-- Live Spin Roller + AD Token -->
+    <section class="glass-panel rounded-3xl p-8 md:p-12 relative overflow-hidden border-primary/20 shadow-[0_0_40px_rgba(212,175,55,0.05)]" id="galleries" style="display:none" aria-hidden="true">
+      <div class="absolute -right-20 -top-20 w-64 h-64 bg-primary/10 rounded-full blur-3xl"></div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-12 relative z-10 items-center">
+        <div>
+          <span class="inline-block px-3 py-1 rounded-full bg-surface-variant text-primary font-label-md text-xs mb-4 border border-primary/20">Daily Rewards</span>
+          <h2 class="font-headline-md text-headline-md text-on-surface mb-4">Spin Wheel &amp; AD Tokens</h2>
+          <p class="text-on-surface-variant font-body-md text-body-md mb-4">Live roller auto-spin ho raha hai. Click karke full spin page kholo. Har din <b class="text-primary">1 AD Token</b> claim karo — <b class="text-primary">10 tokens = 1 spin</b>.</p>
+          <div class="grid grid-cols-2 gap-3 mb-6 max-w-[310px]">
+            <div class="relative overflow-hidden rounded-2xl px-4 py-4 min-w-0 border border-sky-300/25 shadow-[0_0_18px_rgba(56,125,180,0.16)]" style="background:linear-gradient(145deg,#1d3040,#17242e 60%,#132028)">
+              <div class="absolute -right-4 -top-4 w-16 h-16 rounded-full bg-sky-300/10 blur-xl"></div>
+              <p class="text-[10px] uppercase tracking-[0.16em] text-sky-200/80 font-label-md">Your Spins</p>
+              <p class="text-3xl font-bold text-gradient-gold mt-1" id="homeSpinCount">0</p>
+              <p class="text-[10px] text-on-surface-variant mt-1">Ready to play</p>
+            </div>
+            <button type="button" id="homeAddSpinBtn" class="relative overflow-hidden rounded-2xl px-4 py-4 min-w-0 text-left border border-fuchsia-300/25 shadow-[0_0_18px_rgba(147,79,170,0.15)]" style="background:linear-gradient(145deg,#38203d,#2a1b31 60%,#211724)">
+              <div class="absolute -right-4 -top-4 w-16 h-16 rounded-full bg-fuchsia-300/10 blur-xl"></div>
+              <p class="text-[10px] uppercase tracking-[0.16em] text-fuchsia-200/80 font-label-md">Add Spin</p>
+              <p class="text-3xl font-bold text-gradient-gold mt-1">+</p>
+              <p class="text-[10px] text-on-surface-variant mt-1"><span id="homeTokenCount">0</span> tokens = 1 spin</p>
+            </button>
+          </div>
+          <form class="flex flex-col sm:flex-row gap-4" id="spinCodeForm">
+            <div class="relative flex-1">
+              <input class="w-full bg-surface border-b-2 border-outline-variant focus:border-primary text-on-surface font-body-md px-4 py-3 rounded-t-md outline-none transition-colors placeholder:text-on-surface-variant/50 focus:bg-surface-variant/50" id="spinCode" placeholder="Spin code (optional)" type="text" autocomplete="off"/>
+            </div>
+            <button class="bg-surface-bright text-primary border border-primary/30 font-label-md text-label-md px-6 py-3 rounded-lg hover:bg-primary hover:text-on-primary transition-all whitespace-nowrap" type="submit">
+              Verify Code
+            </button>
+          </form>
+          <div class="mt-4 hidden items-center gap-3" id="codeVerifyAlert" role="status">
+            <p class="text-sm font-label-md text-sky-200" id="codeResult"></p>
+            <button type="button" id="codeMobileVerifyBtn" class="shrink-0 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-blue-500/25">✓ Verify</button>
+          </div>
+        </div>
+        <div class="flex flex-col items-center gap-4">
+          <button type="button" class="home-lw-link" title="Tap to spin" id="homeRealWheelLink" aria-label="Spin the reward wheel" style="background:transparent;border:0;padding:0;cursor:pointer">
+            <div class="home-lw-stage">
+              <div class="home-lw-pointer"></div>
+              <div class="home-lw-outer">
+                <div class="home-lw-rim"></div>
+                <div class="home-lw-wheel" id="homeLwWheel">
+                  <div class="home-lw-segments" id="homeLwSegments"></div>
+                </div>
+              </div>
+              <div class="home-lw-hub">📷</div>
+            </div>
+          </button>
+          <p class="text-primary font-label-md text-label-md tracking-wider">Spins left: <span id="homeSpinCount2">0</span></p>
+          <p id="homeSpinHint" class="text-xs text-on-surface-variant text-center">🎡 Roller ghumane ke liye wheel par tap karein</p>
+          <button type="button" id="homeClaimTokenBtn" class="btn-claim-token claimable font-label-md text-label-md px-8 py-3 rounded-full">
+            Claim AD Token
+          </button>
+          <p id="homeClaimMsg" class="text-xs text-on-surface-variant text-center max-w-xs"></p>
+        </div>
+      </div>
+    </section>
     <!-- Photo Frames → full frames shop -->
     <section class="flex flex-col gap-6" id="photo-frames-cta">
       <div class="flex items-center justify-between flex-wrap gap-3">
@@ -929,7 +941,6 @@
     document.addEventListener('DOMContentLoaded', () => {
       const SESSION_KEY = 'aditya_studio_session_v1';
       const PERSIST_SESSION_KEY = 'aditya_studio_persistent_login_v2';
-      const RECOVERY_SESSION_KEY = 'aditya_studio_login_recovery_v1';
       const profileBtn = document.getElementById('profileBtn');
       const guestLoginBtn = document.getElementById('guestLoginBtn');
       const verifyNudge = document.getElementById('verifyNudge');
@@ -1069,17 +1080,15 @@
 
       function loadSession() {
         try {
-          const read = function (key) { try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch (_) { return null; } };
-          const primary = read(SESSION_KEY), persistent = read(PERSIST_SESSION_KEY), recovery = read(RECOVERY_SESSION_KEY);
-          // Refresh ya kisi doosre page ke incomplete write ke baad bhi valid saved login kabhi na khoye.
-          const list = [primary, persistent, recovery];
-          const session = list.find(function (item) { return item && item.mobile && item.sessionToken; }) || primary || persistent || recovery || null;
+          const primary = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
+          const persistent = JSON.parse(localStorage.getItem(PERSIST_SESSION_KEY) || 'null');
+          // Spin page se kabhi incomplete save ho jaye to token wala saved login choose karo.
+          const session = (primary && primary.mobile && primary.sessionToken) ? primary
+            : ((persistent && persistent.mobile && persistent.sessionToken) ? persistent : (primary || persistent));
           if (session && session.pin) delete session.pin;
           if (session && session.mobile && session.sessionToken) {
-            const value = JSON.stringify(session);
-            localStorage.setItem(SESSION_KEY, value);
-            localStorage.setItem(PERSIST_SESSION_KEY, value);
-            localStorage.setItem(RECOVERY_SESSION_KEY, value);
+            localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+            localStorage.setItem(PERSIST_SESSION_KEY, JSON.stringify(session));
           }
           return session;
         } catch (e) { return null; }
@@ -1088,16 +1097,10 @@
         const prev = loadSession() || {};
         const next = { ...prev, ...data };
         delete next.pin;
-        const value = JSON.stringify(next);
-        localStorage.setItem(SESSION_KEY, value);
-        localStorage.setItem(PERSIST_SESSION_KEY, value);
-        localStorage.setItem(RECOVERY_SESSION_KEY, value);
+        localStorage.setItem(SESSION_KEY, JSON.stringify(next));
+        localStorage.setItem(PERSIST_SESSION_KEY, JSON.stringify(next));
       }
-      function clearSession() {
-        localStorage.removeItem(SESSION_KEY);
-        localStorage.removeItem(PERSIST_SESSION_KEY);
-        localStorage.removeItem(RECOVERY_SESSION_KEY);
-      }
+      function clearSession() { localStorage.removeItem(SESSION_KEY); localStorage.removeItem(PERSIST_SESSION_KEY); }
 
       let user = null;
 
@@ -1199,28 +1202,26 @@
         const tokens = user ? (user.adTokens || 0) : 0;
         const spins = user ? (user.spinBalance || 0) : 0;
         const canClaim = user ? !!user.canClaimAdToken : false;
-        document.getElementById('homeTokenCount')?.replaceChildren(document.createTextNode(tokens));
-        document.getElementById('homeSpinCount')?.replaceChildren(document.createTextNode(spins));
-        document.getElementById('homeSpinCount2')?.replaceChildren(document.createTextNode(spins));
+        document.getElementById('homeTokenCount').textContent = tokens;
+        document.getElementById('homeSpinCount').textContent = spins;
+        document.getElementById('homeSpinCount2').textContent = spins;
         const claimBtn = document.getElementById('homeClaimTokenBtn');
         const claimMsg = document.getElementById('homeClaimMsg');
-        if (claimBtn && claimMsg) {
-          if (!user) {
-            claimBtn.disabled = false;
-            claimBtn.classList.add('claimable');
-            claimBtn.textContent = 'Login & Claim AD Token';
-            claimMsg.textContent = '';
-          } else if (canClaim) {
-            claimBtn.disabled = false;
-            claimBtn.classList.add('claimable');
-            claimBtn.textContent = 'Claim AD Token';
-            claimMsg.textContent = 'Aaj ka free AD Token ready hai — chamakta button dabao';
-          } else {
-            claimBtn.disabled = true;
-            claimBtn.classList.remove('claimable');
-            claimBtn.textContent = 'Claimed today';
-            claimMsg.textContent = 'Kal phir 1 AD Token milega. 10 tokens = 1 spin.';
-          }
+        if (!user) {
+          claimBtn.disabled = false;
+          claimBtn.classList.add('claimable');
+          claimBtn.textContent = 'Login & Claim AD Token';
+          claimMsg.textContent = '';
+        } else if (canClaim) {
+          claimBtn.disabled = false;
+          claimBtn.classList.add('claimable');
+          claimBtn.textContent = 'Claim AD Token';
+          claimMsg.textContent = 'Aaj ka free AD Token ready hai — chamakta button dabao';
+        } else {
+          claimBtn.disabled = true;
+          claimBtn.classList.remove('claimable');
+          claimBtn.textContent = 'Claimed today';
+          claimMsg.textContent = 'Kal phir 1 AD Token milega. 10 tokens = 1 spin.';
         }
         // profile
         if (user) {
@@ -1413,7 +1414,7 @@
       // Agar Book Now, Frames ya kisi aur tab se logout kiya gaya ho to Home
       // bhi turant guest mode me aa jaye.
       window.addEventListener('storage', (event) => {
-        if ([SESSION_KEY, PERSIST_SESSION_KEY, RECOVERY_SESSION_KEY].includes(event.key) && !event.newValue && !loadSession()) {
+        if (event.key === SESSION_KEY && !event.newValue) {
           user = null;
           updateTokenUI();
         }
@@ -1770,27 +1771,14 @@
         } catch (e) {}
         if (!items.length) return;
         const veil = box.querySelector('div[style*="linear-gradient"]');
-        box.querySelectorAll('.bg-slide, .hero-bg-video, .hero-video-poster, .hero-video-fallback').forEach(el => el.remove());
+        box.querySelectorAll('.bg-slide, .hero-bg-video').forEach(el => el.remove());
         const media = items.map((item, i) => {
           let el;
           if (isVideo(item)) {
             el = document.createElement('video');
             el.className = 'hero-bg-video' + (i === 0 ? ' active' : '');
-            // iPhone permits inline autoplay only when these are present before assigning the source.
-            el.muted = true; el.defaultMuted = true; el.autoplay = true; el.playsInline = true; el.controls = false;
-            el.setAttribute('muted', ''); el.setAttribute('autoplay', ''); el.setAttribute('playsinline', ''); el.setAttribute('webkit-playsinline', '');
+            el.src = item.url; el.muted = true; el.playsInline = true; el.preload = 'auto';
             el.setAttribute('aria-label', 'Studio hero video');
-            el.src = item.url; el.preload = 'auto';
-            // A canvas first-frame fallback covers iPhone's forced native play icon whenever autoplay is unavailable.
-            var fallback = document.createElement('div'); fallback.className='hero-video-fallback' + (i === 0 ? ' active' : ''); fallback.setAttribute('aria-hidden','true'); el._fallback=fallback;
-            var poster = document.createElement('canvas'); poster.className='hero-video-poster'; poster.width=960; poster.height=540;
-            poster.setAttribute('aria-hidden','true'); el._posterCanvas=poster;
-            function paintPoster(){
-              try { var ctx=poster.getContext('2d'); if(!ctx || !el.videoWidth || !el.videoHeight) return false; var cw=poster.width,ch=poster.height,scale=Math.min(cw/el.videoWidth,ch/el.videoHeight),w=el.videoWidth*scale,h=el.videoHeight*scale; ctx.fillStyle='#050505';ctx.fillRect(0,0,cw,ch);ctx.drawImage(el,(cw-w)/2,(ch-h)/2,w,h);poster.classList.add('active');return true; } catch(_){ return false; }
-            }
-            el.addEventListener('loadeddata',paintPoster,{once:true});
-            el.addEventListener('playing',function(){ el.classList.add('playing'); poster.classList.remove('active'); if(el._fallback) el._fallback.classList.remove('active'); });
-            el.addEventListener('pause',function(){ if(el.classList.contains('active')&&!el.ended){ el.classList.remove('playing'); if(el._fallback) el._fallback.classList.add('active'); paintPoster(); } });
             // Start requesting each Reel/hero video before it is visible, so the next item has no frozen loading frame.
             el.load();
           } else {
@@ -1800,17 +1788,15 @@
             el.style.backgroundPosition = item.x + '% ' + item.y + '%';
           }
           el.style.setProperty('--hero-scale', item.zoom);
-          if (el._fallback) box.insertBefore(el._fallback, veil || null);
           box.insertBefore(el, veil || null);
-          if (el._posterCanvas) box.insertBefore(el._posterCanvas, veil || null);
           return el;
         });
         let idx = 0, advanceTimer = null;
         function activate(next) {
           if (!media.length) return;
           if (advanceTimer) { clearTimeout(advanceTimer); advanceTimer = null; }
-          media[idx].classList.remove('active','playing');
-          if (media[idx].tagName === 'VIDEO') { media[idx].pause(); media[idx].currentTime = 0; if(media[idx]._posterCanvas)media[idx]._posterCanvas.classList.remove('active'); if(media[idx]._fallback)media[idx]._fallback.classList.remove('active'); }
+          media[idx].classList.remove('active');
+          if (media[idx].tagName === 'VIDEO') { media[idx].pause(); media[idx].currentTime = 0; }
           idx = next % media.length;
           const active = media[idx];
           active.style.transition = 'none';
@@ -1818,30 +1804,11 @@
           active.style.transition = '';
           active.classList.add('active');
           if (active.tagName === 'VIDEO') {
-            active.muted = true; active.defaultMuted = true; active.autoplay = true; active.playsInline = true; active.controls = false;
-            active.classList.remove('playing');
-            if(active._fallback)active._fallback.classList.add('active');
-            if(active._posterCanvas && active.readyState>=2){ try { var pc=active._posterCanvas,ctx=pc.getContext('2d'),sc=Math.min(pc.width/active.videoWidth,pc.height/active.videoHeight),pw=active.videoWidth*sc,ph=active.videoHeight*sc;ctx.fillStyle='#050505';ctx.fillRect(0,0,pc.width,pc.height);ctx.drawImage(active,(pc.width-pw)/2,(pc.height-ph)/2,pw,ph);pc.classList.add('active'); }catch(_){} }
-            active.onplay = function(){ active.controls = false; };
             active.onended = () => activate(idx + 1);
             active.onerror = () => { advanceTimer = setTimeout(() => activate(idx + 1), durationMs); };
-            // Retry at every valid media-ready point. Safari can fire canplay before a
-            // dynamically-created hero video becomes active, which previously left it hidden.
-            let playRequested = false;
-            const startVideo = () => {
-              if (playRequested || !active.classList.contains('active')) return;
-              playRequested = true;
-              const play = active.play();
-              if (play && play.catch) play.catch(() => {
-                playRequested = false;
-                // Keep the clean first-frame fallback visible if iOS blocks autoplay.
-                if (active.readyState >= 2) paintPoster();
-                advanceTimer = setTimeout(() => activate(idx + 1), durationMs);
-              });
-            };
-            active.addEventListener('loadeddata', startVideo, { once:true });
-            active.addEventListener('canplay', startVideo, { once:true });
-            if (active.readyState >= 2) startVideo();
+            // Video has already been preloaded. If a slow connection still needs data, start instantly on canplay.
+            const startVideo = () => { const play = active.play(); if (play && play.catch) play.catch(() => { advanceTimer = setTimeout(() => activate(idx + 1), durationMs); }); };
+            if (active.readyState >= 3) startVideo(); else { active.oncanplay = function(){ active.oncanplay=null; startVideo(); }; }
           } else {
             const itemMs = Math.max(2000, Math.min(30000, (Number(items[idx].durationSec) || durationMs / 1000) * 1000));
             advanceTimer = setTimeout(() => activate(idx + 1), itemMs);
@@ -1894,12 +1861,13 @@
         // Real customer rating is loaded independently of the 3D photo rotation.
         const ratingEl = document.getElementById('homePhotographerRating');
         if (ratingEl) {
-          fetch('/api/studio-ratings', { cache: 'no-store' }).then(r => r.json()).then(d => {
+          fetch('/api/photographer-ratings', { cache: 'no-store' }).then(r => r.json()).then(d => {
             const count = Number(d.count || 0), average = Number(d.average || 0);
             const starText = count ? '★'.repeat(Math.round(average)) + '☆'.repeat(5 - Math.round(average)) : '☆ ☆ ☆ ☆ ☆';
             ratingEl.innerHTML = '<span class="rating-stars">' + starText + '</span><span class="rating-detail">' + (count ? average.toFixed(1) + ' / 5 · ' + count + ' rating' + (count === 1 ? '' : 's') : 'No ratings yet') + '</span>';
           }).catch(() => {});
         }
+
         if (urls.length < 2) return;
         setInterval(function () {
           idx = (idx + 1) % urls.length;
@@ -2139,40 +2107,7 @@ document.addEventListener('DOMContentLoaded', function () {
 // Safe usage analytics: only page and clicked control name; never typed form values or payment details.
 (function(){const K='aditya_studio_session_v1',P='aditya_studio_persistent_login_v2';function s(){try{return JSON.parse(localStorage.getItem(K)||localStorage.getItem(P)||'null')}catch(e){return null}}function send(action){const x=s();if(!x||!x.sessionToken)return;fetch('/api/activity',{method:'POST',headers:{'Content-Type':'application/json'},keepalive:true,body:JSON.stringify({sessionToken:x.sessionToken,page:location.pathname,action:action||'heartbeat'})}).catch(()=>{})}send('page_view');setInterval(()=>{if(!document.hidden)send('heartbeat')},30000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)send('page_return')});document.addEventListener('click',e=>{const el=e.target.closest('a,button');if(!el)return;const text=(el.getAttribute('aria-label')||el.textContent||'button').replace(/\s+/g,' ').trim().slice(0,55);if(text&&!/pin|utr|payment screenshot/i.test(text))send('click '+text)});})();
 </script>
-<script>(function(){
-  const qs=document.getElementById("quickStars"),qc=document.getElementById("quickComment"),qsu=document.getElementById("quickSuggestions"),qb=document.getElementById("quickSubmit"),qst=document.getElementById("quickStatus"),shareBtn=document.getElementById("quickShareReview");
-  if(!qs)return;
-  if(shareBtn)shareBtn.onclick=async()=>{
-    const url=location.origin+location.pathname+'#quickRating';
-    const message='Please share your experience and rate Aditya Studio.';
-    try{
-      if(navigator.share){await navigator.share({title:'Rate Aditya Studio',text:message,url});qst.textContent='Review request shared!';}
-      else if(navigator.clipboard){await navigator.clipboard.writeText(message+' '+url);qst.textContent='Review link copied — paste and send it.';}
-      else {qst.textContent='Copy this link: '+url;}
-    }catch(error){if(error&&error.name!=='AbortError')qst.textContent='Could not share right now';}
-  };
-  let n=0;
-  const palette=["#ff4d6d","#ff9f1c","#ffe66d","#41ead4","#a78bfa"];
-  const reviewMessages={
-    1:["I was disappointed with the experience","The service needs a lot of improvement","Please contact me to resolve this","The photos did not meet my expectations","I would not recommend this experience"],
-    2:["The service needs improvement","Expected better coordination","Could be much better next time","The delivery was slower than expected","Photography quality needs more attention"],
-    3:["Good experience overall","Nice work, with room to improve","Satisfied with the service","The photos were good but could be better","Decent service and friendly team"],
-    4:["Very good photography service","Great coordination and support","Beautiful work and memories","Professional team and smooth service","Loved the creativity and effort"],
-    5:["Amazing photography and editing","Beautiful memories captured","Great service and coordination","Excellent quality — highly recommended","Perfect experience from start to finish"]
-  };
-  function paint(){qs.innerHTML=palette.map((c,i)=>"<span style=\"color:"+(i<n?c:"#61566b")+";animation:starPop .45s "+(i*.12)+"s both\">★</span>").join("")}
-  function showSuggestions(){
-    const options=reviewMessages[n]||[];
-    qsu.innerHTML=options.map(msg=>'<button type="button" data-msg="'+msg.replace(/"/g,'&quot;')+'">'+msg+'</button>').join('');
-    qsu.style.display="flex"; qc.style.display=qb.style.display="block";
-    if(options[0])qc.value=options[0];
-    qst.textContent=n+' star rating selected — choose or edit your review';
-  }
-  paint();
-  qs.onclick=e=>{n=n?Math.max(1,Math.min(5,Math.ceil((e.clientX-qs.getBoundingClientRect().left)/qs.clientWidth*5))):5;paint();showSuggestions()};
-  qsu.onclick=e=>{if(e.target.dataset.msg)qc.value=e.target.dataset.msg};
-  qb.onclick=async()=>{if(!n||!qc.value.trim()){qst.textContent="Please choose stars and a comment";return}qst.textContent="Saving…";let name="Aditya Studio customer";try{let x=JSON.parse(localStorage.getItem("aditya_studio_session_v1")||localStorage.getItem("aditya_studio_persistent_login_v2")||"{}");name=x.name||x.customerName||x.userName||name}catch(_){}let r=await fetch("/api/studio-ratings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({rating:n,name,comment:qc.value})});qst.textContent=r.ok?"Thank you for rating Aditya Studio!":"Please try again";if(r.ok){n=0;paint();qc.value="";qsu.style.display="none";qc.style.display=qb.style.display="none"}};
-})()</script></script></body>
+</body>
 </html>
 <script>
 /* Keep the homepage bell unread-only: opening the alert centre marks the current feed as read on this device. */
