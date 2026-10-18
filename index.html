@@ -171,10 +171,6 @@
     .bg-slide.active { opacity:1; transform:none!important; }
     .hero-bg-video { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; background:#050505; opacity:0; transition:opacity .35s ease; }
     .hero-bg-video.active { opacity:1; transform:none!important; }
-    /* Hero video is automatic: never expose a native play/control overlay. */
-    .hero-bg-video::-webkit-media-controls,.hero-bg-video::-webkit-media-controls-enclosure,.hero-bg-video::-webkit-media-controls-panel,.hero-bg-video::-webkit-media-controls-play-button,.hero-bg-video::-webkit-media-controls-start-playback-button,.hero-bg-video::-webkit-media-controls-overlay-play-button{display:none!important;visibility:hidden!important;opacity:0!important;-webkit-appearance:none!important}
-    .hero-bg-video{pointer-events:none!important;-webkit-appearance:none!important}
-    video.hero-bg-video::-webkit-media-controls-start-playback-button{display:none!important;visibility:hidden!important;opacity:0!important}
     @keyframes pulse-ring {
       0% { transform: scale(0.8); opacity: 0.5; }
       100% { transform: scale(2); opacity: 0; }
@@ -1773,12 +1769,9 @@
           if (isVideo(item)) {
             el = document.createElement('video');
             el.className = 'hero-bg-video' + (i === 0 ? ' active' : '');
-            el.src = item.url; el.muted = true; el.defaultMuted = true; el.playsInline = true; el.autoplay = true; el.controls = false;
-            el.setAttribute('muted', ''); el.setAttribute('autoplay', ''); el.setAttribute('playsinline', '');
-            el.setAttribute('webkit-playsinline', ''); el.setAttribute('controlsList', 'nodownload noplaybackrate nofullscreen');
-            el.disablePictureInPicture = true; el.preload = i === 0 ? 'auto' : 'metadata';
+            el.src = item.url; el.muted = true; el.playsInline = true; el.preload = 'auto';
             el.setAttribute('aria-label', 'Studio hero video');
-            // Do not download every large video at once on slow internet; load the first one fully and queue the rest.
+            // Start requesting each Reel/hero video before it is visible, so the next item has no frozen loading frame.
             el.load();
           } else {
             el = document.createElement('div');
@@ -1803,28 +1796,11 @@
           active.style.transition = '';
           active.classList.add('active');
           if (active.tagName === 'VIDEO') {
-            active.muted = true; active.defaultMuted = true; active.controls = false;
             active.onended = () => activate(idx + 1);
             active.onerror = () => { advanceTimer = setTimeout(() => activate(idx + 1), durationMs); };
-            // Begin as soon as the first playable frame arrives; retries keep autoplay working after a brief slow-network stall.
-            const startVideo = () => {
-              const play = active.play();
-              if (play && play.catch) play.catch(() => {
-                active.oncanplay = function(){ active.oncanplay = null; startVideo(); };
-              });
-            };
-            active.oncanplay = function(){ active.oncanplay = null; startVideo(); };
-            active.onloadeddata = function(){ if (active.paused) startVideo(); };
-            active.onstalled = function(){ setTimeout(function(){ if (active.classList.contains('active') && active.paused) startVideo(); }, 250); };
-            if (active.readyState >= 2) startVideo();
-            // Some iPhones wait for a later media event; retry silently while this slide remains active.
-            const keepPlaying = setInterval(function(){
-              if (!active.classList.contains('active') || active.ended) { clearInterval(keepPlaying); return; }
-              if (active.paused) startVideo();
-            }, 900);
-            // Start fetching the following video only after this one is visible, reducing bandwidth competition on weak connections.
-            const following = media[(idx + 1) % media.length];
-            if (following && following !== active && following.tagName === 'VIDEO') { following.preload = 'auto'; following.load(); }
+            // Video has already been preloaded. If a slow connection still needs data, start instantly on canplay.
+            const startVideo = () => { const play = active.play(); if (play && play.catch) play.catch(() => { advanceTimer = setTimeout(() => activate(idx + 1), durationMs); }); };
+            if (active.readyState >= 3) startVideo(); else { active.oncanplay = function(){ active.oncanplay=null; startVideo(); }; }
           } else {
             const itemMs = Math.max(2000, Math.min(30000, (Number(items[idx].durationSec) || durationMs / 1000) * 1000));
             advanceTimer = setTimeout(() => activate(idx + 1), itemMs);
