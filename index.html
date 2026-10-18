@@ -2089,7 +2089,31 @@ document.addEventListener('DOMContentLoaded', function () {
 // Safe usage analytics: only page and clicked control name; never typed form values or payment details.
 (function(){const K='aditya_studio_session_v1',P='aditya_studio_persistent_login_v2';function s(){try{return JSON.parse(localStorage.getItem(K)||localStorage.getItem(P)||'null')}catch(e){return null}}function send(action){const x=s();if(!x||!x.sessionToken)return;fetch('/api/activity',{method:'POST',headers:{'Content-Type':'application/json'},keepalive:true,body:JSON.stringify({sessionToken:x.sessionToken,page:location.pathname,action:action||'heartbeat'})}).catch(()=>{})}send('page_view');setInterval(()=>{if(!document.hidden)send('heartbeat')},30000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)send('page_return')});document.addEventListener('click',e=>{const el=e.target.closest('a,button');if(!el)return;const text=(el.getAttribute('aria-label')||el.textContent||'button').replace(/\s+/g,' ').trim().slice(0,55);if(text&&!/pin|utr|payment screenshot/i.test(text))send('click '+text)});})();
 </script>
-<script>(function(){const qs=document.getElementById("quickStars"),qc=document.getElementById("quickComment"),qsu=document.getElementById("quickSuggestions"),qb=document.getElementById("quickSubmit"),qst=document.getElementById("quickStatus");if(!qs)return;let n=0;const palette=["#ff4d6d","#ff9f1c","#ffe66d","#41ead4","#a78bfa"];function paint(){qs.innerHTML=palette.map((c,i)=>"<span style=\"color:"+(i<n?c:"#61566b")+";animation:starPop .45s "+(i*.12)+"s both\">★</span>").join("")}paint();qs.onclick=e=>{n=n?Math.max(1,Math.min(5,Math.ceil((e.clientX-qs.getBoundingClientRect().left)/qs.clientWidth*5))):5;paint();qsu.style.display="flex";qc.style.display=qb.style.display="block"};qsu.onclick=e=>{if(e.target.dataset.msg)qc.value=e.target.dataset.msg};qb.onclick=async()=>{if(!n||!qc.value.trim()){qst.textContent="Please choose stars and a comment";return}qst.textContent="Saving…";let name="Aditya Studio customer";try{let x=JSON.parse(localStorage.getItem("aditya_studio_session_v1")||localStorage.getItem("aditya_studio_persistent_login_v2")||"{}");name=x.name||x.customerName||x.userName||name}catch(_){}let r=await fetch("/api/studio-ratings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({rating:n,name,comment:qc.value})});qst.textContent=r.ok?"Thank you for rating Aditya Studio!":"Please try again";if(r.ok){n=0;paint();qc.value="";qsu.style.display="none";qc.style.display=qb.style.display="none"}}})()</script></body>
+<script>(function(){
+  const qs=document.getElementById("quickStars"),qc=document.getElementById("quickComment"),qsu=document.getElementById("quickSuggestions"),qb=document.getElementById("quickSubmit"),qst=document.getElementById("quickStatus");
+  if(!qs)return;
+  let n=0;
+  const palette=["#ff4d6d","#ff9f1c","#ffe66d","#41ead4","#a78bfa"];
+  const reviewMessages={
+    1:["I was disappointed with the experience","The service needs a lot of improvement","Please contact me to resolve this"],
+    2:["The service needs improvement","Expected better coordination","Could be much better next time"],
+    3:["Good experience overall","Nice work, with room to improve","Satisfied with the service"],
+    4:["Very good photography service","Great coordination and support","Beautiful work and memories"],
+    5:["Amazing photography and editing","Beautiful memories captured","Great service and coordination"]
+  };
+  function paint(){qs.innerHTML=palette.map((c,i)=>"<span style=\"color:"+(i<n?c:"#61566b")+";animation:starPop .45s "+(i*.12)+"s both\">★</span>").join("")}
+  function showSuggestions(){
+    const options=reviewMessages[n]||[];
+    qsu.innerHTML=options.map(msg=>'<button type="button" data-msg="'+msg.replace(/"/g,'&quot;')+'">'+msg+'</button>').join('');
+    qsu.style.display="flex"; qc.style.display=qb.style.display="block";
+    if(!qc.value.trim()&&options[0])qc.value=options[0];
+    qst.textContent=n+' star rating selected — choose or edit your review';
+  }
+  paint();
+  qs.onclick=e=>{n=n?Math.max(1,Math.min(5,Math.ceil((e.clientX-qs.getBoundingClientRect().left)/qs.clientWidth*5))):5;paint();showSuggestions()};
+  qsu.onclick=e=>{if(e.target.dataset.msg)qc.value=e.target.dataset.msg};
+  qb.onclick=async()=>{if(!n||!qc.value.trim()){qst.textContent="Please choose stars and a comment";return}qst.textContent="Saving…";let name="Aditya Studio customer";try{let x=JSON.parse(localStorage.getItem("aditya_studio_session_v1")||localStorage.getItem("aditya_studio_persistent_login_v2")||"{}");name=x.name||x.customerName||x.userName||name}catch(_){}let r=await fetch("/api/studio-ratings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({rating:n,name,comment:qc.value})});qst.textContent=r.ok?"Thank you for rating Aditya Studio!":"Please try again";if(r.ok){n=0;paint();qc.value="";qsu.style.display="none";qc.style.display=qb.style.display="none"}};
+})()</script></script></body>
 </html>
 <script>
 /* Keep the homepage bell unread-only: opening the alert centre marks the current feed as read on this device. */
