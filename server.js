@@ -2428,9 +2428,10 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === 'GET' && urlPath === '/api/settings') {
-    // Keep settings short-cached: image bytes remain cached in R2, while admin
-    // crop/text changes become visible to customers quickly after refresh.
-    res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
+    // Admin media changes must be visible immediately. Media files themselves
+    // are immutable, but this settings manifest must never overwrite a new card
+    // with a cached old URL after refresh.
+    res.setHeader('Cache-Control', 'no-store, max-age=0');
     return sendJSON(res, 200, { ok: true, settings: publicSettings(loadSettings()) });
   }
 
