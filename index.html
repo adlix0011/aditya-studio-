@@ -1767,7 +1767,7 @@
         } catch (e) {}
         if (!items.length) return;
         const veil = box.querySelector('div[style*="linear-gradient"]');
-        box.querySelectorAll('.bg-slide, .hero-bg-video').forEach(el => el.remove());
+        box.querySelectorAll('.bg-slide, .hero-bg-video, .hero-video-poster').forEach(el => el.remove());
         const media = items.map((item, i) => {
           let el;
           if (isVideo(item)) {
@@ -1797,6 +1797,7 @@
           }
           el.style.setProperty('--hero-scale', item.zoom);
           box.insertBefore(el, veil || null);
+          if (el._posterCanvas) box.insertBefore(el._posterCanvas, veil || null);
           return el;
         });
         let idx = 0, advanceTimer = null;
