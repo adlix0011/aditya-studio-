@@ -169,9 +169,12 @@
     #portfolio{min-height:0!important;height:auto!important;aspect-ratio:16/9;background:#050505}
     .bg-slide { position:absolute; inset:0; background-size:contain; background-repeat:no-repeat; background-position:center; opacity:0; transition:opacity .35s ease; }
     .bg-slide.active { opacity:1; transform:none!important; }
-    .hero-bg-video { position:absolute; z-index:2; inset:0; width:100%; height:100%; object-fit:contain; background:#050505; opacity:0; transition:opacity .2s ease; }
+    /* Hero video stays hidden until it is truly playing: iOS must never expose its native play glyph. */
+    .hero-video-fallback{position:absolute;z-index:2;inset:0;background:radial-gradient(circle at 50% 45%,rgba(212,175,55,.24),transparent 30%),linear-gradient(115deg,#080705 0%,#251806 45%,#050505 100%);opacity:0;transition:opacity .2s ease;pointer-events:none}
+    .hero-video-fallback.active{opacity:1}
+    .hero-bg-video { position:absolute; z-index:3; inset:0; width:100%; height:100%; object-fit:contain; background:#050505; opacity:0; transition:opacity .2s ease; }
     .hero-bg-video.active.playing { opacity:1; transform:none!important; }
-    .hero-video-poster{position:absolute;z-index:3;inset:0;width:100%;height:100%;object-fit:contain;background:#050505;opacity:0;transition:opacity .2s ease;pointer-events:none}
+    .hero-video-poster{position:absolute;z-index:4;inset:0;width:100%;height:100%;object-fit:contain;background:#050505;opacity:0;transition:opacity .2s ease;pointer-events:none}
     .hero-video-poster.active{opacity:1}
     @keyframes pulse-ring {
       0% { transform: scale(0.8); opacity: 0.5; }
@@ -1767,7 +1770,7 @@
         } catch (e) {}
         if (!items.length) return;
         const veil = box.querySelector('div[style*="linear-gradient"]');
-        box.querySelectorAll('.bg-slide, .hero-bg-video, .hero-video-poster').forEach(el => el.remove());
+        box.querySelectorAll('.bg-slide, .hero-bg-video, .hero-video-poster, .hero-video-fallback').forEach(el => el.remove());
         const media = items.map((item, i) => {
           let el;
           if (isVideo(item)) {
@@ -1779,14 +1782,15 @@
             el.setAttribute('aria-label', 'Studio hero video');
             el.src = item.url; el.preload = 'auto';
             // A canvas first-frame fallback covers iPhone's forced native play icon whenever autoplay is unavailable.
+            var fallback = document.createElement('div'); fallback.className='hero-video-fallback' + (i === 0 ? ' active' : ''); fallback.setAttribute('aria-hidden','true'); el._fallback=fallback;
             var poster = document.createElement('canvas'); poster.className='hero-video-poster'; poster.width=960; poster.height=540;
             poster.setAttribute('aria-hidden','true'); el._posterCanvas=poster;
             function paintPoster(){
               try { var ctx=poster.getContext('2d'); if(!ctx || !el.videoWidth || !el.videoHeight) return false; var cw=poster.width,ch=poster.height,scale=Math.min(cw/el.videoWidth,ch/el.videoHeight),w=el.videoWidth*scale,h=el.videoHeight*scale; ctx.fillStyle='#050505';ctx.fillRect(0,0,cw,ch);ctx.drawImage(el,(cw-w)/2,(ch-h)/2,w,h);poster.classList.add('active');return true; } catch(_){ return false; }
             }
             el.addEventListener('loadeddata',paintPoster,{once:true});
-            el.addEventListener('playing',function(){ el.classList.add('playing'); poster.classList.remove('active'); });
-            el.addEventListener('pause',function(){ if(el.classList.contains('active')&&!el.ended){ el.classList.remove('playing'); paintPoster(); } });
+            el.addEventListener('playing',function(){ el.classList.add('playing'); poster.classList.remove('active'); if(el._fallback) el._fallback.classList.remove('active'); });
+            el.addEventListener('pause',function(){ if(el.classList.contains('active')&&!el.ended){ el.classList.remove('playing'); if(el._fallback) el._fallback.classList.add('active'); paintPoster(); } });
             // Start requesting each Reel/hero video before it is visible, so the next item has no frozen loading frame.
             el.load();
           } else {
@@ -1796,6 +1800,7 @@
             el.style.backgroundPosition = item.x + '% ' + item.y + '%';
           }
           el.style.setProperty('--hero-scale', item.zoom);
+          if (el._fallback) box.insertBefore(el._fallback, veil || null);
           box.insertBefore(el, veil || null);
           if (el._posterCanvas) box.insertBefore(el._posterCanvas, veil || null);
           return el;
@@ -1805,7 +1810,7 @@
           if (!media.length) return;
           if (advanceTimer) { clearTimeout(advanceTimer); advanceTimer = null; }
           media[idx].classList.remove('active','playing');
-          if (media[idx].tagName === 'VIDEO') { media[idx].pause(); media[idx].currentTime = 0; if(media[idx]._posterCanvas)media[idx]._posterCanvas.classList.remove('active'); }
+          if (media[idx].tagName === 'VIDEO') { media[idx].pause(); media[idx].currentTime = 0; if(media[idx]._posterCanvas)media[idx]._posterCanvas.classList.remove('active'); if(media[idx]._fallback)media[idx]._fallback.classList.remove('active'); }
           idx = next % media.length;
           const active = media[idx];
           active.style.transition = 'none';
@@ -1815,6 +1820,7 @@
           if (active.tagName === 'VIDEO') {
             active.muted = true; active.defaultMuted = true; active.autoplay = true; active.playsInline = true; active.controls = false;
             active.classList.remove('playing');
+            if(active._fallback)active._fallback.classList.add('active');
             if(active._posterCanvas && active.readyState>=2){ try { var pc=active._posterCanvas,ctx=pc.getContext('2d'),sc=Math.min(pc.width/active.videoWidth,pc.height/active.videoHeight),pw=active.videoWidth*sc,ph=active.videoHeight*sc;ctx.fillStyle='#050505';ctx.fillRect(0,0,pc.width,pc.height);ctx.drawImage(active,(pc.width-pw)/2,(pc.height-ph)/2,pw,ph);pc.classList.add('active'); }catch(_){} }
             active.onplay = function(){ active.controls = false; };
             active.onended = () => activate(idx + 1);

@@ -2189,7 +2189,7 @@ const server = http.createServer(async (req, res) => {
       const firstMediaType = typeof first === 'object' ? String(first.mediaType || '') : '';
       const bootIsVideo = firstMediaType === 'video' || /\.(mp4|webm)(?:[?#]|$)/i.test(safeUrl);
       const heroBootMedia = bootIsVideo
-        ? '<video class="hero-bg-video active" data-hero-boot="1" src="' + safeUrl + '" muted autoplay playsinline preload="auto" aria-label="Studio hero video"></video>'
+        ? '<div class="hero-video-fallback active" data-hero-boot="1" aria-hidden="true"></div>'
         : '<div class="bg-slide active" data-hero-boot="1" style="background-image:url(\'' + safeUrl + '\');background-position:' + x + '% ' + y + '%"></div>';
       const heroFrameFirst = (settings.homeHeroFramePhotos || [])[0] || '';
       const heroFrameRawUrl = mediaUrl(typeof heroFrameFirst === 'string' ? heroFrameFirst : String(heroFrameFirst.url || ''));
