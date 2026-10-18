@@ -2400,7 +2400,7 @@ const server = http.createServer(async (req, res) => {
   // iPhone when Low Power Mode blocks muted autoplay. Range requests keep video
   // startup and seeking responsive without exposing R2 credentials to the page.
   if (req.method === 'GET' && urlPath === '/api/hero-media') {
-    const key = String(url.searchParams.get('key') || '');
+    const key = String(new URL(req.url || '/', 'http://localhost').searchParams.get('key') || '');
     if (!/^studio-images\/hero-bg\/[a-zA-Z0-9._-]+\.(mp4|webm)$/i.test(key) || !r2Ready()) return sendJSON(res, 404, { ok:false });
     try {
       const headers = {};
@@ -8101,6 +8101,7 @@ server.listen(PORT, '0.0.0.0', () => {
     setInterval(createDailyAutomaticBackup, 60 * 60 * 1000);
   }
 })();
+
 
 
 
