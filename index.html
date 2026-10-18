@@ -170,7 +170,8 @@
     .bg-slide { position:absolute; inset:0; background-size:contain; background-repeat:no-repeat; background-position:center; opacity:0; transition:opacity .35s ease; }
     .bg-slide.active { opacity:1; transform:none!important; }
     .hero-bg-video { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; background:#050505; opacity:0; transition:opacity .35s ease; }
-    .hero-bg-video.active { opacity:1; transform:none!important; }
+    .hero-bg-video.active { opacity:0; transform:none!important; }
+    .hero-bg-video.active.playing { opacity:1; }
     /* Hero video is automatic: never expose a native play/control overlay. */
     .hero-bg-video::-webkit-media-controls,.hero-bg-video::-webkit-media-controls-enclosure,.hero-bg-video::-webkit-media-controls-panel,.hero-bg-video::-webkit-media-controls-play-button,.hero-bg-video::-webkit-media-controls-start-playback-button,.hero-bg-video::-webkit-media-controls-overlay-play-button{display:none!important;visibility:hidden!important;opacity:0!important;-webkit-appearance:none!important}
     .hero-bg-video{pointer-events:none!important;-webkit-appearance:none!important}
@@ -1794,7 +1795,7 @@
         function activate(next) {
           if (!media.length) return;
           if (advanceTimer) { clearTimeout(advanceTimer); advanceTimer = null; }
-          media[idx].classList.remove('active');
+          media[idx].classList.remove('active','playing');
           if (media[idx].tagName === 'VIDEO') { media[idx].pause(); media[idx].currentTime = 0; }
           idx = next % media.length;
           const active = media[idx];
@@ -1804,6 +1805,9 @@
           active.classList.add('active');
           if (active.tagName === 'VIDEO') {
             active.muted = true; active.defaultMuted = true; active.controls = false;
+            // Keep the browser's forced paused-play icon invisible. The video fades in only once it is truly playing.
+            active.classList.remove('playing');
+            active.onplaying = function(){ active.classList.add('playing'); };
             active.onended = () => activate(idx + 1);
             active.onerror = () => { advanceTimer = setTimeout(() => activate(idx + 1), durationMs); };
             // Begin as soon as the first playable frame arrives; retries keep autoplay working after a brief slow-network stall.
