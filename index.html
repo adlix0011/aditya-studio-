@@ -813,11 +813,13 @@
                 if(Math.abs(delta)>42) track.scrollBy({left:delta>0?track.clientWidth*.86:-track.clientWidth*.86,behavior:'smooth'});
               },{passive:true});
               reels.forEach(function(src,i){
-                var card=document.createElement('div'); card.className='gallery-reel-card'; card.tabIndex=0; card.setAttribute('role','button'); card.setAttribute('aria-label','Play Reel '+(i+1)+' with sound');
-                var video=document.createElement('video'); video.src=src; video.muted=true; video.loop=true; video.playsInline=true; video.preload='auto'; video.autoplay=true;
-                video.play().catch(function(){});
-                var badge=document.createElement('span'); badge.className='gallery-reel-badge'; badge.textContent='🔇 Tap for sound · Reel '+(i+1);
-                var playControl=document.createElement('span'); playControl.className='gallery-reel-play'; playControl.textContent='❚❚';
+                var card=document.createElement('div'); card.className='gallery-reel-card is-paused'; card.tabIndex=0; card.setAttribute('role','button'); card.setAttribute('aria-label','Play Reel '+(i+1)+' with sound');
+                // Keep initial page data small: metadata gives the browser the video thumbnail/first frame,
+                // while the full Reel starts downloading only after this card is tapped.
+                var video=document.createElement('video'); video.src=src; video.muted=true; video.loop=true; video.playsInline=true; video.preload='metadata'; video.autoplay=false; video.controls=false;
+                video.setAttribute('playsinline',''); video.setAttribute('webkit-playsinline',''); video.setAttribute('preload','metadata');
+                var badge=document.createElement('span'); badge.className='gallery-reel-badge'; badge.textContent='▶ Tap to play · Reel '+(i+1);
+                var playControl=document.createElement('span'); playControl.className='gallery-reel-play'; playControl.textContent='▶';
                 card.appendChild(video); card.appendChild(badge); card.appendChild(playControl);
                 var dragStartX=0, dragged=false, indicatorTimer=0;
                 function showControl(icon){
@@ -830,7 +832,7 @@
                   if(dragged) return;
                   if(video.paused){
                     Array.prototype.forEach.call(track.querySelectorAll('video'),function(other){ if(other!==video){other.muted=true; other.pause();} });
-                    video.muted=false; video.volume=1; video.play().catch(function(){}); card.classList.remove('is-paused'); badge.textContent='🔊 Sound on · Reel '+(i+1); showControl('❚❚');
+                    video.preload='auto'; video.muted=false; video.volume=1; video.play().then(function(){ card.classList.remove('is-paused'); badge.textContent='🔊 Sound on · Reel '+(i+1); showControl('❚❚'); }).catch(function(){ card.classList.add('is-paused'); badge.textContent='▶ Tap to play · Reel '+(i+1); showControl('▶'); });
                   } else if(video.muted) {
                     Array.prototype.forEach.call(track.querySelectorAll('video'),function(other){ if(other!==video){other.muted=true; other.pause();} });
                     video.muted=false; video.volume=1; badge.textContent='🔊 Sound on · Reel '+(i+1); showControl('❚❚');
