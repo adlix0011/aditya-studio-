@@ -720,7 +720,7 @@
       </div>
     </section>
 
-    <section id="quickRating" class="home-photographer-rating" style="display:block;border-radius:20px;text-align:center"><b style="display:block;font-size:16px"><span class="studio-rate-title">Aditya Studio</span><b style="display:block;margin-top:3px">Rate our Studio</b><div id="quickStars" class="rating-stars" style="font-size:30px;cursor:pointer;margin:6px">☆ ☆ ☆ ☆ ☆</div><div id="quickSuggestions" style="display:none;gap:6px;flex-wrap:wrap;justify-content:center"><button data-msg="Amazing photography and editing">Amazing work</button><button data-msg="Beautiful memories captured">Beautiful memories</button><button data-msg="Great service and coordination">Great service</button></div><textarea id="quickComment" placeholder="Write a comment" style="display:none;width:100%;margin-top:8px;min-height:60px;padding:9px;border-radius:9px"></textarea><button id="quickSubmit" style="display:none;margin-top:8px;padding:10px 16px;border-radius:10px;background:linear-gradient(90deg,#fbbf24,#ec4899,#22d3ee);font-weight:900">Submit rating</button><small id="quickStatus" style="display:block;margin-top:5px">Aditya Studio rating · tap stars to rate</small></section>
+    <section id="quickRating" class="home-photographer-rating" style="display:block;border-radius:20px;text-align:center"><b style="display:block;font-size:16px"><span class="studio-rate-title">Aditya Studio</span><b style="display:block;margin-top:3px">Rate our Studio</b><div id="quickStars" class="rating-stars" style="font-size:30px;cursor:pointer;margin:6px">☆ ☆ ☆ ☆ ☆</div><div id="quickSuggestions" style="display:none;gap:6px;flex-wrap:wrap;justify-content:center"><button data-msg="Amazing photography and editing">Amazing work</button><button data-msg="Beautiful memories captured">Beautiful memories</button><button data-msg="Great service and coordination">Great service</button></div><textarea id="quickComment" placeholder="Write a comment" style="display:none;width:100%;margin-top:8px;min-height:60px;padding:9px;border-radius:9px"></textarea><button id="quickSubmit" style="display:none;margin-top:8px;padding:10px 16px;border-radius:10px;background:linear-gradient(90deg,#fbbf24,#ec4899,#22d3ee);font-weight:900">Submit rating</button><button type="button" id="quickShareReview" style="display:block;margin:10px auto 0;padding:9px 15px;border:1px solid rgba(255,255,255,.45);border-radius:10px;background:linear-gradient(90deg,#7c3aed,#2563eb,#06b6d4);color:#fff;font-weight:900">↗ Share review request</button><small id="quickStatus" style="display:block;margin-top:5px">Aditya Studio rating · tap stars to rate</small></section>
 
     <!-- 3D booking frame: placed directly below New Future offers -->
     <section class="home-frame-showcase w-full flex justify-center">
@@ -2090,8 +2090,17 @@ document.addEventListener('DOMContentLoaded', function () {
 (function(){const K='aditya_studio_session_v1',P='aditya_studio_persistent_login_v2';function s(){try{return JSON.parse(localStorage.getItem(K)||localStorage.getItem(P)||'null')}catch(e){return null}}function send(action){const x=s();if(!x||!x.sessionToken)return;fetch('/api/activity',{method:'POST',headers:{'Content-Type':'application/json'},keepalive:true,body:JSON.stringify({sessionToken:x.sessionToken,page:location.pathname,action:action||'heartbeat'})}).catch(()=>{})}send('page_view');setInterval(()=>{if(!document.hidden)send('heartbeat')},30000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)send('page_return')});document.addEventListener('click',e=>{const el=e.target.closest('a,button');if(!el)return;const text=(el.getAttribute('aria-label')||el.textContent||'button').replace(/\s+/g,' ').trim().slice(0,55);if(text&&!/pin|utr|payment screenshot/i.test(text))send('click '+text)});})();
 </script>
 <script>(function(){
-  const qs=document.getElementById("quickStars"),qc=document.getElementById("quickComment"),qsu=document.getElementById("quickSuggestions"),qb=document.getElementById("quickSubmit"),qst=document.getElementById("quickStatus");
+  const qs=document.getElementById("quickStars"),qc=document.getElementById("quickComment"),qsu=document.getElementById("quickSuggestions"),qb=document.getElementById("quickSubmit"),qst=document.getElementById("quickStatus"),shareBtn=document.getElementById("quickShareReview");
   if(!qs)return;
+  if(shareBtn)shareBtn.onclick=async()=>{
+    const url=location.origin+location.pathname+'#quickRating';
+    const message='Please share your experience and rate Aditya Studio.';
+    try{
+      if(navigator.share){await navigator.share({title:'Rate Aditya Studio',text:message,url});qst.textContent='Review request shared!';}
+      else if(navigator.clipboard){await navigator.clipboard.writeText(message+' '+url);qst.textContent='Review link copied — paste and send it.';}
+      else {qst.textContent='Copy this link: '+url;}
+    }catch(error){if(error&&error.name!=='AbortError')qst.textContent='Could not share right now';}
+  };
   let n=0;
   const palette=["#ff4d6d","#ff9f1c","#ffe66d","#41ead4","#a78bfa"];
   const reviewMessages={
