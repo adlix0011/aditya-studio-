@@ -2375,6 +2375,25 @@ const server = http.createServer(async (req, res) => {
     } catch (e) { return sendJSON(res, 500, { ok:false, message:'Rating save nahi hui' }); }
   }
 
+  // Aditya Studio ratings are separate from photographer ratings. The reviewer name always comes from the signed-in profile.
+  if (urlPath === '/api/studio-ratings' && req.method === 'GET') {
+    const ratings = Array.isArray(loadSettings().studioRatings) ? loadSettings().studioRatings : [];
+    const count = ratings.length, average = count ? ratings.reduce((sum,row) => sum + Number(row.rating || 0), 0) / count : 0;
+    return sendJSON(res, 200, { ok:true, count, average:Number(average.toFixed(1)), ratings:ratings.slice(0,30) });
+  }
+  if (urlPath === '/api/studio-ratings' && req.method === 'POST') {
+    try {
+      const body=await readBody(req,10000), accounts=loadAccounts(), account=sessionAccount(req,body,accounts);
+      if(!account) return sendJSON(res,401,{ok:false,message:'Review submit karne ke liye pehle Login karein'});
+      const rating=Math.max(1,Math.min(5,Math.round(Number(body.rating)||0))), comment=String(body.comment||'').trim().slice(0,280);
+      if(!rating||!comment) return sendJSON(res,400,{ok:false,message:'Rating aur comment likhein'});
+      const settings=loadSettings(); settings.studioRatings=Array.isArray(settings.studioRatings)?settings.studioRatings:[];
+      const name=String(account.name||account.displayName||account.shopName||'Aditya Studio customer').trim().slice(0,50)||'Aditya Studio customer';
+      settings.studioRatings.unshift({rating,name,comment,createdAt:new Date().toISOString()}); settings.studioRatings=settings.studioRatings.slice(0,100); saveSettings(settings);
+      return sendJSON(res,200,{ok:true,name});
+    } catch(e) { return sendJSON(res,500,{ok:false,message:'Rating save nahi hui'}); }
+  }
+
   // ---- Public APIs ----
   if (req.method === 'GET' && urlPath === '/api/live-revision') {
     return sendJSON(res, 200, { ok: true, revision: liveRevision() });
