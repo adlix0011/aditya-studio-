@@ -720,7 +720,7 @@
       </div>
     </section>
 
-    <section id="quickRating" class="home-photographer-rating" style="display:block;border-radius:20px;text-align:center"><b style="display:block;font-size:16px"><span class="studio-rate-title">Aditya Studio</span><b style="display:block;margin-top:3px">Rate our Studio</b><div id="quickStars" class="rating-stars" style="font-size:30px;cursor:pointer;margin:6px">☆ ☆ ☆ ☆ ☆</div><div id="quickSuggestions" style="display:none;gap:6px;flex-wrap:wrap;justify-content:center"><button data-msg="Amazing photography and editing">Amazing work</button><button data-msg="Beautiful memories captured">Beautiful memories</button><button data-msg="Great service and coordination">Great service</button></div><textarea id="quickComment" placeholder="Write a comment" style="display:none;width:100%;margin-top:8px;min-height:60px;padding:9px;border-radius:9px"></textarea><button id="quickSubmit" style="display:none;margin-top:8px;padding:10px 16px;border-radius:10px;background:linear-gradient(90deg,#fbbf24,#ec4899,#22d3ee);font-weight:900">Submit rating</button><button type="button" id="quickShareReview" style="display:block;margin:10px auto 0;padding:9px 15px;border:1px solid rgba(255,255,255,.45);border-radius:10px;background:linear-gradient(90deg,#7c3aed,#2563eb,#06b6d4);color:#fff;font-weight:900">↗ Share review request</button><small id="quickStatus" style="display:block;margin-top:5px">Aditya Studio rating · tap stars to rate</small></section>
+    <section id="quickRating" class="home-photographer-rating" style="display:block;position:relative;border-radius:20px;text-align:center"><b style="display:block;font-size:16px"><span class="studio-rate-title">Aditya Studio</span><b style="display:block;margin-top:3px">Rate our Studio</b><div id="quickStars" class="rating-stars" style="font-size:30px;cursor:pointer;margin:6px">☆ ☆ ☆ ☆ ☆</div><div id="quickSuggestions" style="display:none;gap:6px;flex-wrap:wrap;justify-content:center"><button data-msg="Amazing photography and editing">Amazing work</button><button data-msg="Beautiful memories captured">Beautiful memories</button><button data-msg="Great service and coordination">Great service</button></div><textarea id="quickComment" placeholder="Write a comment" style="display:none;width:100%;margin-top:8px;min-height:70px;padding:12px;border-radius:10px;background:#fff;color:#172033!important;font-size:16px;font-weight:700;line-height:1.45;opacity:1"></textarea><button id="quickSubmit" style="display:none;margin-top:8px;padding:10px 16px;border-radius:10px;background:linear-gradient(90deg,#fbbf24,#ec4899,#22d3ee);font-weight:900">Submit rating</button><button type="button" id="quickShareReview" aria-label="Share review request" title="Share review request" style="display:grid;place-items:center;position:absolute;top:12px;right:12px;width:34px;height:34px;padding:0;border:1px solid rgba(255,255,255,.55);border-radius:50%;background:linear-gradient(135deg,#7c3aed,#06b6d4);color:#fff;font-size:19px;font-weight:900">↗</button><small id="quickStatus" style="display:block;margin-top:5px">Aditya Studio rating · tap stars to rate</small></section>
 
     <!-- 3D booking frame: placed directly below New Future offers -->
     <section class="home-frame-showcase w-full flex justify-center">
@@ -2113,18 +2113,18 @@ document.addEventListener('DOMContentLoaded', function () {
   let n=0;
   const palette=["#ff4d6d","#ff9f1c","#ffe66d","#41ead4","#a78bfa"];
   const reviewMessages={
-    1:["I was disappointed with the experience","The service needs a lot of improvement","Please contact me to resolve this"],
-    2:["The service needs improvement","Expected better coordination","Could be much better next time"],
-    3:["Good experience overall","Nice work, with room to improve","Satisfied with the service"],
-    4:["Very good photography service","Great coordination and support","Beautiful work and memories"],
-    5:["Amazing photography and editing","Beautiful memories captured","Great service and coordination"]
+    1:["I was disappointed with the experience","The service needs a lot of improvement","Please contact me to resolve this","The photos did not meet my expectations","I would not recommend this experience"],
+    2:["The service needs improvement","Expected better coordination","Could be much better next time","The delivery was slower than expected","Photography quality needs more attention"],
+    3:["Good experience overall","Nice work, with room to improve","Satisfied with the service","The photos were good but could be better","Decent service and friendly team"],
+    4:["Very good photography service","Great coordination and support","Beautiful work and memories","Professional team and smooth service","Loved the creativity and effort"],
+    5:["Amazing photography and editing","Beautiful memories captured","Great service and coordination","Excellent quality — highly recommended","Perfect experience from start to finish"]
   };
   function paint(){qs.innerHTML=palette.map((c,i)=>"<span style=\"color:"+(i<n?c:"#61566b")+";animation:starPop .45s "+(i*.12)+"s both\">★</span>").join("")}
   function showSuggestions(){
     const options=reviewMessages[n]||[];
     qsu.innerHTML=options.map(msg=>'<button type="button" data-msg="'+msg.replace(/"/g,'&quot;')+'">'+msg+'</button>').join('');
     qsu.style.display="flex"; qc.style.display=qb.style.display="block";
-    if(!qc.value.trim()&&options[0])qc.value=options[0];
+    if(options[0])qc.value=options[0];
     qst.textContent=n+' star rating selected — choose or edit your review';
   }
   paint();
