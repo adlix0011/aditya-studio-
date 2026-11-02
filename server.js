@@ -296,7 +296,7 @@ function isSafeR2PhotoKey(key, mobile) {
   return new RegExp('^customer-photos/' + safeMobile + '/[a-zA-Z0-9._-]+\\.(jpg|jpeg|png|webp)$', 'i').test(String(key || ''));
 }
 function isSafeAdminR2ImageKey(key) {
-  return /^studio-images\/(banner|deal|frame|frame3d|home-frame|hero-bg|book|gallery-[a-z]+)\/[a-zA-Z0-9._-]+\.(jpg|jpeg|png|webp)$/i.test(String(key || '')) || /^studio-images\/(hero-bg|gallery-reel)\/[a-zA-Z0-9._-]+\.(mp4|webm)$/i.test(String(key || ''));
+  return /^studio-images\/(banner|deal|frame|frame3d|home-frame|hero-bg|book|gallery-[a-z-]+)\/[a-zA-Z0-9._-]+\.(jpg|jpeg|png|webp)$/i.test(String(key || '')) || /^studio-images\/(hero-bg|gallery-reel)\/[a-zA-Z0-9._-]+\.(mp4|webm)$/i.test(String(key || ''));
 }
 function mediaUrl(value) {
   const raw = String(value || '');
@@ -2424,7 +2424,7 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req, 20000);
       const group = String(body.group || '').trim().toLowerCase();
       const type = String(body.contentType || '').toLowerCase();
-      const validGroups = ['banner','deal','frame3d','home-frame','hero-bg','book','gallery-wedding','gallery-birthday','gallery-baby','gallery-prewedding','gallery-reel'];
+      const validGroups = ['banner','deal','frame3d','home-frame','hero-bg','book','gallery-wedding','gallery-birthday','gallery-baby','gallery-prewedding','gallery-reel','gallery-live-event'];
       const ext = ({ 'image/jpeg':'jpg', 'image/jpg':'jpg', 'image/png':'png', 'image/webp':'webp', 'video/mp4':'mp4', 'video/webm':'webm' })[type];
       const videoAllowed = (group === 'hero-bg' || group === 'gallery-reel') && (type === 'video/mp4' || type === 'video/webm');
       if (!validGroups.includes(group) || !ext || ((type.startsWith('video/')) && !videoAllowed)) return sendJSON(res, 400, { ok:false, error:'invalid-image' });
