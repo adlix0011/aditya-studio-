@@ -743,8 +743,6 @@
         <div class="absolute bottom-10 left-10 w-32 h-32 rounded-full bg-tertiary/20 blur-3xl -z-10"></div>
       </a>
     </section>
-    <a id="homePhotographerRating" class="home-photographer-rating" href="/photographer#client-ratings" aria-label="View photographer ratings"><span class="rating-stars">☆ ☆ ☆ ☆ ☆</span><span class="rating-detail">No ratings yet</span></a>
-
     <section class="live-wedding-showcase" id="live-wedding-showcase">
       <div class="live-wedding-head"><h2 class="live-wedding-heading">Live Wedding</h2></div>
       <article class="gallery-live-wedding" id="liveWeddingCard" aria-label="Open Live Wedding album">
@@ -1868,16 +1866,6 @@
         // 3D frame kabhi flash nahi hoga. Sirf alag photo ho to preload karo.
         if (bootUrl !== urls[0]) await setPhoto(urls[0], false);
         else { el.style.opacity = '1'; if (frameLink) frameLink.href = '/photographer?photo=' + encodeURIComponent(urls[0]); }
-        // Real customer rating is loaded independently of the 3D photo rotation.
-        const ratingEl = document.getElementById('homePhotographerRating');
-        if (ratingEl) {
-          fetch('/api/photographer-ratings', { cache: 'no-store' }).then(r => r.json()).then(d => {
-            const count = Number(d.count || 0), average = Number(d.average || 0);
-            const starText = count ? '★'.repeat(Math.round(average)) + '☆'.repeat(5 - Math.round(average)) : '☆ ☆ ☆ ☆ ☆';
-            ratingEl.innerHTML = '<span class="rating-stars">' + starText + '</span><span class="rating-detail">' + (count ? average.toFixed(1) + ' / 5 · ' + count + ' rating' + (count === 1 ? '' : 's') : 'No ratings yet') + '</span>';
-          }).catch(() => {});
-        }
-
         if (urls.length < 2) return;
         setInterval(function () {
           idx = (idx + 1) % urls.length;
