@@ -5339,7 +5339,7 @@ function computeOrderFees(subtotal, settingsFees) {
     try {
       const body=await readBody(req,8e6), thumbnail=storedMediaValue(String(body.thumbnail||'').trim()), driveUrl=String(body.driveUrl||'').trim();
       const isImage=value=>!value||/^data:image\/(png|jpe?g|webp);base64,/i.test(value)||(value.startsWith('r2:')&&isSafeAdminR2ImageKey(value.slice(3)))||/^https:\/\//i.test(value);
-      if(!thumbnail || !isImage(thumbnail) || !/^https:\/(drive\.google\.com|docs\.google\.com)\//i.test(driveUrl)) return sendJSON(res,400,{ok:false,message:'Thumbnail aur valid Google Drive link zaroori hai'});
+      if(!thumbnail || !isImage(thumbnail) || !/^https:\/\/(drive\.google\.com|docs\.google\.com)\//i.test(driveUrl)) return sendJSON(res,400,{ok:false,message:'Thumbnail aur valid Google Drive link zaroori hai'});
       const cur=loadSettings();cur.liveEvent={thumbnail,driveUrl};saveSettings(cur);return sendJSON(res,200,{ok:true});
     } catch(e){return sendJSON(res,500,{ok:false,message:'Live Event save nahi hua'});}
   }
