@@ -5769,7 +5769,7 @@ loadOrdersPage();setInterval(loadOrdersPage,20000);
     const bi = settingsView.bookImages || {};
     const gallerySamples = settingsView.gallerySamples || {};
     const liveWedding = settingsView.liveWedding || {};
-    const liveEvent = settings.liveEvent || {};
+    const liveEvent = { ...(settingsView.liveEvent || {}), driveUrl:String((settings.liveEvent || {}).driveUrl || ''), passwordHash:String((settings.liveEvent || {}).passwordHash || '') };
     const pendingResets = accounts.filter(a => a.pinResetRequested);
     const pendingOtps = loadOtpRequests().filter(r => !r.verified);
     const codes = loadCodes().slice().reverse();
