@@ -395,7 +395,7 @@
     .live-wedding-showcase{position:relative;overflow:hidden;padding:18px;border:1px solid rgba(251,113,133,.52);border-radius:26px;background:radial-gradient(circle at 8% 8%,rgba(244,63,94,.36),transparent 31%),radial-gradient(circle at 95% 92%,rgba(34,211,238,.28),transparent 38%),linear-gradient(135deg,#31101f,#12172e 55%,#102c35);box-shadow:0 18px 34px rgba(0,0,0,.34),0 0 28px rgba(236,72,153,.23)}
     .live-wedding-showcase::before{content:"";position:absolute;inset:-90px;pointer-events:none;background:conic-gradient(from 20deg,transparent,#fb718533,transparent,#22d3ee2b,transparent);animation:liveSweep 7s linear infinite}.live-wedding-showcase>*{position:relative;z-index:1}
     .live-wedding-head{display:flex;align-items:center;justify-content:center;margin:0 2px 16px}.live-wedding-heading{margin:0;color:#fff1ca;font-family:Georgia,serif;font-size:clamp(1.75rem,7vw,2.8rem);letter-spacing:.04em;text-align:center;text-shadow:0 0 15px rgba(251,191,36,.4)}.live-wedding-heading::before{content:"";display:inline-block;width:10px;height:10px;margin:0 12px 3px 0;border-radius:50%;background:#ff3657;box-shadow:0 0 13px #ff3657;animation:recordBlink 1s steps(2,end) infinite}@keyframes recordBlink{50%{opacity:.15}}@keyframes liveSweep{to{transform:rotate(360deg)}}
-    .gallery-live-wedding{display:flex;width:100%;flex-direction:column;gap:10px;padding:0;border:0;background:transparent;cursor:pointer}.gallery-live-wedding .gallery-story-media{box-shadow:0 14px 32px rgba(0,0,0,.48),0 0 25px rgba(34,211,238,.44)}
+    .gallery-live-wedding{display:flex;width:100%;flex-direction:column;gap:10px;padding:0;border:0;background:transparent;cursor:pointer}.gallery-live-wedding .gallery-story-media{box-shadow:0 14px 32px rgba(0,0,0,.48),0 0 25px rgba(34,211,238,.44)}.live-wedding-empty{display:grid;place-items:center;min-height:178px;padding:24px;border:1px dashed rgba(103,232,249,.76);border-radius:20px;background:linear-gradient(135deg,rgba(17,28,52,.78),rgba(55,14,43,.7));color:#e8faff;text-align:center;font-weight:800;line-height:1.5}.live-wedding-empty strong{display:block;color:#fef3c7;font-size:1.08rem;letter-spacing:.04em}
     .gallery-lightbox{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(3,5,12,.86);backdrop-filter:blur(14px)}
     .gallery-lightbox-panel{width:min(940px,100%);max-height:92vh;overflow:auto;border-radius:24px;padding:16px;background:linear-gradient(145deg,#21152d,#0c1423 55%,#20150f);border:1px solid rgba(103,232,249,.58);box-shadow:0 0 38px rgba(168,85,247,.42)}
     .gallery-lightbox-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:2px 2px 14px}.gallery-lightbox-head h3{margin:0;font-family:'EB Garamond',serif;font-size:clamp(1.8rem,7vw,3rem);background:linear-gradient(100deg,#fef3c7,#fbbf24,#f472b6,#67e8f9);-webkit-background-clip:text;color:transparent}.gallery-lightbox-close{width:38px;height:38px;border:1px solid rgba(255,255,255,.45);border-radius:50%;background:rgba(0,0,0,.35);color:#fff;font-size:25px;cursor:pointer}
@@ -744,10 +744,11 @@
       </a>
     </section>
     <section class="live-wedding-showcase" id="live-wedding-showcase">
-      <div class="live-wedding-head"><h2 class="live-wedding-heading">Live Wedding</h2></div>
-      <article class="gallery-live-wedding" id="liveWeddingCard" aria-label="Open Live Wedding album">
+      <div class="live-wedding-head"><h2 class="live-wedding-heading">Live Event</h2></div>
+      <article class="gallery-live-wedding" id="liveWeddingCard" aria-label="Open Live Wedding album" hidden>
         <div class="gallery-story-media"><img id="liveWeddingImage" data-fallback="" src="" alt="Live Wedding photo downloads"></div>
       </article>
+      <div id="liveWeddingEmpty" class="live-wedding-empty"><div><strong>Live Wedding</strong>Live event photos will appear here</div></div>
     </section>
 
     <section class="flex flex-col gap-6" id="gallery-samples">
@@ -787,7 +788,7 @@
           });
           timers.forEach(function(id){ clearTimeout(id); }); timers=[];
           var liveCard=document.getElementById('liveWeddingCard'), liveImage=document.getElementById('liveWeddingImage');
-          if(liveCard&&liveImage){ var liveThumb=(liveWedding&&liveWedding.thumbnail)||''; var liveSection=document.getElementById('live-wedding-showcase'); if(!liveThumb){ if(liveSection)liveSection.hidden=true; } else { if(liveSection)liveSection.hidden=false; liveCard.classList.add('is-ready'); liveImage.onerror=function(){ liveImage.removeAttribute('src'); }; liveImage.src=liveThumb; liveCard.onclick=function(){ window.location.href='/live-wedding'; }; liveCard.setAttribute('role','link'); liveCard.tabIndex=0; liveCard.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();window.location.href='/live-wedding';}}; } }
+          if(liveCard&&liveImage){ var liveThumb=(liveWedding&&liveWedding.thumbnail)||'', liveSection=document.getElementById('live-wedding-showcase'), liveEmpty=document.getElementById('liveWeddingEmpty'); if(liveSection)liveSection.hidden=false; if(!liveThumb){ liveCard.hidden=true; if(liveEmpty)liveEmpty.hidden=false; } else { liveCard.hidden=false; if(liveEmpty)liveEmpty.hidden=true; liveCard.classList.add('is-ready'); liveImage.onerror=function(){ liveCard.hidden=true; if(liveEmpty)liveEmpty.hidden=false; liveImage.removeAttribute('src'); }; liveImage.src=liveThumb; liveCard.onclick=function(){ window.location.href='/live-wedding'; }; liveCard.setAttribute('role','link'); liveCard.tabIndex=0; liveCard.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();window.location.href='/live-wedding';}}; } }
           // Every category changes on its own clock with a different direction, never all together.
           document.querySelectorAll('[data-gallery]').forEach(function(img, cardIndex){
             var key=img.dataset.gallery, list=(gallery&&gallery[key])||[]; if(list.length<2) return;
