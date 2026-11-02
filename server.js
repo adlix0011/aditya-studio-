@@ -2377,7 +2377,10 @@ const server = http.createServer(async (req, res) => {
 
   // Aditya Studio ratings are separate from photographer ratings. The reviewer name always comes from the signed-in profile.
   if (urlPath === '/api/studio-ratings' && req.method === 'GET') {
-    const ratings = Array.isArray(loadSettings().studioRatings) ? loadSettings().studioRatings : [];
+    const settings=loadSettings();
+    // Version 2 starts the one-rating-per-user system with a clean review list.
+    if (settings.studioRatingSystemVersion !== 2) { settings.studioRatingSystemVersion=2; settings.studioRatings=[]; saveSettings(settings); }
+    const ratings = Array.isArray(settings.studioRatings) ? settings.studioRatings : [];
     const count = ratings.length, average = count ? ratings.reduce((sum,row) => sum + Number(row.rating || 0), 0) / count : 0;
     return sendJSON(res, 200, { ok:true, count, average:Number(average.toFixed(1)), ratings:ratings.slice(0,30) });
   }
@@ -2387,9 +2390,14 @@ const server = http.createServer(async (req, res) => {
       if(!account) return sendJSON(res,401,{ok:false,message:'Review submit karne ke liye pehle Login karein'});
       const rating=Math.max(1,Math.min(5,Math.round(Number(body.rating)||0))), comment=String(body.comment||'').trim().slice(0,280);
       if(!rating||!comment) return sendJSON(res,400,{ok:false,message:'Rating aur comment likhein'});
-      const settings=loadSettings(); settings.studioRatings=Array.isArray(settings.studioRatings)?settings.studioRatings:[];
+      const reviewerId=String(account.mobile||'').replace(/\D/g,'').slice(-10);
+      if(!/^[6-9]\d{9}$/.test(reviewerId)) return sendJSON(res,400,{ok:false,message:'Valid user account required'});
+      const settings=loadSettings();
+      if (settings.studioRatingSystemVersion !== 2) { settings.studioRatingSystemVersion=2; settings.studioRatings=[]; }
+      settings.studioRatings=Array.isArray(settings.studioRatings)?settings.studioRatings:[];
+      if(settings.studioRatings.some(row=>String(row.reviewerId||'')===reviewerId)) return sendJSON(res,409,{ok:false,message:'Aap apni rating pehle hi submit kar chuke hain'});
       const name=String(account.name||account.displayName||account.shopName||'Aditya Studio customer').trim().slice(0,50)||'Aditya Studio customer';
-      settings.studioRatings.unshift({rating,name,comment,createdAt:new Date().toISOString()}); settings.studioRatings=settings.studioRatings.slice(0,100); saveSettings(settings);
+      settings.studioRatings.unshift({rating,name,comment,reviewerId,createdAt:new Date().toISOString()}); settings.studioRatings=settings.studioRatings.slice(0,100); saveSettings(settings);
       return sendJSON(res,200,{ok:true,name});
     } catch(e) { return sendJSON(res,500,{ok:false,message:'Rating save nahi hui'}); }
   }
