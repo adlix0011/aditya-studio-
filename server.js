@@ -6388,7 +6388,7 @@ document.querySelectorAll('.book-up-btn').forEach(function(btn){
   <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">${liveEvent.thumbnail ? '<img src="'+esc(liveEvent.thumbnail)+'" alt="Live Event thumbnail" style="width:112px;height:64px;object-fit:cover;border-radius:9px;border:1px solid #fde68a">' : '<span class="muted" style="font-size:11px">No thumbnail uploaded</span>'}<input type="file" accept="image/*" class="field-file" id="liveEventFile"></div>
   <label class="muted" style="display:block">Google Drive link<input class="inp" id="liveEventDriveUrl" value="${esc(liveEvent.driveUrl || '')}" placeholder="https://drive.google.com/drive/folders/..." style="margin-top:5px"></label>
   <label class="muted" style="display:block;margin-top:9px">Event password<input class="inp" id="liveEventPassword" type="password" minlength="4" maxlength="80" placeholder="${liveEvent.passwordHash ? 'Password set hai · change ke liye naya password likhein' : 'Minimum 4 characters'}" style="margin-top:5px"><small class="muted">Blank chhodne par current password same rahega.</small></label>
-  <div style="display:flex;gap:8px;align-items:center;margin-top:10px"><button type="button" class="gen-btn" style="padding:8px 12px;background:linear-gradient(90deg,#f59e0b,#ec4899)" onclick="adminSaveLiveEvent()">💾 Save Live Event</button><span id="liveEventSt" class="muted" style="font-size:11px"></span></div>
+  <div style="display:flex;gap:8px;align-items:center;margin-top:10px"><button type="button" id="liveEventSaveBtn" class="gen-btn" style="padding:8px 12px;background:linear-gradient(90deg,#f59e0b,#ec4899)">💾 Save Live Event</button><span id="liveEventSt" style="font-size:12px;color:#fde68a;font-weight:700">Ready to save</span></div>
 </div>
 <div class="form-grid" id="gallerySamplesUploadGrid">
 ${[['wedding','💍 Wedding'],['birthday','🎂 Birthday Shoot'],['baby','🍼 Baby Shower'],['prewedding','✨ Pre-Wedding']].map(row => {
@@ -7276,11 +7276,23 @@ async function adminSaveLiveWedding() {
   } catch(e) { if(st)st.textContent='Upload fail'; alert('Live Wedding save fail: '+(e.message||'Network error')); }
 }
 
-async function adminSaveLiveEvent() {
-  var fileInput=document.getElementById('liveEventFile'),driveInput=document.getElementById('liveEventDriveUrl'),passwordInput=document.getElementById('liveEventPassword'),st=document.getElementById('liveEventSt'),driveUrl=(driveInput&&driveInput.value||'').trim(),password=(passwordInput&&passwordInput.value||'');
-  if(!/^https:\/\/(drive\.google\.com|docs\.google\.com)\//i.test(driveUrl)){alert('Google Drive ka valid link paste karein');return;}
-  try{if(st)st.textContent='Preparing Live Event…';var live=await fetch('/api/home-gallery-samples',{credentials:'same-origin',cache:'no-store'}).then(function(r){if(!r.ok)throw Error('Current data load nahi hua');return r.json()}),thumbnail=(live.liveEvent&&live.liveEvent.thumbnail)||'',file=fileInput&&fileInput.files&&fileInput.files[0];if(file){if(st)st.textContent='Thumbnail upload ho raha hai…';var dataUrl=await compressImageFile(file,1400,.84);try{thumbnail=await uploadAdminImageToR2(dataUrl,'gallery-live-event');}catch(e){thumbnail=dataUrl;}}if(!thumbnail){throw Error('Pehle Live Event thumbnail choose karein');}if(st)st.textContent='Saving Live Event…';var res=await fetch('/admin/live-event-save',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({thumbnail:thumbnail,driveUrl:driveUrl,password:password})}),out=await res.json().catch(function(){return {message:'Server response read nahi hua'}});if(!res.ok||!out.ok)throw Error(out.message||('Save fail (HTTP '+res.status+')'));if(st)st.textContent='Saved ✅';alert('Live Event saved ✅');location.reload();}catch(e){var msg=e.message||'Network error';if(st)st.textContent='Upload fail: '+msg;alert('Live Event save fail: '+msg);}
-}
+window.adminSaveLiveEvent = async function() {
+  var fileInput=document.getElementById('liveEventFile'),driveInput=document.getElementById('liveEventDriveUrl'),passwordInput=document.getElementById('liveEventPassword'),st=document.getElementById('liveEventSt'),btn=document.getElementById('liveEventSaveBtn'),driveUrl=(driveInput&&driveInput.value||'').trim(),password=(passwordInput&&passwordInput.value||'');
+  function show(message,color){if(st){st.textContent=message;st.style.color=color||'#fde68a';}}
+  if(!/^https:\/\/(drive\.google\.com|docs\.google\.com)\//i.test(driveUrl)){show('Error: valid Google Drive link paste karein','#fca5a5');alert('Google Drive ka valid link paste karein');return;}
+  try{
+    if(btn)btn.disabled=true;show('1/3 Current data check ho raha hai…');
+    var currentRes=await fetch('/api/home-gallery-samples',{credentials:'same-origin',cache:'no-store'});if(!currentRes.ok)throw Error('Current data load fail (HTTP '+currentRes.status+')');
+    var live=await currentRes.json(),thumbnail=(live.liveEvent&&live.liveEvent.thumbnail)||'',file=fileInput&&fileInput.files&&fileInput.files[0];
+    if(file){show('2/3 Thumbnail upload ho raha hai…');var dataUrl=await compressImageFile(file,1400,.84);try{thumbnail=await uploadAdminImageToR2(dataUrl,'gallery-live-event');}catch(uploadError){show('R2 unavailable, local image save ho rahi hai…');thumbnail=dataUrl;}}
+    if(!thumbnail)throw Error('Pehle Live Event thumbnail choose karein');
+    show('3/3 Live Event settings save ho rahi hain…');
+    var res=await fetch('/admin/live-event-save',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({thumbnail:thumbnail,driveUrl:driveUrl,password:password})}),out=await res.json().catch(function(){return {message:'Server response JSON nahi hai'};});
+    if(!res.ok||!out.ok)throw Error(out.message||('Save fail (HTTP '+res.status+')'));
+    show('Saved successfully ✅','#86efac');alert('Live Event saved successfully ✅');location.reload();
+  }catch(e){var msg=e&&e.message?e.message:'Unknown error';console.error('Live Event save failed',e);show('Save failed: '+msg,'#fca5a5');alert('Live Event save fail: '+msg);}finally{if(btn)btn.disabled=false;}
+};
+(function(){var button=document.getElementById('liveEventSaveBtn');if(button)button.addEventListener('click',function(event){event.preventDefault();window.adminSaveLiveEvent();});})();
 
 async function adminSaveGallerySamples(category) {
   var input = document.getElementById('galleryFiles_' + category);
