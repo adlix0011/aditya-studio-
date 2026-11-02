@@ -2207,6 +2207,7 @@ const server = http.createServer(async (req, res) => {
       const bookBootJson = JSON.stringify(bookBootImages).replace(/</g, '\\u003c');
       const galleryBootJson = JSON.stringify(publicSettings(settings).gallerySamples || {}).replace(/</g, '\\u003c');
       const liveWeddingBootJson = JSON.stringify(publicSettings(settings).liveWedding || {}).replace(/</g, '\\u003c');
+      const liveEventBootJson = JSON.stringify(publicSettings(settings).liveEvent || {}).replace(/</g, '\\u003c');
       const html = data.toString('utf8')
         .replace(/__HERO_SIDE_BG_BOOT_MEDIA__/g, heroBootMedia)
         .replace(/__HERO_SIDE_BG_BOOT_URL__/g, safeUrl)
@@ -2216,7 +2217,8 @@ const server = http.createServer(async (req, res) => {
         .replace(/__HERO_FRAME_BOOT_URL__/g, heroFrameUrl)
         .replace(/__BOOK_IMAGES_BOOT__/g, bookBootJson)
         .replace(/__GALLERY_BOOT__/g, galleryBootJson)
-        .replace(/__LIVE_WEDDING_BOOT__/g, liveWeddingBootJson);
+        .replace(/__LIVE_WEDDING_BOOT__/g, liveWeddingBootJson)
+        .replace(/__LIVE_EVENT_BOOT__/g, liveEventBootJson);
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store, max-age=0' });
       serveLiveHtml(res, html);
     });
