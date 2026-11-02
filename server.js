@@ -1258,7 +1258,7 @@ function defaultSettings() {
     gallerySamplesConfigured: false,
     // One clickable live-wedding card. Admin uploads its thumbnail and pastes the Google Drive folder/file link.
     liveWedding: { title: 'Rahul Sharan & Anita Sharma', thumbnail: '', driveUrl: '', albums: { chulmati:'', devpoojan:'', haldi:'', barat:'', reception:'' } },
-    liveEvent: { thumbnail:'', driveUrl:'' },
+    liveEvent: { thumbnail:'/assets/live-event-default.png', driveUrl:'https://drive.google.com/drive/folders/1J0umA6teo_VHb6tDOZqPtieY1RYGIBwt?usp=sharing', passwordHash:'a8d0b6f0939cfd883251f62b265f971ef8a5ab97eee32b91460f08b965601d93' },
     marketplacePosters: [],
     fees: {
       platformFee: 10,
@@ -1309,7 +1309,7 @@ function loadSettings() {
     homeHeroFramePhotos: Array.isArray(data.homeHeroFramePhotos) ? data.homeHeroFramePhotos : defaults.homeHeroFramePhotos,
     heroSideBgPhotos: Array.isArray(data.heroSideBgPhotos) ? data.heroSideBgPhotos : defaults.heroSideBgPhotos,
     liveWedding: { ...defaults.liveWedding, ...(data.liveWedding || {}) },
-    liveEvent: { ...defaults.liveEvent, ...(data.liveEvent || {}) },
+    liveEvent: { ...defaults.liveEvent, ...(data.liveEvent || {}), thumbnail:String((data.liveEvent || {}).thumbnail || defaults.liveEvent.thumbnail), driveUrl:String((data.liveEvent || {}).driveUrl || defaults.liveEvent.driveUrl), passwordHash:String((data.liveEvent || {}).passwordHash || defaults.liveEvent.passwordHash) },
     gallerySamples: Object.fromEntries(['wedding','birthday','baby','prewedding','reel'].map(k => [k, realGallery[k] || defaults.gallerySamples[k]])),
     heroSideBgDurationSec: Math.max(2, Math.min(20, Number(data.heroSideBgDurationSec) || defaults.heroSideBgDurationSec)),
     marketplacePosters: Array.isArray(data.marketplacePosters) ? data.marketplacePosters.slice(0,5) : defaults.marketplacePosters,
@@ -1816,6 +1816,12 @@ const server = http.createServer(async (req, res) => {
       'Access-Control-Allow-Headers': 'Content-Type'
     });
     return res.end();
+  }
+
+  if (req.method === 'GET' && urlPath === '/assets/live-event-default.png') {
+    const imageFile=path.join(__dirname,'assets','live-event-default.png');
+    try { const image=fs.readFileSync(imageFile); res.writeHead(200,{'Content-Type':'image/png','Cache-Control':'public, max-age=31536000, immutable'}); return res.end(image); }
+    catch(e) { res.writeHead(404,{'Content-Type':'text/plain'}); return res.end('Live Event image missing'); }
   }
 
   // This small standalone file intentionally stays outside the large inline
