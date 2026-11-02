@@ -749,6 +749,12 @@
         <div class="gallery-story-media"><img id="liveWeddingImage" data-fallback="" src="" alt="Live Wedding photo downloads"></div>
       </article>
     </section>
+    <section class="live-wedding-showcase" id="live-event-showcase" hidden>
+      <div class="live-wedding-head"><h2 class="live-wedding-heading">Live Event</h2></div>
+      <article class="gallery-live-wedding" id="liveEventCard" aria-label="Open Live Event on Google Drive">
+        <div class="gallery-story-media"><img id="liveEventImage" src="" alt="Live Event photos"></div>
+      </article>
+    </section>
 
     <section class="flex flex-col gap-6" id="gallery-samples">
       <h2 class="font-headline-md text-headline-md text-on-surface m-0">Gallery Samples</h2>
@@ -776,9 +782,9 @@
       </div>
       <script>
       (function(){
-        var galleryCacheKey='aditya-gallery-v9', current='', timers=[], bootGallery=__GALLERY_BOOT__, bootLiveWedding=__LIVE_WEDDING_BOOT__;
-        function renderGallery(gallery, liveWedding){
-          var signature=JSON.stringify({gallery:gallery||{},liveWedding:liveWedding||{}}); if(signature===current) return; current=signature;
+        var galleryCacheKey='aditya-gallery-v10', current='', timers=[], bootGallery=__GALLERY_BOOT__, bootLiveWedding=__LIVE_WEDDING_BOOT__;
+        function renderGallery(gallery, liveWedding, liveEvent){
+          var signature=JSON.stringify({gallery:gallery||{},liveWedding:liveWedding||{},liveEvent:liveEvent||{}}); if(signature===current) return; current=signature;
           var pos={};
           document.querySelectorAll('[data-gallery]').forEach(function(img){
             var key=img.dataset.gallery, list=(gallery&&gallery[key])||[]; pos[key]=0; img.onerror=function(){ var fallback=img.dataset.fallback||''; if(fallback&&img.src!==fallback){ img.src=fallback; img.style.opacity='1'; img.style.transform='scale(1)'; } };
@@ -788,6 +794,7 @@
           timers.forEach(function(id){ clearTimeout(id); }); timers=[];
           var liveCard=document.getElementById('liveWeddingCard'), liveImage=document.getElementById('liveWeddingImage');
           if(liveCard&&liveImage){ var liveSection=document.getElementById('live-wedding-showcase'), liveThumb=(liveWedding&&liveWedding.thumbnail)||((gallery&&gallery.wedding||[])[0])||((gallery&&gallery.prewedding||[])[0])||((gallery&&gallery.baby||[])[0])||''; if(liveSection)liveSection.hidden=false; liveCard.classList.add('is-ready'); if(liveThumb){ liveImage.onerror=function(){ liveImage.removeAttribute('src'); }; liveImage.src=liveThumb; } else { liveImage.alt='Live Wedding'; liveImage.style.display='none'; liveCard.querySelector('.gallery-story-media').style.minHeight='190px'; } liveCard.onclick=function(){ window.location.href='/live-wedding'; }; liveCard.setAttribute('role','link'); liveCard.tabIndex=0; liveCard.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();window.location.href='/live-wedding';}}; }
+          var eventCard=document.getElementById('liveEventCard'),eventImage=document.getElementById('liveEventImage'),eventSection=document.getElementById('live-event-showcase');if(eventCard&&eventImage){var eventThumb=(liveEvent&&liveEvent.thumbnail)||'',eventLink=(liveEvent&&liveEvent.driveUrl)||'';if(!eventThumb||!eventLink){if(eventSection)eventSection.hidden=true;}else{if(eventSection)eventSection.hidden=false;eventImage.src=eventThumb;eventImage.onerror=function(){if(eventSection)eventSection.hidden=true;};eventCard.onclick=function(){window.location.href=eventLink;};eventCard.setAttribute('role','link');eventCard.tabIndex=0;eventCard.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();window.location.href=eventLink;}};}}
           // Every category changes on its own clock with a different direction, never all together.
           document.querySelectorAll('[data-gallery]').forEach(function(img, cardIndex){
             var key=img.dataset.gallery, list=(gallery&&gallery[key])||[]; if(list.length<2) return;
@@ -822,11 +829,11 @@
         }
 
         // Server-rendered admin media is available immediately, before any API request.
-        if(bootGallery) renderGallery(bootGallery,bootLiveWedding);
+        if(bootGallery) renderGallery(bootGallery,bootLiveWedding,{});
         // Cached URLs render immediately on every refresh. The network check runs after the page is usable.
-        var cached=null; try { cached=JSON.parse(localStorage.getItem(galleryCacheKey)||'null'); if(cached&&cached.gallery) renderGallery(cached.gallery,cached.liveWedding); } catch(e) {}
+        var cached=null; try { cached=JSON.parse(localStorage.getItem(galleryCacheKey)||'null'); if(cached&&cached.gallery) renderGallery(cached.gallery,cached.liveWedding,cached.liveEvent); } catch(e) {}
         // Gallery stays fast from local cache, then checks the latest Live Wedding configuration.
-        fetch('/api/home-gallery-samples',{cache:'no-store'}).then(function(res){ return res.json(); }).then(function(data){ var gallery=data.gallery||{}, liveWedding=data.liveWedding||{}; try { localStorage.setItem(galleryCacheKey,JSON.stringify({gallery:gallery,liveWedding:liveWedding,savedAt:Date.now()})); } catch(e) {} renderGallery(gallery,liveWedding); }).catch(function(e){ console.warn('Gallery samples unavailable',e); });
+        fetch('/api/home-gallery-samples',{cache:'no-store'}).then(function(res){ return res.json(); }).then(function(data){ var gallery=data.gallery||{}, liveWedding=data.liveWedding||{}, liveEvent=data.liveEvent||{}; try { localStorage.setItem(galleryCacheKey,JSON.stringify({gallery:gallery,liveWedding:liveWedding,liveEvent:liveEvent,savedAt:Date.now()})); } catch(e) {} renderGallery(gallery,liveWedding,liveEvent); }).catch(function(e){ console.warn('Gallery samples unavailable',e); });
       })();
       </script>
     </section>
