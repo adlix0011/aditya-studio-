@@ -5337,12 +5337,12 @@ function computeOrderFees(subtotal, settingsFees) {
 
   if (req.method === 'POST' && urlPath === '/admin/live-event-save') {
     try {
-      const body=await readBody(req,8e6), thumbnail=storedMediaValue(String(body.thumbnail||'').trim()), driveUrl=String(body.driveUrl||'').trim(), password=String(body.password||'');
+      const body=await readBody(req,35e6), thumbnail=storedMediaValue(String(body.thumbnail||'').trim()), driveUrl=String(body.driveUrl||'').trim(), password=String(body.password||'');
       const isImage=value=>!value||/^data:image\/(png|jpe?g|webp);base64,/i.test(value)||(value.startsWith('r2:')&&isSafeAdminR2ImageKey(value.slice(3)))||/^https:\/\//i.test(value);
       if(!thumbnail || !isImage(thumbnail) || !/^https:\/\/(drive\.google\.com|docs\.google\.com)\//i.test(driveUrl)) return sendJSON(res,400,{ok:false,message:'Thumbnail aur valid Google Drive link zaroori hai'});
       if(password && (password.length<4 || password.length>80)) return sendJSON(res,400,{ok:false,message:'Password 4 se 80 characters ka rakhein'});
       const cur=loadSettings(), previous=cur.liveEvent||{};cur.liveEvent={thumbnail,driveUrl,passwordHash:password?crypto.createHash('sha256').update(password).digest('hex'):String(previous.passwordHash||'')};saveSettings(cur);return sendJSON(res,200,{ok:true});
-    } catch(e){return sendJSON(res,500,{ok:false,message:'Live Event save nahi hua'});}
+    } catch(e){console.error('live-event-save',e);return sendJSON(res,500,{ok:false,message:'Live Event save nahi hua: '+String(e.message||'server error')});}
   }
   if (req.method === 'POST' && urlPath === '/api/live-event-open') {
     try {
@@ -7279,7 +7279,7 @@ async function adminSaveLiveWedding() {
 async function adminSaveLiveEvent() {
   var fileInput=document.getElementById('liveEventFile'),driveInput=document.getElementById('liveEventDriveUrl'),passwordInput=document.getElementById('liveEventPassword'),st=document.getElementById('liveEventSt'),driveUrl=(driveInput&&driveInput.value||'').trim(),password=(passwordInput&&passwordInput.value||'');
   if(!/^https:\/\/(drive\.google\.com|docs\.google\.com)\//i.test(driveUrl)){alert('Google Drive ka valid link paste karein');return;}
-  try{var live=await fetch('/api/home-gallery-samples',{credentials:'same-origin',cache:'no-store'}).then(function(r){return r.json()}),thumbnail=(live.liveEvent&&live.liveEvent.thumbnail)||'',file=fileInput&&fileInput.files&&fileInput.files[0];if(file){if(st)st.textContent='Thumbnail upload ho raha hai…';var dataUrl=await compressImageFile(file,1400,.84);try{thumbnail=await uploadAdminImageToR2(dataUrl,'gallery-live-event');}catch(e){thumbnail=dataUrl;}}if(!thumbnail){alert('Pehle Live Event thumbnail upload karein');return;}var res=await fetch('/admin/live-event-save',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({thumbnail:thumbnail,driveUrl:driveUrl,password:password})}),out=await res.json();if(!res.ok||!out.ok)throw Error(out.message||'Save fail');if(st)st.textContent='Saved ✅';location.reload();}catch(e){if(st)st.textContent='Upload fail: '+(e.message||'Network error');}
+  try{if(st)st.textContent='Preparing Live Event…';var live=await fetch('/api/home-gallery-samples',{credentials:'same-origin',cache:'no-store'}).then(function(r){if(!r.ok)throw Error('Current data load nahi hua');return r.json()}),thumbnail=(live.liveEvent&&live.liveEvent.thumbnail)||'',file=fileInput&&fileInput.files&&fileInput.files[0];if(file){if(st)st.textContent='Thumbnail upload ho raha hai…';var dataUrl=await compressImageFile(file,1400,.84);try{thumbnail=await uploadAdminImageToR2(dataUrl,'gallery-live-event');}catch(e){thumbnail=dataUrl;}}if(!thumbnail){throw Error('Pehle Live Event thumbnail choose karein');}if(st)st.textContent='Saving Live Event…';var res=await fetch('/admin/live-event-save',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({thumbnail:thumbnail,driveUrl:driveUrl,password:password})}),out=await res.json().catch(function(){return {message:'Server response read nahi hua'}});if(!res.ok||!out.ok)throw Error(out.message||('Save fail (HTTP '+res.status+')'));if(st)st.textContent='Saved ✅';alert('Live Event saved ✅');location.reload();}catch(e){var msg=e.message||'Network error';if(st)st.textContent='Upload fail: '+msg;alert('Live Event save fail: '+msg);}
 }
 
 async function adminSaveGallerySamples(category) {
