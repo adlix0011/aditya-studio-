@@ -829,7 +829,7 @@
         // Server-rendered admin media is available immediately, before any API request.
         if(bootGallery) renderGallery(bootGallery,bootLiveWedding,bootLiveEvent,bootLiveEvents);
         // Cached URLs render immediately on every refresh. The network check runs after the page is usable.
-        var cached=null; try { cached=JSON.parse(localStorage.getItem(galleryCacheKey)||'null'); if(cached&&cached.gallery) renderGallery(cached.gallery,cached.liveWedding,cached.liveEvent,cached.liveEvents); } catch(e) {}
+        var cached=null; try { cached=JSON.parse(localStorage.getItem(galleryCacheKey)||'null'); if(!bootGallery&&cached&&cached.gallery) renderGallery(cached.gallery,cached.liveWedding,cached.liveEvent,cached.liveEvents); } catch(e) {}
         // Gallery stays fast from local cache, then checks the latest Live Wedding configuration.
         fetch('/api/home-gallery-samples',{cache:'no-store'}).then(function(res){ return res.json(); }).then(function(data){ var gallery=data.gallery||{}, liveWedding=data.liveWedding||{}, liveEvent=data.liveEvent||{}, liveEvents=data.liveEvents||[]; try { localStorage.setItem(galleryCacheKey,JSON.stringify({gallery:gallery,liveWedding:liveWedding,liveEvent:liveEvent,liveEvents:liveEvents,savedAt:Date.now()})); } catch(e) {} renderGallery(gallery,liveWedding,liveEvent,liveEvents); }).catch(function(e){ console.warn('Gallery samples unavailable',e); });
       })();

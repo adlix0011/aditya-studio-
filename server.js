@@ -1330,10 +1330,10 @@ function loadSettings() {
     },
   };
 }
-function saveSettings(obj) {
-  _cache.settings = obj;
+function saveSettings(obj, options = {}) {
   try { fs.writeFileSync(SETTINGS_FILE, JSON.stringify(obj, null, 2)); }
-  catch (e) { console.error('saveSettings', e.message); }
+  catch (e) { console.error('saveSettings', e.message); if (options.throwOnError) throw e; }
+  _cache.settings = obj;
   if (useMongo) {
     mongoSaveSettings(obj).catch(e => console.error('mongo save settings:', e.message));
   }
@@ -1825,6 +1825,14 @@ const server = http.createServer(async (req, res) => {
     const imageFile=path.join(__dirname,'assets','live-event-default.png');
     try { const image=fs.readFileSync(imageFile); res.writeHead(200,{'Content-Type':'image/png','Cache-Control':'public, max-age=31536000, immutable'}); return res.end(image); }
     catch(e) { res.writeHead(404,{'Content-Type':'text/plain'}); return res.end('Live Event image missing'); }
+  }
+
+  if (req.method === 'GET' && urlPath === '/admin-live-events.js') {
+    return fs.readFile(path.join(__dirname, 'admin-live-events.js'), (error, data) => {
+      if (error) return sendJSON(res, 500, { ok:false, message:'Live Event script load nahi hua' });
+      res.writeHead(200, { 'Content-Type':'application/javascript; charset=utf-8', 'Cache-Control':'no-store' });
+      res.end(data);
+    });
   }
 
   // This small standalone file intentionally stays outside the large inline
@@ -5351,10 +5359,10 @@ function computeOrderFees(subtotal, settingsFees) {
   if (req.method === 'POST' && urlPath === '/admin/live-event-save') {
     try {
       const body=await readBody(req,35e6), thumbnail=storedMediaValue(String(body.thumbnail||'').trim()), driveUrl=String(body.driveUrl||'').trim(), password=String(body.password||'');
-      const isImage=value=>!value||/^data:image\/(png|jpe?g|webp);base64,/i.test(value)||(value.startsWith('r2:')&&isSafeAdminR2ImageKey(value.slice(3)))||/^https:\/\//i.test(value);
+      const isImage=value=>value==='/assets/live-event-default.png'||/^data:image\/(png|jpe?g|webp);base64,/i.test(value)||(value.startsWith('r2:')&&isSafeAdminR2ImageKey(value.slice(3)))||/^https:\/\//i.test(value);
       if(!thumbnail || !isImage(thumbnail) || !/^https:\/\/(drive\.google\.com|docs\.google\.com)\//i.test(driveUrl)) return sendJSON(res,400,{ok:false,message:'Thumbnail aur valid Google Drive link zaroori hai'});
       if(password && (password.length<4 || password.length>80)) return sendJSON(res,400,{ok:false,message:'Password 4 se 80 characters ka rakhein'});
-      const cur=loadSettings(), previous=cur.liveEvent||{};cur.liveEvent={thumbnail,driveUrl,passwordHash:password?crypto.createHash('sha256').update(password).digest('hex'):String(previous.passwordHash||'')};saveSettings(cur);return sendJSON(res,200,{ok:true});
+      const cur=loadSettings(), previous=cur.liveEvent||{};cur.liveEvent={thumbnail,driveUrl,passwordHash:password?crypto.createHash('sha256').update(password).digest('hex'):String(previous.passwordHash||'')};saveSettings(cur, { throwOnError:true });return sendJSON(res,200,{ok:true});
     } catch(e){console.error('live-event-save',e);return sendJSON(res,500,{ok:false,message:'Live Event save nahi hua: '+String(e.message||'server error')});}
   }
   if (req.method === 'POST' && urlPath === '/admin/live-events-add') {
@@ -5362,16 +5370,16 @@ function computeOrderFees(subtotal, settingsFees) {
       const body=await readBody(req,35e6),thumbnail=storedMediaValue(String(body.thumbnail||'').trim()),driveUrl=String(body.driveUrl||'').trim(),password=String(body.password||''),title=String(body.title||'Live Event').trim().slice(0,60)||'Live Event';
       const isImage=value=>/^data:image\/(png|jpe?g|webp);base64,/i.test(value)||(value.startsWith('r2:')&&isSafeAdminR2ImageKey(value.slice(3)))||/^https:\/\//i.test(value);
       if(!isImage(thumbnail)||!/^https:\/\/(drive\.google\.com|docs\.google\.com)\//i.test(driveUrl)||password.length<4||password.length>80)return sendJSON(res,400,{ok:false,message:'Thumbnail, Google Drive link aur 4+ character password zaroori hai'});
-      const cur=loadSettings();cur.liveEvents=Array.isArray(cur.liveEvents)?cur.liveEvents:[];if(cur.liveEvents.length>=12)return sendJSON(res,400,{ok:false,message:'Maximum 12 Live Events allowed'});cur.liveEvents.push({id:crypto.randomUUID(),title,thumbnail,driveUrl,passwordHash:crypto.createHash('sha256').update(password).digest('hex')});saveSettings(cur);return sendJSON(res,200,{ok:true});
-    }catch(e){console.error('live-events-add',e);return sendJSON(res,500,{ok:false,message:'Live Event add nahi hua'});}
+      const cur=loadSettings();cur.liveEvents=Array.isArray(cur.liveEvents)?cur.liveEvents:[];if(cur.liveEvents.length>=12)return sendJSON(res,400,{ok:false,message:'Maximum 12 Live Events allowed'});cur.liveEvents.push({id:crypto.randomUUID(),title,thumbnail,driveUrl,passwordHash:crypto.createHash('sha256').update(password).digest('hex')});saveSettings(cur, { throwOnError:true });return sendJSON(res,200,{ok:true});
+    }catch(e){console.error('live-events-add',e);return sendJSON(res,500,{ok:false,message:'Live Event save nahi hua. Server storage check karein.',code:e.code||'SAVE_FAILED'});}
   }
 
   if (req.method === 'POST' && urlPath === '/api/live-event-open') {
     try {
       const body=await readBody(req,10000),settings=loadSettings(),requestedId=String(body.id||''),event=requestedId?(Array.isArray(settings.liveEvents)?settings.liveEvents.find(row=>String(row.id)===requestedId):null):(settings.liveEvent||{}), password=String(body.password||''), expected=String((event||{}).passwordHash||'');
-      if(!event.thumbnail || !event.driveUrl) return sendJSON(res,404,{ok:false,message:'Live Event abhi available nahi hai'});
+      if(!event || !event.thumbnail || !event.driveUrl) return sendJSON(res,404,{ok:false,message:'Live Event abhi available nahi hai'});
       const actual=crypto.createHash('sha256').update(password).digest('hex');
-      if(!expected || !crypto.timingSafeEqual(Buffer.from(expected,'hex'),Buffer.from(actual,'hex'))) return sendJSON(res,401,{ok:false,message:'Password sahi nahi hai'});
+      if(!/^[a-f0-9]{64}$/i.test(expected) || !crypto.timingSafeEqual(Buffer.from(expected,'hex'),Buffer.from(actual,'hex'))) return sendJSON(res,401,{ok:false,message:'Password sahi nahi hai'});
       return sendJSON(res,200,{ok:true,url:event.driveUrl});
     } catch(e){return sendJSON(res,500,{ok:false,message:'Live Event open nahi hua'});}
   }
@@ -6411,18 +6419,21 @@ document.querySelectorAll('.book-up-btn').forEach(function(btn){
   <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">${liveEvent.thumbnail ? '<img src="'+esc(liveEvent.thumbnail)+'" alt="Live Event thumbnail" style="width:112px;height:64px;object-fit:cover;border-radius:9px;border:1px solid #fde68a">' : '<span class="muted" style="font-size:11px">No thumbnail uploaded</span>'}<input type="file" accept="image/*" class="field-file" id="liveEventFile"></div>
   <label class="muted" style="display:block">Google Drive link<input class="inp" id="liveEventDriveUrl" value="${esc(liveEvent.driveUrl || '')}" placeholder="https://drive.google.com/drive/folders/..." style="margin-top:5px"></label>
   <label class="muted" style="display:block;margin-top:9px">Event password<input class="inp" id="liveEventPassword" type="password" minlength="4" maxlength="80" placeholder="${liveEvent.passwordHash ? 'Password set hai · change ke liye naya password likhein' : 'Minimum 4 characters'}" style="margin-top:5px"><small class="muted">Blank chhodne par current password same rahega.</small></label>
-  <div style="display:flex;gap:8px;align-items:center;margin-top:10px"><button type="button" id="liveEventSaveBtn" class="gen-btn" style="padding:8px 12px;background:linear-gradient(90deg,#f59e0b,#ec4899)">💾 Save Live Event</button><span id="liveEventSt" style="font-size:12px;color:#fde68a;font-weight:700">Ready to save</span></div>
+  <div style="display:flex;gap:8px;align-items:center;margin-top:10px"><button type="button" id="liveEventSaveBtn" disabled class="gen-btn" style="padding:8px 12px;background:linear-gradient(90deg,#f59e0b,#ec4899)">💾 Save Live Event</button><span id="liveEventSt" style="font-size:12px;color:#fde68a;font-weight:700">Live Event controls loading…</span></div>
+  <pre id="liveEventSaveDebug" hidden style="white-space:pre-wrap;font:12px/1.5 monospace;color:#fed7aa"></pre>
+  <div id="liveEventSavedPreview" aria-live="polite"></div>
 </div>
 <div style="margin:12px 0 16px;padding:14px;border:1px solid rgba(103,232,249,.55);border-radius:14px;background:linear-gradient(135deg,#111d36,#152a32)">
   <div style="font-weight:900;color:#a5f3fc;margin-bottom:6px">➕ Add another Live Event</div>
   <div class="muted" style="font-size:12px;margin-bottom:10px">Har naye event ka thumbnail, Drive link aur password alag rahega. Save hote hi Live Wedding ke niche card add hoga.</div>
   <label class="muted" style="display:block">Event name<input class="inp" id="liveEventNewTitle" value="Live Event" maxlength="60" style="margin-top:5px"></label>
   <label class="muted" style="display:block;margin-top:9px">Thumbnail<input type="file" accept="image/*" class="field-file" id="liveEventNewFile" style="margin-top:5px"></label>
-  <label class="muted" style="display:block;margin-top:9px">Google Drive link<input class="inp" id="liveEventNewDriveUrl" placeholder="https://drive.google.com/drive/folders/..." style="margin-top:5px"></label>
-  <label class="muted" style="display:block;margin-top:9px">Event password<input class="inp" id="liveEventNewPassword" type="password" minlength="4" maxlength="80" placeholder="Minimum 4 characters" style="margin-top:5px"></label>
-  <div style="display:flex;gap:8px;align-items:center;margin-top:10px"><button type="button" id="liveEventAddBtn" class="gen-btn" style="padding:8px 12px;background:linear-gradient(90deg,#0891b2,#7c3aed)">➕ Add Live Event</button><span id="liveEventAddSt" role="status" style="font-size:12px;color:#a5f3fc;font-weight:700">Ready to add</span></div>
+  <label class="muted" style="display:block;margin-top:9px">Google Drive link<input class="inp" id="liveEventNewDriveUrl" type="url" autocomplete="off" placeholder="https://drive.google.com/drive/folders/..." style="margin-top:5px"></label>
+  <label class="muted" style="display:block;margin-top:9px">Event password<input class="inp" id="liveEventNewPassword" type="password" autocomplete="new-password" minlength="4" maxlength="80" placeholder="Minimum 4 characters" style="margin-top:5px"></label>
+  <div style="display:flex;gap:8px;align-items:center;margin-top:10px"><button type="button" id="liveEventAddBtn" disabled class="gen-btn" style="padding:8px 12px;background:linear-gradient(90deg,#0891b2,#7c3aed)">➕ Add Live Event</button><span id="liveEventAddSt" role="status" style="font-size:12px;color:#a5f3fc;font-weight:700">Live Event controls loading…</span></div>
   <pre id="liveEventAddDebug" style="display:none;white-space:pre-wrap;margin:9px 0 0;padding:9px;border:1px solid rgba(251,146,60,.7);border-radius:8px;background:#1c1210;color:#fed7aa;font:11px/1.4 ui-monospace,monospace"></pre>
-  <script>(function(){var b=document.getElementById('liveEventAddBtn');if(!b)return;function ui(m,bad){var s=document.getElementById('liveEventAddSt'),d=document.getElementById('liveEventAddDebug');if(s){s.textContent=m;s.style.color=bad?'#fca5a5':'#a5f3fc';}if(d){d.style.display='block';d.textContent='Live Event status: '+m;}}function imageData(f){return new Promise(function(ok,no){var r=new FileReader();r.onerror=function(){no(Error('Thumbnail read failed'));};r.onload=function(){var im=new Image();im.onerror=function(){no(Error('Thumbnail image invalid'));};im.onload=function(){var c=document.createElement('canvas'),w=Math.min(1400,im.width),h=Math.max(1,Math.round(im.height*w/im.width));c.width=w;c.height=h;c.getContext('2d').drawImage(im,0,0,w,h);ok(c.toDataURL('image/jpeg',.84));};im.src=r.result;};r.readAsDataURL(f);});}b.addEventListener('click',async function(){var f=(document.getElementById('liveEventNewFile').files||[])[0],n=(document.getElementById('liveEventNewTitle').value||'Live Event').trim(),u=(document.getElementById('liveEventNewDriveUrl').value||'').trim(),p=document.getElementById('liveEventNewPassword').value||'';try{ui('1/3 Checking details…');if(!f)throw Error('Thumbnail choose karein');if(!/^image\//.test(f.type))throw Error('Image thumbnail choose karein');if(!/^https:\/\/(drive\.google\.com|docs\.google\.com)\//i.test(u))throw Error('Valid Google Drive link paste karein');if(p.length<4)throw Error('Password minimum 4 characters ka hona chahiye');b.disabled=true;ui('2/3 Thumbnail processing…');var thumb=await imageData(f);ui('3/3 Live Event save ho raha hai…');var r=await fetch('/admin/live-events-add',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:n,thumbnail:thumb,driveUrl:u,password:p})}),t=await r.text(),o;try{o=JSON.parse(t);}catch(_){throw Error('Server response invalid: '+t.slice(0,100));}if(!r.ok||!o.ok)throw Error(o.message||('Server error '+r.status));ui('Added successfully ✅ Home page update ho raha hai…');setTimeout(function(){location.reload();},700);}catch(e){ui('FAILED: '+(e.message||'Unknown error'),true);}finally{b.disabled=false;}});})();</script>
+
+  <div id="liveEventAddedPreviews" aria-live="polite"></div>
   ${liveEvents.length?'<div style="margin-top:12px;font-size:12px;color:#dbeafe">Saved extra events: '+liveEvents.map(x=>'✓ '+esc(x.title||'Live Event')).join(' · ')+'</div>':''}
 </div>
 <div class="form-grid" id="gallerySamplesUploadGrid">
@@ -7297,7 +7308,7 @@ async function adminUploadBookImage(key) {
 async function adminSaveLiveWedding() {
   var fileInput=document.getElementById('liveWeddingFile'), driveInput=document.getElementById('liveWeddingDriveUrl'), titleInput=document.getElementById('liveWeddingTitle'), st=document.getElementById('liveWeddingSt');
   var driveUrl=(driveInput&&driveInput.value||'').trim(), title=(titleInput&&titleInput.value||'').trim();
-  if(driveUrl && !/^https:\/\/(drive\.google\.com|docs\.google\.com)\//i.test(driveUrl)){ alert('Google Drive ka valid link paste karein'); return; }
+  if(driveUrl && !/^https:\\/\\/(drive\\.google\\.com|docs\\.google\\.com)\\//i.test(driveUrl)){ alert('Google Drive ka valid link paste karein'); return; }
   try {
     var live=await fetch('/api/home-gallery-samples',{credentials:'same-origin',cache:'no-store'}).then(function(r){return r.json()});
     var thumbnail=(live.liveWedding&&live.liveWedding.thumbnail)||'', albums=Object.assign({},(live.liveWedding&&live.liveWedding.albums)||{});
@@ -7311,47 +7322,6 @@ async function adminSaveLiveWedding() {
   } catch(e) { if(st)st.textContent='Upload fail'; alert('Live Wedding save fail: '+(e.message||'Network error')); }
 }
 
-window.adminSaveLiveEvent = async function() {
-  var fileInput=document.getElementById('liveEventFile'),driveInput=document.getElementById('liveEventDriveUrl'),passwordInput=document.getElementById('liveEventPassword'),st=document.getElementById('liveEventSt'),btn=document.getElementById('liveEventSaveBtn'),driveUrl=(driveInput&&driveInput.value||'').trim(),password=(passwordInput&&passwordInput.value||'');
-  function show(message,color){if(st){st.textContent=message;st.style.color=color||'#fde68a';}}
-  if(!/^https:\/\/(drive\.google\.com|docs\.google\.com)\//i.test(driveUrl)){show('Error: valid Google Drive link paste karein','#fca5a5');alert('Google Drive ka valid link paste karein');return;}
-  try{
-    if(btn)btn.disabled=true;show('1/3 Current data check ho raha hai…');
-    var currentRes=await fetch('/api/home-gallery-samples',{credentials:'same-origin',cache:'no-store'});if(!currentRes.ok)throw Error('Current data load fail (HTTP '+currentRes.status+')');
-    var live=await currentRes.json(),thumbnail=(live.liveEvent&&live.liveEvent.thumbnail)||'',file=fileInput&&fileInput.files&&fileInput.files[0];
-    if(file){show('2/3 Thumbnail upload ho raha hai…');var dataUrl=await compressImageFile(file,1400,.84);try{thumbnail=await uploadAdminImageToR2(dataUrl,'gallery-live-event');}catch(uploadError){show('R2 unavailable, local image save ho rahi hai…');thumbnail=dataUrl;}}
-    if(!thumbnail)throw Error('Pehle Live Event thumbnail choose karein');
-    show('3/3 Live Event settings save ho rahi hain…');
-    var res=await fetch('/admin/live-event-save',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({thumbnail:thumbnail,driveUrl:driveUrl,password:password})}),out=await res.json().catch(function(){return {message:'Server response JSON nahi hai'};});
-    if(!res.ok||!out.ok)throw Error(out.message||('Save fail (HTTP '+res.status+')'));
-    show('Saved successfully ✅','#86efac');alert('Live Event saved successfully ✅');location.reload();
-  }catch(e){var msg=e&&e.message?e.message:'Unknown error';console.error('Live Event save failed',e);show('Save failed: '+msg,'#fca5a5');alert('Live Event save fail: '+msg);}finally{if(btn)btn.disabled=false;}
-};
-(function(){var button=document.getElementById('liveEventSaveBtn');if(button)button.addEventListener('click',function(event){event.preventDefault();window.adminSaveLiveEvent();});})();
-window.adminAddLiveEvent=async function(){
-  var input=document.getElementById('liveEventNewFile'),file=input&&input.files&&input.files[0],title=((document.getElementById('liveEventNewTitle')||{}).value||'Live Event').trim(),driveUrl=((document.getElementById('liveEventNewDriveUrl')||{}).value||'').trim(),password=(document.getElementById('liveEventNewPassword')||{}).value||'',st=document.getElementById('liveEventAddSt'),debug=document.getElementById('liveEventAddDebug'),btn=document.getElementById('liveEventAddBtn'),log=[];
-  function show(message,color){if(st){st.textContent=message;st.style.color=color||'#a5f3fc';}log.push(message);if(debug){debug.style.display='block';debug.textContent='Live Event debug\\n'+log.join('\\n');}console.info('[Live Event]',message);}
-  try{
-    show('1/5 Button clicked — checking fields…');
-    if(!file)throw Error('Thumbnail choose nahi hua');
-    if(!/^image\//i.test(file.type||''))throw Error('Thumbnail image file honi chahiye');
-    if(file.size>12*1024*1024)throw Error('Thumbnail 12 MB se chhota rakhein');
-    if(!/^https:\/\/(drive\.google\.com|docs\.google\.com)\//i.test(driveUrl))throw Error('Google Drive ka valid https link paste karein');
-    if(password.length<4)throw Error('Password minimum 4 characters ka rakhein');
-    if(btn)btn.disabled=true;
-    show('2/5 Thumbnail compress ho raha hai…');
-    var dataUrl=await compressImageFile(file,1400,.84),thumbnail=dataUrl;
-    show('3/5 Cloud upload try ho raha hai…');
-    try{thumbnail=await uploadAdminImageToR2(dataUrl,'gallery-live-event');show('3/5 Cloud upload complete ✅');}catch(uploadError){show('3/5 Cloud upload unavailable; secure local save use hoga ('+(uploadError.message||'upload fail')+')');}
-    show('4/5 Server par Live Event save ho raha hai…');
-    var res=await fetch('/admin/live-events-add',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:title||'Live Event',thumbnail:thumbnail,driveUrl:driveUrl,password:password})});
-    var raw=await res.text(),out={};try{out=JSON.parse(raw);}catch(parseError){throw Error('Server response invalid (HTTP '+res.status+'): '+raw.slice(0,180));}
-    if(!res.ok||!out.ok)throw Error('Server rejected (HTTP '+res.status+'): '+(out.message||out.error||'Unknown error'));
-    show('5/5 Added successfully ✅ Home page update ho raha hai…','#86efac');
-    setTimeout(function(){location.reload();},700);
-  }catch(e){var message=e&&e.message?e.message:'Unknown error';show('FAILED: '+message,'#fca5a5');console.error('Live Event add failed',e);alert('Live Event add fail: '+message);}
-  finally{if(btn)btn.disabled=false;}
-};
 async function adminSaveGallerySamples(category) {
   var input = document.getElementById('galleryFiles_' + category);
   var st = document.getElementById('gallerySt_' + category);
@@ -7388,7 +7358,7 @@ async function adminSaveGallerySamples(category) {
 }
 
 async function adminUploadReelVideo(file) {
-  if (!file || !/^video\/(mp4|webm)$/i.test(file.type || '')) throw new Error('Sirf MP4 ya WebM video select karein');
+  if (!file || !/^video\\/(mp4|webm)$/i.test(file.type || '')) throw new Error('Sirf MP4 ya WebM video select karein');
   if (file.size > 30 * 1024 * 1024) throw new Error('Har Reel video 30 MB se chhota rakhein');
   var base64 = await new Promise(function(resolve,reject){ var r=new FileReader(); r.onload=function(){ resolve(String(r.result||'').split(',')[1]||''); }; r.onerror=function(){ reject(new Error('Video read fail')); }; r.readAsDataURL(file); });
   var res=await fetch('/admin/hero-media-upload-proxy',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({group:'gallery-reel',contentType:file.type,base64:base64})});
@@ -8099,6 +8069,7 @@ loadWhatsAppRelayHealth();
 setInterval(loadWhatsAppRelayHealth, 10_000);
 </script>
 <script src="/admin-hero-recovery.js" defer></script>
+<script src="/admin-live-events.js?v=2" defer></script>
 </body></html>`;
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store, max-age=0' });
     return res.end(html);
