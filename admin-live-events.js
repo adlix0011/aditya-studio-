@@ -1,6 +1,86 @@
 (function () {
   'use strict';
 
+  async function request(url, body) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30000);
+    try {
+      const response = await fetch(url, {
+        method: body ? 'POST' : 'GET', credentials: 'same-origin', cache: 'no-store',
+        signal: controller.signal,
+        headers: body ? { 'Content-Type': 'application/json' } : {},
+        body: body ? JSON.stringify(body) : undefined
+      });
+      if (response.status === 401 || response.status === 403 || response.redirected) {
+        throw new Error('Admin session verify karein (HTTP ' + response.status + ').');
+      }
+      let result;
+      try { result = await response.json(); }
+      catch (_) { throw new Error('Server response invalid (HTTP ' + response.status + ').'); }
+      if (!response.ok || !result.ok) {
+        throw new Error((result.message || result.error || 'Request failed') + ' (HTTP ' + response.status + ').');
+      }
+      return result;
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        throw new Error('Server ne 30 seconds mein jawab nahi diya. Dobara try karne se pehle saved events check karein.');
+      }
+      throw error;
+    } finally { clearTimeout(timer); }
+  }
+
+  function eventPreview(event) {
+    const item = document.createElement('div');
+    item.className = 'live-event-admin-row';
+    item.dataset.liveEventId = event.id;
+    const img = document.createElement('img');
+    img.src = event.thumbnail;
+    img.alt = event.title + ' thumbnail';
+    const label = document.createElement('span');
+    label.textContent = event.title;
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'live-event-delete';
+    remove.dataset.liveEventDelete = event.id;
+    remove.setAttribute('aria-label', 'Delete ' + event.title);
+    remove.textContent = 'Delete';
+    const note = document.createElement('span');
+    note.className = 'live-event-delete-status';
+    note.setAttribute('role', 'status');
+    item.append(img, label, remove, note);
+    return item;
+  }
+
+  document.addEventListener('click', async event => {
+    const button = event.target.closest('[data-live-event-delete]');
+    if (!button || button.disabled) return;
+    const row = button.closest('[data-live-event-id]');
+    const id = button.dataset.liveEventDelete;
+    const label = row.querySelector('img').alt;
+    if (!window.confirm(label + ' aur event Home page se delete karein?')) return;
+    const note = row.querySelector('.live-event-delete-status');
+    button.disabled = true;
+    note.style.color = '#a5f3fc';
+    note.textContent = 'Deleting…';
+    try {
+      await request('/admin/live-events-delete', { id });
+      const legacy = id === 'legacy';
+      const status = document.getElementById(legacy ? 'liveEventSt' : 'liveEventAddSt');
+      status.textContent = 'Deleted — event Home page se hata diya gaya.';
+      status.style.color = '#86efac';
+      row.remove();
+      if (legacy) {
+        document.getElementById('liveEventFile').value = '';
+        document.getElementById('liveEventDriveUrl').value = '';
+        document.getElementById('liveEventPassword').value = '';
+      }
+    } catch (error) {
+      note.style.color = '#fca5a5';
+      note.textContent = 'FAILED: ' + error.message;
+      button.disabled = false;
+    }
+  });
+
   // Keep browser code outside server.js's HTML template: template escaping
   // previously turned /https:\/\// into invalid JavaScript before it arrived.
   function bindEventEditor(options) {
@@ -22,34 +102,6 @@
         debug.style.display = 'block';
         debug.textContent = messages.join('\n');
       }
-    }
-
-    async function request(url, body) {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 30000);
-      try {
-        const response = await fetch(url, {
-          method: body ? 'POST' : 'GET', credentials: 'same-origin', cache: 'no-store',
-          signal: controller.signal,
-          headers: body ? { 'Content-Type': 'application/json' } : {},
-          body: body ? JSON.stringify(body) : undefined
-        });
-        if (response.status === 401 || response.status === 403 || response.redirected) {
-          throw new Error('Admin session verify karein; save nahi hua (HTTP ' + response.status + ').');
-        }
-        let result;
-        try { result = await response.json(); }
-        catch (_) { throw new Error('Server response invalid (HTTP ' + response.status + ').'); }
-        if (!response.ok || !result.ok) {
-          throw new Error((result.message || result.error || 'Save failed') + ' (HTTP ' + response.status + ').');
-        }
-        return result;
-      } catch (error) {
-        if (error.name === 'AbortError') {
-          throw new Error('Server ne 30 seconds mein jawab nahi diya. Dobara add karne se pehle saved events check karein.');
-        }
-        throw error;
-      } finally { clearTimeout(timer); }
     }
 
     function thumbnail(file) {
@@ -108,7 +160,7 @@
         const image = file ? await thumbnail(file) : (await request('/api/home-gallery-samples')).liveEvent.thumbnail;
         if (!image) throw new Error('Pehle thumbnail choose karein.');
         show('3/3 Thumbnail, link aur password save ho rahe hain…');
-        await request(options.endpoint, { title, thumbnail: image, driveUrl, password });
+        const result = await request(options.endpoint, { title, thumbnail: image, driveUrl, password });
         show('Saved successfully — Home page par Live Event available hai.');
         status.style.color = '#86efac';
         input(options.file).value = '';
@@ -116,13 +168,7 @@
         const saved = input(options.preview);
         if (saved) {
           if (!options.add) saved.textContent = '';
-          const item = document.createElement('div');
-          const img = document.createElement('img');
-          img.src = image;
-          img.alt = title + ' thumbnail';
-          img.style.cssText = 'width:112px;height:64px;object-fit:cover;border-radius:9px;vertical-align:middle;margin:8px';
-          item.append(img, document.createTextNode('✓ ' + title + ' saved'));
-          saved.appendChild(item);
+          saved.appendChild(eventPreview({ id: options.add ? result.id : 'legacy', title, thumbnail: image }));
         }
       } catch (error) {
         show('FAILED: ' + (error.message || 'Network error; connection check karein.'), true);

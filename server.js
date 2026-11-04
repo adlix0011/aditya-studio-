@@ -1311,7 +1311,7 @@ function loadSettings() {
     homeHeroFramePhotos: Array.isArray(data.homeHeroFramePhotos) ? data.homeHeroFramePhotos : defaults.homeHeroFramePhotos,
     heroSideBgPhotos: Array.isArray(data.heroSideBgPhotos) ? data.heroSideBgPhotos : defaults.heroSideBgPhotos,
     liveWedding: { ...defaults.liveWedding, ...(data.liveWedding || {}) },
-    liveEvent: { ...defaults.liveEvent, ...(data.liveEvent || {}), thumbnail:String((data.liveEvent || {}).thumbnail || defaults.liveEvent.thumbnail), driveUrl:String((data.liveEvent || {}).driveUrl || defaults.liveEvent.driveUrl), passwordHash:String((data.liveEvent || {}).passwordHash || defaults.liveEvent.passwordHash) },
+    liveEvent: data.liveEvent && data.liveEvent.deleted === true ? { deleted:true, thumbnail:'', driveUrl:'', passwordHash:'' } : { ...defaults.liveEvent, ...(data.liveEvent || {}), thumbnail:String((data.liveEvent || {}).thumbnail || defaults.liveEvent.thumbnail), driveUrl:String((data.liveEvent || {}).driveUrl || defaults.liveEvent.driveUrl), passwordHash:String((data.liveEvent || {}).passwordHash || defaults.liveEvent.passwordHash) },
     liveEvents: Array.isArray(data.liveEvents) ? data.liveEvents.slice(0,12).filter(x=>x&&x.thumbnail&&x.driveUrl).map(x=>({id:String(x.id||crypto.randomUUID()),title:String(x.title||'Live Event').slice(0,60),thumbnail:String(x.thumbnail||''),driveUrl:String(x.driveUrl||''),passwordHash:String(x.passwordHash||'')})) : [],
     gallerySamples: Object.fromEntries(['wedding','birthday','baby','prewedding','reel'].map(k => [k, realGallery[k] || defaults.gallerySamples[k]])),
     heroSideBgDurationSec: Math.max(2, Math.min(20, Number(data.heroSideBgDurationSec) || defaults.heroSideBgDurationSec)),
@@ -5362,7 +5362,7 @@ function computeOrderFees(subtotal, settingsFees) {
       const isImage=value=>value==='/assets/live-event-default.png'||/^data:image\/(png|jpe?g|webp);base64,/i.test(value)||(value.startsWith('r2:')&&isSafeAdminR2ImageKey(value.slice(3)))||/^https:\/\//i.test(value);
       if(!thumbnail || !isImage(thumbnail) || !/^https:\/\/(drive\.google\.com|docs\.google\.com)\//i.test(driveUrl)) return sendJSON(res,400,{ok:false,message:'Thumbnail aur valid Google Drive link zaroori hai'});
       if(password && (password.length<4 || password.length>80)) return sendJSON(res,400,{ok:false,message:'Password 4 se 80 characters ka rakhein'});
-      const cur=loadSettings(), previous=cur.liveEvent||{};cur.liveEvent={thumbnail,driveUrl,passwordHash:password?crypto.createHash('sha256').update(password).digest('hex'):String(previous.passwordHash||'')};saveSettings(cur, { throwOnError:true });return sendJSON(res,200,{ok:true});
+      const cur=loadSettings(), previous=cur.liveEvent||{};if(!password&&!previous.passwordHash)return sendJSON(res,400,{ok:false,message:'Naye Live Event ke liye password zaroori hai'});cur.liveEvent={thumbnail,driveUrl,passwordHash:password?crypto.createHash('sha256').update(password).digest('hex'):String(previous.passwordHash||'')};saveSettings(cur, { throwOnError:true });return sendJSON(res,200,{ok:true});
     } catch(e){console.error('live-event-save',e);return sendJSON(res,500,{ok:false,message:'Live Event save nahi hua: '+String(e.message||'server error')});}
   }
   if (req.method === 'POST' && urlPath === '/admin/live-events-add') {
@@ -5370,8 +5370,32 @@ function computeOrderFees(subtotal, settingsFees) {
       const body=await readBody(req,35e6),thumbnail=storedMediaValue(String(body.thumbnail||'').trim()),driveUrl=String(body.driveUrl||'').trim(),password=String(body.password||''),title=String(body.title||'Live Event').trim().slice(0,60)||'Live Event';
       const isImage=value=>/^data:image\/(png|jpe?g|webp);base64,/i.test(value)||(value.startsWith('r2:')&&isSafeAdminR2ImageKey(value.slice(3)))||/^https:\/\//i.test(value);
       if(!isImage(thumbnail)||!/^https:\/\/(drive\.google\.com|docs\.google\.com)\//i.test(driveUrl)||password.length<4||password.length>80)return sendJSON(res,400,{ok:false,message:'Thumbnail, Google Drive link aur 4+ character password zaroori hai'});
-      const cur=loadSettings();cur.liveEvents=Array.isArray(cur.liveEvents)?cur.liveEvents:[];if(cur.liveEvents.length>=12)return sendJSON(res,400,{ok:false,message:'Maximum 12 Live Events allowed'});cur.liveEvents.push({id:crypto.randomUUID(),title,thumbnail,driveUrl,passwordHash:crypto.createHash('sha256').update(password).digest('hex')});saveSettings(cur, { throwOnError:true });return sendJSON(res,200,{ok:true});
+      const cur=loadSettings();cur.liveEvents=Array.isArray(cur.liveEvents)?cur.liveEvents:[];if(cur.liveEvents.length>=12)return sendJSON(res,400,{ok:false,message:'Maximum 12 Live Events allowed'});const id=crypto.randomUUID();cur.liveEvents.push({id,title,thumbnail,driveUrl,passwordHash:crypto.createHash('sha256').update(password).digest('hex')});saveSettings(cur, { throwOnError:true });return sendJSON(res,200,{ok:true,id});
     }catch(e){console.error('live-events-add',e);return sendJSON(res,500,{ok:false,message:'Live Event save nahi hua. Server storage check karein.',code:e.code||'SAVE_FAILED'});}
+  }
+
+  if (req.method === 'POST' && urlPath === '/admin/live-events-delete') {
+    try {
+      const body = await readBody(req, 10000);
+      const id = String(body.id || '').trim();
+      if (!id) return sendJSON(res, 400, { ok:false, message:'Event ID zaroori hai' });
+      const cur = loadSettings();
+      if (id === 'legacy') {
+        // Persist a tombstone so the bundled default photo never reappears.
+        cur.liveEvent = { deleted:true, thumbnail:'', driveUrl:'', passwordHash:'' };
+      } else {
+        const events = Array.isArray(cur.liveEvents) ? cur.liveEvents : [];
+        if (!events.some(event => event.id === id)) {
+          return sendJSON(res, 404, { ok:false, message:'Event nahi mila. Admin page refresh karein.' });
+        }
+        cur.liveEvents = events.filter(event => event.id !== id);
+      }
+      saveSettings(cur, { throwOnError:true });
+      return sendJSON(res, 200, { ok:true, id });
+    } catch (error) {
+      console.error('live-events-delete', error);
+      return sendJSON(res, 500, { ok:false, message:'Event delete nahi hua. Server storage check karein.' });
+    }
   }
 
   if (req.method === 'POST' && urlPath === '/api/live-event-open') {
@@ -5801,6 +5825,15 @@ loadOrdersPage();setInterval(loadOrdersPage,20000);
     const liveWedding = settingsView.liveWedding || {};
     const liveEvent = { ...(settingsView.liveEvent || {}), driveUrl:String((settings.liveEvent || {}).driveUrl || ''), passwordHash:String((settings.liveEvent || {}).passwordHash || '') };
     const liveEvents = Array.isArray(settingsView.liveEvents) ? settingsView.liveEvents : [];
+    function liveEventAdminRow(event, id) {
+      const title = String(event.title || 'Live Event');
+      return '<div class="live-event-admin-row" data-live-event-id="' + esc(id) + '">'
+        + '<img src="' + esc(event.thumbnail) + '" alt="' + esc(title) + ' thumbnail">'
+        + '<span>' + esc(title) + '</span>'
+        + '<button type="button" class="live-event-delete" data-live-event-delete="' + esc(id) + '" aria-label="Delete ' + esc(title) + '">Delete</button>'
+        + '<span class="live-event-delete-status" role="status"></span></div>';
+    }
+
     const pendingResets = accounts.filter(a => a.pinResetRequested);
     const pendingOtps = loadOtpRequests().filter(r => !r.verified);
     const codes = loadCodes().slice().reverse();
@@ -5984,6 +6017,7 @@ a{color:#D4AF37;text-decoration:none}
 .nav-link{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:8px;color:#c4b496;font-size:13px;margin-bottom:3px;transition:.15s}
 .nav-link:hover,.nav-link.active{background:rgba(212,175,55,.12);color:#F3DE9A}
 .module-nav{display:grid;gap:7px;margin:18px 0}.module-nav a{display:block;padding:10px 11px;border-radius:9px;color:#d8d0c4;text-decoration:none;background:#1b1511;border:1px solid rgba(212,175,55,.13);font-size:13px}.module-nav a:hover,.module-nav a.active{background:linear-gradient(135deg,#6d4b12,#2a2010);color:#ffe38b;border-color:#d4af37}.module-nav a.offline-alert-link{background:linear-gradient(135deg,#064e3b,#164e63);color:#a7f3d0;border-color:#34d399;font-weight:800}.admin-module-focus .main>section.panel{display:none}.admin-module-focus .main>section.panel.module-show{display:block}
+.live-event-admin-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:12px 0;color:#f4ead6}.live-event-admin-row img{width:112px;height:64px;object-fit:cover;border-radius:9px;border:1px solid #67e8f9}.live-event-delete{border:1px solid #fca5a5;border-radius:8px;padding:8px 12px;background:#991b1b;color:#fff;font-weight:700;cursor:pointer}.live-event-delete:disabled{opacity:.6;cursor:wait}.live-event-delete-status{font-size:12px}
 .main{margin-left:240px;flex:1;padding:24px 28px 80px;max-width:1100px}
 .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px;flex-wrap:wrap;gap:12px}
 .topbar h1{margin:0;font-size:1.35rem;color:#F4EAD6;font-weight:600}
@@ -6416,12 +6450,12 @@ document.querySelectorAll('.book-up-btn').forEach(function(btn){
 <div style="margin:12px 0 16px;padding:14px;border:1px solid rgba(251,191,36,.55);border-radius:14px;background:linear-gradient(135deg,#2a1326,#102b35)">
   <div style="font-weight:900;color:#fde68a;margin-bottom:6px">📡 Live Event <span class="muted" style="font-size:11px">Live Wedding ke niche clickable card</span></div>
   <div class="muted" style="font-size:12px;margin-bottom:10px">Thumbnail upload karein aur Google Drive link paste karein. Customer thumbnail par click karke direct Google Drive khol sakega.</div>
-  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">${liveEvent.thumbnail ? '<img src="'+esc(liveEvent.thumbnail)+'" alt="Live Event thumbnail" style="width:112px;height:64px;object-fit:cover;border-radius:9px;border:1px solid #fde68a">' : '<span class="muted" style="font-size:11px">No thumbnail uploaded</span>'}<input type="file" accept="image/*" class="field-file" id="liveEventFile"></div>
+  <div id="liveEventSavedPreview" aria-live="polite">${liveEvent.thumbnail ? liveEventAdminRow(liveEvent, 'legacy') : ''}</div>
+  <input type="file" accept="image/*" class="field-file" id="liveEventFile">
   <label class="muted" style="display:block">Google Drive link<input class="inp" id="liveEventDriveUrl" value="${esc(liveEvent.driveUrl || '')}" placeholder="https://drive.google.com/drive/folders/..." style="margin-top:5px"></label>
   <label class="muted" style="display:block;margin-top:9px">Event password<input class="inp" id="liveEventPassword" type="password" minlength="4" maxlength="80" placeholder="${liveEvent.passwordHash ? 'Password set hai · change ke liye naya password likhein' : 'Minimum 4 characters'}" style="margin-top:5px"><small class="muted">Blank chhodne par current password same rahega.</small></label>
   <div style="display:flex;gap:8px;align-items:center;margin-top:10px"><button type="button" id="liveEventSaveBtn" disabled class="gen-btn" style="padding:8px 12px;background:linear-gradient(90deg,#f59e0b,#ec4899)">💾 Save Live Event</button><span id="liveEventSt" style="font-size:12px;color:#fde68a;font-weight:700">Live Event controls loading…</span></div>
   <pre id="liveEventSaveDebug" hidden style="white-space:pre-wrap;font:12px/1.5 monospace;color:#fed7aa"></pre>
-  <div id="liveEventSavedPreview" aria-live="polite"></div>
 </div>
 <div style="margin:12px 0 16px;padding:14px;border:1px solid rgba(103,232,249,.55);border-radius:14px;background:linear-gradient(135deg,#111d36,#152a32)">
   <div style="font-weight:900;color:#a5f3fc;margin-bottom:6px">➕ Add another Live Event</div>
@@ -6433,8 +6467,7 @@ document.querySelectorAll('.book-up-btn').forEach(function(btn){
   <div style="display:flex;gap:8px;align-items:center;margin-top:10px"><button type="button" id="liveEventAddBtn" disabled class="gen-btn" style="padding:8px 12px;background:linear-gradient(90deg,#0891b2,#7c3aed)">➕ Add Live Event</button><span id="liveEventAddSt" role="status" style="font-size:12px;color:#a5f3fc;font-weight:700">Live Event controls loading…</span></div>
   <pre id="liveEventAddDebug" style="display:none;white-space:pre-wrap;margin:9px 0 0;padding:9px;border:1px solid rgba(251,146,60,.7);border-radius:8px;background:#1c1210;color:#fed7aa;font:11px/1.4 ui-monospace,monospace"></pre>
 
-  <div id="liveEventAddedPreviews" aria-live="polite"></div>
-  ${liveEvents.length?'<div style="margin-top:12px;font-size:12px;color:#dbeafe">Saved extra events: '+liveEvents.map(x=>'✓ '+esc(x.title||'Live Event')).join(' · ')+'</div>':''}
+  <div id="liveEventAddedPreviews" aria-live="polite">${liveEvents.map(event => liveEventAdminRow(event, event.id)).join('')}</div>
 </div>
 <div class="form-grid" id="gallerySamplesUploadGrid">
 ${[['wedding','💍 Wedding'],['birthday','🎂 Birthday Shoot'],['baby','🍼 Baby Shower'],['prewedding','✨ Pre-Wedding']].map(row => {
@@ -8069,7 +8102,7 @@ loadWhatsAppRelayHealth();
 setInterval(loadWhatsAppRelayHealth, 10_000);
 </script>
 <script src="/admin-hero-recovery.js" defer></script>
-<script src="/admin-live-events.js?v=2" defer></script>
+<script src="/admin-live-events.js?v=3" defer></script>
 </body></html>`;
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store, max-age=0' });
     return res.end(html);

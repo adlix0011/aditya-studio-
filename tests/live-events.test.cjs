@@ -62,12 +62,12 @@ test('Live Event admin rendering, save and password access', { timeout: 120000 }
       const response = await fetch(origin + '/admin', { headers, redirect: 'manual' });
       assert.equal(response.status, 200);
       const html = await response.text();
-      assert.match(html, /src="\/admin-live-events\.js\?v=2"/);
+      assert.match(html, /src="\/admin-live-events\.js\?v=3"/);
       let i = 0;
       for (const match of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)) {
         new vm.Script(match[1], { filename: 'rendered-admin-script-' + (++i) + '.js' });
       }
-      const script = await fetch(origin + '/admin-live-events.js?v=2');
+      const script = await fetch(origin + '/admin-live-events.js?v=3');
       assert.equal(script.status, 200);
       assert.match(script.headers.get('content-type'), /javascript/);
       new vm.Script(await script.text());
@@ -76,6 +76,9 @@ test('Live Event admin rendering, save and password access', { timeout: 120000 }
     await t.test('admin auth and validation reject unsaved submissions', async () => {
       assert.equal((await post('/admin/live-events-add', {}, false)).status, 401);
       assert.equal((await post('/admin/live-events-add', {})).status, 400);
+      assert.equal((await post('/admin/live-events-delete', { id: 'legacy' }, false)).status, 401);
+      assert.equal((await post('/admin/live-events-delete', {})).status, 400);
+      assert.equal((await post('/admin/live-events-delete', { id: 'does-not-exist' })).status, 404);
       assert.equal((await post('/api/live-event-open', { id: 'does-not-exist', password: '0011' }, false)).status, 404);
     });
 
@@ -167,6 +170,84 @@ test('Live Event admin rendering, save and password access', { timeout: 120000 }
       t.diagnostic('Chrome verified real button click, thumbnail, link, password, error state, refresh, and restart.');
     });
 
+    await t.test('Chrome deletes only the chosen event, supports cancel and errors, and persists after restart', {
+      skip: process.env.LIVE_EVENT_BROWSER !== '1'
+    }, async () => {
+      const { chromium } = require('playwright');
+      browser = await chromium.launch({ headless: true,
+        ...(process.env.CHROME_EXECUTABLE ? { executablePath: process.env.CHROME_EXECUTABLE } : {}) });
+      const context = await browser.newContext({ httpCredentials: { username: 'admin', password }, viewport: { width: 1280, height: 900 } });
+      await context.addCookies([{ name: 'aditya_admin_totp', value: token, url: origin }]);
+      await context.route('**/*', route => new URL(route.request().url()).origin === origin ? route.continue() : route.fulfill({ status: 200, body: '' }));
+      const page = await context.newPage();
+      await page.goto(origin + '/admin#site');
+      const first = JSON.parse(fs.readFileSync(settingsFile)).liveEvents[0];
+      const firstRow = page.locator('[data-live-event-id="' + first.id + '"]');
+      assert.equal(await firstRow.locator('img').getAttribute('src'), first.thumbnail);
+
+      // Create another event with the same title through the UI; deletion must use its ID.
+      await page.locator('#liveEventNewTitle').fill(first.title);
+      await page.locator('#liveEventNewDriveUrl').fill(first.driveUrl);
+      await page.locator('#liveEventNewPassword').fill('0011');
+      await page.locator('#liveEventNewFile').setInputFiles({ name: 'second.jpg', mimeType: 'image/jpeg', buffer: Buffer.from(first.thumbnail.split(',')[1], 'base64') });
+      await page.locator('#liveEventAddBtn').click();
+      await page.waitForFunction(() => document.getElementById('liveEventAddSt').textContent.startsWith('Saved successfully'));
+      const second = JSON.parse(fs.readFileSync(settingsFile)).liveEvents[1];
+      const secondRow = page.locator('[data-live-event-id="' + second.id + '"]');
+      assert.equal(await secondRow.getByRole('button', { name: 'Delete ' + first.title, exact: true }).count(), 1);
+      if (process.env.LIVE_EVENT_SCREENSHOT) {
+        await page.locator('#liveEventAddedPreviews').screenshot({ path: process.env.LIVE_EVENT_SCREENSHOT });
+      }
+      let deleteRequests = 0;
+      page.on('request', req => { if (req.url().endsWith('/admin/live-events-delete')) deleteRequests++; });
+      page.once('dialog', dialog => dialog.dismiss());
+      await secondRow.locator('button').click();
+      assert.equal(deleteRequests, 0);
+      assert.equal(await secondRow.count(), 1);
+
+      await page.route('**/admin/live-events-delete', route => route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ ok: false, message: 'Test delete failure' }) }));
+      page.once('dialog', dialog => dialog.accept());
+      await secondRow.locator('button').click();
+      await page.waitForFunction(id => document.querySelector('[data-live-event-id="' + id + '"] .live-event-delete-status').textContent.includes('HTTP 500'), second.id);
+      assert.match(await secondRow.textContent(), /Test delete failure/);
+      assert.equal(await secondRow.locator('button').isEnabled(), true);
+      assert.equal(JSON.parse(fs.readFileSync(settingsFile)).liveEvents.length, 2);
+      await page.unroute('**/admin/live-events-delete');
+
+      page.once('dialog', dialog => dialog.accept());
+      await secondRow.locator('button').click();
+      await secondRow.waitFor({ state: 'detached' });
+      assert.equal(await firstRow.count(), 1);
+      assert.deepEqual(JSON.parse(fs.readFileSync(settingsFile)).liveEvents.map(event => event.id), [first.id]);
+      assert.equal((await post('/api/live-event-open', { id: second.id, password: '0011' }, false)).status, 404);
+
+      // Also exercise server-rendered delete buttons after refresh, including the original event.
+      await page.reload();
+      page.once('dialog', dialog => dialog.accept());
+      await firstRow.locator('button').click();
+      await firstRow.waitFor({ state: 'detached' });
+      const legacy = page.locator('[data-live-event-id="legacy"]');
+      page.once('dialog', dialog => dialog.accept());
+      await legacy.locator('button').click();
+      await legacy.waitFor({ state: 'detached' });
+      assert.equal(await page.locator('#liveEventDriveUrl').inputValue(), '');
+      await page.reload();
+      assert.equal(await page.locator('[data-live-event-delete]').count(), 0);
+      await page.goto(origin + '/');
+      assert.equal(await page.getByRole('link', { name: 'Open ' + first.title, exact: true }).count(), 0);
+      await browser.close(); browser = null;
+      await stop(); await start();
+      const restarted = await (await fetch(origin + '/api/home-gallery-samples')).json();
+      assert.deepEqual(restarted.liveEvents, []);
+      assert.equal(restarted.liveEvent.thumbnail, '', 'Deleted original photo must not fall back to the default');
+      assert.equal((await post('/api/live-event-open', { password: '0011' }, false)).status, 404);
+      const readd = { thumbnail: '/assets/live-event-default.png', driveUrl: first.driveUrl };
+      assert.equal((await post('/admin/live-event-save', readd)).status, 400, 'Re-adding a deleted event needs a new password');
+      assert.equal((await post('/admin/live-event-save', { ...readd, password: '0022' })).status, 200);
+      assert.equal((await post('/api/live-event-open', { password: '0022' }, false)).status, 200);
+      t.diagnostic('Chrome verified Delete beside thumbnails, cancellation, visible errors, duplicate titles, Home removal, refresh and restart.');
+    });
+
     await t.test('storage failures return an error and do not publish an unsaved event', async () => {
       const original = fs.readFileSync(settingsFile);
       const before = await (await fetch(origin + '/api/home-gallery-samples')).json();
@@ -180,6 +261,9 @@ test('Live Event admin rendering, save and password access', { timeout: 120000 }
         assert.equal(JSON.parse(failed.text).ok, false);
         const after = await (await fetch(origin + '/api/home-gallery-samples')).json();
         assert.deepEqual(after.liveEvents, before.liveEvents);
+        assert.equal((await post('/admin/live-events-delete', { id: 'legacy' })).status, 500);
+        const afterDelete = await (await fetch(origin + '/api/home-gallery-samples')).json();
+        assert.deepEqual(afterDelete.liveEvent, before.liveEvent, 'Failed deletion must preserve the original event');
       } finally {
         fs.rmdirSync(settingsFile);
         fs.renameSync(settingsFile + '.test-backup', settingsFile);
