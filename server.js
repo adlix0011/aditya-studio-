@@ -337,6 +337,7 @@ function publicSettings(settings) {
   out.gallerySamples = Object.fromEntries(Object.entries(out.gallerySamples || {}).map(([k, list]) => [k, mapItems(list)]));
   out.liveWedding = { ...(out.liveWedding || {}), thumbnail: mediaUrl((out.liveWedding || {}).thumbnail || ''), albums: Object.fromEntries(Object.entries((out.liveWedding || {}).albums || {}).map(([k,v]) => [k, mediaUrl(v)])) };
   out.liveEvent = { thumbnail: mediaUrl((out.liveEvent || {}).thumbnail || ''), protected: !!((out.liveEvent || {}).passwordHash) };
+  out.liveEvents = (Array.isArray(out.liveEvents)?out.liveEvents:[]).slice(0,12).map(row=>({id:String(row.id||''),title:String(row.title||'Live Event'),thumbnail:mediaUrl(row.thumbnail||''),protected:!!row.passwordHash}));
   return out;
 }
 async function moveDataImageToR2(value, group) {
@@ -1259,6 +1260,7 @@ function defaultSettings() {
     // One clickable live-wedding card. Admin uploads its thumbnail and pastes the Google Drive folder/file link.
     liveWedding: { title: 'Rahul Sharan & Anita Sharma', thumbnail: '', driveUrl: '', albums: { chulmati:'', devpoojan:'', haldi:'', barat:'', reception:'' } },
     liveEvent: { thumbnail:'/assets/live-event-default.png', driveUrl:'https://drive.google.com/drive/folders/1J0umA6teo_VHb6tDOZqPtieY1RYGIBwt?usp=sharing', passwordHash:'a8d0b6f0939cfd883251f62b265f971ef8a5ab97eee32b91460f08b965601d93' },
+    liveEvents: [],
     marketplacePosters: [],
     fees: {
       platformFee: 10,
@@ -1310,6 +1312,7 @@ function loadSettings() {
     heroSideBgPhotos: Array.isArray(data.heroSideBgPhotos) ? data.heroSideBgPhotos : defaults.heroSideBgPhotos,
     liveWedding: { ...defaults.liveWedding, ...(data.liveWedding || {}) },
     liveEvent: { ...defaults.liveEvent, ...(data.liveEvent || {}), thumbnail:String((data.liveEvent || {}).thumbnail || defaults.liveEvent.thumbnail), driveUrl:String((data.liveEvent || {}).driveUrl || defaults.liveEvent.driveUrl), passwordHash:String((data.liveEvent || {}).passwordHash || defaults.liveEvent.passwordHash) },
+    liveEvents: Array.isArray(data.liveEvents) ? data.liveEvents.slice(0,12).filter(x=>x&&x.thumbnail&&x.driveUrl).map(x=>({id:String(x.id||crypto.randomUUID()),title:String(x.title||'Live Event').slice(0,60),thumbnail:String(x.thumbnail||''),driveUrl:String(x.driveUrl||''),passwordHash:String(x.passwordHash||'')})) : [],
     gallerySamples: Object.fromEntries(['wedding','birthday','baby','prewedding','reel'].map(k => [k, realGallery[k] || defaults.gallerySamples[k]])),
     heroSideBgDurationSec: Math.max(2, Math.min(20, Number(data.heroSideBgDurationSec) || defaults.heroSideBgDurationSec)),
     marketplacePosters: Array.isArray(data.marketplacePosters) ? data.marketplacePosters.slice(0,5) : defaults.marketplacePosters,
@@ -2208,6 +2211,7 @@ const server = http.createServer(async (req, res) => {
       const galleryBootJson = JSON.stringify(publicSettings(settings).gallerySamples || {}).replace(/</g, '\\u003c');
       const liveWeddingBootJson = JSON.stringify(publicSettings(settings).liveWedding || {}).replace(/</g, '\\u003c');
       const liveEventBootJson = JSON.stringify(publicSettings(settings).liveEvent || {}).replace(/</g, '\\u003c');
+      const liveEventsBootJson = JSON.stringify(publicSettings(settings).liveEvents || []).replace(/</g, '\\u003c');
       const html = data.toString('utf8')
         .replace(/__HERO_SIDE_BG_BOOT_MEDIA__/g, heroBootMedia)
         .replace(/__HERO_SIDE_BG_BOOT_URL__/g, safeUrl)
@@ -2218,7 +2222,8 @@ const server = http.createServer(async (req, res) => {
         .replace(/__BOOK_IMAGES_BOOT__/g, bookBootJson)
         .replace(/__GALLERY_BOOT__/g, galleryBootJson)
         .replace(/__LIVE_WEDDING_BOOT__/g, liveWeddingBootJson)
-        .replace(/__LIVE_EVENT_BOOT__/g, liveEventBootJson);
+        .replace(/__LIVE_EVENT_BOOT__/g, liveEventBootJson)
+        .replace(/__LIVE_EVENTS_BOOT__/g, liveEventsBootJson);
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store, max-age=0' });
       serveLiveHtml(res, html);
     });
@@ -5324,7 +5329,7 @@ function computeOrderFees(subtotal, settingsFees) {
   if (req.method === 'GET' && urlPath === '/api/home-gallery-samples') {
     const publicSite = publicSettings(loadSettings());
     const gallery = publicSite.gallerySamples || {};
-    return sendJSON(res, 200, { ok: true, gallery, liveWedding: publicSite.liveWedding || { thumbnail:'', driveUrl:'' }, liveEvent: publicSite.liveEvent || { thumbnail:'', driveUrl:'' } });
+    return sendJSON(res, 200, { ok: true, gallery, liveWedding: publicSite.liveWedding || { thumbnail:'', driveUrl:'' }, liveEvent: publicSite.liveEvent || { thumbnail:'', driveUrl:'' }, liveEvents: publicSite.liveEvents || [] });
   }
 
   if (req.method === 'POST' && urlPath === '/admin/live-wedding-save') {
@@ -5352,9 +5357,18 @@ function computeOrderFees(subtotal, settingsFees) {
       const cur=loadSettings(), previous=cur.liveEvent||{};cur.liveEvent={thumbnail,driveUrl,passwordHash:password?crypto.createHash('sha256').update(password).digest('hex'):String(previous.passwordHash||'')};saveSettings(cur);return sendJSON(res,200,{ok:true});
     } catch(e){console.error('live-event-save',e);return sendJSON(res,500,{ok:false,message:'Live Event save nahi hua: '+String(e.message||'server error')});}
   }
+  if (req.method === 'POST' && urlPath === '/admin/live-events-add') {
+    try {
+      const body=await readBody(req,35e6),thumbnail=storedMediaValue(String(body.thumbnail||'').trim()),driveUrl=String(body.driveUrl||'').trim(),password=String(body.password||''),title=String(body.title||'Live Event').trim().slice(0,60)||'Live Event';
+      const isImage=value=>/^data:image\/(png|jpe?g|webp);base64,/i.test(value)||(value.startsWith('r2:')&&isSafeAdminR2ImageKey(value.slice(3)))||/^https:\/\//i.test(value);
+      if(!isImage(thumbnail)||!/^https:\/\/(drive\.google\.com|docs\.google\.com)\//i.test(driveUrl)||password.length<4||password.length>80)return sendJSON(res,400,{ok:false,message:'Thumbnail, Google Drive link aur 4+ character password zaroori hai'});
+      const cur=loadSettings();cur.liveEvents=Array.isArray(cur.liveEvents)?cur.liveEvents:[];if(cur.liveEvents.length>=12)return sendJSON(res,400,{ok:false,message:'Maximum 12 Live Events allowed'});cur.liveEvents.push({id:crypto.randomUUID(),title,thumbnail,driveUrl,passwordHash:crypto.createHash('sha256').update(password).digest('hex')});saveSettings(cur);return sendJSON(res,200,{ok:true});
+    }catch(e){console.error('live-events-add',e);return sendJSON(res,500,{ok:false,message:'Live Event add nahi hua'});}
+  }
+
   if (req.method === 'POST' && urlPath === '/api/live-event-open') {
     try {
-      const body=await readBody(req,10000), event=loadSettings().liveEvent||{}, password=String(body.password||''), expected=String(event.passwordHash||'');
+      const body=await readBody(req,10000),settings=loadSettings(),requestedId=String(body.id||''),event=requestedId?(Array.isArray(settings.liveEvents)?settings.liveEvents.find(row=>String(row.id)===requestedId):null):(settings.liveEvent||{}), password=String(body.password||''), expected=String((event||{}).passwordHash||'');
       if(!event.thumbnail || !event.driveUrl) return sendJSON(res,404,{ok:false,message:'Live Event abhi available nahi hai'});
       const actual=crypto.createHash('sha256').update(password).digest('hex');
       if(!expected || !crypto.timingSafeEqual(Buffer.from(expected,'hex'),Buffer.from(actual,'hex'))) return sendJSON(res,401,{ok:false,message:'Password sahi nahi hai'});
@@ -5778,6 +5792,7 @@ loadOrdersPage();setInterval(loadOrdersPage,20000);
     const gallerySamples = settingsView.gallerySamples || {};
     const liveWedding = settingsView.liveWedding || {};
     const liveEvent = { ...(settingsView.liveEvent || {}), driveUrl:String((settings.liveEvent || {}).driveUrl || ''), passwordHash:String((settings.liveEvent || {}).passwordHash || '') };
+    const liveEvents = Array.isArray(settingsView.liveEvents) ? settingsView.liveEvents : [];
     const pendingResets = accounts.filter(a => a.pinResetRequested);
     const pendingOtps = loadOtpRequests().filter(r => !r.verified);
     const codes = loadCodes().slice().reverse();
@@ -6397,6 +6412,16 @@ document.querySelectorAll('.book-up-btn').forEach(function(btn){
   <label class="muted" style="display:block">Google Drive link<input class="inp" id="liveEventDriveUrl" value="${esc(liveEvent.driveUrl || '')}" placeholder="https://drive.google.com/drive/folders/..." style="margin-top:5px"></label>
   <label class="muted" style="display:block;margin-top:9px">Event password<input class="inp" id="liveEventPassword" type="password" minlength="4" maxlength="80" placeholder="${liveEvent.passwordHash ? 'Password set hai · change ke liye naya password likhein' : 'Minimum 4 characters'}" style="margin-top:5px"><small class="muted">Blank chhodne par current password same rahega.</small></label>
   <div style="display:flex;gap:8px;align-items:center;margin-top:10px"><button type="button" id="liveEventSaveBtn" class="gen-btn" style="padding:8px 12px;background:linear-gradient(90deg,#f59e0b,#ec4899)">💾 Save Live Event</button><span id="liveEventSt" style="font-size:12px;color:#fde68a;font-weight:700">Ready to save</span></div>
+</div>
+<div style="margin:12px 0 16px;padding:14px;border:1px solid rgba(103,232,249,.55);border-radius:14px;background:linear-gradient(135deg,#111d36,#152a32)">
+  <div style="font-weight:900;color:#a5f3fc;margin-bottom:6px">➕ Add another Live Event</div>
+  <div class="muted" style="font-size:12px;margin-bottom:10px">Har naye event ka thumbnail, Drive link aur password alag rahega. Save hote hi Live Wedding ke niche card add hoga.</div>
+  <label class="muted" style="display:block">Event name<input class="inp" id="liveEventNewTitle" value="Live Event" maxlength="60" style="margin-top:5px"></label>
+  <label class="muted" style="display:block;margin-top:9px">Thumbnail<input type="file" accept="image/*" class="field-file" id="liveEventNewFile" style="margin-top:5px"></label>
+  <label class="muted" style="display:block;margin-top:9px">Google Drive link<input class="inp" id="liveEventNewDriveUrl" placeholder="https://drive.google.com/drive/folders/..." style="margin-top:5px"></label>
+  <label class="muted" style="display:block;margin-top:9px">Event password<input class="inp" id="liveEventNewPassword" type="password" minlength="4" maxlength="80" placeholder="Minimum 4 characters" style="margin-top:5px"></label>
+  <div style="display:flex;gap:8px;align-items:center;margin-top:10px"><button type="button" id="liveEventAddBtn" class="gen-btn" style="padding:8px 12px;background:linear-gradient(90deg,#0891b2,#7c3aed)">➕ Add Live Event</button><span id="liveEventAddSt" style="font-size:12px;color:#a5f3fc;font-weight:700">Ready to add</span></div>
+  ${liveEvents.length?'<div style="margin-top:12px;font-size:12px;color:#dbeafe">Saved extra events: '+liveEvents.map(x=>'✓ '+esc(x.title||'Live Event')).join(' · ')+'</div>':''}
 </div>
 <div class="form-grid" id="gallerySamplesUploadGrid">
 ${[['wedding','💍 Wedding'],['birthday','🎂 Birthday Shoot'],['baby','🍼 Baby Shower'],['prewedding','✨ Pre-Wedding']].map(row => {
@@ -7301,6 +7326,8 @@ window.adminSaveLiveEvent = async function() {
   }catch(e){var msg=e&&e.message?e.message:'Unknown error';console.error('Live Event save failed',e);show('Save failed: '+msg,'#fca5a5');alert('Live Event save fail: '+msg);}finally{if(btn)btn.disabled=false;}
 };
 (function(){var button=document.getElementById('liveEventSaveBtn');if(button)button.addEventListener('click',function(event){event.preventDefault();window.adminSaveLiveEvent();});})();
+window.adminAddLiveEvent=async function(){var file=(document.getElementById('liveEventNewFile')||{}).files||[],title=(document.getElementById('liveEventNewTitle')||{}).value||'Live Event',driveUrl=(document.getElementById('liveEventNewDriveUrl')||{}).value||'',password=(document.getElementById('liveEventNewPassword')||{}).value||'',st=document.getElementById('liveEventAddSt'),btn=document.getElementById('liveEventAddBtn');function show(msg,color){if(st){st.textContent=msg;st.style.color=color||'#a5f3fc';}}if(!file[0])return show('Thumbnail choose karein','#fca5a5');if(!/^https:\/\/(drive\.google\.com|docs\.google\.com)\//i.test(driveUrl))return show('Valid Google Drive link paste karein','#fca5a5');if(password.length<4)return show('Password minimum 4 characters rakhein','#fca5a5');try{if(btn)btn.disabled=true;show('Thumbnail upload ho raha hai…');var dataUrl=await compressImageFile(file[0],1400,.84),thumbnail;try{thumbnail=await uploadAdminImageToR2(dataUrl,'gallery-live-event');}catch(e){thumbnail=dataUrl;}show('Live Event add ho raha hai…');var res=await fetch('/admin/live-events-add',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:title,thumbnail:thumbnail,driveUrl:driveUrl,password:password})}),out=await res.json().catch(function(){return {message:'Server response invalid'};});if(!res.ok||!out.ok)throw Error(out.message||'Save fail');show('Added successfully ✅','#86efac');alert('Live Event added ✅');location.reload();}catch(e){show('Add failed: '+(e.message||'Network error'),'#fca5a5');alert('Live Event add fail: '+(e.message||'Network error'));}finally{if(btn)btn.disabled=false;}};
+(function(){var button=document.getElementById('liveEventAddBtn');if(button)button.addEventListener('click',function(e){e.preventDefault();window.adminAddLiveEvent();});})();
 
 async function adminSaveGallerySamples(category) {
   var input = document.getElementById('galleryFiles_' + category);
