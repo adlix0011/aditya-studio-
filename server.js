@@ -6422,6 +6422,7 @@ document.querySelectorAll('.book-up-btn').forEach(function(btn){
   <label class="muted" style="display:block;margin-top:9px">Event password<input class="inp" id="liveEventNewPassword" type="password" minlength="4" maxlength="80" placeholder="Minimum 4 characters" style="margin-top:5px"></label>
   <div style="display:flex;gap:8px;align-items:center;margin-top:10px"><button type="button" id="liveEventAddBtn" class="gen-btn" style="padding:8px 12px;background:linear-gradient(90deg,#0891b2,#7c3aed)">➕ Add Live Event</button><span id="liveEventAddSt" role="status" style="font-size:12px;color:#a5f3fc;font-weight:700">Ready to add</span></div>
   <pre id="liveEventAddDebug" style="display:none;white-space:pre-wrap;margin:9px 0 0;padding:9px;border:1px solid rgba(251,146,60,.7);border-radius:8px;background:#1c1210;color:#fed7aa;font:11px/1.4 ui-monospace,monospace"></pre>
+  <script>(function(){var b=document.getElementById('liveEventAddBtn');if(!b)return;function ui(m,bad){var s=document.getElementById('liveEventAddSt'),d=document.getElementById('liveEventAddDebug');if(s){s.textContent=m;s.style.color=bad?'#fca5a5':'#a5f3fc';}if(d){d.style.display='block';d.textContent='Live Event status: '+m;}}function imageData(f){return new Promise(function(ok,no){var r=new FileReader();r.onerror=function(){no(Error('Thumbnail read failed'));};r.onload=function(){var im=new Image();im.onerror=function(){no(Error('Thumbnail image invalid'));};im.onload=function(){var c=document.createElement('canvas'),w=Math.min(1400,im.width),h=Math.max(1,Math.round(im.height*w/im.width));c.width=w;c.height=h;c.getContext('2d').drawImage(im,0,0,w,h);ok(c.toDataURL('image/jpeg',.84));};im.src=r.result;};r.readAsDataURL(f);});}b.addEventListener('click',async function(){var f=(document.getElementById('liveEventNewFile').files||[])[0],n=(document.getElementById('liveEventNewTitle').value||'Live Event').trim(),u=(document.getElementById('liveEventNewDriveUrl').value||'').trim(),p=document.getElementById('liveEventNewPassword').value||'';try{ui('1/3 Checking details…');if(!f)throw Error('Thumbnail choose karein');if(!/^image\//.test(f.type))throw Error('Image thumbnail choose karein');if(!/^https:\/\/(drive\.google\.com|docs\.google\.com)\//i.test(u))throw Error('Valid Google Drive link paste karein');if(p.length<4)throw Error('Password minimum 4 characters ka hona chahiye');b.disabled=true;ui('2/3 Thumbnail processing…');var thumb=await imageData(f);ui('3/3 Live Event save ho raha hai…');var r=await fetch('/admin/live-events-add',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:n,thumbnail:thumb,driveUrl:u,password:p})}),t=await r.text(),o;try{o=JSON.parse(t);}catch(_){throw Error('Server response invalid: '+t.slice(0,100));}if(!r.ok||!o.ok)throw Error(o.message||('Server error '+r.status));ui('Added successfully ✅ Home page update ho raha hai…');setTimeout(function(){location.reload();},700);}catch(e){ui('FAILED: '+(e.message||'Unknown error'),true);}finally{b.disabled=false;}});})();</script>
   ${liveEvents.length?'<div style="margin-top:12px;font-size:12px;color:#dbeafe">Saved extra events: '+liveEvents.map(x=>'✓ '+esc(x.title||'Live Event')).join(' · ')+'</div>':''}
 </div>
 <div class="form-grid" id="gallerySamplesUploadGrid">
@@ -7351,18 +7352,6 @@ window.adminAddLiveEvent=async function(){
   }catch(e){var message=e&&e.message?e.message:'Unknown error';show('FAILED: '+message,'#fca5a5');console.error('Live Event add failed',e);alert('Live Event add fail: '+message);}
   finally{if(btn)btn.disabled=false;}
 };
-(function(){
-  var button=document.getElementById('liveEventAddBtn');
-  if(!button)return;
-  button.addEventListener('click',function(event){
-    event.preventDefault();
-    var status=document.getElementById('liveEventAddSt');
-    if(status)status.textContent='Button click received — starting…';
-    if(typeof window.adminAddLiveEvent==='function')window.adminAddLiveEvent();
-    else if(status){status.textContent='FAILED: Add Event script missing. Refresh page.';status.style.color='#fca5a5';}
-  });
-})();
-
 async function adminSaveGallerySamples(category) {
   var input = document.getElementById('galleryFiles_' + category);
   var st = document.getElementById('gallerySt_' + category);
